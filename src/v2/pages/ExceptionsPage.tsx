@@ -4,9 +4,9 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ShieldCheck } from "lucide-react";
 import { Badge, Card, EmptyState, PageHeader, V, formatDate, formatINR } from "../ui";
 import { AgentStatusBadge } from "../agents";
-import { useV2 } from "../store";
+import { EXCEPTION_REASONS, useV2 } from "../store";
 
-const REASONS = ["Amount mismatch", "Date gap", "No candidate", "Duplicate"] as const;
+const REASONS = EXCEPTION_REASONS;
 
 export default function ExceptionsPage() {
   const { exceptions, clients, clientName, setExceptionStatus, runs } = useV2();
@@ -60,15 +60,15 @@ export default function ExceptionsPage() {
                   >
                     <td style={{ fontWeight: 600 }}>{clientName(e.clientId)}</td>
                     <td><Badge tone="warn">{e.reason}</Badge></td>
-                    <td style={{ color: V.body }}>{e.narration}</td>
+                    <td style={{ color: V.body }}>{e.narration}{e.detail && <div style={{ fontSize: 12, color: V.muted, marginTop: 3 }}>{e.detail}</div>}</td>
                     <td className="num" style={{ color: e.amount < 0 ? V.maroon : V.green }}>{formatINR(e.amount)}</td>
                     <td className="num" style={{ color: V.body }}>{formatDate(e.date)}</td>
                     <td style={{ color: V.body, fontSize: 12.5 }}>{e.candidates[0] ?? "No candidate found"}</td>
                     <td>
                       <div style={{ display: "flex", gap: 7, justifyContent: "flex-end" }}>
-                        <button className="v2-btn v2-btn-quiet" onClick={() => { setExceptionStatus(e.id, "resolved"); toast.success("Matched manually. Matched count updated."); }}>Match</button>
+                        <button className="v2-btn v2-btn-quiet" disabled={!e.candidateIds?.length} title={e.candidateIds?.length ? "Match with the suggested entry" : "No suggested entry to match"} onClick={() => { setExceptionStatus(e.id, "resolved", { action: "match" }); toast.success("Matched manually. Matched count updated."); }}>Match</button>
                         <button className="v2-btn v2-btn-quiet" onClick={() => { setExceptionStatus(e.id, "ignored"); toast.success("Exception ignored"); }}>Ignore</button>
-                        <button className="v2-btn v2-btn-quiet" onClick={() => { setExceptionStatus(e.id, "resolved"); toast.success("Exception resolved"); }}>Resolve</button>
+                        <button className="v2-btn v2-btn-quiet" title="Mark as reconciled outside FynHelp" onClick={() => { setExceptionStatus(e.id, "resolved", { action: "reconciled_external" }); toast.success("Exception resolved"); }}>Resolve</button>
                       </div>
                     </td>
                   </motion.tr>

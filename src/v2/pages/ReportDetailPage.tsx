@@ -53,6 +53,14 @@ export default function ReportDetailPage() {
         }
       />
 
+      {report.warnings && report.warnings.length > 0 && (
+        <Card style={{ marginBottom: 18, borderLeft: `3px solid ${V.maroon}` }}>
+          {report.warnings.map((w) => (
+            <div key={w} style={{ fontSize: 13, color: V.body, lineHeight: 1.6 }}>{w}</div>
+          ))}
+        </Card>
+      )}
+
       <Card style={{ marginBottom: 18, borderLeft: `3px solid ${report.signedOff ? V.green : report.correction ? V.maroon : V.blue}` }}>
         {report.signedOff ? (
           <div>
@@ -112,7 +120,7 @@ export default function ReportDetailPage() {
                   <button
                     className="v2-btn v2-btn-quiet"
                     style={{ marginTop: 10 }}
-                    onClick={() => setSource({ label: i.source, rows: allRows })}
+                    onClick={() => setSource({ label: i.source, rows: i.cited_transaction_ids?.length ? allRows.filter((r) => r.id && i.cited_transaction_ids!.includes(r.id)) : allRows })}
                   >
                     {i.source}
                   </button>
@@ -152,7 +160,7 @@ export default function ReportDetailPage() {
             {report.bankSummary.map((b) => (
               <div key={b.label} style={{ background: V.gray, borderRadius: 14, padding: 14, cursor: b.rows.length ? "pointer" : "default" }} onClick={() => b.rows.length && setSource({ label: b.label, rows: b.rows })}>
                 <div style={{ fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase", color: V.muted, fontWeight: 600 }}>{b.label}</div>
-                <div className="num" style={{ fontSize: 22, fontWeight: 600, marginTop: 6 }}>{b.label.toLowerCase().includes("lines") ? b.value : formatINR(b.value)}</div>
+                <div className="num" style={{ fontSize: 22, fontWeight: 600, marginTop: 6 }}>{(b.unit ? b.unit === "count" : b.label.toLowerCase().includes("lines")) ? b.value : formatINR(b.value)}</div>
                 {b.rows.length > 0 && <div style={{ fontSize: 11.5, color: V.muted, marginTop: 4 }}>{b.rows.length} transactions. Click to open.</div>}
               </div>
             ))}

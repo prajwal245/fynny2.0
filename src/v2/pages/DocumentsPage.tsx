@@ -51,8 +51,8 @@ export default function DocumentsPage() {
             <UploadCloud size={22} />
           </div>
           <h3 style={{ fontSize: 16 }}>Drop files here or click to upload</h3>
-          <p style={{ fontSize: 13, color: V.body, marginTop: 6 }}>Bank statements, GSTR files and bills. CSV, XML and PDF.</p>
-          <input ref={fileRef} type="file" multiple accept=".csv,.xml,.pdf" hidden onChange={(e) => upload(e.target.files)} />
+          <p style={{ fontSize: 13, color: V.body, marginTop: 6 }}>Bank statements, Tally exports and bills. CSV, Excel, Tally XML, PDF and photos.</p>
+          <input ref={fileRef} type="file" multiple accept=".csv,.tsv,.txt,.xml,.pdf,.xlsx,.xls,.jpg,.jpeg,.png,.webp" hidden onChange={(e) => upload(e.target.files)} />
         </div>
       </Card>
 

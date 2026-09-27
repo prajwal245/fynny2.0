@@ -113,3 +113,6 @@ verify_jwt = false
 
 [functions.create-demo-org]
 verify_jwt = false
+
+[functions.practice-ai]
+verify_jwt = false

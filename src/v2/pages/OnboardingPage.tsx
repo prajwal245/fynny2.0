@@ -203,7 +203,7 @@ export default function OnboardingPage() {
                     </div>
                     <div style={{ fontSize: 14.5, fontWeight: 600 }}>Click to upload a statement or bills</div>
                     <div style={{ fontSize: 12.5, color: V.body, marginTop: 5 }}>CSV, XML or PDF.</div>
-                    <input ref={fileRef} type="file" accept=".csv,.xml,.pdf" hidden onChange={(e) => upload(e.target.files)} />
+                    <input ref={fileRef} type="file" accept=".csv,.tsv,.txt,.xml,.pdf,.xlsx,.xls,.jpg,.jpeg,.png,.webp" hidden onChange={(e) => upload(e.target.files)} />
                   </div>
                   <button className="v2-btn v2-btn-ghost" style={{ justifySelf: "start" }} onClick={finish}>Skip and explore the portfolio</button>
                 </>

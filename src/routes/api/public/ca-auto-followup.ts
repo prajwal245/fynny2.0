@@ -90,6 +90,8 @@ async function run(request: Request): Promise<Response> {
       .select("id, ca_firm_id, business_id, title, period, doc_types, due_date, last_chased_at, chaser_count")
       .eq("ca_firm_id", rule.ca_firm_id)
       .neq("status", "fulfilled")
+      // Requests scheduled by the practice Chaser follow their own schedule.
+      .or("managed_by.is.null,managed_by.neq.practice")
       .lt("due_date", cutoff.slice(0, 10))
       .limit(500);
 

@@ -112,6 +112,18 @@ export function detectKind(bytes: Uint8Array, filename: string, mime: string | n
   return "unsupported";
 }
 
+/**
+ * Which side of the reconciliation a document belongs to when the uploader
+ * did not say: Tally and invoices are books; statements are bank.
+ */
+export function inferSide(filename: string, kind: FileKind): Side {
+  const n = filename.toLowerCase();
+  if (kind === "tally_xml") return "books";
+  if (/(statement|stmt|bank|passbook|account|a\/c|hdfc|icici|sbi|axis|kotak)/.test(n)) return "bank";
+  if (/(invoice|inv|bill|purchase|sales|ledger|daybook|day book|tally|books|voucher|receipt)/.test(n)) return "books";
+  return kind === "csv" || kind === "xlsx" ? "bank" : "books";
+}
+
 function decodeText(bytes: Uint8Array): string {
   const utf8 = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
   // UTF-16 exports (some Tally versions) show up full of NULs.

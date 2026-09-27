@@ -308,9 +308,12 @@ async function run(request: Request): Promise<Response> {
             original_filename: filename,
             classification,
             confidence: rows.length > 0 ? extractConfidence : match.confidence,
-            extracted: { rows },
+            extracted: { rows, source: "Gmail" },
             review_state: reviewState,
             source_type: "gmail",
+            // The practice Extract agent re-reads the stored file into ca_txns.
+            extract_status: "queued",
+            source_metadata: { gmail_message_id: msg.id, from: senderEmail, subject },
             gmail_message_id: msg.id,
             gmail_sender_email: senderEmail,
             gmail_subject: subject,
@@ -497,11 +500,28 @@ async function run(request: Request): Promise<Response> {
   });
 }
 
+/**
+ * The 15-minute poll is also the heartbeat for the practice agents: it
+ * extracts queued documents (including the attachments just pulled) and sends
+ * chaser follow-ups that have fallen due. Runs only after an authorised poll.
+ */
+async function withPracticeTick(res: Response): Promise<Response> {
+  if (res.status !== 200) return res;
+  try {
+    const { practiceTick } = await import("@/lib/practice/cron.server");
+    const tick = await practiceTick();
+    console.log(`[fyn:practice] tick ${JSON.stringify(tick)}`);
+  } catch (e) {
+    console.error(`[fyn:practice] tick failed: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  return res;
+}
+
 export const Route = createFileRoute("/api/public/ca-poll-gmail")({
   server: {
     handlers: {
-      POST: async ({ request }) => run(request),
-      GET: async ({ request }) => run(request),
+      POST: async ({ request }) => withPracticeTick(await run(request)),
+      GET: async ({ request }) => withPracticeTick(await run(request)),
     },
   },
 });

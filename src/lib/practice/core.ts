@@ -317,3 +317,9 @@ export class PracticeError extends Error {
     this.name = "PracticeError";
   }
 }
+
+/** ₹1,25,000 for whole rupees, ₹17.70 when there are paise. */
+export function formatRupees(n: number): string {
+  const whole = Number.isInteger(Math.round(n * 100) / 100);
+  return `₹${n.toLocaleString("en-IN", whole ? { maximumFractionDigits: 0 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}

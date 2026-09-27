@@ -2,7 +2,8 @@ DO $$
 DECLARE v_uid uuid; v_biz uuid;
 BEGIN
   SELECT id INTO v_uid FROM auth.users WHERE email ILIKE 'adireddytarun@fynhelp.com' LIMIT 1;
-  IF v_uid IS NULL THEN RAISE EXCEPTION 'pilot user not found'; END IF;
+  -- Pilot-account setup: nothing to do on a fresh project without that user.
+  IF v_uid IS NULL THEN RAISE NOTICE 'pilot user not found, skipping'; RETURN; END IF;
   SELECT business_id INTO v_biz FROM public.profiles WHERE user_id = v_uid;
 
   UPDATE public.profiles SET role = 'owner' WHERE user_id = v_uid;

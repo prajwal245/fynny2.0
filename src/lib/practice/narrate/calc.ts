@@ -5,7 +5,7 @@
  * number keeps the list of transaction ids that produced it so a partner can
  * click through to the source. The AI never produces a figure.
  */
-import { round2, sumRupees, toPaise, type Period } from "../core";
+import { formatRupees, round2, sumRupees, toPaise, type Period } from "../core";
 
 export interface NarrateTxn {
   id: string;
@@ -292,8 +292,7 @@ export interface Insight {
   source: string;
 }
 
-const inr = (n: number) =>
-  `₹${Math.abs(n).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+const inr = (n: number) => formatRupees(Math.abs(n));
 const sourceLabel = (ids: string[]) =>
   `${ids.length} transaction${ids.length === 1 ? "" : "s"}`;
 

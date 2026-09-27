@@ -12,6 +12,7 @@
  */
 import {
   daysBetween,
+  formatRupees,
   normaliseRef,
   normaliseText,
   toPaise,
@@ -625,8 +626,7 @@ export function reconcile(
   };
 }
 
-const fmt = (n: number) =>
-  `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+const fmt = formatRupees;
 
 /** Works out why a transaction could not be matched and who the nearest candidates were. */
 function explain(

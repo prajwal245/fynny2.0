@@ -267,7 +267,7 @@ type Store = {
   signIn: (name: string, email: string) => void;
   signOut: () => void;
   saveFirm: (patch: Partial<Firm>) => void;
-  completeOnboarding: () => void;
+  completeOnboarding: () => Promise<void>;
   refresh: () => Promise<void>;
   clients: Client[];
   docs: Doc[];
@@ -440,7 +440,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
         .maybeSingle();
       setFirm({
         name: f?.firm_name ?? workspace.firm.name,
-        partnerName: f?.contact_person ?? meta.full_name ?? "",
+        partnerName: f?.ca_name ?? meta.full_name ?? "",
         email: f?.email ?? user.email ?? "",
         city: f?.city ?? "",
         frn: f?.membership_number ?? "",
@@ -539,9 +539,8 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
     })();
   }, []);
 
-  const completeOnboarding = useCallback(() => {
-    void boot();
-  }, [boot]);
+  /** Loads the workspace for the practice onboarding just created; resolves when ready. */
+  const completeOnboarding = useCallback(() => boot(), [boot]);
 
   /**
    * Shows an agent's steps while the real server call runs. Steps advance on a

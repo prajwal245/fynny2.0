@@ -506,7 +506,7 @@ export const savePracticeFirm = createServerFn({ method: "POST" })
     if (data.frn !== undefined) payload.membership_number = data.frn.trim();
     if (data.email !== undefined) payload.email = data.email.trim();
     if (data.partnerName !== undefined)
-      payload.contact_person = data.partnerName.trim();
+      payload.ca_name = data.partnerName.trim();
 
     let firmId: string | null = null;
     try {
@@ -538,13 +538,19 @@ export const savePracticeFirm = createServerFn({ method: "POST" })
       .single();
     if (error)
       throw new Error(`Could not create the practice: ${error.message}`);
-    await db.from("ca_firm_members").insert({
+    // The owner is the firm's first partner (the role check allows partner,
+    // manager, senior, junior and staff). File storage policies rely on this row.
+    const { error: memberErr } = await db.from("ca_firm_members").insert({
       ca_firm_id: firm.id,
       user_id: context.userId,
       invited_email: data.email ?? "",
-      role: "admin",
+      role: "partner",
       status: "active",
       is_active: true,
     });
+    if (memberErr) {
+      await db.from("ca_firms").delete().eq("id", firm.id);
+      throw new Error(`Could not create the practice: ${memberErr.message}`);
+    }
     return { id: firm.id as string, created: true };
   });

@@ -279,3 +279,33 @@ CREATE OR REPLACE FUNCTION public.ca_txns_touch() RETURNS trigger LANGUAGE plpgs
 BEGIN NEW.updated_at := now(); RETURN NEW; END $$;
 DROP TRIGGER IF EXISTS ca_txns_touch ON public.ca_txns;
 CREATE TRIGGER ca_txns_touch BEFORE UPDATE ON public.ca_txns FOR EACH ROW EXECUTE FUNCTION public.ca_txns_touch();
+
+-- ── 13. CA client businesses are created by the server ──────────────────────
+-- link_business_to_creator links a new business to the signed-in user who
+-- created it (the SME sign-up flow). A client business created by a CA firm
+-- through the practice backend (service role) must not be linked to anyone:
+-- linking would repoint the partner's own profile at their client.
+CREATE OR REPLACE FUNCTION public.link_business_to_creator()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  IF auth.role() = 'service_role' THEN
+    RETURN NEW;
+  END IF;
+
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'must be authenticated to create a business';
+  END IF;
+
+  -- Ensure profile exists and is linked to this business
+  INSERT INTO public.profiles (user_id, business_id)
+  VALUES (auth.uid(), NEW.id)
+  ON CONFLICT (user_id) DO UPDATE
+    SET business_id = COALESCE(public.profiles.business_id, EXCLUDED.business_id);
+
+  RETURN NEW;
+END;
+$function$;

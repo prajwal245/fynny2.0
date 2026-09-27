@@ -13,6 +13,8 @@ DECLARE
   r record;
   i int;
 BEGIN
+  -- Demo data for the original pilot account only; skip on a fresh project.
+  IF NOT EXISTS (SELECT 1 FROM auth.users WHERE id = v_user) THEN RAISE NOTICE 'pilot user not found, skipping demo seed'; RETURN; END IF;
   SELECT id INTO v_firm FROM public.ca_firms WHERE user_id = v_user LIMIT 1;
 
   UPDATE public.ca_firms SET

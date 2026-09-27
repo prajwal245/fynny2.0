@@ -26,6 +26,37 @@ export interface FirmContext {
   role: "owner" | "admin" | "partner" | "manager" | "junior" | "member";
 }
 
+/**
+ * Firms created by the earlier v2 screens have an owner but no member row, and
+ * the document storage policies only admit active members. Add it once.
+ */
+async function ensureOwnerMembership(
+  db: Db,
+  firmId: string,
+  userId: string,
+  email: string | null,
+) {
+  const { data } = await db
+    .from("ca_firm_members")
+    .select("id, status")
+    .eq("ca_firm_id", firmId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (data) return;
+  const { error } = await db.from("ca_firm_members").insert({
+    ca_firm_id: firmId,
+    user_id: userId,
+    invited_email: email ?? "",
+    role: "partner",
+    status: "active",
+    is_active: true,
+  });
+  if (error)
+    console.error(
+      `[practice] could not add owner membership: ${error.message}`,
+    );
+}
+
 /** The caller's firm: the one they own, else an active membership. */
 export async function firmContext(
   db: Db,
@@ -38,7 +69,8 @@ export async function firmContext(
     .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
-  if (owned)
+  if (owned) {
+    await ensureOwnerMembership(db, owned.id, userId, owned.email ?? null);
     return {
       firmId: owned.id,
       firmName: owned.firm_name,
@@ -46,6 +78,7 @@ export async function firmContext(
       userId,
       role: "owner",
     };
+  }
   const { data: member } = await db
     .from("ca_firm_members")
     .select("ca_firm_id, role, ca_firms(firm_name, email)")

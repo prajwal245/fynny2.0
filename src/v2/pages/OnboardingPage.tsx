@@ -73,8 +73,10 @@ export default function OnboardingPage() {
     toast.success("Extract agent is reading your document");
   };
 
-  const finish = () => {
-    completeOnboarding();
+  const finish = async () => {
+    // Wait for the workspace to load, so the shell does not bounce the user
+    // back to onboarding (or the portfolio) while it reloads.
+    await completeOnboarding();
     // Land inside the client, where the next best action is already waiting.
     if (clientId) navigate({ to: "/v2/clients/$clientId", params: { clientId } });
     else navigate({ to: "/v2" });

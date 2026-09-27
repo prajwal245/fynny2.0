@@ -22,7 +22,11 @@ export interface ChaseState {
 
 export type ChaseDecision =
   | { action: "skip"; reason: string }
-  | { action: "send"; follow_up_number: number; next_follow_up_at: string | null }
+  | {
+      action: "send";
+      follow_up_number: number;
+      next_follow_up_at: string | null;
+    }
   | { action: "escalate" };
 
 const DAY = 86_400_000;
@@ -30,11 +34,17 @@ const DAY = 86_400_000;
 export const DEFAULT_SCHEDULE = [0, 3, 7];
 
 export function isClosed(status: string) {
-  return status === "fulfilled" || status === "resolved" || status === "cancelled";
+  return (
+    status === "fulfilled" || status === "resolved" || status === "cancelled"
+  );
 }
 
 /** When the n-th (0-based) follow-up slot falls due. */
-export function slotAt(createdAt: string, schedule: number[], n: number): string | null {
+export function slotAt(
+  createdAt: string,
+  schedule: number[],
+  n: number,
+): string | null {
   const day = schedule[n];
   if (day === undefined) return null;
   return new Date(Date.parse(createdAt) + day * DAY).toISOString();
@@ -43,12 +53,18 @@ export function slotAt(createdAt: string, schedule: number[], n: number): string
 export function decide(s: ChaseState, now: Date): ChaseDecision {
   if (isClosed(s.status)) return { action: "skip", reason: "resolved" };
   if (s.escalated_at) return { action: "skip", reason: "already escalated" };
-  if (s.do_not_disturb) return { action: "skip", reason: "client marked do not disturb" };
+  if (s.do_not_disturb)
+    return { action: "skip", reason: "client marked do not disturb" };
   const schedule = s.schedule_days?.length ? s.schedule_days : DEFAULT_SCHEDULE;
-  const due = s.next_follow_up_at ?? slotAt(s.created_at, schedule, s.chaser_count);
-  if (!due || Date.parse(due) > now.getTime()) return { action: "skip", reason: "not due" };
+  const due =
+    s.next_follow_up_at ?? slotAt(s.created_at, schedule, s.chaser_count);
+  if (!due || Date.parse(due) > now.getTime())
+    return { action: "skip", reason: "not due" };
   // Never two nudges on the same calendar day (cron retries, manual + auto).
-  if (s.last_chased_at && s.last_chased_at.slice(0, 10) === now.toISOString().slice(0, 10)) {
+  if (
+    s.last_chased_at &&
+    s.last_chased_at.slice(0, 10) === now.toISOString().slice(0, 10)
+  ) {
     return { action: "skip", reason: "already chased today" };
   }
   if (s.chaser_count >= s.max_follow_ups) return { action: "escalate" };
@@ -56,7 +72,12 @@ export function decide(s: ChaseState, now: Date): ChaseDecision {
   const next = slotAt(s.created_at, schedule, s.chaser_count + 1);
   // If the schedule has no further slot, escalate one schedule-gap later.
   const fallback = new Date(now.getTime() + 4 * DAY).toISOString();
-  return { action: "send", follow_up_number: s.chaser_count + 1, next_follow_up_at: next && Date.parse(next) > now.getTime() ? next : fallback };
+  return {
+    action: "send",
+    follow_up_number: s.chaser_count + 1,
+    next_follow_up_at:
+      next && Date.parse(next) > now.getTime() ? next : fallback,
+  };
 }
 
 /* ── templates ──────────────────────────────────────────── */
@@ -78,11 +99,20 @@ export interface RenderedEmail {
   html: string;
 }
 
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
+const esc = (s: string) =>
+  s.replace(
+    /[&<>"]/g,
+    (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] as string,
+  );
 
-const what = (t: TemplateInput) => `${t.item.toLowerCase()}${t.period ? ` for ${t.period}` : ""}`;
+const what = (t: TemplateInput) =>
+  `${t.item.toLowerCase()}${t.period ? ` for ${t.period}` : ""}`;
 
-export function renderEmail(followUpNumber: number, t: TemplateInput): RenderedEmail {
+export function renderEmail(
+  followUpNumber: number,
+  t: TemplateInput,
+): RenderedEmail {
   const first = followUpNumber <= 1;
   const subject = first
     ? `Gentle reminder – ${t.item}${t.period ? ` for ${t.period}` : ""}`
@@ -105,9 +135,16 @@ export function renderEmail(followUpNumber: number, t: TemplateInput): RenderedE
   const text = lines.join("\n").replace(/\n{3,}/g, "\n\n");
   const html = `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#1a1a1a">${text
     .split("\n\n")
-    .map((p) => `<p style="margin:0 0 12px">${esc(p).replace(/\n/g, "<br>")}</p>`)
+    .map(
+      (p) => `<p style="margin:0 0 12px">${esc(p).replace(/\n/g, "<br>")}</p>`,
+    )
     .join("")}</div>`;
-  return { template_id: first ? "chase_email_first" : "chase_email_followup", subject, text, html };
+  return {
+    template_id: first ? "chase_email_first" : "chase_email_followup",
+    subject,
+    text,
+    html,
+  };
 }
 
 export function whatsappMessage(t: TemplateInput): string {
@@ -127,8 +164,19 @@ export function normalisePhone(raw: string | null | undefined): string | null {
   return d;
 }
 
-export function whatsappLink(phone: string | null | undefined, message: string): { url: string | null; error: string | null } {
+export function whatsappLink(
+  phone: string | null | undefined,
+  message: string,
+): { url: string | null; error: string | null } {
   const p = normalisePhone(phone);
-  if (!p) return { url: null, error: "The phone number is missing or not a valid mobile number. Update the contact to use WhatsApp." };
-  return { url: `https://wa.me/${p}?text=${encodeURIComponent(message)}`, error: null };
+  if (!p)
+    return {
+      url: null,
+      error:
+        "The phone number is missing or not a valid mobile number. Update the contact to use WhatsApp.",
+    };
+  return {
+    url: `https://wa.me/${p}?text=${encodeURIComponent(message)}`,
+    error: null,
+  };
 }

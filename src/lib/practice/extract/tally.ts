@@ -6,10 +6,19 @@
  * AMOUNT on a ledger entry is a debit (ISDEEMEDPOSITIVE = Yes).
  */
 import { parseMoneyCell } from "@/lib/bankAmount";
-import { parseDate, round2, type Direction, type ExtractedRow, type TxnCategory } from "../core";
+import {
+  parseDate,
+  round2,
+  type Direction,
+  type ExtractedRow,
+  type TxnCategory,
+} from "../core";
 import { childText, children, findAll, parseXml, type XmlNode } from "./xml";
 
-const TYPE_MAP: Record<string, { direction: Direction | null; category: TxnCategory }> = {
+const TYPE_MAP: Record<
+  string,
+  { direction: Direction | null; category: TxnCategory }
+> = {
   receipt: { direction: "in", category: "receipt" },
   payment: { direction: "out", category: "payment" },
   sales: { direction: "in", category: "sales_invoice" },
@@ -24,10 +33,13 @@ interface LedgerEntry {
   ledger: string;
   amount: number; // signed as in Tally: negative = debit
   isBank: boolean;
+  hasAllocation: boolean;
   instrument: string | null;
 }
 
-const BANK_HINT = /\b(bank|hdfc|icici|sbi|axis|kotak|yes bank|idfc|indusind|federal|canara|pnb|bob|union bank|cash)\b/i;
+const NOT_BANK = /\b(charges?|interest|commission|fees?|gst|tds|loan)\b/i;
+const BANK_HINT =
+  /\b(bank|hdfc|icici|sbi|axis|kotak|yes bank|idfc|indusind|federal|canara|pnb|bob|union bank|cash)\b/i;
 
 function ledgerEntries(v: XmlNode): LedgerEntry[] {
   const lists = [
@@ -37,14 +49,20 @@ function ledgerEntries(v: XmlNode): LedgerEntry[] {
   return lists.map((l) => {
     const alloc = children(l, "BANKALLOCATIONS.LIST")[0];
     const instrument = alloc
-      ? childText(alloc, "INSTRUMENTNUMBER") || childText(alloc, "UNIQUEREFERENCEID") || childText(alloc, "TRANSACTIONID") || null
+      ? childText(alloc, "INSTRUMENTNUMBER") ||
+        childText(alloc, "UNIQUEREFERENCEID") ||
+        childText(alloc, "TRANSACTIONID") ||
+        null
       : null;
     const money = parseMoneyCell(childText(l, "AMOUNT"));
     const ledger = childText(l, "LEDGERNAME");
     return {
       ledger,
       amount: money.sign === -1 ? -money.value : money.value,
-      isBank: Boolean(alloc) || BANK_HINT.test(ledger),
+      // "Bank Charges" / "Bank Interest" are expense or income ledgers, not the bank account.
+      isBank:
+        Boolean(alloc) || (BANK_HINT.test(ledger) && !NOT_BANK.test(ledger)),
+      hasAllocation: Boolean(alloc),
       instrument,
     };
   });
@@ -52,7 +70,11 @@ function ledgerEntries(v: XmlNode): LedgerEntry[] {
 
 export function isTallyXml(text: string): boolean {
   const head = text.slice(0, 4000).toUpperCase();
-  return head.includes("<ENVELOPE") || head.includes("<TALLYMESSAGE") || head.includes("<VOUCHER");
+  return (
+    head.includes("<ENVELOPE") ||
+    head.includes("<TALLYMESSAGE") ||
+    head.includes("<VOUCHER")
+  );
 }
 
 export function rowsFromTally(xml: string): ExtractedRow[] {
@@ -60,39 +82,65 @@ export function rowsFromTally(xml: string): ExtractedRow[] {
   const vouchers = findAll(doc, "VOUCHER");
   const out: ExtractedRow[] = [];
   vouchers.forEach((v, idx) => {
-    const vtype = (childText(v, "VOUCHERTYPENAME") || v.attrs.VCHTYPE || "").trim();
+    const vtype = (
+      childText(v, "VOUCHERTYPENAME") ||
+      v.attrs.VCHTYPE ||
+      ""
+    ).trim();
     const kind = TYPE_MAP[vtype.toLowerCase()] ?? null;
-    const date = parseDate(childText(v, "DATE") || childText(v, "EFFECTIVEDATE"));
-    const party = childText(v, "PARTYLEDGERNAME") || childText(v, "PARTYNAME") || null;
+    const date = parseDate(
+      childText(v, "DATE") || childText(v, "EFFECTIVEDATE"),
+    );
+    const party =
+      childText(v, "PARTYLEDGERNAME") || childText(v, "PARTYNAME") || null;
     const narration = childText(v, "NARRATION");
     const vno = childText(v, "VOUCHERNUMBER") || null;
     const entries = ledgerEntries(v);
-    const cancelled = /^yes$/i.test(childText(v, "ISCANCELLED")) || /^yes$/i.test(childText(v, "ISOPTIONAL"));
+    const cancelled =
+      /^yes$/i.test(childText(v, "ISCANCELLED")) ||
+      /^yes$/i.test(childText(v, "ISOPTIONAL"));
     if (cancelled) return;
 
     const issues: string[] = [];
     let confidence = 0.95;
 
-    const bankEntry = entries.find((e) => e.isBank);
-    const partyEntry = party ? entries.find((e) => e.ledger === party) : undefined;
-    const pick = bankEntry ?? partyEntry ?? [...entries].sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))[0];
+    // A ledger with bank allocations is certainly the bank account; a name match is second best.
+    const bankEntry =
+      entries.find((e) => e.hasAllocation) ?? entries.find((e) => e.isBank);
+    const partyEntry = party
+      ? entries.find((e) => e.ledger === party)
+      : undefined;
+    const pick =
+      bankEntry ??
+      partyEntry ??
+      [...entries].sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))[0];
     const amount = pick ? round2(Math.abs(pick.amount)) : 0;
 
     // Direction from the bank ledger's side is the most reliable signal:
     // bank debited (negative in Tally) means money came in.
     let direction: Direction | null = null;
-    if (bankEntry && bankEntry.amount !== 0) direction = bankEntry.amount < 0 ? "in" : "out";
+    if (bankEntry && bankEntry.amount !== 0)
+      direction = bankEntry.amount < 0 ? "in" : "out";
     else if (kind?.direction) direction = kind.direction;
     if (!direction) {
       direction = "out";
-      issues.push(`${vtype || "Voucher"} has no bank ledger, so money in/out was assumed`);
+      issues.push(
+        `${vtype || "Voucher"} has no bank ledger, so money in/out was assumed`,
+      );
       confidence = 0.55;
     }
-    if (!kind) { issues.push(`Unfamiliar voucher type "${vtype}"`); confidence = Math.min(confidence, 0.7); }
-    if (!date) { issues.push("Voucher date missing"); confidence = 0.3; }
+    if (!kind) {
+      issues.push(`Unfamiliar voucher type "${vtype}"`);
+      confidence = Math.min(confidence, 0.7);
+    }
+    if (!date) {
+      issues.push("Voucher date missing");
+      confidence = 0.3;
+    }
     if (!amount) return;
 
-    const counterparty = party ?? entries.find((e) => !e.isBank && e !== pick)?.ledger ?? null;
+    const counterparty =
+      party ?? entries.find((e) => !e.isBank && e !== pick)?.ledger ?? null;
     const reference = bankEntry?.instrument || childText(v, "REFERENCE") || vno;
     const rawText = [
       `Voucher ${vtype} #${vno ?? "?"}`,
@@ -100,7 +148,9 @@ export function rowsFromTally(xml: string): ExtractedRow[] {
       party ? `Party ${party}` : "",
       narration ? `Narration ${narration}` : "",
       ...entries.map((e) => `${e.ledger}: ${e.amount}`),
-    ].filter(Boolean).join(" | ");
+    ]
+      .filter(Boolean)
+      .join(" | ");
 
     out.push({
       row_index: idx,
@@ -108,7 +158,8 @@ export function rowsFromTally(xml: string): ExtractedRow[] {
       date,
       amount,
       direction,
-      description: narration || [vtype, counterparty].filter(Boolean).join(" — "),
+      description:
+        narration || [vtype, counterparty].filter(Boolean).join(" — "),
       counterparty,
       reference: reference || null,
       category: kind?.category ?? null,

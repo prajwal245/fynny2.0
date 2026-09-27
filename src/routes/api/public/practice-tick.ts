@@ -10,8 +10,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { timingSafeEqual } from "node:crypto";
 
 function authorized(request: Request): boolean {
-  const accepted = [process.env["CA_CRON_SECRET"], process.env["CRON_SECRET"]].filter((s): s is string => Boolean(s));
-  const provided = request.headers.get("x-cron-secret") ?? (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+  const accepted = [
+    process.env["CA_CRON_SECRET"],
+    process.env["CRON_SECRET"],
+  ].filter((s): s is string => Boolean(s));
+  const provided =
+    request.headers.get("x-cron-secret") ??
+    (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!provided || !accepted.length) return false;
   let ok = false;
   for (const s of accepted) {
@@ -23,12 +28,23 @@ function authorized(request: Request): boolean {
 }
 
 async function run(request: Request) {
-  if (!authorized(request)) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { "content-type": "application/json" } });
+  if (!authorized(request))
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "content-type": "application/json" },
+    });
   const { practiceTick } = await import("@/lib/practice/cron.server");
   const result = await practiceTick({ queueLimit: 10 });
-  return new Response(JSON.stringify(result), { headers: { "content-type": "application/json" } });
+  return new Response(JSON.stringify(result), {
+    headers: { "content-type": "application/json" },
+  });
 }
 
 export const Route = createFileRoute("/api/public/practice-tick")({
-  server: { handlers: { POST: async ({ request }) => run(request), GET: async ({ request }) => run(request) } },
+  server: {
+    handlers: {
+      POST: async ({ request }) => run(request),
+      GET: async ({ request }) => run(request),
+    },
+  },
 });

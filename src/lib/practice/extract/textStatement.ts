@@ -9,9 +9,11 @@
 import { parseMoneyCell } from "@/lib/bankAmount";
 import { parseDate, round2, toPaise, type ExtractedRow } from "../core";
 
-const DATE_AT_START = /^\s*(\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}|\d{1,2}[-\s][A-Za-z]{3}[-\s]\d{2,4}|\d{4}-\d{2}-\d{2})\b/;
+const DATE_AT_START =
+  /^\s*(\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}|\d{1,2}[-\s][A-Za-z]{3}[-\s]\d{2,4}|\d{4}-\d{2}-\d{2})\b/;
 const MONEY = /(?:\(?-?[\d,]+\.\d{2}\)?(?:\s?(?:Cr|Dr|CR|DR))?)/g;
-const SKIP = /\b(opening balance|closing balance|balance b\/?f|brought forward|carried forward|total)\b/i;
+const SKIP =
+  /\b(opening balance|closing balance|balance b\/?f|brought forward|carried forward|total)\b/i;
 
 export interface TextStatementResult {
   rows: ExtractedRow[];
@@ -20,7 +22,10 @@ export interface TextStatementResult {
 }
 
 export function rowsFromStatementText(text: string): TextStatementResult {
-  const lines = text.split(/\r?\n/).map((l) => l.replace(/\s+/g, " ").trim()).filter(Boolean);
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
   const rows: ExtractedRow[] = [];
   let prevBalance: number | null = null;
   let verified = 0;
@@ -40,7 +45,7 @@ export function rowsFromStatementText(text: string): TextStatementResult {
     if (!dm) {
       // Narration spilling onto the next line.
       const prev = rows[rows.length - 1];
-      if (prev && !SKIP.test(line) && !(line.match(MONEY)?.length)) {
+      if (prev && !SKIP.test(line) && !line.match(MONEY)?.length) {
         prev.description = `${prev.description} ${line}`.trim().slice(0, 500);
         prev.raw_text = `${prev.raw_text} ${line}`;
       }
@@ -56,7 +61,9 @@ export function rowsFromStatementText(text: string): TextStatementResult {
       return p.sign === -1 ? -p.value : p.value;
     });
     const balance = monies.length >= 2 ? values[values.length - 1] : null;
-    const amount = Math.abs(monies.length >= 2 ? values[values.length - 2] : values[0]);
+    const amount = Math.abs(
+      monies.length >= 2 ? values[values.length - 2] : values[0],
+    );
     if (!amount) return;
 
     let description = line.slice(dm[0].length);
@@ -81,7 +88,11 @@ export function rowsFromStatementText(text: string): TextStatementResult {
       issues.push("No running balance to confirm money in/out");
     }
     if (!direction) {
-      const hint = /\b(cr|credit|deposit|by)\b/i.test(line) ? "in" : /\b(dr|debit|withdrawal|to)\b/i.test(line) ? "out" : null;
+      const hint = /\b(cr|credit|deposit|by)\b/i.test(line)
+        ? "in"
+        : /\b(dr|debit|withdrawal|to)\b/i.test(line)
+          ? "out"
+          : null;
       direction = hint;
       if (!hint) issues.push("Money in/out unclear");
     }

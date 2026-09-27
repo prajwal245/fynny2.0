@@ -23,28 +23,48 @@ export const CONFIDENCE_THRESHOLD = 0.75;
 /* ── heuristics ─────────────────────────────────────────── */
 
 const RULES: { re: RegExp; category: TxnCategory }[] = [
-  { re: /\b(chrgs?|chgs?|charges?|sms ?chgs?|amc|min(imum)? bal|annual fee|service fee|gst on|cgst on|sgst on|igst on)\b/i, category: "bank_charge" },
-  { re: /\b(int(erest)?\.? ?(pd|paid|cr|credit)|interest|int\.coll|sb int|fd int)\b/i, category: "interest" },
-  { re: /\b(gst ?(pmt|payment|challan)|gstn|tds|cbdt|advance tax|income tax|itns|oltas|pf ?contribution|epfo|esic|professional tax)\b/i, category: "tax" },
+  {
+    re: /\b(chrgs?|chgs?|charges?|sms ?chgs?|amc|min(imum)? bal|annual fee|service fee|gst on|cgst on|sgst on|igst on)\b/i,
+    category: "bank_charge",
+  },
+  {
+    re: /\b(int(erest)?\.? ?(pd|paid|cr|credit)|interest|int\.coll|sb int|fd int)\b/i,
+    category: "interest",
+  },
+  {
+    re: /\b(gst ?(pmt|payment|challan)|gstn|tds|cbdt|advance tax|income tax|itns|oltas|pf ?contribution|epfo|esic|professional tax)\b/i,
+    category: "tax",
+  },
   { re: /\b(salary|salaries|sal ?cr|payroll|wages)\b/i, category: "salary" },
-  { re: /\b(self|own a\/?c|own account|sweep|fd booking|fd closure|inter ?account|contra)\b/i, category: "transfer" },
+  {
+    re: /\b(self|own a\/?c|own account|sweep|fd booking|fd closure|inter ?account|contra)\b/i,
+    category: "transfer",
+  },
 ];
 
-export function categorise(description: string, direction: Direction | null, side: Side): TxnCategory {
+export function categorise(
+  description: string,
+  direction: Direction | null,
+  side: Side,
+): TxnCategory {
   for (const r of RULES) if (r.re.test(description)) return r.category;
-  if (side === "books" && /\b(invoice|inv no|bill no|tax invoice)\b/i.test(description)) {
+  if (
+    side === "books" &&
+    /\b(invoice|inv no|bill no|tax invoice)\b/i.test(description)
+  ) {
     return direction === "in" ? "sales_invoice" : "purchase_invoice";
   }
   return direction === "in" ? "receipt" : "payment";
 }
 
-const PROTOCOL = /^(upi|neft|rtgs|imps|ach|nach|ecs|pos|atm|cms|mmt|trf|transfer|by|to|from|dr|cr|p2a|p2m|inb|ib|mob|net|clg|chq|cheque|inw|otw|ft|nfs|bil|billpay|payment|pmt|ref|utr|txn|a\/c|ac|acct)$/i;
+const PROTOCOL =
+  /^(upi|neft|rtgs|imps|ach|nach|ecs|pos|atm|cms|mmt|trf|transfer|by|to|from|dr|cr|p2a|p2m|inb|ib|mob|net|clg|chq|cheque|inw|otw|ft|nfs|bil|billpay|payment|pmt|ref|utr|txn|a\/c|ac|acct)$/i;
 const IFSC = /^[A-Z]{4}0[A-Z0-9]{6}$/i;
 
 /** Pulls the counterparty name out of typical Indian bank narrations. */
 export function counterpartyFromNarration(narration: string): string | null {
   const tokens = narration
-    .split(/[\/\-|:*]+|\s{2,}/)
+    .split(/[/\-|:*]+|\s{2,}/)
     .map((t) => t.trim())
     .filter(Boolean);
   for (const t of tokens) {
@@ -56,7 +76,12 @@ export function counterpartyFromNarration(narration: string): string | null {
     const letters = cleaned.replace(/[^a-z]/gi, "").length;
     const digits = cleaned.replace(/[^0-9]/g, "").length;
     if (letters < 3 || digits > letters) continue;
-    if (/^(chq|cheque|clearing|cash|charges?|interest|salary|self)$/i.test(cleaned)) continue;
+    if (
+      /^(chq|cheque|clearing|cash|charges?|interest|salary|self)$/i.test(
+        cleaned,
+      )
+    )
+      continue;
     return cleaned.replace(/\s+/g, " ").slice(0, 80);
   }
   return null;
@@ -78,7 +103,9 @@ export function applyHeuristics(row: ExtractedRow, side: Side): ExtractedRow {
   return {
     ...row,
     category: row.category ?? categorise(description, row.direction, side),
-    counterparty: row.counterparty ?? (side === "bank" ? counterpartyFromNarration(description) : null),
+    counterparty:
+      row.counterparty ??
+      (side === "bank" ? counterpartyFromNarration(description) : null),
     reference: row.reference ?? referenceFromNarration(description),
   };
 }
@@ -167,19 +194,36 @@ export function amountAppearsIn(amount: number, text: string): boolean {
  * applying the anti-hallucination checks. `sourceText` is the document text
  * layer when there is one (empty for images, which lowers trust further).
  */
-export function rowsFromAiRead(aiRows: AiReadRow[], sourceText: string): ExtractedRow[] {
+export function rowsFromAiRead(
+  aiRows: AiReadRow[],
+  sourceText: string,
+): ExtractedRow[] {
   const out: ExtractedRow[] = [];
   aiRows.forEach((r, i) => {
     const issues: string[] = [];
-    const amountNum = typeof r.amount === "number" ? r.amount : Number(String(r.amount ?? "").replace(/[^0-9.]/g, ""));
-    const amount = Number.isFinite(amountNum) && amountNum > 0 ? round2(amountNum) : null;
+    const amountNum =
+      typeof r.amount === "number"
+        ? r.amount
+        : Number(String(r.amount ?? "").replace(/[^0-9.]/g, ""));
+    const amount =
+      Number.isFinite(amountNum) && amountNum > 0 ? round2(amountNum) : null;
     const date = parseDate(r.date ?? "");
-    const direction: Direction | null = r.direction === "in" || r.direction === "out" ? r.direction : null;
+    const direction: Direction | null =
+      r.direction === "in" || r.direction === "out" ? r.direction : null;
     let confidence = Math.min(0.9, Math.max(0, Number(r.confidence ?? 0.5)));
 
-    if (!amount) { issues.push("Amount could not be read"); confidence = Math.min(confidence, 0.3); }
-    if (!date) { issues.push("Date could not be read"); confidence = Math.min(confidence, 0.4); }
-    if (!direction) { issues.push("Money in/out unclear"); confidence = Math.min(confidence, 0.5); }
+    if (!amount) {
+      issues.push("Amount could not be read");
+      confidence = Math.min(confidence, 0.3);
+    }
+    if (!date) {
+      issues.push("Date could not be read");
+      confidence = Math.min(confidence, 0.4);
+    }
+    if (!direction) {
+      issues.push("Money in/out unclear");
+      confidence = Math.min(confidence, 0.5);
+    }
     if (amount) {
       const evidence = `${r.source_text ?? ""}\n${sourceText}`;
       if (sourceText && !amountAppearsIn(amount, sourceText)) {
@@ -195,10 +239,15 @@ export function rowsFromAiRead(aiRows: AiReadRow[], sourceText: string): Extract
       confidence = Math.min(confidence, 0.8);
     }
     const currency = (r.currency || "INR").toUpperCase();
-    if (currency !== "INR") { issues.push(`Amount is in ${currency}`); confidence = Math.min(confidence, 0.5); }
+    if (currency !== "INR") {
+      issues.push(`Amount is in ${currency}`);
+      confidence = Math.min(confidence, 0.5);
+    }
     if (r.reason && confidence < CONFIDENCE_THRESHOLD) issues.push(r.reason);
 
-    const category = TXN_CATEGORIES.includes(r.category as TxnCategory) ? (r.category as TxnCategory) : null;
+    const category = TXN_CATEGORIES.includes(r.category as TxnCategory)
+      ? (r.category as TxnCategory)
+      : null;
     out.push({
       row_index: i,
       raw_text: (r.source_text || r.description || "").slice(0, 2000),
@@ -227,30 +276,49 @@ export interface ScoredRow extends ExtractedRow {
 }
 
 /** Merges the parser's confidence with the AI verdict (if any) and routes the row. */
-export function scoreRow(row: ExtractedRow, verdict: AiRowVerdict | undefined, threshold = CONFIDENCE_THRESHOLD): ScoredRow {
+export function scoreRow(
+  row: ExtractedRow,
+  verdict: AiRowVerdict | undefined,
+  threshold = CONFIDENCE_THRESHOLD,
+): ScoredRow {
   const issues = [...row.parse_issues];
   let confidence = row.parse_confidence;
   let category = row.category;
   let counterparty = row.counterparty;
 
   if (verdict) {
-    if (verdict.category && TXN_CATEGORIES.includes(verdict.category as TxnCategory)) category = verdict.category as TxnCategory;
+    if (
+      verdict.category &&
+      TXN_CATEGORIES.includes(verdict.category as TxnCategory)
+    )
+      category = verdict.category as TxnCategory;
     if (verdict.counterparty && normaliseText(verdict.counterparty)) {
       // Accept the AI's counterparty only if it is visible in the row text.
       const hay = normaliseText(`${row.raw_text} ${row.description}`);
-      if (hay.includes(normaliseText(verdict.counterparty))) counterparty = verdict.counterparty.slice(0, 120);
+      if (hay.includes(normaliseText(verdict.counterparty)))
+        counterparty = verdict.counterparty.slice(0, 120);
     }
-    if (typeof verdict.confidence === "number" && Number.isFinite(verdict.confidence)) {
-      confidence = Math.min(confidence, Math.max(0, Math.min(1, verdict.confidence)));
-      if (verdict.confidence < threshold && verdict.reason) issues.push(verdict.reason);
+    if (
+      typeof verdict.confidence === "number" &&
+      Number.isFinite(verdict.confidence)
+    ) {
+      confidence = Math.min(
+        confidence,
+        Math.max(0, Math.min(1, verdict.confidence)),
+      );
+      if (verdict.confidence < threshold && verdict.reason)
+        issues.push(verdict.reason);
     }
     if (verdict.direction_doubt) {
-      issues.push("Narration suggests the money in/out direction may be reversed");
+      issues.push(
+        "Narration suggests the money in/out direction may be reversed",
+      );
       confidence = Math.min(confidence, 0.6);
     }
   }
 
-  if (!row.amount || !row.date || !row.direction) confidence = Math.min(confidence, 0.4);
+  if (!row.amount || !row.date || !row.direction)
+    confidence = Math.min(confidence, 0.4);
   confidence = round2(confidence);
   const route = confidence >= threshold ? "transaction" : "review";
   return {

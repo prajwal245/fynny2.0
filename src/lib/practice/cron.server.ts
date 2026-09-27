@@ -6,9 +6,16 @@
 import { runDueFollowups } from "./chaser.server";
 import { processQueue } from "./documents.server";
 
-export async function practiceTick(opts: { queueLimit?: number; now?: Date } = {}) {
+export async function practiceTick(
+  opts: { queueLimit?: number; now?: Date } = {},
+) {
   const started = Date.now();
-  const queue = await processQueue(opts.queueLimit ?? 5).catch((e) => ({ processed: 0, error: (e as Error).message }));
-  const chaser = await runDueFollowups(opts.now ?? new Date()).catch((e) => ({ error: (e as Error).message }));
+  const queue = await processQueue(opts.queueLimit ?? 5).catch((e) => ({
+    processed: 0,
+    error: (e as Error).message,
+  }));
+  const chaser = await runDueFollowups(opts.now ?? new Date()).catch((e) => ({
+    error: (e as Error).message,
+  }));
   return { queue, chaser, ms: Date.now() - started };
 }

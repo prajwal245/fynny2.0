@@ -8,7 +8,16 @@
  * and reloads the workspace after each action. Figures are always derived
  * from transactions read out of files the practice actually uploaded.
  */
-import { createContext, useContext, useMemo, useState, ReactNode, useCallback, useRef, useEffect } from "react";
+import {
+  createContext,
+  useContext,
+  useMemo,
+  useState,
+  ReactNode,
+  useCallback,
+  useRef,
+  useEffect,
+} from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -28,7 +37,14 @@ import {
 } from "@/lib/practice/practice.functions";
 import type { AgentKey } from "./agents";
 
-export type Txn = { id?: string; date: string; particulars: string; amount: number; matchStatus?: string; side?: string };
+export type Txn = {
+  id?: string;
+  date: string;
+  particulars: string;
+  amount: number;
+  matchStatus?: string;
+  side?: string;
+};
 
 export type Client = {
   id: string;
@@ -111,9 +127,25 @@ export type Report = {
   revenue: number;
   expenses: number;
   sources: { revenue: Txn[]; expenses: Txn[] };
-  insights: { text: string; source: string; cited_transaction_ids?: string[]; origin?: "rules" | "ai" }[];
-  variances: { label: string; current: number; prior: number; change_pct?: number | null }[];
-  bankSummary: { label: string; value: number; rows: Txn[]; unit?: "inr" | "count"; key?: string }[];
+  insights: {
+    text: string;
+    source: string;
+    cited_transaction_ids?: string[];
+    origin?: "rules" | "ai";
+  }[];
+  variances: {
+    label: string;
+    current: number;
+    prior: number;
+    change_pct?: number | null;
+  }[];
+  bankSummary: {
+    label: string;
+    value: number;
+    rows: Txn[];
+    unit?: "inr" | "count";
+    key?: string;
+  }[];
   warnings?: string[];
 };
 
@@ -150,14 +182,32 @@ export type Chase = {
   timeline: { at: string; text: string; agent?: AgentKey }[];
 };
 
-export type ReconResult = { matched: number; exceptions: number; bank: number; at: string; period?: string };
+export type ReconResult = {
+  matched: number;
+  exceptions: number;
+  bank: number;
+  at: string;
+  period?: string;
+};
 
-export type Activity = { id: string; clientId: string; at: string; text: string; agent?: AgentKey };
+export type Activity = {
+  id: string;
+  clientId: string;
+  at: string;
+  text: string;
+  agent?: AgentKey;
+};
 
 export type Role = "Partner" | "Junior";
 
 /** The monthly close cycle every client moves through. */
-export const CLOSE_STAGES = ["Documents", "Review", "Recon", "Exceptions", "MIS"] as const;
+export const CLOSE_STAGES = [
+  "Documents",
+  "Review",
+  "Recon",
+  "Exceptions",
+  "MIS",
+] as const;
 export type CloseStage = (typeof CLOSE_STAGES)[number];
 
 export type CloseStep = { stage: CloseStage; done: boolean; detail: string };
@@ -167,7 +217,12 @@ export type CloseState = {
   percent: number;
   stage: CloseStage;
   /** The single most useful thing to do next for this client. */
-  next: { label: string; why: string; tab: string; action?: "recon" | "mis" | "upload" };
+  next: {
+    label: string;
+    why: string;
+    tab: string;
+    action?: "recon" | "mis" | "upload";
+  };
 };
 
 function periodList() {
@@ -191,10 +246,14 @@ export type AgentRun = {
   target: string;
 };
 
-const iso = (daysAgo: number) => new Date(Date.now() - daysAgo * 864e5).toISOString().slice(0, 10);
+const iso = (daysAgo: number) =>
+  new Date(Date.now() - daysAgo * 864e5).toISOString().slice(0, 10);
 const today = () => iso(0);
-const uid = () => (globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(16)}-0000-4000-8000-${Math.random().toString(16).slice(2, 14).padEnd(12, "0")}`);
-const safeName = (s: string) => s.replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 120) || "document";
+const uid = () =>
+  globalThis.crypto?.randomUUID?.() ??
+  `${Date.now().toString(16)}-0000-4000-8000-${Math.random().toString(16).slice(2, 14).padEnd(12, "0")}`;
+const safeName = (s: string) =>
+  s.replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 120) || "document";
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 type Workspace = Awaited<ReturnType<typeof getPracticeWorkspace>>;
@@ -220,12 +279,36 @@ type Store = {
   runsFor: (target: string) => AgentRun[];
   addClient: (c: Omit<Client, "id">) => Client;
   updateClient: (id: string, patch: Partial<Client>) => void;
-  addDoc: (name: string, clientId: string, source?: Doc["source"], file?: File) => void;
-  resolveReview: (id: string, status: "confirmed" | "discarded", patch?: Txn) => void;
-  setExceptionStatus: (id: string, status: Exception["status"], opts?: { action?: "match" | "reconciled_external"; counterpartIds?: string[]; note?: string }) => void;
+  addDoc: (
+    name: string,
+    clientId: string,
+    source?: Doc["source"],
+    file?: File,
+  ) => void;
+  resolveReview: (
+    id: string,
+    status: "confirmed" | "discarded",
+    patch?: Txn,
+  ) => void;
+  setExceptionStatus: (
+    id: string,
+    status: Exception["status"],
+    opts?: {
+      action?: "match" | "reconciled_external";
+      counterpartIds?: string[];
+      note?: string;
+    },
+  ) => void;
   runRecon: (clientId: string, onDone?: (r: ReconResult) => void) => void;
-  generateReport: (clientId: string, period: string, template: ReportTemplate, onDone: (r: Report) => void) => void;
-  addChase: (c: Omit<Chase, "id" | "timeline" | "status" | "followUps">) => void;
+  generateReport: (
+    clientId: string,
+    period: string,
+    template: ReportTemplate,
+    onDone: (r: Report) => void,
+  ) => void;
+  addChase: (
+    c: Omit<Chase, "id" | "timeline" | "status" | "followUps">,
+  ) => void;
   sendFollowUp: (id: string, channel: "Email" | "WhatsApp") => void;
   setChaseStatus: (id: string, status: Chase["status"], note?: string) => void;
   clientName: (id: string) => string;
@@ -275,7 +358,12 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
   const pendingClients = useRef<Record<string, Promise<void>>>({});
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  useEffect(() => () => { timers.current.forEach(clearTimeout); }, []);
+  useEffect(
+    () => () => {
+      timers.current.forEach(clearTimeout);
+    },
+    [],
+  );
 
   // Period and role preference are the only things kept in the browser.
   useEffect(() => {
@@ -284,12 +372,19 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       if (raw) {
         const saved = JSON.parse(raw) as { role?: Role; period?: string };
         if (saved.role) setRole(saved.role);
-        if (saved.period && PERIODS.includes(saved.period)) setPeriod(saved.period);
+        if (saved.period && PERIODS.includes(saved.period))
+          setPeriod(saved.period);
       }
-    } catch { /* first visit */ }
+    } catch {
+      /* first visit */
+    }
   }, []);
   useEffect(() => {
-    try { window.localStorage.setItem(PREF_KEY, JSON.stringify({ role, period })); } catch { /* ignore */ }
+    try {
+      window.localStorage.setItem(PREF_KEY, JSON.stringify({ role, period }));
+    } catch {
+      /* ignore */
+    }
   }, [role, period]);
 
   const apply = useCallback((w: Workspace) => {
@@ -316,22 +411,48 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
   const boot = useCallback(async () => {
     const { data: auth } = await sb.auth.getUser();
     const user = auth?.user ?? null;
-    if (!user) { setSession(null); setFirm(null); setHydrated(true); return; }
+    if (!user) {
+      setSession(null);
+      setFirm(null);
+      setHydrated(true);
+      return;
+    }
     userId.current = user.id;
     const meta = (user.user_metadata ?? {}) as { full_name?: string };
-    setSession({ name: meta.full_name ?? user.email ?? "", email: user.email ?? "" });
+    setSession({
+      name: meta.full_name ?? user.email ?? "",
+      email: user.email ?? "",
+    });
     let workspace: Workspace | null = null;
-    try { workspace = await getPracticeWorkspace(); } catch { workspace = null; }
+    try {
+      workspace = await getPracticeWorkspace();
+    } catch {
+      workspace = null;
+    }
     if (workspace) {
       firmId.current = workspace.firm.id;
       firmReady.current = Promise.resolve(workspace.firm.id);
-      const { data: f } = await sb.from("ca_firms").select("*").eq("id", workspace.firm.id).maybeSingle();
+      const { data: f } = await sb
+        .from("ca_firms")
+        .select("*")
+        .eq("id", workspace.firm.id)
+        .maybeSingle();
       setFirm({
-        name: f?.firm_name ?? workspace.firm.name, partnerName: f?.contact_person ?? meta.full_name ?? "",
-        email: f?.email ?? user.email ?? "", city: f?.city ?? "", frn: f?.membership_number ?? "", gmailConnected: false,
+        name: f?.firm_name ?? workspace.firm.name,
+        partnerName: f?.contact_person ?? meta.full_name ?? "",
+        email: f?.email ?? user.email ?? "",
+        city: f?.city ?? "",
+        frn: f?.membership_number ?? "",
+        gmailConnected: false,
       });
-      const { data: gmail } = await sb.from("ca_gmail_connections").select("id").eq("ca_firm_id", workspace.firm.id).eq("is_active", true).limit(1);
-      if (gmail?.length) setFirm((p) => (p ? { ...p, gmailConnected: true } : p));
+      const { data: gmail } = await sb
+        .from("ca_gmail_connections")
+        .select("id")
+        .eq("ca_firm_id", workspace.firm.id)
+        .eq("is_active", true)
+        .limit(1);
+      if (gmail?.length)
+        setFirm((p) => (p ? { ...p, gmailConnected: true } : p));
       apply(workspace);
     } else {
       setFirm(null);
@@ -339,23 +460,42 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
     setHydrated(true);
   }, [apply]);
 
-  useEffect(() => { void boot(); }, [boot]);
+  useEffect(() => {
+    void boot();
+  }, [boot]);
 
   // Documents from Gmail / WhatsApp and scheduled chaser emails arrive in the
   // background, so the workspace refreshes itself while the tab is open.
   useEffect(() => {
-    const t = setInterval(() => { if (document.visibilityState === "visible") void refresh(); }, 60_000);
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") void refresh();
+    }, 60_000);
     return () => clearInterval(t);
   }, [refresh]);
 
-  const signIn = useCallback(() => { /* authentication happens on the practice sign in page */ }, []);
+  const signIn = useCallback(() => {
+    /* authentication happens on the practice sign in page */
+  }, []);
   const signOut = useCallback(() => {
-    void sb.auth.signOut().then(() => { setSession(null); setFirm(null); firmId.current = null; });
+    void sb.auth.signOut().then(() => {
+      setSession(null);
+      setFirm(null);
+      firmId.current = null;
+    });
   }, []);
 
   /** Creates or updates the real practice record for the signed in user. */
   const saveFirm = useCallback((patch: Partial<Firm>) => {
-    setFirm((p) => ({ name: "", partnerName: "", email: "", city: "", frn: "", gmailConnected: false, ...(p ?? {}), ...patch }));
+    setFirm((p) => ({
+      name: "",
+      partnerName: "",
+      email: "",
+      city: "",
+      frn: "",
+      gmailConnected: false,
+      ...(p ?? {}),
+      ...patch,
+    }));
     firmReady.current = (async () => {
       const uidNow = userId.current;
       if (!uidNow) return firmId.current;
@@ -364,40 +504,88 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       if (patch.city !== undefined) payload.city = patch.city;
       if (patch.frn !== undefined) payload.membership_number = patch.frn;
       if (patch.email !== undefined) payload.email = patch.email;
-      if (patch.partnerName !== undefined) payload.contact_person = patch.partnerName;
+      if (patch.partnerName !== undefined)
+        payload.contact_person = patch.partnerName;
       if (!Object.keys(payload).length) return firmId.current;
       if (firmId.current) {
         await sb.from("ca_firms").update(payload).eq("id", firmId.current);
       } else {
-        const { data, error } = await sb.from("ca_firms").insert({
-          user_id: uidNow, firm_name: payload.firm_name ?? "My practice",
-          verification_status: "approved", is_verified: true, ...payload,
-        }).select("id").maybeSingle();
-        if (error) toast.error(`Could not create the practice: ${error.message}`);
+        const { data, error } = await sb
+          .from("ca_firms")
+          .insert({
+            user_id: uidNow,
+            firm_name: payload.firm_name ?? "My practice",
+            verification_status: "approved",
+            is_verified: true,
+            ...payload,
+          })
+          .select("id")
+          .maybeSingle();
+        if (error)
+          toast.error(`Could not create the practice: ${error.message}`);
         if (data?.id) {
           firmId.current = data.id;
-          await sb.from("ca_firm_members").insert({ ca_firm_id: data.id, user_id: uidNow, invited_email: patch.email ?? "", role: "admin", status: "active", is_active: true });
+          await sb.from("ca_firm_members").insert({
+            ca_firm_id: data.id,
+            user_id: uidNow,
+            invited_email: patch.email ?? "",
+            role: "admin",
+            status: "active",
+            is_active: true,
+          });
         }
       }
       return firmId.current;
     })();
   }, []);
 
-  const completeOnboarding = useCallback(() => { void boot(); }, [boot]);
+  const completeOnboarding = useCallback(() => {
+    void boot();
+  }, [boot]);
 
   /**
    * Shows an agent's steps while the real server call runs. Steps advance on a
    * timer but the run only finishes when the server answers.
    */
-  const track = useCallback(<T,>(agent: AgentKey, title: string, steps: string[], target: string, work: Promise<T>): Promise<T> => {
-    const id = uid();
-    setRuns((p) => [...p, { id, agent, title, steps, current: 0, target }]);
-    steps.slice(0, -1).forEach((_, i) => {
-      timers.current.push(setTimeout(() => setRuns((p) => p.map((r) => (r.id === id && r.current < i + 1 ? { ...r, current: i + 1 } : r))), 700 * (i + 1)));
-    });
-    const done = () => setRuns((p) => p.filter((r) => r.id !== id));
-    return work.then((v) => { done(); return v; }, (e) => { done(); throw e; });
-  }, []);
+  const track = useCallback(
+    <T,>(
+      agent: AgentKey,
+      title: string,
+      steps: string[],
+      target: string,
+      work: Promise<T>,
+    ): Promise<T> => {
+      const id = uid();
+      setRuns((p) => [...p, { id, agent, title, steps, current: 0, target }]);
+      steps.slice(0, -1).forEach((_, i) => {
+        timers.current.push(
+          setTimeout(
+            () =>
+              setRuns((p) =>
+                p.map((r) =>
+                  r.id === id && r.current < i + 1
+                    ? { ...r, current: i + 1 }
+                    : r,
+                ),
+              ),
+            700 * (i + 1),
+          ),
+        );
+      });
+      const done = () => setRuns((p) => p.filter((r) => r.id !== id));
+      return work.then(
+        (v) => {
+          done();
+          return v;
+        },
+        (e) => {
+          done();
+          throw e;
+        },
+      );
+    },
+    [],
+  );
 
   const waitForClient = useCallback(async (clientId: string) => {
     await firmReady.current;
@@ -405,253 +593,680 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
     if (pending) await pending;
   }, []);
 
-  const addClient = useCallback((c: Omit<Client, "id">) => {
-    const id = uid();
-    const created: Client = { ...c, id };
-    setClients((p) => [created, ...p]);
-    pendingClients.current[id] = (async () => {
-      await firmReady.current;
-      if (!firmId.current) firmId.current = (await firmReady.current) ?? null;
-      try {
-        await createPracticeClient({ data: { id, name: c.name, entityType: c.entityType, gstin: c.gstin || undefined, contactName: c.contactName || undefined, email: c.email || undefined, phone: c.phone || undefined } });
-      } catch (e) {
-        setClients((p) => p.filter((x) => x.id !== id));
-        toast.error(`Could not add ${c.name}: ${errMsg(e)}`);
-        throw e;
-      } finally {
-        delete pendingClients.current[id];
-      }
-      void refresh();
-    })();
-    pendingClients.current[id]?.catch(() => { /* reported above */ });
-    return created;
-  }, [refresh]);
-
-  const updateClient = useCallback((id: string, patch: Partial<Client>) => {
-    setClients((p) => p.map((c) => (c.id === id ? { ...c, ...patch } : c)));
-    void (async () => {
-      await waitForClient(id);
-      try {
-        await updatePracticeClient({ data: { id, patch: {
-          ...(patch.name !== undefined ? { name: patch.name } : {}),
-          ...(patch.entityType !== undefined ? { entityType: patch.entityType } : {}),
-          ...(patch.gstin !== undefined ? { gstin: patch.gstin } : {}),
-          ...(patch.contactName !== undefined ? { contactName: patch.contactName } : {}),
-          ...(patch.email !== undefined ? { email: patch.email } : {}),
-          ...(patch.phone !== undefined ? { phone: patch.phone } : {}),
-          ...(patch.doNotDisturb !== undefined ? { doNotDisturb: patch.doNotDisturb } : {}),
-          ...(patch.lastMis !== undefined ? { lastMis: patch.lastMis } : {}),
-        } } });
-      } catch (e) {
-        toast.error(`Could not save the client: ${errMsg(e)}`);
+  const addClient = useCallback(
+    (c: Omit<Client, "id">) => {
+      const id = uid();
+      const created: Client = { ...c, id };
+      setClients((p) => [created, ...p]);
+      pendingClients.current[id] = (async () => {
+        await firmReady.current;
+        if (!firmId.current) firmId.current = (await firmReady.current) ?? null;
+        try {
+          await createPracticeClient({
+            data: {
+              id,
+              name: c.name,
+              entityType: c.entityType,
+              gstin: c.gstin || undefined,
+              contactName: c.contactName || undefined,
+              email: c.email || undefined,
+              phone: c.phone || undefined,
+            },
+          });
+        } catch (e) {
+          setClients((p) => p.filter((x) => x.id !== id));
+          toast.error(`Could not add ${c.name}: ${errMsg(e)}`);
+          throw e;
+        } finally {
+          delete pendingClients.current[id];
+        }
         void refresh();
-      }
-    })();
-  }, [refresh, waitForClient]);
+      })();
+      pendingClients.current[id]?.catch(() => {
+        /* reported above */
+      });
+      return created;
+    },
+    [refresh],
+  );
+
+  const updateClient = useCallback(
+    (id: string, patch: Partial<Client>) => {
+      setClients((p) => p.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+      void (async () => {
+        await waitForClient(id);
+        try {
+          await updatePracticeClient({
+            data: {
+              id,
+              patch: {
+                ...(patch.name !== undefined ? { name: patch.name } : {}),
+                ...(patch.entityType !== undefined
+                  ? { entityType: patch.entityType }
+                  : {}),
+                ...(patch.gstin !== undefined ? { gstin: patch.gstin } : {}),
+                ...(patch.contactName !== undefined
+                  ? { contactName: patch.contactName }
+                  : {}),
+                ...(patch.email !== undefined ? { email: patch.email } : {}),
+                ...(patch.phone !== undefined ? { phone: patch.phone } : {}),
+                ...(patch.doNotDisturb !== undefined
+                  ? { doNotDisturb: patch.doNotDisturb }
+                  : {}),
+                ...(patch.lastMis !== undefined
+                  ? { lastMis: patch.lastMis }
+                  : {}),
+              },
+            },
+          });
+        } catch (e) {
+          toast.error(`Could not save the client: ${errMsg(e)}`);
+          void refresh();
+        }
+      })();
+    },
+    [refresh, waitForClient],
+  );
 
   /** Workflow A — upload the file, then the Extract agent reads it on the server. */
-  const addDoc = useCallback((name: string, clientId: string, source: Doc["source"] = "Manual", file?: File) => {
-    if (!file) { toast.error("Choose a file to upload."); return; }
-    const tempId = uid();
-    setDocs((p) => [{ id: tempId, name, clientId, source, status: "Processing", date: today(), rows: [] }, ...p]);
+  const addDoc = useCallback(
+    (
+      name: string,
+      clientId: string,
+      source: Doc["source"] = "Manual",
+      file?: File,
+    ) => {
+      if (!file) {
+        toast.error("Choose a file to upload.");
+        return;
+      }
+      const tempId = uid();
+      setDocs((p) => [
+        {
+          id: tempId,
+          name,
+          clientId,
+          source,
+          status: "Processing",
+          date: today(),
+          rows: [],
+        },
+        ...p,
+      ]);
 
-    const work = (async () => {
-      await waitForClient(clientId);
-      const fid = firmId.current ?? (await firmReady.current);
-      if (!fid) throw new Error("Create your practice first.");
-      const path = `${fid}/${clientId}/v2/${Date.now()}_${safeName(name)}`;
-      const { error: upErr } = await sb.storage.from("ca-client-documents").upload(path, file, { contentType: file.type || undefined, upsert: false });
-      if (upErr) throw new Error(`Upload failed: ${upErr.message}`);
-      return registerPracticeUpload({ data: { storage_path: path, filename: name, mime: file.type || null, business_id: clientId, source } });
-    })();
+      const work = (async () => {
+        await waitForClient(clientId);
+        const fid = firmId.current ?? (await firmReady.current);
+        if (!fid) throw new Error("Create your practice first.");
+        const path = `${fid}/${clientId}/v2/${Date.now()}_${safeName(name)}`;
+        const { error: upErr } = await sb.storage
+          .from("ca-client-documents")
+          .upload(path, file, {
+            contentType: file.type || undefined,
+            upsert: false,
+          });
+        if (upErr) throw new Error(`Upload failed: ${upErr.message}`);
+        return registerPracticeUpload({
+          data: {
+            storage_path: path,
+            filename: name,
+            mime: file.type || null,
+            business_id: clientId,
+            source,
+          },
+        });
+      })();
 
-    void track("extract", name, ["Reading file", "Identifying transaction lines", "Scoring confidence"], tempId, work)
-      .then((res) => {
-        if (res.duplicate) toast.info(`${name} was already received earlier. Nothing was added twice.`);
-        else if (res.extract_status === "failed") toast.error(`${name}: ${res.error_message ?? "could not be read"}`);
-        else if (res.review_count) toast.info(`${name}: ${res.txn_count ?? 0} transactions extracted, ${res.review_count} need review.`);
-        else if (res.extract_status === "parsed") toast.success(`${name}: ${res.txn_count ?? 0} transactions extracted.`);
+      void track(
+        "extract",
+        name,
+        ["Reading file", "Identifying transaction lines", "Scoring confidence"],
+        tempId,
+        work,
+      )
+        .then((res) => {
+          if (res.duplicate)
+            toast.info(
+              `${name} was already received earlier. Nothing was added twice.`,
+            );
+          else if (res.extract_status === "failed")
+            toast.error(`${name}: ${res.error_message ?? "could not be read"}`);
+          else if (res.review_count)
+            toast.info(
+              `${name}: ${res.txn_count ?? 0} transactions extracted, ${res.review_count} need review.`,
+            );
+          else if (res.extract_status === "parsed")
+            toast.success(
+              `${name}: ${res.txn_count ?? 0} transactions extracted.`,
+            );
+        })
+        .catch((e) => {
+          setDocs((p) =>
+            p.map((d) =>
+              d.id === tempId
+                ? { ...d, status: "Failed", error: errMsg(e) }
+                : d,
+            ),
+          );
+          toast.error(`${name}: ${errMsg(e)}`);
+        })
+        .finally(() => {
+          void refresh();
+        });
+    },
+    [refresh, track, waitForClient],
+  );
+
+  const resolveReview = useCallback(
+    (id: string, status: "confirmed" | "discarded", patch?: Txn) => {
+      setReview((p) =>
+        p.map((r) =>
+          r.id === id ? { ...r, status, suggestion: patch ?? r.suggestion } : r,
+        ),
+      );
+      void resolvePracticeReview({
+        data: {
+          id,
+          action: status === "confirmed" ? "confirm" : "discard",
+          ...(patch
+            ? {
+                patch: {
+                  date: patch.date,
+                  amount: patch.amount,
+                  particulars: patch.particulars,
+                },
+              }
+            : {}),
+        },
       })
-      .catch((e) => {
-        setDocs((p) => p.map((d) => (d.id === tempId ? { ...d, status: "Failed", error: errMsg(e) } : d)));
-        toast.error(`${name}: ${errMsg(e)}`);
+        .catch((e) => toast.error(`Review item not saved: ${errMsg(e)}`))
+        .finally(() => {
+          void refresh();
+        });
+    },
+    [refresh],
+  );
+
+  const setExceptionStatus = useCallback(
+    (
+      id: string,
+      status: Exception["status"],
+      opts?: {
+        action?: "match" | "reconciled_external";
+        counterpartIds?: string[];
+        note?: string;
+      },
+    ) => {
+      if (status === "open") return;
+      const ex = exceptions.find((e) => e.id === id);
+      setExceptions((p) => p.map((e) => (e.id === id ? { ...e, status } : e)));
+      const action =
+        status === "ignored"
+          ? "ignore"
+          : (opts?.action ?? "reconciled_external");
+      void resolvePracticeException({
+        data: {
+          id,
+          action,
+          counterpart_ids:
+            opts?.counterpartIds ??
+            (action === "match" ? ex?.candidateIds?.slice(0, 1) : undefined),
+          note: opts?.note,
+        },
       })
-      .finally(() => { void refresh(); });
-  }, [refresh, track, waitForClient]);
+        .catch((e) => {
+          setExceptions((p) =>
+            p.map((x) => (x.id === id ? { ...x, status: "open" } : x)),
+          );
+          toast.error(errMsg(e));
+        })
+        .finally(() => {
+          void refresh();
+        });
+    },
+    [exceptions, refresh],
+  );
 
-  const resolveReview = useCallback((id: string, status: "confirmed" | "discarded", patch?: Txn) => {
-    setReview((p) => p.map((r) => (r.id === id ? { ...r, status, suggestion: patch ?? r.suggestion } : r)));
-    void resolvePracticeReview({ data: {
-      id,
-      action: status === "confirmed" ? "confirm" : "discard",
-      ...(patch ? { patch: { date: patch.date, amount: patch.amount, particulars: patch.particulars } } : {}),
-    } })
-      .catch((e) => toast.error(`Review item not saved: ${errMsg(e)}`))
-      .finally(() => { void refresh(); });
-  }, [refresh]);
-
-  const setExceptionStatus = useCallback((id: string, status: Exception["status"], opts?: { action?: "match" | "reconciled_external"; counterpartIds?: string[]; note?: string }) => {
-    if (status === "open") return;
-    const ex = exceptions.find((e) => e.id === id);
-    setExceptions((p) => p.map((e) => (e.id === id ? { ...e, status } : e)));
-    const action = status === "ignored" ? "ignore" : opts?.action ?? "reconciled_external";
-    void resolvePracticeException({ data: { id, action, counterpart_ids: opts?.counterpartIds ?? (action === "match" ? ex?.candidateIds?.slice(0, 1) : undefined), note: opts?.note } })
-      .catch((e) => {
-        setExceptions((p) => p.map((x) => (x.id === id ? { ...x, status: "open" } : x)));
-        toast.error(errMsg(e));
-      })
-      .finally(() => { void refresh(); });
-  }, [exceptions, refresh]);
-
-  const clientTxns = useCallback((clientId: string) => docs.filter((d) => d.clientId === clientId).flatMap((d) => d.rows), [docs]);
+  const clientTxns = useCallback(
+    (clientId: string) =>
+      docs.filter((d) => d.clientId === clientId).flatMap((d) => d.rows),
+    [docs],
+  );
 
   /** Only transactions the Recon agent matched are allowed into an MIS. */
-  const matchedTxns = useCallback((clientId: string) => clientTxns(clientId).filter((r) => r.matchStatus === "matched"), [clientTxns]);
+  const matchedTxns = useCallback(
+    (clientId: string) =>
+      clientTxns(clientId).filter((r) => r.matchStatus === "matched"),
+    [clientTxns],
+  );
 
   /** Workflow B — deterministic matching of bank lines against the books, on the server. */
-  const runRecon = useCallback((clientId: string, onDone?: (r: ReconResult) => void) => {
-    const work = (async () => {
-      await waitForClient(clientId);
-      return runPracticeRecon({ data: { business_id: clientId, period } });
-    })();
-    void track("recon", "Reconciling bank and books", ["Loading bank lines", "Exact match pass", "Fuzzy match pass", "Flagging exceptions"], clientId, work)
-      .then((s) => {
-        if (!s.run_id) { toast.info(s.message); return; }
-        const result: ReconResult = { matched: s.matched_total, exceptions: s.exceptions, bank: s.bank + (s.matched_total - s.matched), at: today(), period: s.period.label };
-        setRecon((p) => ({ ...p, [clientId]: result }));
-        onDone?.(result);
-      })
-      .catch((e) => toast.error(`Recon failed: ${errMsg(e)}`))
-      .finally(() => { void refresh(); });
-  }, [period, refresh, track, waitForClient]);
+  const runRecon = useCallback(
+    (clientId: string, onDone?: (r: ReconResult) => void) => {
+      const work = (async () => {
+        await waitForClient(clientId);
+        return runPracticeRecon({ data: { business_id: clientId, period } });
+      })();
+      void track(
+        "recon",
+        "Reconciling bank and books",
+        [
+          "Loading bank lines",
+          "Exact match pass",
+          "Fuzzy match pass",
+          "Flagging exceptions",
+        ],
+        clientId,
+        work,
+      )
+        .then((s) => {
+          if (!s.run_id) {
+            toast.info(s.message);
+            return;
+          }
+          const result: ReconResult = {
+            matched: s.matched_total,
+            exceptions: s.exceptions,
+            bank: s.bank + (s.matched_total - s.matched),
+            at: today(),
+            period: s.period.label,
+          };
+          setRecon((p) => ({ ...p, [clientId]: result }));
+          onDone?.(result);
+        })
+        .catch((e) => toast.error(`Recon failed: ${errMsg(e)}`))
+        .finally(() => {
+          void refresh();
+        });
+    },
+    [period, refresh, track, waitForClient],
+  );
 
   /** Stage 7 — the partner either accepts the MIS or sends it back. */
-  const signOffReport = useCallback((reportId: string, by: string) => {
-    setReports((p) => p.map((r) => (r.id === reportId ? { ...r, signedOff: { by, at: today() }, correction: undefined } : r)));
-    void signOffPracticeReport({ data: { id: reportId, by } })
-      .catch((e) => toast.error(errMsg(e)))
-      .finally(() => { void refresh(); });
-  }, [refresh]);
+  const signOffReport = useCallback(
+    (reportId: string, by: string) => {
+      setReports((p) =>
+        p.map((r) =>
+          r.id === reportId
+            ? { ...r, signedOff: { by, at: today() }, correction: undefined }
+            : r,
+        ),
+      );
+      void signOffPracticeReport({ data: { id: reportId, by } })
+        .catch((e) => toast.error(errMsg(e)))
+        .finally(() => {
+          void refresh();
+        });
+    },
+    [refresh],
+  );
 
-  const requestCorrection = useCallback((reportId: string, note: string) => {
-    setReports((p) => p.map((r) => (r.id === reportId ? { ...r, correction: { note, at: today() }, signedOff: undefined } : r)));
-    void requestPracticeReportCorrection({ data: { id: reportId, note } })
-      .catch((e) => toast.error(errMsg(e)))
-      .finally(() => { void refresh(); });
-  }, [refresh]);
+  const requestCorrection = useCallback(
+    (reportId: string, note: string) => {
+      setReports((p) =>
+        p.map((r) =>
+          r.id === reportId
+            ? { ...r, correction: { note, at: today() }, signedOff: undefined }
+            : r,
+        ),
+      );
+      void requestPracticeReportCorrection({ data: { id: reportId, note } })
+        .catch((e) => toast.error(errMsg(e)))
+        .finally(() => {
+          void refresh();
+        });
+    },
+    [refresh],
+  );
 
   /** Workflow C — Narrate agent: numbers computed on the server, insights cited. */
-  const generateReport = useCallback((clientId: string, reportPeriod: string, template: ReportTemplate, onDone: (r: Report) => void) => {
-    const work = (async () => {
-      await waitForClient(clientId);
-      return generatePracticeReport({ data: { business_id: clientId, period: reportPeriod, template } });
-    })();
-    void track("narrate", `${template} for ${reportPeriod}`, ["Collecting matched transactions", "Computing figures", "Writing insights"], clientId, work)
-      .then(async (r) => {
-        const c = r.content;
-        const created: Report = {
-          id: r.id, clientId, period: r.period, template, generated: today(),
-          excluded: c.excluded, revenue: c.revenue, expenses: c.expenses,
-          sources: c.sources, variances: c.variances, bankSummary: c.bankSummary, insights: c.insights, warnings: c.warnings,
-        };
-        setReports((p) => [created, ...p.filter((x) => x.id !== created.id)]);
-        setClients((p) => p.map((x) => (x.id === clientId ? { ...x, lastMis: today() } : x)));
-        onDone(created);
-      })
-      .catch((e) => toast.error(errMsg(e)))
-      .finally(() => { void refresh(); });
-  }, [refresh, track, waitForClient]);
+  const generateReport = useCallback(
+    (
+      clientId: string,
+      reportPeriod: string,
+      template: ReportTemplate,
+      onDone: (r: Report) => void,
+    ) => {
+      const work = (async () => {
+        await waitForClient(clientId);
+        return generatePracticeReport({
+          data: { business_id: clientId, period: reportPeriod, template },
+        });
+      })();
+      void track(
+        "narrate",
+        `${template} for ${reportPeriod}`,
+        [
+          "Collecting matched transactions",
+          "Computing figures",
+          "Writing insights",
+        ],
+        clientId,
+        work,
+      )
+        .then(async (r) => {
+          const c = r.content;
+          const created: Report = {
+            id: r.id,
+            clientId,
+            period: r.period,
+            template,
+            generated: today(),
+            excluded: c.excluded,
+            revenue: c.revenue,
+            expenses: c.expenses,
+            sources: c.sources,
+            variances: c.variances,
+            bankSummary: c.bankSummary,
+            insights: c.insights,
+            warnings: c.warnings,
+          };
+          setReports((p) => [created, ...p.filter((x) => x.id !== created.id)]);
+          setClients((p) =>
+            p.map((x) => (x.id === clientId ? { ...x, lastMis: today() } : x)),
+          );
+          onDone(created);
+        })
+        .catch((e) => toast.error(errMsg(e)))
+        .finally(() => {
+          void refresh();
+        });
+    },
+    [refresh, track, waitForClient],
+  );
 
-  const addChase = useCallback((c: Omit<Chase, "id" | "timeline" | "status" | "followUps">) => {
-    const temp: Chase = { ...c, id: uid(), status: "Open", followUps: 0, timeline: [{ at: today(), text: "Chase created", agent: "chaser" }] };
-    setChases((p) => [temp, ...p]);
-    void (async () => {
-      await waitForClient(c.clientId);
-      await createPracticeChase({ data: { business_id: c.clientId, type: c.type, contact: c.contact, phone: c.phone || undefined, due: c.due || null, note: c.note || undefined, period } });
-    })()
-      .catch((e) => {
-        setChases((p) => p.filter((x) => x.id !== temp.id));
-        toast.error(`Chase not created: ${errMsg(e)}`);
-      })
-      .finally(() => { void refresh(); });
-  }, [period, refresh, waitForClient]);
+  const addChase = useCallback(
+    (c: Omit<Chase, "id" | "timeline" | "status" | "followUps">) => {
+      const temp: Chase = {
+        ...c,
+        id: uid(),
+        status: "Open",
+        followUps: 0,
+        timeline: [{ at: today(), text: "Chase created", agent: "chaser" }],
+      };
+      setChases((p) => [temp, ...p]);
+      void (async () => {
+        await waitForClient(c.clientId);
+        await createPracticeChase({
+          data: {
+            business_id: c.clientId,
+            type: c.type,
+            contact: c.contact,
+            phone: c.phone || undefined,
+            due: c.due || null,
+            note: c.note || undefined,
+            period,
+          },
+        });
+      })()
+        .catch((e) => {
+          setChases((p) => p.filter((x) => x.id !== temp.id));
+          toast.error(`Chase not created: ${errMsg(e)}`);
+        })
+        .finally(() => {
+          void refresh();
+        });
+    },
+    [period, refresh, waitForClient],
+  );
 
   /** Workflow D — email goes out from the server; WhatsApp is logged (the page opens wa.me). */
-  const sendFollowUp = useCallback((id: string, channel: "Email" | "WhatsApp") => {
-    void sendPracticeFollowUp({ data: { id, channel } })
-      .then((res) => {
-        if (channel === "Email" && "simulated" in res && res.simulated) toast.info("Email service is not configured yet, so the follow up was recorded but not sent.");
-      })
-      .catch((e) => toast.error(errMsg(e)))
-      .finally(() => { void refresh(); });
-  }, [refresh]);
+  const sendFollowUp = useCallback(
+    (id: string, channel: "Email" | "WhatsApp") => {
+      void sendPracticeFollowUp({ data: { id, channel } })
+        .then((res) => {
+          if (channel === "Email" && "simulated" in res && res.simulated)
+            toast.info(
+              "Email service is not configured yet, so the follow up was recorded but not sent.",
+            );
+        })
+        .catch((e) => toast.error(errMsg(e)))
+        .finally(() => {
+          void refresh();
+        });
+    },
+    [refresh],
+  );
 
-  const setChaseStatus = useCallback((id: string, status: Chase["status"], note?: string) => {
-    const target = status === "Resolved" ? "Resolved" : "Open";
-    setChases((p) => p.map((c) => (c.id === id ? { ...c, status: target === "Resolved" ? "Resolved" : "Open" } : c)));
-    void setPracticeChaseStatus({ data: { id, status: target, note } })
-      .catch((e) => toast.error(errMsg(e)))
-      .finally(() => { void refresh(); });
-  }, [refresh]);
+  const setChaseStatus = useCallback(
+    (id: string, status: Chase["status"], note?: string) => {
+      const target = status === "Resolved" ? "Resolved" : "Open";
+      setChases((p) =>
+        p.map((c) =>
+          c.id === id
+            ? { ...c, status: target === "Resolved" ? "Resolved" : "Open" }
+            : c,
+        ),
+      );
+      void setPracticeChaseStatus({ data: { id, status: target, note } })
+        .catch((e) => toast.error(errMsg(e)))
+        .finally(() => {
+          void refresh();
+        });
+    },
+    [refresh],
+  );
 
-  const activityFor = useCallback((clientId: string) => activity.filter((a) => a.clientId === clientId), [activity]);
+  const activityFor = useCallback(
+    (clientId: string) => activity.filter((a) => a.clientId === clientId),
+    [activity],
+  );
 
   /**
    * Close progress for one client. The stages mirror how a CA firm actually
    * closes a month, and the next action is the single most useful step left.
    */
-  const closeStateFor = useCallback((clientId: string): CloseState => {
-    const cDocs = docs.filter((d) => d.clientId === clientId);
-    const parsed = cDocs.filter((d) => d.status === "Parsed");
-    const openReview = review.filter((r) => r.clientId === clientId && r.status === "open");
-    const openEx = exceptions.filter((e) => e.clientId === clientId && e.status === "open");
-    const openChase = chases.filter((c) => c.clientId === clientId && c.status !== "Resolved");
-    const run = recon[clientId];
-    const reconRun = run && (!run.period || run.period === period) ? run : undefined;
-    const mis = reports.filter((r) => r.clientId === clientId && r.period === period);
+  const closeStateFor = useCallback(
+    (clientId: string): CloseState => {
+      const cDocs = docs.filter((d) => d.clientId === clientId);
+      const parsed = cDocs.filter((d) => d.status === "Parsed");
+      const openReview = review.filter(
+        (r) => r.clientId === clientId && r.status === "open",
+      );
+      const openEx = exceptions.filter(
+        (e) => e.clientId === clientId && e.status === "open",
+      );
+      const openChase = chases.filter(
+        (c) => c.clientId === clientId && c.status !== "Resolved",
+      );
+      const run = recon[clientId];
+      const reconRun =
+        run && (!run.period || run.period === period) ? run : undefined;
+      const mis = reports.filter(
+        (r) => r.clientId === clientId && r.period === period,
+      );
 
-    const steps: CloseStep[] = [
-      { stage: "Documents", done: parsed.length > 0 && openChase.length === 0, detail: openChase.length ? `${openChase.length} still being chased` : `${parsed.length} documents read` },
-      { stage: "Review", done: parsed.length > 0 && openReview.length === 0, detail: openReview.length ? `${openReview.length} rows to confirm` : "All rows confirmed" },
-      { stage: "Recon", done: Boolean(reconRun), detail: reconRun ? `${reconRun.matched} of ${reconRun.bank} matched` : "Not run for this period" },
-      { stage: "Exceptions", done: Boolean(reconRun) && openEx.length === 0, detail: openEx.length ? `${openEx.length} to clear` : "Nothing unmatched" },
-      { stage: "MIS", done: mis.some((r) => r.signedOff), detail: mis.some((r) => r.signedOff) ? "Signed off by the partner" : mis.length ? "Waiting for partner sign off" : "Not generated yet" },
-    ];
+      const steps: CloseStep[] = [
+        {
+          stage: "Documents",
+          done: parsed.length > 0 && openChase.length === 0,
+          detail: openChase.length
+            ? `${openChase.length} still being chased`
+            : `${parsed.length} documents read`,
+        },
+        {
+          stage: "Review",
+          done: parsed.length > 0 && openReview.length === 0,
+          detail: openReview.length
+            ? `${openReview.length} rows to confirm`
+            : "All rows confirmed",
+        },
+        {
+          stage: "Recon",
+          done: Boolean(reconRun),
+          detail: reconRun
+            ? `${reconRun.matched} of ${reconRun.bank} matched`
+            : "Not run for this period",
+        },
+        {
+          stage: "Exceptions",
+          done: Boolean(reconRun) && openEx.length === 0,
+          detail: openEx.length
+            ? `${openEx.length} to clear`
+            : "Nothing unmatched",
+        },
+        {
+          stage: "MIS",
+          done: mis.some((r) => r.signedOff),
+          detail: mis.some((r) => r.signedOff)
+            ? "Signed off by the partner"
+            : mis.length
+              ? "Waiting for partner sign off"
+              : "Not generated yet",
+        },
+      ];
 
-    const firstOpen = steps.find((s) => !s.done);
-    const percent = Math.round((steps.filter((s) => s.done).length / steps.length) * 100);
+      const firstOpen = steps.find((s) => !s.done);
+      const percent = Math.round(
+        (steps.filter((s) => s.done).length / steps.length) * 100,
+      );
 
-    let next: CloseState["next"];
-    if (!firstOpen) {
-      next = { label: "This period is closed", why: "The partner has signed off and every figure still links to its source.", tab: "mis" };
-    } else if (firstOpen.stage === "Documents") {
-      next = openChase.length
-        ? { label: "Follow up on pending documents", why: `${openChase.length} item${openChase.length > 1 ? "s are" : " is"} still with the client.`, tab: "chaser" }
-        : { label: "Upload the first document", why: "Nothing has been collected for this client yet.", tab: "documents", action: "upload" };
-    } else if (firstOpen.stage === "Review") {
-      next = { label: `Confirm ${openReview.length} extracted row${openReview.length > 1 ? "s" : ""}`, why: "The Extract agent was unsure about these. Recon needs them confirmed first.", tab: "review" };
-    } else if (firstOpen.stage === "Recon") {
-      next = { label: "Run recon for this period", why: "Bank and books have not been matched yet.", tab: "recon", action: "recon" };
-    } else if (firstOpen.stage === "Exceptions") {
-      next = { label: `Clear ${openEx.length} exception${openEx.length > 1 ? "s" : ""}`, why: "Only matched transactions are allowed into the MIS.", tab: "exceptions" };
-    } else {
-      next = mis.length
-        ? { label: "Send the MIS to the partner for sign off", why: "The report is ready and waiting for a partner to accept it.", tab: "mis" }
-        : { label: `Generate the ${period} MIS`, why: "Recon is clean, so the numbers can be trusted.", tab: "mis", action: "mis" };
-    }
+      let next: CloseState["next"];
+      if (!firstOpen) {
+        next = {
+          label: "This period is closed",
+          why: "The partner has signed off and every figure still links to its source.",
+          tab: "mis",
+        };
+      } else if (firstOpen.stage === "Documents") {
+        next = openChase.length
+          ? {
+              label: "Follow up on pending documents",
+              why: `${openChase.length} item${openChase.length > 1 ? "s are" : " is"} still with the client.`,
+              tab: "chaser",
+            }
+          : {
+              label: "Upload the first document",
+              why: "Nothing has been collected for this client yet.",
+              tab: "documents",
+              action: "upload",
+            };
+      } else if (firstOpen.stage === "Review") {
+        next = {
+          label: `Confirm ${openReview.length} extracted row${openReview.length > 1 ? "s" : ""}`,
+          why: "The Extract agent was unsure about these. Recon needs them confirmed first.",
+          tab: "review",
+        };
+      } else if (firstOpen.stage === "Recon") {
+        next = {
+          label: "Run recon for this period",
+          why: "Bank and books have not been matched yet.",
+          tab: "recon",
+          action: "recon",
+        };
+      } else if (firstOpen.stage === "Exceptions") {
+        next = {
+          label: `Clear ${openEx.length} exception${openEx.length > 1 ? "s" : ""}`,
+          why: "Only matched transactions are allowed into the MIS.",
+          tab: "exceptions",
+        };
+      } else {
+        next = mis.length
+          ? {
+              label: "Send the MIS to the partner for sign off",
+              why: "The report is ready and waiting for a partner to accept it.",
+              tab: "mis",
+            }
+          : {
+              label: `Generate the ${period} MIS`,
+              why: "Recon is clean, so the numbers can be trusted.",
+              tab: "mis",
+              action: "mis",
+            };
+      }
 
-    return { steps, percent, stage: firstOpen ? firstOpen.stage : "MIS", next };
-  }, [docs, review, exceptions, chases, recon, reports, period]);
+      return {
+        steps,
+        percent,
+        stage: firstOpen ? firstOpen.stage : "MIS",
+        next,
+      };
+    },
+    [docs, review, exceptions, chases, recon, reports, period],
+  );
 
-  const value = useMemo<Store>(() => ({
-    hydrated, session, firm, onboarded: Boolean(firm), signIn, signOut, saveFirm, completeOnboarding, refresh,
-    clients, docs, review, exceptions, reports, chases, runs, recon,
-    runsFor: (target: string) => runs.filter((r) => r.target === target),
-    addClient, updateClient, addDoc, resolveReview, setExceptionStatus, runRecon, generateReport,
-    addChase, sendFollowUp, setChaseStatus, clientTxns, matchedTxns, signOffReport, requestCorrection,
-    clientName: (id: string) => clients.find((c) => c.id === id)?.name ?? "Unassigned",
-    period, setPeriod, role, setRole, activity, activityFor, closeStateFor,
-  }), [matchedTxns, signOffReport, requestCorrection, period, role, activity, activityFor, closeStateFor, hydrated, session, firm, signIn, signOut, saveFirm, completeOnboarding, refresh, clients, docs, review, exceptions, reports, chases, runs, recon, addClient, updateClient, addDoc, resolveReview, setExceptionStatus, runRecon, generateReport, addChase, sendFollowUp, setChaseStatus, clientTxns]);
+  const value = useMemo<Store>(
+    () => ({
+      hydrated,
+      session,
+      firm,
+      onboarded: Boolean(firm),
+      signIn,
+      signOut,
+      saveFirm,
+      completeOnboarding,
+      refresh,
+      clients,
+      docs,
+      review,
+      exceptions,
+      reports,
+      chases,
+      runs,
+      recon,
+      runsFor: (target: string) => runs.filter((r) => r.target === target),
+      addClient,
+      updateClient,
+      addDoc,
+      resolveReview,
+      setExceptionStatus,
+      runRecon,
+      generateReport,
+      addChase,
+      sendFollowUp,
+      setChaseStatus,
+      clientTxns,
+      matchedTxns,
+      signOffReport,
+      requestCorrection,
+      clientName: (id: string) =>
+        clients.find((c) => c.id === id)?.name ?? "Unassigned",
+      period,
+      setPeriod,
+      role,
+      setRole,
+      activity,
+      activityFor,
+      closeStateFor,
+    }),
+    [
+      matchedTxns,
+      signOffReport,
+      requestCorrection,
+      period,
+      role,
+      activity,
+      activityFor,
+      closeStateFor,
+      hydrated,
+      session,
+      firm,
+      signIn,
+      signOut,
+      saveFirm,
+      completeOnboarding,
+      refresh,
+      clients,
+      docs,
+      review,
+      exceptions,
+      reports,
+      chases,
+      runs,
+      recon,
+      addClient,
+      updateClient,
+      addDoc,
+      resolveReview,
+      setExceptionStatus,
+      runRecon,
+      generateReport,
+      addChase,
+      sendFollowUp,
+      setChaseStatus,
+      clientTxns,
+    ],
+  );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
@@ -662,4 +1277,11 @@ export function useV2() {
   return ctx;
 }
 
-export const ENTITY_TYPES = ["Private Limited", "LLP", "Partnership", "Proprietorship", "Public Limited", "Trust or Society"];
+export const ENTITY_TYPES = [
+  "Private Limited",
+  "LLP",
+  "Partnership",
+  "Proprietorship",
+  "Public Limited",
+  "Trust or Society",
+];

@@ -21,11 +21,16 @@ import {
   type AiRowVerdict,
   type ScoredRow,
 } from "./classify";
-import { looksLikeSpreadsheetBinary, parseDelimited, rowsFromTable } from "./table";
+import {
+  looksLikeSpreadsheetBinary,
+  parseDelimited,
+  rowsFromTable,
+} from "./table";
 import { isTallyXml, rowsFromTally } from "./tally";
 import { rowsFromStatementText } from "./textStatement";
 
-export type FileKind = "csv" | "xlsx" | "tally_xml" | "pdf" | "image" | "unsupported";
+export type FileKind =
+  "csv" | "xlsx" | "tally_xml" | "pdf" | "image" | "unsupported";
 
 export interface LlmJsonRequest {
   purpose: string;
@@ -99,16 +104,40 @@ export class PdfPasswordError extends Error {
 const BATCH = 12;
 const MAX_TEXT_CHARS = 60_000;
 
-export function detectKind(bytes: Uint8Array, filename: string, mime: string | null): FileKind {
+export function detectKind(
+  bytes: Uint8Array,
+  filename: string,
+  mime: string | null,
+): FileKind {
   const name = filename.toLowerCase();
   const head = new TextDecoder().decode(bytes.slice(0, 2048)).trimStart();
-  if (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) return "pdf"; // %PDF
-  if ((bytes[0] === 0xff && bytes[1] === 0xd8) || (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e)) return "image";
-  if (/\.(jpe?g|png|webp|heic)$/.test(name) || mime?.startsWith("image/")) return "image";
+  if (
+    bytes[0] === 0x25 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x44 &&
+    bytes[3] === 0x46
+  )
+    return "pdf"; // %PDF
+  if (
+    (bytes[0] === 0xff && bytes[1] === 0xd8) ||
+    (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e)
+  )
+    return "image";
+  if (/\.(jpe?g|png|webp|heic)$/.test(name) || mime?.startsWith("image/"))
+    return "image";
   if (looksLikeSpreadsheetBinary(bytes)) return "xlsx"; // includes Excel renamed to .csv
-  if (head.startsWith("<") && isTallyXml(new TextDecoder().decode(bytes.slice(0, 8192)))) return "tally_xml";
+  if (
+    head.startsWith("<") &&
+    isTallyXml(new TextDecoder().decode(bytes.slice(0, 8192)))
+  )
+    return "tally_xml";
   if (/\.(xml)$/.test(name)) return "tally_xml";
-  if (/\.(csv|tsv|txt)$/.test(name) || mime?.includes("csv") || mime?.startsWith("text/")) return "csv";
+  if (
+    /\.(csv|tsv|txt)$/.test(name) ||
+    mime?.includes("csv") ||
+    mime?.startsWith("text/")
+  )
+    return "csv";
   return "unsupported";
 }
 
@@ -119,21 +148,33 @@ export function detectKind(bytes: Uint8Array, filename: string, mime: string | n
 export function inferSide(filename: string, kind: FileKind): Side {
   const n = filename.toLowerCase();
   if (kind === "tally_xml") return "books";
-  if (/(statement|stmt|bank|passbook|account|a\/c|hdfc|icici|sbi|axis|kotak)/.test(n)) return "bank";
-  if (/(invoice|inv|bill|purchase|sales|ledger|daybook|day book|tally|books|voucher|receipt)/.test(n)) return "books";
+  if (
+    /(statement|stmt|bank|passbook|account|a\/c|hdfc|icici|sbi|axis|kotak)/.test(
+      n,
+    )
+  )
+    return "bank";
+  if (
+    /(invoice|inv|bill|purchase|sales|ledger|daybook|day book|tally|books|voucher|receipt)/.test(
+      n,
+    )
+  )
+    return "books";
   return kind === "csv" || kind === "xlsx" ? "bank" : "books";
 }
 
 function decodeText(bytes: Uint8Array): string {
   const utf8 = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
   // UTF-16 exports (some Tally versions) show up full of NULs.
-  if ((utf8.match(/\u0000/g) ?? []).length > utf8.length / 4) return new TextDecoder("utf-16le").decode(bytes);
+  if (utf8.split(String.fromCharCode(0)).length - 1 > utf8.length / 4)
+    return new TextDecoder("utf-16le").decode(bytes);
   return utf8;
 }
 
 function toBase64(bytes: Uint8Array): string {
   let s = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  for (let i = 0; i < bytes.length; i += 0x8000)
+    s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(s);
 }
 
@@ -146,16 +187,45 @@ async function aiRead(
   const started = Date.now();
   try {
     const res = await deps.llm.json(req);
-    const data = (res.data ?? {}) as { rows?: AiReadRow[]; document_kind?: string };
-    calls.push({ purpose: req.purpose, provider: res.provider, model: res.model, input: req.user.slice(0, 20_000), output: res.raw.slice(0, 20_000), latency_ms: res.latency_ms, status: "success", error: null });
-    return { rows: Array.isArray(data.rows) ? data.rows : [], kind: data.document_kind ?? null };
+    const data = (res.data ?? {}) as {
+      rows?: AiReadRow[];
+      document_kind?: string;
+    };
+    calls.push({
+      purpose: req.purpose,
+      provider: res.provider,
+      model: res.model,
+      input: req.user.slice(0, 20_000),
+      output: res.raw.slice(0, 20_000),
+      latency_ms: res.latency_ms,
+      status: "success",
+      error: null,
+    });
+    return {
+      rows: Array.isArray(data.rows) ? data.rows : [],
+      kind: data.document_kind ?? null,
+    };
   } catch (e) {
-    calls.push({ purpose: req.purpose, provider: null, model: null, input: req.user.slice(0, 20_000), output: null, latency_ms: Date.now() - started, status: "error", error: e instanceof Error ? e.message : String(e) });
+    calls.push({
+      purpose: req.purpose,
+      provider: null,
+      model: null,
+      input: req.user.slice(0, 20_000),
+      output: null,
+      latency_ms: Date.now() - started,
+      status: "error",
+      error: e instanceof Error ? e.message : String(e),
+    });
     return null;
   }
 }
 
-async function aiClassify(deps: ExtractDeps, calls: AiCallRecord[], rows: ExtractedRow[], side: Side): Promise<Map<number, AiRowVerdict>> {
+async function aiClassify(
+  deps: ExtractDeps,
+  calls: AiCallRecord[],
+  rows: ExtractedRow[],
+  side: Side,
+): Promise<Map<number, AiRowVerdict>> {
   const verdicts = new Map<number, AiRowVerdict>();
   if (!deps.llm || rows.length === 0) return verdicts;
   const limit = deps.maxAiRows ?? 240;
@@ -165,24 +235,63 @@ async function aiClassify(deps: ExtractDeps, calls: AiCallRecord[], rows: Extrac
     const user = classifyUserPrompt(batch, side);
     const started = Date.now();
     try {
-      const res = await deps.llm.json({ purpose: "extract_classify", system: CLASSIFY_SYSTEM_PROMPT, user });
+      const res = await deps.llm.json({
+        purpose: "extract_classify",
+        system: CLASSIFY_SYSTEM_PROMPT,
+        user,
+      });
       const list = ((res.data ?? {}) as { rows?: AiRowVerdict[] }).rows ?? [];
-      for (const v of list) if (typeof v?.index === "number") verdicts.set(v.index, v);
-      calls.push({ purpose: "extract_classify", provider: res.provider, model: res.model, input: user, output: res.raw.slice(0, 20_000), latency_ms: res.latency_ms, status: "success", error: null });
+      for (const v of list)
+        if (typeof v?.index === "number") verdicts.set(v.index, v);
+      calls.push({
+        purpose: "extract_classify",
+        provider: res.provider,
+        model: res.model,
+        input: user,
+        output: res.raw.slice(0, 20_000),
+        latency_ms: res.latency_ms,
+        status: "success",
+        error: null,
+      });
     } catch (e) {
       // Rate limited or down: rules-only for this batch, and stop asking.
-      calls.push({ purpose: "extract_classify", provider: null, model: null, input: user, output: null, latency_ms: Date.now() - started, status: "error", error: e instanceof Error ? e.message : String(e) });
+      calls.push({
+        purpose: "extract_classify",
+        provider: null,
+        model: null,
+        input: user,
+        output: null,
+        latency_ms: Date.now() - started,
+        status: "error",
+        error: e instanceof Error ? e.message : String(e),
+      });
       break;
     }
   }
   return verdicts;
 }
 
-function fail(kind: FileKind, code: string, message: string, calls: AiCallRecord[] = []): ExtractOutcome {
-  return { kind, rows: [], duplicateRows: 0, sourceText: "", aiCalls: calls, documentKind: null, error: { code, message } };
+function fail(
+  kind: FileKind,
+  code: string,
+  message: string,
+  calls: AiCallRecord[] = [],
+): ExtractOutcome {
+  return {
+    kind,
+    rows: [],
+    duplicateRows: 0,
+    sourceText: "",
+    aiCalls: calls,
+    documentKind: null,
+    error: { code, message },
+  };
 }
 
-export async function runExtract(input: ExtractInput, deps: ExtractDeps): Promise<ExtractOutcome> {
+export async function runExtract(
+  input: ExtractInput,
+  deps: ExtractDeps,
+): Promise<ExtractOutcome> {
   const threshold = deps.threshold ?? CONFIDENCE_THRESHOLD;
   const calls: AiCallRecord[] = [];
   const kind = detectKind(input.bytes, input.filename, input.mime);
@@ -192,7 +301,11 @@ export async function runExtract(input: ExtractInput, deps: ExtractDeps): Promis
   let aiReadUsed = false;
 
   if (kind === "unsupported") {
-    return fail(kind, "unsupported_type", "Only CSV, Excel, Tally XML, PDF and image files can be read.");
+    return fail(
+      kind,
+      "unsupported_type",
+      "Only CSV, Excel, Tally XML, PDF and image files can be read.",
+    );
   }
 
   if (kind === "csv") {
@@ -200,26 +313,60 @@ export async function runExtract(input: ExtractInput, deps: ExtractDeps): Promis
     parsed = rowsFromTable(parseDelimited(sourceText));
     documentKind = input.side === "bank" ? "bank_statement" : "ledger_export";
   } else if (kind === "xlsx") {
-    if (!deps.sheetRows) return fail(kind, "unsupported_type", "Excel reading is not available on this server.");
+    if (!deps.sheetRows)
+      return fail(
+        kind,
+        "unsupported_type",
+        "Excel reading is not available on this server.",
+      );
     let rows: string[][];
-    try { rows = deps.sheetRows(input.bytes); } catch { return fail(kind, "unreadable", "The Excel file could not be opened. It may be password protected or damaged."); }
-    sourceText = rows.slice(0, 2000).map((r) => r.join(", ")).join("\n");
+    try {
+      rows = deps.sheetRows(input.bytes);
+    } catch {
+      return fail(
+        kind,
+        "unreadable",
+        "The Excel file could not be opened. It may be password protected or damaged.",
+      );
+    }
+    sourceText = rows
+      .slice(0, 2000)
+      .map((r) => r.join(", "))
+      .join("\n");
     parsed = rowsFromTable(rows);
     documentKind = input.side === "bank" ? "bank_statement" : "ledger_export";
   } else if (kind === "tally_xml") {
     sourceText = decodeText(input.bytes);
-    try { parsed = rowsFromTally(sourceText); } catch (e) { return fail(kind, "unreadable", `Tally XML could not be read: ${e instanceof Error ? e.message : e}`); }
+    try {
+      parsed = rowsFromTally(sourceText);
+    } catch (e) {
+      return fail(
+        kind,
+        "unreadable",
+        `Tally XML could not be read: ${e instanceof Error ? e.message : e}`,
+      );
+    }
     documentKind = "tally_export";
   } else if (kind === "pdf") {
     let pdf: { text: string; pages: number } | null = null;
     if (deps.pdfText) {
-      try { pdf = await deps.pdfText(input.bytes); } catch (e) {
-        if (e instanceof PdfPasswordError) return fail(kind, "password_protected", "This PDF is password protected. Ask the client for an unlocked copy or the password.");
+      try {
+        pdf = await deps.pdfText(input.bytes);
+      } catch (e) {
+        if (e instanceof PdfPasswordError)
+          return fail(
+            kind,
+            "password_protected",
+            "This PDF is password protected. Ask the client for an unlocked copy or the password.",
+          );
         pdf = null;
       }
     }
     const text = pdf?.text ?? "";
-    const textRich = pdf ? text.replace(/\s/g, "").length >= 80 * Math.max(1, Math.min(pdf.pages, 3)) : false;
+    const textRich = pdf
+      ? text.replace(/\s/g, "").length >=
+        80 * Math.max(1, Math.min(pdf.pages, 3))
+      : false;
     if (textRich) {
       sourceText = text.slice(0, MAX_TEXT_CHARS);
       const statement = rowsFromStatementText(sourceText);
@@ -227,40 +374,77 @@ export async function runExtract(input: ExtractInput, deps: ExtractDeps): Promis
         parsed = statement.rows;
         documentKind = "bank_statement";
       } else {
-        const read = await aiRead(deps, calls, { purpose: "extract_read_text", system: READ_SYSTEM_PROMPT, user: `Document text:\n${sourceText}` });
+        const read = await aiRead(deps, calls, {
+          purpose: "extract_read_text",
+          system: READ_SYSTEM_PROMPT,
+          user: `Document text:\n${sourceText}`,
+        });
         if (read) {
           aiReadUsed = true;
           parsed = rowsFromAiRead(read.rows, sourceText);
           documentKind = read.kind;
         } else if (statement.rows.length) {
-          parsed = statement.rows.map((r) => ({ ...r, parse_confidence: Math.min(r.parse_confidence, 0.6) }));
+          parsed = statement.rows.map((r) => ({
+            ...r,
+            parse_confidence: Math.min(r.parse_confidence, 0.6),
+          }));
           documentKind = "bank_statement";
         } else {
-          return fail(kind, "needs_ai", "The PDF has text but no statement layout was recognised, and the AI reader is not configured.", calls);
+          return fail(
+            kind,
+            "needs_ai",
+            "The PDF has text but no statement layout was recognised, and the AI reader is not configured.",
+            calls,
+          );
         }
       }
     } else {
-      if (input.bytes.length > 15_000_000) return fail(kind, "too_large", "Scanned PDFs larger than 15 MB must be split before upload.");
+      if (input.bytes.length > 15_000_000)
+        return fail(
+          kind,
+          "too_large",
+          "Scanned PDFs larger than 15 MB must be split before upload.",
+        );
       const read = await aiRead(deps, calls, {
         purpose: "extract_read_scan",
         system: READ_SYSTEM_PROMPT,
         user: "This is a scanned document. Read it carefully.",
         attachment: { mime: "application/pdf", base64: toBase64(input.bytes) },
       });
-      if (!read) return fail(kind, "needs_ai", "This PDF is scanned (no text layer). Configure the AI reader (LOVABLE_API_KEY or GEMINI_API_KEY) to read scanned files.", calls);
+      if (!read)
+        return fail(
+          kind,
+          "needs_ai",
+          "This PDF is scanned (no text layer). Configure the AI reader (LOVABLE_API_KEY or GEMINI_API_KEY) to read scanned files.",
+          calls,
+        );
       aiReadUsed = true;
       parsed = rowsFromAiRead(read.rows, "");
       documentKind = read.kind;
     }
   } else if (kind === "image") {
-    if (input.bytes.length > 10_000_000) return fail(kind, "too_large", "Images larger than 10 MB cannot be read.");
+    if (input.bytes.length > 10_000_000)
+      return fail(
+        kind,
+        "too_large",
+        "Images larger than 10 MB cannot be read.",
+      );
     const read = await aiRead(deps, calls, {
       purpose: "extract_read_image",
       system: READ_SYSTEM_PROMPT,
       user: "This is a photo of a financial document. Read it carefully; photos may be blurred or tilted.",
-      attachment: { mime: input.mime?.startsWith("image/") ? input.mime : "image/jpeg", base64: toBase64(input.bytes) },
+      attachment: {
+        mime: input.mime?.startsWith("image/") ? input.mime : "image/jpeg",
+        base64: toBase64(input.bytes),
+      },
     });
-    if (!read) return fail(kind, "needs_ai", "Photos need the AI reader. Configure LOVABLE_API_KEY or GEMINI_API_KEY.", calls);
+    if (!read)
+      return fail(
+        kind,
+        "needs_ai",
+        "Photos need the AI reader. Configure LOVABLE_API_KEY or GEMINI_API_KEY.",
+        calls,
+      );
     aiReadUsed = true;
     parsed = rowsFromAiRead(read.rows, "");
     documentKind = read.kind;
@@ -269,9 +453,19 @@ export async function runExtract(input: ExtractInput, deps: ExtractDeps): Promis
   if (parsed === null) {
     // Table without a recognisable header: let the AI read the text, if available.
     const read = sourceText
-      ? await aiRead(deps, calls, { purpose: "extract_read_text", system: READ_SYSTEM_PROMPT, user: `Document text:\n${sourceText.slice(0, MAX_TEXT_CHARS)}` })
+      ? await aiRead(deps, calls, {
+          purpose: "extract_read_text",
+          system: READ_SYSTEM_PROMPT,
+          user: `Document text:\n${sourceText.slice(0, MAX_TEXT_CHARS)}`,
+        })
       : null;
-    if (!read) return fail(kind, "no_header", "No date and amount columns were found in this file.", calls);
+    if (!read)
+      return fail(
+        kind,
+        "no_header",
+        "No date and amount columns were found in this file.",
+        calls,
+      );
     aiReadUsed = true;
     parsed = rowsFromAiRead(read.rows, sourceText);
     documentKind = read.kind;
@@ -279,20 +473,48 @@ export async function runExtract(input: ExtractInput, deps: ExtractDeps): Promis
 
   const withRules = parsed.map((r) => applyHeuristics(r, input.side));
   // Rows the AI already read carry its confidence; only parser rows get a second AI opinion.
-  const verdicts = aiReadUsed ? new Map<number, AiRowVerdict>() : await aiClassify(deps, calls, withRules, input.side);
-  const scored = withRules.map((r) => scoreRow(r, verdicts.get(r.row_index), threshold));
+  const verdicts = aiReadUsed
+    ? new Map<number, AiRowVerdict>()
+    : await aiClassify(deps, calls, withRules, input.side);
+  const scored = withRules.map((r) =>
+    scoreRow(r, verdicts.get(r.row_index), threshold),
+  );
 
   // Identical rows inside one file: keep the first, send the rest to a person.
   const seen = new Map<string, number>();
   let duplicateRows = 0;
   const rows = scored.map((r) => {
     if (!r.date || !r.amount || !r.direction) return r;
-    const key = dedupeKey({ business_id: input.businessId, side: input.side, date: r.date, direction: r.direction, amount: r.amount, reference: r.reference, description: r.description });
+    const key = dedupeKey({
+      business_id: input.businessId,
+      side: input.side,
+      date: r.date,
+      direction: r.direction,
+      amount: r.amount,
+      reference: r.reference,
+      description: r.description,
+    });
     const first = seen.get(key);
-    if (first === undefined) { seen.set(key, r.row_index); return r; }
+    if (first === undefined) {
+      seen.set(key, r.row_index);
+      return r;
+    }
     duplicateRows++;
-    return { ...r, route: "review" as const, confidence: Math.min(r.confidence, 0.5), reason: `Identical to row ${first + 1} in the same file. Confirm only if it is a genuine second transaction.` };
+    return {
+      ...r,
+      route: "review" as const,
+      confidence: Math.min(r.confidence, 0.5),
+      reason: `Identical to row ${first + 1} in the same file. Confirm only if it is a genuine second transaction.`,
+    };
   });
 
-  return { kind, rows, duplicateRows, sourceText: sourceText.slice(0, 200_000), aiCalls: calls, documentKind, error: null };
+  return {
+    kind,
+    rows,
+    duplicateRows,
+    sourceText: sourceText.slice(0, 200_000),
+    aiCalls: calls,
+    documentKind,
+    error: null,
+  };
 }

@@ -20,7 +20,10 @@ import { parseDate, round2, type ExtractedRow } from "../core";
 /* ── delimited text ─────────────────────────────────────── */
 
 function detectDelimiter(sample: string): string {
-  const lines = sample.split(/\r?\n/).filter((l) => l.trim()).slice(0, 30);
+  const lines = sample
+    .split(/\r?\n/)
+    .filter((l) => l.trim())
+    .slice(0, 30);
   let best = ",";
   let bestScore = -1;
   for (const d of [",", "\t", ";", "|"]) {
@@ -28,7 +31,10 @@ function detectDelimiter(sample: string): string {
     const common = counts.filter((c) => c > 1);
     // Prefer the delimiter that gives many columns consistently.
     const score = common.length ? common.length * Math.min(...common) : 0;
-    if (score > bestScore) { bestScore = score; best = d; }
+    if (score > bestScore) {
+      bestScore = score;
+      best = d;
+    }
   }
   return best;
 }
@@ -40,12 +46,16 @@ function splitDelimited(line: string, delim: string): string[] {
   for (let i = 0; i < line.length; i++) {
     const ch = line[i];
     if (quoted) {
-      if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
-      else if (ch === '"') quoted = false;
+      if (ch === '"' && line[i + 1] === '"') {
+        cur += '"';
+        i++;
+      } else if (ch === '"') quoted = false;
       else cur += ch;
     } else if (ch === '"') quoted = true;
-    else if (ch === delim) { out.push(cur); cur = ""; }
-    else cur += ch;
+    else if (ch === delim) {
+      out.push(cur);
+      cur = "";
+    } else cur += ch;
   }
   out.push(cur);
   return out.map((c) => c.trim());
@@ -53,7 +63,7 @@ function splitDelimited(line: string, delim: string): string[] {
 
 /** Splits CSV/TSV text into rows of cells, honouring quoted newlines. */
 export function parseDelimited(text: string): string[][] {
-  const clean = text.replace(/^﻿/, "");
+  const clean = text.replace(/^\uFEFF/, "");
   const delim = detectDelimiter(clean);
   const rows: string[][] = [];
   let buf = "";
@@ -73,14 +83,55 @@ export function parseDelimited(text: string): string[][] {
 
 /* ── column mapping ─────────────────────────────────────── */
 
-const norm = (h: string) => h.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-const has = (h: string, words: string[]) => words.some((w) => norm(h) === w || norm(h).includes(w));
+const norm = (h: string) =>
+  h
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+const has = (h: string, words: string[]) =>
+  words.some((w) => norm(h) === w || norm(h).includes(w));
 
-const DATE_WORDS = ["txn date", "transaction date", "tran date", "posting date", "date"];
+const DATE_WORDS = [
+  "txn date",
+  "transaction date",
+  "tran date",
+  "posting date",
+  "date",
+];
 const VALUE_DATE_WORDS = ["value date", "value dt"];
-const DESC_WORDS = ["narration", "description", "particulars", "transaction remarks", "remarks", "details", "transaction details"];
-const REF_WORDS = ["chq ref no", "ref no cheque no", "cheque no", "chq no", "ref no", "reference", "utr", "instrument no", "transaction id", "voucher no", "vch no"];
-const PARTY_WORDS = ["party", "counterparty", "beneficiary", "payee", "ledger", "account name", "customer", "vendor", "supplier"];
+const DESC_WORDS = [
+  "narration",
+  "description",
+  "particulars",
+  "transaction remarks",
+  "remarks",
+  "details",
+  "transaction details",
+];
+const REF_WORDS = [
+  "chq ref no",
+  "ref no cheque no",
+  "cheque no",
+  "chq no",
+  "ref no",
+  "reference",
+  "utr",
+  "instrument no",
+  "transaction id",
+  "voucher no",
+  "vch no",
+];
+const PARTY_WORDS = [
+  "party",
+  "counterparty",
+  "beneficiary",
+  "payee",
+  "ledger",
+  "account name",
+  "customer",
+  "vendor",
+  "supplier",
+];
 const BALANCE_WORDS = ["balance", "closing balance", "running balance"];
 const CURRENCY_WORDS = ["currency", "ccy"];
 
@@ -99,10 +150,16 @@ export interface ColumnMap {
   type: number;
 }
 
-function findBy(headers: string[], words: string[], exclude: number[] = []): number {
+function findBy(
+  headers: string[],
+  words: string[],
+  exclude: number[] = [],
+): number {
   // Exact matches first so "date" does not grab "value date" when both exist.
   for (const w of words) {
-    const i = headers.findIndex((h, idx) => !exclude.includes(idx) && norm(h) === w);
+    const i = headers.findIndex(
+      (h, idx) => !exclude.includes(idx) && norm(h) === w,
+    );
     if (i !== -1) return i;
   }
   return headers.findIndex((h, idx) => !exclude.includes(idx) && has(h, words));
@@ -114,7 +171,9 @@ export function mapColumns(rows: string[][]): ColumnMap | null {
     const headers = rows[r].map((c) => String(c ?? ""));
     const lower = headers.map(norm);
     const hasDate = lower.some((h) => h.includes("date"));
-    const hasMoney = headers.some((h) => isDebitHeader(h) || isCreditHeader(h) || isAmountHeader(h));
+    const hasMoney = headers.some(
+      (h) => isDebitHeader(h) || isCreditHeader(h) || isAmountHeader(h),
+    );
     if (!hasDate || !hasMoney) continue;
     const detected = detectAmountPattern(headers, rows.slice(r + 1, r + 21));
     const valueDate = findBy(headers, VALUE_DATE_WORDS);
@@ -133,7 +192,13 @@ export function mapColumns(rows: string[][]): ColumnMap | null {
       debit: detected.debitIdx,
       credit: detected.creditIdx,
       // A "balance" column must never be read as the amount.
-      amount: detected.amountIdx === balance ? findHeaderIndex(headers.map((h, i) => (i === balance ? "" : h)), isAmountHeader) : detected.amountIdx,
+      amount:
+        detected.amountIdx === balance
+          ? findHeaderIndex(
+              headers.map((h, i) => (i === balance ? "" : h)),
+              isAmountHeader,
+            )
+          : detected.amountIdx,
       type: detected.typeIdx,
     };
   }
@@ -141,7 +206,8 @@ export function mapColumns(rows: string[][]): ColumnMap | null {
 }
 
 const FOREIGN_CCY = /\b(USD|EUR|GBP|AED|SGD|JPY|AUD|CAD)\b|[$€£¥]/i;
-const SUMMARY_LINE = /\b(total|opening balance|closing balance|balance b\/?f|balance c\/?f|carried forward|brought forward|statement summary|grand total)\b/i;
+const SUMMARY_LINE =
+  /\b(total|opening balance|closing balance|balance b\/?f|balance c\/?f|carried forward|brought forward|statement summary|grand total)\b/i;
 
 /**
  * Turns a table into extracted rows. `rows` includes the preamble and header.
@@ -152,17 +218,29 @@ export function rowsFromTable(rows: string[][]): ExtractedRow[] | null {
   const map = mapColumns(rows);
   if (!map) return null;
   const header = rows[map.headerRow];
-  const cell = (r: string[], i: number) => (i >= 0 ? String(r[i] ?? "").trim() : "");
-  const unsignedSingleColumn = map.debit === -1 && map.credit === -1 && map.type === -1;
+  const cell = (r: string[], i: number) =>
+    i >= 0 ? String(r[i] ?? "").trim() : "";
+  const unsignedSingleColumn =
+    map.debit === -1 && map.credit === -1 && map.type === -1;
 
   const out: ExtractedRow[] = [];
   for (let r = map.headerRow + 1; r < rows.length; r++) {
     const row = rows[r];
-    const rawText = header.map((h, i) => `${h || `col${i + 1}`}: ${cell(row, i)}`).filter((s) => !s.endsWith(": ")).join(" | ");
+    const rawText = header
+      .map((h, i) => `${h || `col${i + 1}`}: ${cell(row, i)}`)
+      .filter((s) => !s.endsWith(": "))
+      .join(" | ");
     const dateCell = cell(row, map.date) || cell(row, map.valueDate);
     const date = parseDate(dateCell);
     const description = cell(row, map.description);
-    const signed = round2(normaliseAmount(cell(row, map.amount), cell(row, map.type), cell(row, map.debit), cell(row, map.credit)));
+    const signed = round2(
+      normaliseAmount(
+        cell(row, map.amount),
+        cell(row, map.type),
+        cell(row, map.debit),
+        cell(row, map.credit),
+      ),
+    );
 
     if (!date && signed === 0) {
       // Continuation of a multi-line narration: keep the text, attach it upward.
@@ -175,22 +253,45 @@ export function rowsFromTable(rows: string[][]): ExtractedRow[] | null {
       continue;
     }
     if (signed === 0) continue; // balance-only or blank amount line
-    if (SUMMARY_LINE.test(description) || (!date && SUMMARY_LINE.test(row.join(" ")))) continue;
+    if (
+      SUMMARY_LINE.test(description) ||
+      (!date && SUMMARY_LINE.test(row.join(" ")))
+    )
+      continue;
 
     const issues: string[] = [];
     let confidence = 0.97;
-    if (!date) { issues.push(`Date "${dateCell}" could not be read`); confidence = 0.3; }
-    if (unsignedSingleColumn && parseMoneyCell(cell(row, map.amount)).sign !== -1) {
-      issues.push("Statement has one unsigned amount column; money in/out was assumed");
+    if (!date) {
+      issues.push(`Date "${dateCell}" could not be read`);
+      confidence = 0.3;
+    }
+    if (
+      unsignedSingleColumn &&
+      parseMoneyCell(cell(row, map.amount)).sign !== -1
+    ) {
+      issues.push(
+        "Statement has one unsigned amount column; money in/out was assumed",
+      );
       confidence = Math.min(confidence, 0.6);
     }
-    if (!description) { issues.push("No narration on this line"); confidence = Math.min(confidence, 0.7); }
+    if (!description) {
+      issues.push("No narration on this line");
+      confidence = Math.min(confidence, 0.7);
+    }
 
     const ccyCell = cell(row, map.currency);
     const rawMoney = `${cell(row, map.amount)} ${cell(row, map.debit)} ${cell(row, map.credit)}`;
-    const foreign = (ccyCell && !/^(inr|rs|₹)$/i.test(ccyCell)) || FOREIGN_CCY.test(rawMoney);
-    const currency = foreign ? (ccyCell || rawMoney.match(FOREIGN_CCY)?.[0] || "FOREIGN").toUpperCase() : "INR";
-    if (foreign) { issues.push(`Amount is in ${currency}; multi-currency lines are reviewed by a person`); confidence = Math.min(confidence, 0.5); }
+    const foreign =
+      (ccyCell && !/^(inr|rs|₹)$/i.test(ccyCell)) || FOREIGN_CCY.test(rawMoney);
+    const currency = foreign
+      ? (ccyCell || rawMoney.match(FOREIGN_CCY)?.[0] || "FOREIGN").toUpperCase()
+      : "INR";
+    if (foreign) {
+      issues.push(
+        `Amount is in ${currency}; multi-currency lines are reviewed by a person`,
+      );
+      confidence = Math.min(confidence, 0.5);
+    }
 
     const balanceCell = cell(row, map.balance);
     const balance = balanceCell ? normaliseAmount(balanceCell) : null;
@@ -217,6 +318,10 @@ export function rowsFromTable(rows: string[][]): ExtractedRow[] | null {
 /** Excel files that were renamed to .csv start with the zip or OLE signature. */
 export function looksLikeSpreadsheetBinary(bytes: Uint8Array): boolean {
   const zip = bytes[0] === 0x50 && bytes[1] === 0x4b;
-  const ole = bytes[0] === 0xd0 && bytes[1] === 0xcf && bytes[2] === 0x11 && bytes[3] === 0xe0;
+  const ole =
+    bytes[0] === 0xd0 &&
+    bytes[1] === 0xcf &&
+    bytes[2] === 0x11 &&
+    bytes[3] === 0xe0;
   return zip || ole;
 }

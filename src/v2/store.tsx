@@ -28,6 +28,7 @@ import {
   registerPracticeUpload,
   requestPracticeReportCorrection,
   resolvePracticeException,
+  savePracticeFirm,
   resolvePracticeReview,
   runPracticeRecon,
   sendPracticeFollowUp,
@@ -464,6 +465,20 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
     void boot();
   }, [boot]);
 
+  // Signing out (here or in another tab) clears the workspace. Sign-in is picked
+  // up by onboarding itself (completeOnboarding) or by the page load that follows
+  // an email confirmation, so onboarding is never cut short.
+  useEffect(() => {
+    const { data } = sb.auth.onAuthStateChange((event) => {
+      if (event !== "SIGNED_OUT") return;
+      userId.current = null;
+      firmId.current = null;
+      setSession(null);
+      setFirm(null);
+    });
+    return () => data.subscription.unsubscribe();
+  }, []);
+
   // Documents from Gmail / WhatsApp and scheduled chaser emails arrive in the
   // background, so the workspace refreshes itself while the tab is open.
   useEffect(() => {
@@ -497,43 +512,28 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       ...patch,
     }));
     firmReady.current = (async () => {
-      const uidNow = userId.current;
-      if (!uidNow) return firmId.current;
-      const payload: Record<string, unknown> = {};
-      if (patch.name !== undefined) payload.firm_name = patch.name;
-      if (patch.city !== undefined) payload.city = patch.city;
-      if (patch.frn !== undefined) payload.membership_number = patch.frn;
-      if (patch.email !== undefined) payload.email = patch.email;
-      if (patch.partnerName !== undefined)
-        payload.contact_person = patch.partnerName;
-      if (!Object.keys(payload).length) return firmId.current;
-      if (firmId.current) {
-        await sb.from("ca_firms").update(payload).eq("id", firmId.current);
-      } else {
-        const { data, error } = await sb
-          .from("ca_firms")
-          .insert({
-            user_id: uidNow,
-            firm_name: payload.firm_name ?? "My practice",
-            verification_status: "approved",
-            is_verified: true,
-            ...payload,
-          })
-          .select("id")
-          .maybeSingle();
-        if (error)
-          toast.error(`Could not create the practice: ${error.message}`);
-        if (data?.id) {
-          firmId.current = data.id;
-          await sb.from("ca_firm_members").insert({
-            ca_firm_id: data.id,
-            user_id: uidNow,
-            invited_email: patch.email ?? "",
-            role: "admin",
-            status: "active",
-            is_active: true,
-          });
-        }
+      // The user may have signed up on the previous onboarding step.
+      const { data: sess } = await sb.auth.getSession();
+      if (!sess.session) {
+        toast.error(
+          "Confirm your email address, then sign in to finish setting up your practice.",
+        );
+        return firmId.current;
+      }
+      userId.current = sess.session.user.id;
+      try {
+        const res = await savePracticeFirm({
+          data: {
+            name: patch.name,
+            city: patch.city,
+            frn: patch.frn,
+            email: patch.email,
+            partnerName: patch.partnerName,
+          },
+        });
+        firmId.current = res.id;
+      } catch (e) {
+        toast.error(errMsg(e));
       }
       return firmId.current;
     })();

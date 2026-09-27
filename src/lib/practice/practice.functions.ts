@@ -476,3 +476,75 @@ export const connectPracticeWhatsapp = createServerFn({ method: "POST" })
       ),
     ),
   );
+
+/* ── practice (firm) ───────────────────────────────────── */
+
+/**
+ * Creates the signed-in user's practice on first run, or updates it. Runs on
+ * the server so onboarding does not depend on browser-side insert policies.
+ */
+export const savePracticeFirm = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z
+      .object({
+        name: z.string().max(200).optional(),
+        city: z.string().max(100).optional(),
+        frn: z.string().max(40).optional(),
+        email: z.string().max(200).optional(),
+        partnerName: z.string().max(120).optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { adminDb, firmContext } = await import("./db.server");
+    const db = await adminDb();
+    const payload: Record<string, unknown> = {};
+    if (data.name !== undefined)
+      payload.firm_name = data.name.trim() || "My practice";
+    if (data.city !== undefined) payload.city = data.city.trim();
+    if (data.frn !== undefined) payload.membership_number = data.frn.trim();
+    if (data.email !== undefined) payload.email = data.email.trim();
+    if (data.partnerName !== undefined)
+      payload.contact_person = data.partnerName.trim();
+
+    let firmId: string | null = null;
+    try {
+      firmId = (await firmContext(db, context.userId)).firmId;
+    } catch {
+      firmId = null;
+    }
+    if (firmId) {
+      if (Object.keys(payload).length) {
+        const { error } = await db
+          .from("ca_firms")
+          .update(payload)
+          .eq("id", firmId);
+        if (error)
+          throw new Error(`Could not save the practice: ${error.message}`);
+      }
+      return { id: firmId, created: false };
+    }
+    const { data: firm, error } = await db
+      .from("ca_firms")
+      .insert({
+        user_id: context.userId,
+        firm_name: "My practice",
+        verification_status: "approved",
+        is_verified: true,
+        ...payload,
+      })
+      .select("id")
+      .single();
+    if (error)
+      throw new Error(`Could not create the practice: ${error.message}`);
+    await db.from("ca_firm_members").insert({
+      ca_firm_id: firm.id,
+      user_id: context.userId,
+      invited_email: data.email ?? "",
+      role: "admin",
+      status: "active",
+      is_active: true,
+    });
+    return { id: firm.id as string, created: true };
+  });

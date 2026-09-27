@@ -1,0 +1,47 @@
+name: Supabase security lint
+
+# Fails the build if the Supabase database linter reports any new
+# security finding (ERROR or WARN) that is not already in
+# .github/security/lint-baseline.json.
+#
+# Required GitHub repo secrets:
+#   SUPABASE_ACCESS_TOKEN  Personal access token (Supabase dashboard → Account → Access Tokens)
+#   SUPABASE_PROJECT_REF   Project ref (e.g. ukmtzflxtcoqnwujvrqh)
+#
+# To enforce as a merge gate: Settings → Branches → Branch protection
+# → Required status checks → select "supabase-security-lint".
+
+on:
+  pull_request:
+    paths:
+      - "supabase/migrations/**"
+      - ".github/security/lint-baseline.json"
+      - ".github/workflows/supabase-security-lint.yml"
+      - "scripts/check-supabase-lint.mjs"
+  push:
+    branches: [main]
+  schedule:
+    # Daily catch-all in case of out-of-band DB changes.
+    - cron: "0 6 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  supabase-security-lint:
+    name: supabase-security-lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run Supabase linter gate
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: node scripts/check-supabase-lint.mjs

@@ -1,0 +1,9 @@
+{
+  "customizations": [
+    { "token": "entire FynHelp design system (1,059 lines: --fyn-* palette/ink/red/beige/gold scales, type & spacing scales, keyframes, @layer rules)", "source": "src/index.css", "reappliedIn": "src/legacy-theme.css (imported by src/styles.css)" },
+    { "token": "Google Fonts import (Oswald/Raleway/Roboto/DM Sans/Work Sans/Playfair Display/JetBrains Mono)", "source": "src/index.css", "reappliedIn": "src/styles.css" },
+    { "token": "fontsource imports (Inter, Plus Jakarta Sans Variable, DM Sans, Space Grotesk)", "source": "src/main.tsx", "reappliedIn": "src/styles.css" },
+    { "token": "typography.css article styles", "source": "src/styles/typography.css (via main.tsx import)", "reappliedIn": "src/styles.css" },
+    { "token": "tailwind.config.ts theme (fyn-* colors, font families, fyn type/spacing scales, accordion keyframes, tailwindcss-animate)", "source": "tailwind.config.ts", "reappliedIn": "src/styles.css via @config \"../tailwind.config.ts\" (Tailwind v4 legacy-config compatibility)" }
+  ]
+}

@@ -1,0 +1,2 @@
+ALTER TABLE public.liquidity_metrics ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+CREATE UNIQUE INDEX IF NOT EXISTS liquidity_metrics_business_idx ON public.liquidity_metrics (business_id);

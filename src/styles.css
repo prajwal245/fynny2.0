@@ -1,0 +1,144 @@
+/* Fonts (moved from src/index.css and src/main.tsx head) */
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "@fontsource-variable/plus-jakarta-sans/index.css";
+@import "@fontsource/dm-sans/400.css";
+@import "@fontsource/dm-sans/600.css";
+@import "@fontsource/dm-sans/700.css";
+@import "@fontsource/space-grotesk/400.css";
+@import "@fontsource/space-grotesk/600.css";
+@import "@fontsource/space-grotesk/700.css";
+
+@import "tailwindcss";
+
+/* Full FynHelp design system, preserved verbatim from the pre-migration
+   src/index.css (minus the @tailwind directives, replaced by the v4 import
+   above, and the font @import moved to the top of this file). */
+@import "./legacy-theme.css";
+@import "./styles/typography.css";
+
+/* Legacy Tailwind v3 JS config (fyn-* colors, font families, type/spacing
+   scales, keyframes, tailwindcss-animate plugin) loaded via v4's
+   compatibility layer. */
+@config "../tailwind.config.ts";
+
+/* ---------------------------------------------------------------
+   CA portal responsive fallbacks.
+   Wide data tables stay readable on phones by scrolling horizontally,
+   and controls keep comfortable touch targets at 375-468px.
+   --------------------------------------------------------------- */
+@media (max-width: 767px) {
+  .ca-portal-main table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .ca-portal-main th,
+  .ca-portal-main td {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+  .ca-portal-main input,
+  .ca-portal-main select,
+  .ca-portal-main textarea {
+    font-size: 16px; /* stops iOS zoom-on-focus */
+    min-height: 42px;
+  }
+  .ca-portal-main button {
+    min-height: 40px;
+  }
+  /* Client 360 and other tab strips scroll instead of wrapping. */
+  .ca-tabstrip {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .ca-tabstrip::-webkit-scrollbar { display: none; }
+  .ca-tabstrip > * { flex: 0 0 auto; }
+}
+
+/* ---------------------------------------------------------------
+   CA portal — phone polish (<= 480px, tested at 468px).
+   Wide tables scroll horizontally with a pinned first column, toolbars
+   and header action rows wrap, and touch targets stay >= 40px.
+   --------------------------------------------------------------- */
+@media (max-width: 480px) {
+  /* Tables scroll as one unit instead of squeezing every column. */
+  .ca-portal-main table {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  .ca-portal-main table th,
+  .ca-portal-main table td {
+    white-space: nowrap;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+  /* Pin the identifying first column while the rest scrolls. */
+  .ca-portal-main table thead th:first-child,
+  .ca-portal-main table tbody td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: #ffffff;
+    box-shadow: 1px 0 0 rgba(26, 26, 26, 0.08);
+  }
+
+  /* Inline flex rows (toolbars, filter bars, header action groups) wrap. */
+  .ca-portal-main [style*="display: flex"]:not(.ca-tabstrip):not(.ca-nowrap) {
+    flex-wrap: wrap;
+  }
+  /* Filters and action buttons take a usable share of the row. */
+  .ca-portal-main input,
+  .ca-portal-main select,
+  .ca-portal-main textarea {
+    max-width: 100% !important;
+  }
+  .ca-portal-main input:not([type="checkbox"]):not([type="radio"]),
+  .ca-portal-main select {
+    flex: 1 1 200px;
+    min-width: 0;
+  }
+  /* Grids that hard-code desktop columns reflow into 1-2 phone columns. */
+  .ca-portal-main [style*="grid-template-columns"]:not(.ca-keep-grid) {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important;
+  }
+  /* Content + fixed-width sidebar layouts stack instead of splitting. */
+  .ca-portal-main [style*="280px"],
+  .ca-portal-main [style*="300px"],
+  .ca-portal-main [style*="320px"],
+  .ca-portal-main [style*="340px"],
+  .ca-portal-main [style*="360px"],
+  .ca-portal-main [style*="380px"] {
+    grid-template-columns: 1fr !important;
+  }
+
+
+  /* Headings shrink so long firm/client names never overflow. */
+  .ca-portal-main h1 {
+    font-size: 21px !important;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+  .ca-portal-main h2 {
+    overflow-wrap: anywhere;
+  }
+  /* Comfortable tap targets everywhere in the portal. */
+  .ca-portal-main button,
+  .ca-portal a.ca-nav-link {
+    min-height: 42px;
+  }
+  .ca-portal a.ca-nav-link {
+    padding-top: 10px !important;
+    padding-bottom: 10px !important;
+  }
+}
+

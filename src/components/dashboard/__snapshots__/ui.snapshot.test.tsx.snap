@@ -1,0 +1,323 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`dashboard design-system snapshots > FynBadge danger uses brand red tones 1`] = `
+<span
+  class="inline-flex items-center px-2.5 py-0.5 rounded-full font-medium bg-[#FDEAEA] text-[#C41E1E]"
+>
+  Overdue
+</span>
+`;
+
+exports[`dashboard design-system snapshots > FynBadge neutral uses brand slate tones 1`] = `
+<span
+  class="inline-flex items-center px-2.5 py-0.5 rounded-full font-medium bg-[#F1F5F9] text-[#475569]"
+>
+  Draft
+</span>
+`;
+
+exports[`dashboard design-system snapshots > FynBadge success uses brand green tones 1`] = `
+<span
+  class="inline-flex items-center px-2.5 py-0.5 rounded-full font-medium bg-[#DCFCE7] text-[#16A34A]"
+>
+  Filed
+</span>
+`;
+
+exports[`dashboard design-system snapshots > FynBadge warning uses brand amber tones 1`] = `
+<span
+  class="inline-flex items-center px-2.5 py-0.5 rounded-full font-medium bg-[#FEF3E2] text-[#8B5A00]"
+>
+  Due soon
+</span>
+`;
+
+exports[`dashboard design-system snapshots > FynButton ghost uses ink-60 text + ink-05 hover 1`] = `
+<button
+  class="px-5 py-2.5 font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2 text-fyn-ink-60 hover:text-fyn-ink hover:bg-fyn-ink-05"
+>
+  Skip
+</button>
+`;
+
+exports[`dashboard design-system snapshots > FynButton primary uses fyn-red 1`] = `
+<button
+  class="px-5 py-2.5 font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2 bg-fyn-red text-white hover:bg-fyn-red-dark"
+>
+  Save
+</button>
+`;
+
+exports[`dashboard design-system snapshots > FynButton secondary uses beige-card + ink border 1`] = `
+<button
+  class="px-5 py-2.5 font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2 bg-fyn-beige-card text-fyn-ink border border-fyn-ink-10 hover:bg-fyn-ink-05"
+>
+  Cancel
+</button>
+`;
+
+exports[`dashboard design-system snapshots > FynCard renders with beige-card surface 1`] = `
+<div
+  class="bg-fyn-beige-card border border-fyn-ink-10 rounded-lg p-fyn-lg"
+>
+  <h3
+    class="font-serif text-fyn-ink mb-fyn-md"
+  >
+    Card title
+  </h3>
+  <p>
+    body
+  </p>
+</div>
+`;
+
+exports[`dashboard design-system snapshots > FynEmpty renders title/description/action with brand chrome 1`] = `
+<div
+  class="bg-fyn-beige-card border border-fyn-ink-10 rounded-lg p-fyn-lg p-fyn-2xl text-center"
+>
+  <h3
+    class="font-serif text-[20px] font-semibold text-fyn-ink mb-fyn-sm"
+  >
+    No filings yet
+  </h3>
+  <p
+    class="text-fyn-body text-fyn-ink-60 mb-fyn-lg"
+  >
+    Connect GST to start tracking.
+  </p>
+  <button
+    class="px-5 py-2.5 font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2 bg-fyn-red text-white hover:bg-fyn-red-dark"
+  >
+    Connect GST →
+  </button>
+</div>
+`;
+
+exports[`dashboard design-system snapshots > FynField composes label/hint 1`] = `
+<div
+  class="space-y-fyn-xs"
+>
+  <label
+    class="block text-fyn-small font-medium text-fyn-ink-60"
+  >
+    GSTIN
+  </label>
+  <input
+    class="w-full bg-fyn-beige-card border border-fyn-ink-10 rounded-md px-fyn-md py-fyn-sm text-fyn-ink placeholder:text-fyn-ink-40 focus:outline-hidden focus:ring-2 focus:ring-fyn-red focus:border-transparent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+    type="text"
+    value=""
+  />
+  <p
+    class="text-fyn-tiny text-fyn-ink-45"
+  >
+    15 characters
+  </p>
+</div>
+`;
+
+exports[`dashboard design-system snapshots > FynField shows error in danger tone 1`] = `
+<div
+  class="space-y-fyn-xs"
+>
+  <label
+    class="block text-fyn-small font-medium text-fyn-ink-60"
+  >
+    GSTIN
+  </label>
+  <input
+    class="w-full bg-fyn-beige-card border border-fyn-ink-10 rounded-md px-fyn-md py-fyn-sm text-fyn-ink placeholder:text-fyn-ink-40 focus:outline-hidden focus:ring-2 focus:ring-fyn-red focus:border-transparent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+    type="text"
+    value=""
+  />
+  <p
+    class="text-fyn-tiny text-fyn-danger"
+  >
+    Invalid format
+  </p>
+</div>
+`;
+
+exports[`dashboard design-system snapshots > FynInput uses brand input chrome 1`] = `
+<input
+  class="w-full bg-fyn-beige-card border border-fyn-ink-10 rounded-md px-fyn-md py-fyn-sm text-fyn-ink placeholder:text-fyn-ink-40 focus:outline-hidden focus:ring-2 focus:ring-fyn-red focus:border-transparent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+  placeholder="Enter GSTIN"
+  type="text"
+/>
+`;
+
+exports[`dashboard design-system snapshots > FynLabel uses tiny uppercase ink-45 1`] = `
+<p
+  class="font-medium text-fyn-ink-45 uppercase tracking-[0.06em]"
+>
+  cash runway
+</p>
+`;
+
+exports[`dashboard design-system snapshots > FynLoading renders skeleton rows 1`] = `
+<div
+  class="space-y-fyn-sm"
+>
+  <div
+    class="h-32 bg-fyn-ink-05 animate-pulse rounded-lg"
+  />
+  <div
+    class="h-32 bg-fyn-ink-05 animate-pulse rounded-lg"
+  />
+</div>
+`;
+
+exports[`dashboard design-system snapshots > FynMetric renders mono metric with label and sub 1`] = `
+<div>
+  <p
+    class="font-medium text-fyn-ink-45 uppercase tracking-[0.06em] mb-fyn-sm"
+  >
+    Cash Runway
+  </p>
+  <p
+    class="font-mono text-fyn-metric text-fyn-ink mt-fyn-xs"
+  >
+    142 days
+  </p>
+  <p
+    class="text-fyn-small text-fyn-ink-40 mt-fyn-xs"
+  >
+    Healthy
+  </p>
+</div>
+`;
+
+exports[`dashboard design-system snapshots > FynPage wraps children with brand spacing 1`] = `
+<div
+  class="max-w-[1400px] mx-auto p-fyn-lg space-y-fyn-lg"
+>
+  <div>
+    content
+  </div>
+</div>
+`;
+
+exports[`dashboard design-system snapshots > FynPageTitle uses serif h1 and ink-60 sub 1`] = `
+<header
+  class="space-y-fyn-xs"
+>
+  <h1
+    class="font-serif text-fyn-h1 text-fyn-ink"
+  >
+    Compliance Health
+  </h1>
+  <p
+    class="text-fyn-body text-fyn-ink-60"
+  >
+    Sub copy goes here
+  </p>
+</header>
+`;
+
+exports[`dashboard design-system snapshots > FynSearchInput renders icon + brand chrome 1`] = `
+<div
+  class="relative w-full"
+>
+  <svg
+    aria-hidden="true"
+    class="lucide lucide-search absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-fyn-ink-40 pointer-events-none"
+    fill="none"
+    height="24"
+    stroke="currentColor"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="2"
+    viewBox="0 0 24 24"
+    width="24"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="m21 21-4.34-4.34"
+    />
+    <circle
+      cx="11"
+      cy="11"
+      r="8"
+    />
+  </svg>
+  <input
+    class="w-full bg-fyn-beige-card border border-fyn-ink-10 rounded-md px-fyn-md py-fyn-sm text-fyn-ink placeholder:text-fyn-ink-40 focus:outline-hidden focus:ring-2 focus:ring-fyn-red focus:border-transparent transition-colors disabled:opacity-50 disabled:cursor-not-allowed pl-9"
+    placeholder="Search filings…"
+    type="search"
+  />
+</div>
+`;
+
+exports[`dashboard design-system snapshots > FynSectionTitle uses serif h2 1`] = `
+<h2
+  class="font-serif text-fyn-ink mb-fyn-md"
+>
+  Section
+</h2>
+`;
+
+exports[`dashboard design-system snapshots > FynSelect uses brand input chrome with chevron 1`] = `
+<select
+  class="w-full border border-fyn-ink-10 rounded-md px-fyn-md py-fyn-sm text-fyn-ink placeholder:text-fyn-ink-40 focus:outline-hidden focus:ring-2 focus:ring-fyn-red focus:border-transparent transition-colors disabled:opacity-50 disabled:cursor-not-allowed appearance-none bg-no-repeat bg-[right_12px_center] pr-10"
+>
+  <option
+    selected=""
+    value=""
+  >
+    Pick one
+  </option>
+  <option
+    value="a"
+  >
+    A
+  </option>
+</select>
+`;
+
+exports[`dashboard design-system snapshots > FynTable renders header/row/cell with brand spacing 1`] = `
+<div
+  class="overflow-x-auto"
+>
+  <table
+    class="w-full"
+  >
+    <thead>
+      <tr>
+        <th
+          class="px-fyn-md py-fyn-sm font-medium text-fyn-ink-45 uppercase tracking-[0.06em] text-left"
+        >
+          Filing
+        </th>
+        <th
+          class="px-fyn-md py-fyn-sm font-medium text-fyn-ink-45 uppercase tracking-[0.06em] text-right"
+        >
+          Amount
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr
+        class="border-b border-fyn-ink-10 hover:bg-fyn-ink-02 transition-colors"
+      >
+        <td
+          class="px-fyn-md py-fyn-sm font-medium text-fyn-ink-60 text-left"
+        >
+          GSTR-3B (Mar)
+        </td>
+        <td
+          class="px-fyn-md py-fyn-sm font-medium text-fyn-ink-60 text-right font-mono"
+        >
+          ₹1,24,500
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+`;
+
+exports[`dashboard design-system snapshots > FynTextarea uses brand input chrome 1`] = `
+<textarea
+  class="w-full bg-fyn-beige-card border border-fyn-ink-10 rounded-md px-fyn-md py-fyn-sm text-fyn-ink placeholder:text-fyn-ink-40 focus:outline-hidden focus:ring-2 focus:ring-fyn-red focus:border-transparent transition-colors disabled:opacity-50 disabled:cursor-not-allowed resize-y"
+  placeholder="Notes"
+  rows="4"
+/>
+`;

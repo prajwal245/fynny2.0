@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Anyone can record auth link events" ON public.auth_link_events;

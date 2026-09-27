@@ -1,0 +1,2 @@
+DROP POLICY IF EXISTS "public read glossary" ON public.glossary_terms;
+CREATE POLICY "public read published glossary" ON public.glossary_terms FOR SELECT TO anon, authenticated USING (is_published = true);

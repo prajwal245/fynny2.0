@@ -1,0 +1,1 @@
+GRANT EXECUTE ON FUNCTION public.admin_ai_usage_overview() TO service_role;

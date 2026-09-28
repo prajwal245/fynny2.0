@@ -41,7 +41,7 @@ const daysOverdue = (due: string, now: Date) =>
 
 async function run(request: Request): Promise<Response> {
   // Either the shared CA cron secret or the scheduler-specific secret is accepted.
-  const accepted = [process.env["CA_CRON_SECRET"], process.env["CA_AUTO_FOLLOWUP_SECRET"]].filter(
+  const accepted = [process.env["CA_CRON_SECRET"], process.env["CRON_SECRET"], process.env["CA_AUTO_FOLLOWUP_SECRET"]].filter(
     (s): s is string => Boolean(s),
   );
   const provided =

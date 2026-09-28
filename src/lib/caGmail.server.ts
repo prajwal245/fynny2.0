@@ -26,11 +26,31 @@ const ORIGIN_PATTERNS = [/^https:\/\/[a-z0-9-]+\.lovable\.app$/i, /^https:\/\/[a
 
 export const CALLBACK_PATH = "/ca/integrations/gmail/callback";
 
+/** This deployment's own origins: PUBLIC_APP_URL plus the ones Vercel sets. */
+function deploymentOrigins(): string[] {
+  const out: string[] = [];
+  const app = process.env["PUBLIC_APP_URL"];
+  if (app) {
+    try {
+      out.push(new URL(app).origin);
+    } catch {
+      /* not a URL; ignore */
+    }
+  }
+  for (const host of [process.env["VERCEL_PROJECT_PRODUCTION_URL"], process.env["VERCEL_BRANCH_URL"], process.env["VERCEL_URL"]]) {
+    if (host) out.push(`https://${host}`);
+  }
+  return out;
+}
+
 /** Only ever redirect Google back to one of our own origins. */
 export function redirectUriFor(origin: string | null | undefined): string {
   const fallback = process.env["GMAIL_REDIRECT_URI"] ?? `https://fynhelp.com${CALLBACK_PATH}`;
   if (!origin) return fallback;
-  const ok = ALLOWED_ORIGINS.includes(origin) || ORIGIN_PATTERNS.some((re) => re.test(origin));
+  const ok =
+    ALLOWED_ORIGINS.includes(origin) ||
+    deploymentOrigins().includes(origin) ||
+    ORIGIN_PATTERNS.some((re) => re.test(origin));
   return ok ? `${origin}${CALLBACK_PATH}` : fallback;
 }
 

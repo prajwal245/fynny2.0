@@ -102,7 +102,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "google-site-verification", content: "lwPij_cJgAb2D1gva7DUy_Bnc4sj99qXMxpdXwKODmg" },
     ],
     links: [
-      { rel: "preconnect", href: "https://ukmtzflxtcoqnwujvrqh.supabase.co", crossOrigin: "anonymous" },
+      { rel: "preconnect", href: "https://qfowcjyueonpwmxzthmz.supabase.co", crossOrigin: "anonymous" },
       { rel: "preconnect", href: "https://wiknwxniwqvsxgyzqqxu.supabase.co", crossOrigin: "anonymous" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },

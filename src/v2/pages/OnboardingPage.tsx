@@ -1,3 +1,4 @@
+import { startGmailConnect } from "@/lib/caGmail.functions";
 /**
  * FynHelp v2 — first run journey.
  * Sign in, create the firm, add the first client, connect Gmail or skip,
@@ -16,7 +17,7 @@ import { ENTITY_TYPES, useV2 } from "../store";
 const STEPS = ["Your account", "Your firm", "First client", "Gmail", "First document"];
 
 export default function OnboardingPage() {
-  const { session, saveFirm, addClient, addDoc, completeOnboarding, firm } = useV2();
+  const { session, saveFirm, addClient, addDoc, completeOnboarding, firm, firmIdReady } = useV2();
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -55,6 +56,20 @@ export default function OnboardingPage() {
     saveFirm({ ...firmForm, partnerName: account.name, email: account.email });
     toast.success("Firm created");
     next();
+  };
+
+  /** Real Google consent. After connecting, Google sends the user back to Documents to upload or wait for mail. */
+  const connectGmail = async () => {
+    try {
+      const fid = await firmIdReady();
+      if (!fid) throw new Error("Create your practice first");
+      try { window.sessionStorage.setItem("fynhelp.gmail.return", "/v2/documents"); } catch { /* private mode */ }
+      const { url } = await startGmailConnect({ data: { firmId: fid, origin: window.location.origin } });
+      window.location.href = url;
+    } catch (e) {
+      toast.error(`Gmail could not be connected here: ${e instanceof Error ? e.message : String(e)}. You can connect it later from Settings.`);
+      next();
+    }
   };
 
   const submitClient = (e: React.FormEvent) => {
@@ -168,7 +183,7 @@ export default function OnboardingPage() {
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                 <button
                   className="v2-btn v2-btn-primary"
-                  onClick={() => { saveFirm({ gmailConnected: true }); toast.success("Gmail connected. New attachments will arrive automatically."); next(); }}
+                  onClick={connectGmail}
                 >
                   Connect Gmail
                 </button>

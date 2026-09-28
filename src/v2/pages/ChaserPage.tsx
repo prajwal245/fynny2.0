@@ -10,15 +10,19 @@ const TONE: Record<Chase["status"], Tone> = { Open: "info", "Following Up": "war
 const TYPES = ["Missing bank statement", "Missing invoice", "Overdue receivable", "GST confirmation", "Custom"];
 const FILTERS = ["All", "Open", "Following Up", "Escalated", "Resolved"] as const;
 
-export default function ChaserPage() {
-  const { chases, clients, clientName, addChase, sendFollowUp, setChaseStatus } = useV2();
+/** Chaser. All follow-ups as a page; the client's Chaser tab when given a clientId. */
+export default function ChaserPage({ clientId: scopedClient }: { clientId?: string } = {}) {
+  const { chases: allChases, clients, clientName, addChase, sendFollowUp, setChaseStatus } = useV2();
+  const chases = scopedClient ? allChases.filter((c) => c.clientId === scopedClient) : allChases;
   const [creating, setCreating] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("All");
-  const [form, setForm] = useState({ clientId: clients[0]?.id ?? "", type: TYPES[0], contact: "", phone: "", due: "", note: "" });
+  const [form, setForm] = useState({ clientId: scopedClient ?? clients[0]?.id ?? "", type: TYPES[0], contact: "", phone: "", due: "", note: "" });
 
   const active = chases.find((c) => c.id === openId) ?? null;
-  const list = chases.filter((c) => filter === "All" || c.status === filter);
+  const rank: Record<Chase["status"], number> = { Escalated: 0, "Following Up": 1, Open: 2, Resolved: 3 };
+  // Escalated items first: they need a person today.
+  const list = chases.filter((c) => filter === "All" || c.status === filter).sort((a, b) => rank[a.status] - rank[b.status]);
 
   const create = (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,11 +39,17 @@ export default function ChaserPage() {
 
   return (
     <>
-      <PageHeader
+      {scopedClient ? (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
+          <button className="v2-btn v2-btn-primary" onClick={() => setCreating(true)}><Plus size={15} /> Create chase item</button>
+        </div>
+      ) : (
+        <PageHeader
         title="Chaser"
         subtitle="Polite follow ups, tracked to closure. Two unanswered nudges and it escalates."
         action={<button className="v2-btn v2-btn-primary" onClick={() => setCreating(true)}><Plus size={15} /> Create chase item</button>}
       />
+      )}
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
         {FILTERS.map((f) => (

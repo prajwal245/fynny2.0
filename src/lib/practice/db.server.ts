@@ -79,13 +79,21 @@ export async function firmContext(
       role: "owner",
     };
   }
-  const { data: member } = await db
-    .from("ca_firm_members")
-    .select("ca_firm_id, role, ca_firms(firm_name, email)")
-    .eq("user_id", userId)
-    .eq("status", "active")
-    .limit(1)
-    .maybeSingle();
+  const findMember = () =>
+    db
+      .from("ca_firm_members")
+      .select("ca_firm_id, role, ca_firms(firm_name, email)")
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .limit(1)
+      .maybeSingle();
+  let { data: member } = await findMember();
+  if (!member) {
+    // Someone invited this email: join that practice instead of starting one.
+    const { acceptPendingInvite } = await import("./team.server");
+    if (await acceptPendingInvite(db, userId))
+      ({ data: member } = await findMember());
+  }
   if (!member)
     throw new PracticeError("no_firm", "Create your practice first.");
   const firm =

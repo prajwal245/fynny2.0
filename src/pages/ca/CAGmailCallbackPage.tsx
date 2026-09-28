@@ -22,6 +22,15 @@ function sanitizeErrorForUser(msg: string): string {
   return msg;
 }
 
+/** Where the connection was started: the practice workspace sets this; the CA portal does not. */
+function returnPath(): string {
+  try {
+    const saved = window.sessionStorage.getItem("fynhelp.gmail.return");
+    if (saved && saved.startsWith("/")) return saved;
+  } catch { /* storage unavailable */ }
+  return "/ca/integrations";
+}
+
 export default function CAGmailCallbackPage() {
   const navigate = useNavigate();
   const complete = useServerFn(completeGmailConnect);
@@ -76,7 +85,7 @@ export default function CAGmailCallbackPage() {
         const res = await complete({ data: { code, state, origin } });
         try { window.sessionStorage.removeItem(ORIGIN_KEY); } catch { /* ignore */ }
         toast.success(`Gmail connected — ${res.gmailAddress}`);
-        navigate("/ca/integrations", { replace: true });
+        navigate(returnPath(), { replace: true });
       } catch (e) {
         console.error("[fyn:gmail] callback failed:", e instanceof Error ? e.message : e);
         setErrorMsg(e instanceof Error ? e.message : "Could not complete the Gmail connection.");
@@ -96,8 +105,8 @@ export default function CAGmailCallbackPage() {
             {sanitizeErrorForUser(errorMsg)}
           </div>
           <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-            <CAButton onClick={() => navigate("/ca/integrations")}>Back to Integrations</CAButton>
-            <CAButton variant="ghost" onClick={() => { window.location.href = "/ca/integrations"; }}>Try again</CAButton>
+            <CAButton onClick={() => navigate(returnPath())}>Back to Integrations</CAButton>
+            <CAButton variant="ghost" onClick={() => { window.location.href = returnPath(); }}>Try again</CAButton>
           </div>
         </CACard>
       </div>

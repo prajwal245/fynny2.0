@@ -508,11 +508,21 @@ export const savePracticeFirm = createServerFn({ method: "POST" })
     if (data.partnerName !== undefined)
       payload.ca_name = data.partnerName.trim();
 
-    let firmId: string | null = null;
+    let existing: Awaited<ReturnType<typeof firmContext>> | null = null;
     try {
-      firmId = (await firmContext(db, context.userId)).firmId;
+      existing = await firmContext(db, context.userId);
     } catch {
-      firmId = null;
+      existing = null;
+    }
+    const firmId = existing?.firmId ?? null;
+    if (existing && existing.role !== "owner") {
+      // An invited colleague joined an existing practice; its details are not theirs to change.
+      return {
+        id: existing.firmId,
+        created: false,
+        joined: true,
+        firmName: existing.firmName,
+      };
     }
     if (firmId) {
       if (Object.keys(payload).length) {
@@ -554,3 +564,53 @@ export const savePracticeFirm = createServerFn({ method: "POST" })
     }
     return { id: firm.id as string, created: true };
   });
+
+/* ── team and integrations (Settings) ──────────────────── */
+
+export const listPracticeTeam = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) =>
+    withFirm(context.userId, async (db, ctx) =>
+      (await import("./team.server")).listTeam(db, ctx),
+    ),
+  );
+
+export const invitePracticeMember = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z
+      .object({
+        email: z.string().min(3).max(200),
+        role: z.enum(["partner", "manager", "senior", "junior", "staff"]),
+        origin: z.string().max(200).nullable().optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) =>
+      (await import("./team.server")).inviteMember(
+        db,
+        ctx,
+        data.email,
+        data.role,
+        data.origin ?? null,
+      ),
+    ),
+  );
+
+export const revokePracticeMember = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: uuid }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) =>
+      (await import("./team.server")).revokeMember(db, ctx, data.id),
+    ),
+  );
+
+export const getPracticeIntegrations = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) =>
+    withFirm(context.userId, async (db, ctx) =>
+      (await import("./team.server")).integrationStatus(db, ctx),
+    ),
+  );

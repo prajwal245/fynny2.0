@@ -24,7 +24,10 @@ import {
   createPracticeChase,
   createPracticeClient,
   generatePracticeReport,
+  assignPracticeDocument,
+  getPracticeDocumentUrl,
   getPracticeWorkspace,
+  reprocessPracticeDocument,
   registerPracticeUpload,
   requestPracticeReportCorrection,
   resolvePracticeException,
@@ -39,6 +42,8 @@ import {
 import type { AgentKey } from "./agents";
 
 export type Txn = {
+  counterparty?: string | null;
+  reference?: string | null;
   id?: string;
   date: string;
   particulars: string;
@@ -269,6 +274,20 @@ type Store = {
   saveFirm: (patch: Partial<Firm>) => void;
   completeOnboarding: () => Promise<void>;
   refresh: () => Promise<void>;
+  /** The practice id (null until onboarding creates it). */
+  firmId: string | null;
+  /** Resolves with the practice id once onboarding has created it. */
+  firmIdReady: () => Promise<string | null>;
+  /** Re-run the Extract agent on a document (retry after a failure). */
+  reprocessDoc: (id: string) => Promise<void>;
+  /** File an unassigned document under a client (and bank/books side); it is re-extracted. */
+  assignDoc: (
+    id: string,
+    clientId: string,
+    side?: "bank" | "books",
+  ) => Promise<void>;
+  /** Opens the original file in a new tab (short-lived signed link). */
+  openDocument: (id: string) => Promise<void>;
   clients: Client[];
   docs: Doc[];
   review: ReviewItem[];
@@ -756,6 +775,72 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
     [refresh, track, waitForClient],
   );
 
+  const firmIdReady = useCallback(
+    async () => (await firmReady.current) ?? firmId.current,
+    [],
+  );
+
+  const reprocessDoc = useCallback(
+    async (id: string) => {
+      setDocs((p) =>
+        p.map((d) =>
+          d.id === id ? { ...d, status: "Processing", error: undefined } : d,
+        ),
+      );
+      try {
+        const r = await reprocessPracticeDocument({ data: { id } });
+        if (r.status === "failed")
+          toast.error(r.error ?? "The file still could not be read.");
+        else
+          toast.success(
+            `Re-read: ${r.txns} transactions${r.review ? `, ${r.review} to review` : ""}.`,
+          );
+      } catch (e) {
+        toast.error(errMsg(e));
+      } finally {
+        void refresh();
+      }
+    },
+    [refresh],
+  );
+
+  const assignDoc = useCallback(
+    async (id: string, clientId: string, side?: "bank" | "books") => {
+      setDocs((p) =>
+        p.map((d) =>
+          d.id === id ? { ...d, clientId, status: "Processing" } : d,
+        ),
+      );
+      try {
+        await waitForClient(clientId);
+        const r = await assignPracticeDocument({
+          data: { id, business_id: clientId, ...(side ? { side } : {}) },
+        });
+        toast.success(
+          `Filed and read: ${r.txns} transactions${r.review ? `, ${r.review} to review` : ""}.`,
+        );
+      } catch (e) {
+        toast.error(errMsg(e));
+      } finally {
+        void refresh();
+      }
+    },
+    [refresh, waitForClient],
+  );
+
+  const openDocument = useCallback(async (id: string) => {
+    // Open the tab first so pop-up blockers allow it, then point it at the file.
+    const tab = window.open("about:blank", "_blank");
+    try {
+      const { url } = await getPracticeDocumentUrl({ data: { id } });
+      if (tab) tab.location.href = url;
+      else window.location.href = url;
+    } catch (e) {
+      tab?.close();
+      toast.error(errMsg(e));
+    }
+  }, []);
+
   const resolveReview = useCallback(
     (id: string, status: "confirmed" | "discarded", patch?: Txn) => {
       setReview((p) =>
@@ -773,6 +858,12 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
                   date: patch.date,
                   amount: patch.amount,
                   particulars: patch.particulars,
+                  ...(patch.counterparty !== undefined
+                    ? { counterparty: patch.counterparty || null }
+                    : {}),
+                  ...(patch.reference !== undefined
+                    ? { reference: patch.reference || null }
+                    : {}),
                 },
               }
             : {}),
@@ -1195,6 +1286,11 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       saveFirm,
       completeOnboarding,
       refresh,
+      firmId: firmId.current,
+      firmIdReady,
+      reprocessDoc,
+      assignDoc,
+      openDocument,
       clients,
       docs,
       review,
@@ -1245,6 +1341,10 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       saveFirm,
       completeOnboarding,
       refresh,
+      firmIdReady,
+      reprocessDoc,
+      assignDoc,
+      openDocument,
       clients,
       docs,
       review,

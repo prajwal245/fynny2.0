@@ -15,15 +15,17 @@ const TEMPLATE_HINT: Record<ReportTemplate, string> = {
   "Exception and Review Summary": "Internal record of what was queried, corrected and left out.",
 };
 
-export default function ReportsPage() {
-  const { reports, clients, clientName, generateReport, runs, period: currentPeriod } = useV2();
+/** MIS and Reports. All clients as a page; the client's MIS tab when given a clientId. */
+export default function ReportsPage({ clientId: scopedClient }: { clientId?: string } = {}) {
+  const { reports: allReports, clients, clientName, generateReport, runs, period: currentPeriod } = useV2();
+  const reports = scopedClient ? allReports.filter((r) => r.clientId === scopedClient) : allReports;
   const [open, setOpen] = useState(false);
-  const [clientId, setClientId] = useState(clients[0]?.id ?? "");
+  const [clientId, setClientId] = useState(scopedClient ?? clients[0]?.id ?? "");
   const [period, setPeriod] = useState(currentPeriod);
   const [template, setTemplate] = useState<ReportTemplate>(REPORT_TEMPLATES[0]);
   const navigate = useNavigate();
 
-  const narrateRuns = runs.filter((r) => r.agent === "narrate");
+  const narrateRuns = runs.filter((r) => r.agent === "narrate" && (!scopedClient || r.target === scopedClient));
 
   const generate = () => {
     if (!clientId) { toast.error("Add a client first"); return; }
@@ -38,11 +40,17 @@ export default function ReportsPage() {
 
   return (
     <>
-      <PageHeader
+      {scopedClient ? (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
+          <button className="v2-btn v2-btn-primary" onClick={() => setOpen(true)}><Plus size={15} /> Generate MIS</button>
+        </div>
+      ) : (
+        <PageHeader
         title="MIS and Reports"
         subtitle={`Narrate agent. Every number stays linked to the transactions behind it. Current period ${currentPeriod}.`}
         action={<button className="v2-btn v2-btn-primary" onClick={() => setOpen(true)}><Plus size={15} /> Generate MIS</button>}
       />
+      )}
 
       <div style={{ display: "grid", gap: 12, marginBottom: narrateRuns.length ? 18 : 0 }}>
         <AnimatePresence>
@@ -62,7 +70,7 @@ export default function ReportsPage() {
       ) : reports.length > 0 && (
         <Card style={{ padding: 0 }} className="v2-scroll">
           <table className="v2-table">
-            <thead><tr><th>Client</th><th>Period</th><th>Template</th><th>Revenue</th><th>Expenses</th><th>Generated</th></tr></thead>
+            <thead><tr>{!scopedClient && <th>Client</th>}<th>Period</th><th>Template</th><th>Revenue</th><th>Expenses</th><th>Generated</th></tr></thead>
             <tbody>
               <AnimatePresence initial={false}>
                 {reports.map((r) => (
@@ -74,7 +82,7 @@ export default function ReportsPage() {
                     className="clickable"
                     onClick={() => navigate({ to: "/v2/reports/$reportId", params: { reportId: r.id } })}
                   >
-                    <td style={{ fontWeight: 600 }}>{clientName(r.clientId)}</td>
+                    {!scopedClient && <td style={{ fontWeight: 600 }}>{clientName(r.clientId)}</td>}
                     <td style={{ color: V.body }}>{r.period}</td>
                     <td style={{ color: V.body }}>{r.template}</td>
                     <td className="num" style={{ color: V.green }}>{formatINR(r.revenue)}</td>
@@ -91,12 +99,14 @@ export default function ReportsPage() {
       <Modal open={open} onClose={() => setOpen(false)} title="Generate MIS">
         <div style={{ display: "grid", gap: 14 }}>
           <AgentStatusBadge agent="narrate" label="Narrate agent" />
-          <div>
-            <label className="v2-label">Client</label>
-            <select className="v2-input" value={clientId} onChange={(e) => setClientId(e.target.value)}>
-              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
+          {!scopedClient && (
+            <div>
+              <label className="v2-label">Client</label>
+              <select className="v2-input" value={clientId} onChange={(e) => setClientId(e.target.value)}>
+                {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+          )}
           <div>
             <label className="v2-label">Period</label>
             <select className="v2-input" value={period} onChange={(e) => setPeriod(e.target.value)}>

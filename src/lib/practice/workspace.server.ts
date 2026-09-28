@@ -220,6 +220,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       direction?: string | null;
       description?: string;
       counterparty?: string | null;
+      reference?: string | null;
     };
     const amount = p.amount
       ? p.direction === "out"
@@ -236,6 +237,8 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
         date: p.date ?? String(r.created_at).slice(0, 10),
         particulars: p.description || p.counterparty || "",
         amount,
+        counterparty: p.counterparty ?? null,
+        reference: p.reference ?? null,
       },
       confidence: Number(r.confidence ?? 0),
       reason: r.reason,

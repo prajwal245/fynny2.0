@@ -7,6 +7,14 @@ import { Badge, Card, EmptyState, PageHeader, Stat, Tabs, V, formatDate, formatI
 import { AgentStatusBadge, AgentTimeline, AnimatedCounter, ProcessingCard } from "../agents";
 import { useV2 } from "../store";
 import { CloseProgress, NextAction } from "../components/CloseProgress";
+import DocumentsPage from "./DocumentsPage";
+import ReviewPage from "./ReviewPage";
+import ExceptionsPage from "./ExceptionsPage";
+import ReportsPage from "./ReportsPage";
+import ChaserPage from "./ChaserPage";
+import { parsePeriod } from "@/lib/practice/core";
+
+const STATUS_LABEL: Record<string, string> = { matched: "Matched", exception: "Exception", unmatched: "Not run", ignored: "Ignored" };
 
 export default function ClientWorkspacePage() {
   const { clientId } = useParams({ from: "/v2/clients/$clientId" });
@@ -47,11 +55,16 @@ export default function ClientWorkspacePage() {
     setTab(close.next.tab);
   };
   const cChases = chases.filter((c) => c.clientId === client.id && c.status !== "Resolved");
-  const bankRows = cDocs.flatMap((d) => d.rows);
+  let range: { start: string; end: string } | null = null;
+  try { range = parsePeriod(period); } catch { range = null; }
+  const inPeriod = cDocs.flatMap((d) => d.rows).filter((r) => !range || (r.date >= range.start && r.date <= range.end)).sort((a, b) => (a.date < b.date ? -1 : 1));
+  const bankSide = inPeriod.filter((r) => r.side !== "books");
+  const bookSide = inPeriod.filter((r) => r.side === "books");
+  const matchedBank = bankSide.filter((r) => r.matchStatus === "matched").length;
+  const ignoredBank = bankSide.filter((r) => r.matchStatus === "ignored").length;
   const clientRuns = runs.filter((r) => r.target === client.id);
   const reconRunning = clientRuns.some((r) => r.agent === "recon");
   const result = recon[client.id];
-  const matched = result ? result.matched : Math.max(0, bankRows.length - cEx.length);
 
   const status = cEx.length > 0
     ? { label: "Needs attention", tone: "bad" as const }
@@ -125,80 +138,19 @@ export default function ClientWorkspacePage() {
         </motion.div>
       )}
 
-      {tab === "documents" && (
-        cDocs.length === 0 ? (
-          <EmptyState title="No documents for this client" description="Upload a statement or bills from the Documents page and they will show up here." action={<Link className="v2-btn v2-btn-primary" to="/v2/documents">Go to Documents</Link>} />
-        ) : (
-          <Card style={{ padding: 0 }} className="v2-scroll">
-            <table className="v2-table">
-              <thead><tr><th>File</th><th>Source</th><th>Status</th><th>Rows</th><th>Date</th></tr></thead>
-              <tbody>
-                {cDocs.map((d) => (
-                  <tr key={d.id}>
-                    <td style={{ fontWeight: 600 }}>{d.name}</td>
-                    <td style={{ color: V.body }}>{d.source}</td>
-                    <td>{d.status === "Processing" ? <AgentStatusBadge agent="extract" active label="Extracting" /> : <Badge tone={d.status === "Parsed" ? "good" : "bad"}>{d.status}</Badge>}</td>
-                    <td className="num" style={{ color: V.body }}>{d.rows.length}</td>
-                    <td className="num" style={{ color: V.body }}>{formatDate(d.date)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Card>
-        )
-      )}
+      {tab === "documents" && <DocumentsPage clientId={client.id} />}
 
-      {tab === "review" && (
-        cReview.length === 0 ? (
-          <EmptyState title="Nothing needs review" description="Every extracted row for this client met the confidence threshold." action={<Link className="v2-btn v2-btn-ghost" to="/v2/review">Open review queue</Link>} />
-        ) : (
-          <Card style={{ padding: 0 }} className="v2-scroll">
-            <table className="v2-table">
-              <thead><tr><th>Document</th><th>Raw text</th><th>Suggestion</th><th>Confidence</th></tr></thead>
-              <tbody>
-                {cReview.map((r) => (
-                  <tr key={r.id}>
-                    <td style={{ fontWeight: 600 }}>{r.docName}</td>
-                    <td style={{ color: V.muted, fontSize: 12.5 }}>{r.rawText}</td>
-                    <td>{r.suggestion.particulars}</td>
-                    <td><Badge tone={r.confidence >= 0.7 ? "warn" : "bad"}>{Math.round(r.confidence * 100)} percent</Badge></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Card>
-        )
-      )}
+      {tab === "review" && <ReviewPage clientId={client.id} />}
 
-      {tab === "exceptions" && (
-        cEx.length === 0 ? (
-          <EmptyState title="No open exceptions" description="Every bank line for this client is matched." action={<Link className="v2-btn v2-btn-ghost" to="/v2/exceptions">Open exception queue</Link>} />
-        ) : (
-          <Card style={{ padding: 0 }} className="v2-scroll">
-            <table className="v2-table">
-              <thead><tr><th>Reason</th><th>Narration</th><th>Amount</th><th>Date</th></tr></thead>
-              <tbody>
-                {cEx.map((e) => (
-                  <tr key={e.id}>
-                    <td><Badge tone="warn">{e.reason}</Badge></td>
-                    <td style={{ color: V.body }}>{e.narration}</td>
-                    <td className="num" style={{ color: e.amount < 0 ? V.maroon : V.green }}>{formatINR(e.amount)}</td>
-                    <td className="num" style={{ color: V.body }}>{formatDate(e.date)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Card>
-        )
-      )}
+      {tab === "exceptions" && <ExceptionsPage clientId={client.id} />}
 
       {tab === "recon" && (
         <>
           <div className="v2-grid-cards" style={{ marginBottom: 18 }}>
-            <Stat label="Bank transactions" value={<AnimatedCounter value={bankRows.length} />} />
-            <Stat label="Book transactions" value={<AnimatedCounter value={Math.max(0, bankRows.length - cEx.length)} />} />
-            <Stat label="Matched" value={<AnimatedCounter value={matched} />} tone="good" hint={result ? `Last run ${formatDate(result.at)}` : "Run recon to refresh"} />
-            <Stat label="Exceptions" value={<AnimatedCounter value={cEx.length} />} tone={cEx.length ? "bad" : "neutral"} />
+            <Stat label="Bank transactions" value={<AnimatedCounter value={bankSide.length} />} hint={`Dated in ${period}`} />
+            <Stat label="Book transactions" value={<AnimatedCounter value={bookSide.length} />} hint={`Dated in ${period}`} />
+            <Stat label="Matched" value={<AnimatedCounter value={matchedBank} />} tone="good" hint={result ? `Last run ${formatDate(result.at)}` : "Run recon to match"} />
+            <Stat label="Unmatched" value={<AnimatedCounter value={bankSide.length - matchedBank - ignoredBank} />} tone={bankSide.length - matchedBank - ignoredBank ? "bad" : "neutral"} hint={`${cEx.length} open exception${cEx.length === 1 ? "" : "s"}`} onClick={() => setTab("exceptions")} />
           </div>
           <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap", alignItems: "center" }}>
             <button
@@ -206,73 +158,42 @@ export default function ClientWorkspacePage() {
               disabled={reconRunning}
               onClick={() => { runRecon(client.id, (r) => toast.success(`Recon complete. Matched ${r.matched}, exceptions ${r.exceptions}.`)); toast.success("Recon agent is matching transactions"); }}
             >
-              {reconRunning ? "Recon agent is working" : "Run recon"}
+              {reconRunning ? "Recon agent is working" : `Run recon for ${period}`}
             </button>
-            <Link className="v2-btn v2-btn-ghost" to="/v2/exceptions">View exception queue</Link>
-            <AgentStatusBadge agent="recon" active={reconRunning} label={reconRunning ? "Matching transactions" : "Recon"} />
+            <button className="v2-btn v2-btn-ghost" onClick={() => setTab("exceptions")}>View exceptions</button>
+            <AgentStatusBadge agent="recon" active={reconRunning} label={reconRunning ? "Matching transactions" : "Exact, fuzzy, then rules"} />
           </div>
-          <Card style={{ padding: 0 }} className="v2-scroll">
-            <table className="v2-table">
-              <thead><tr><th>Date</th><th>Particulars</th><th>Amount</th><th>Status</th></tr></thead>
-              <tbody>
-                {bankRows.length === 0 && <tr><td colSpan={4} style={{ color: V.muted, textAlign: "center", padding: 28 }}>No transactions to reconcile yet.</td></tr>}
-                {bankRows.map((r, i) => (
-                  <tr key={i}>
-                    <td className="num">{formatDate(r.date)}</td>
-                    <td>{r.particulars}</td>
-                    <td className="num" style={{ color: r.amount < 0 ? V.maroon : V.green }}>{formatINR(r.amount)}</td>
-                    <td><Badge tone={i < matched ? "good" : "warn"}>{i < matched ? "Matched" : "Unmatched"}</Badge></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Card>
+          {bankSide.length === 0 && bookSide.length === 0 ? (
+            <EmptyState title={`Nothing dated in ${period} yet`} description="Upload the bank statement and the Tally export or ledger for this month, then run recon." action={<button className="v2-btn v2-btn-primary" onClick={() => setTab("documents")}>Upload documents</button>} />
+          ) : (
+            <div style={{ display: "grid", gap: 18, gridTemplateColumns: "repeat(auto-fit,minmax(420px,1fr))" }}>
+              {([["Bank side", bankSide], ["Books side", bookSide]] as const).map(([label, rows]) => (
+                <Card key={label} style={{ padding: 0 }} className="v2-scroll">
+                  <div style={{ padding: "14px 16px 0", fontWeight: 600 }}>{label} <span style={{ color: V.muted, fontWeight: 400 }}>· {rows.length}</span></div>
+                  <table className="v2-table">
+                    <thead><tr><th>Date</th><th>Particulars</th><th>Amount</th><th>Status</th></tr></thead>
+                    <tbody>
+                      {rows.length === 0 && <tr><td colSpan={4} style={{ color: V.muted, textAlign: "center", padding: 22 }}>{label === "Bank side" ? "No bank statement lines yet." : "No book entries yet. Upload the Tally export or ledger."}</td></tr>}
+                      {rows.map((r, i) => (
+                        <tr key={r.id ?? i}>
+                          <td className="num">{formatDate(r.date)}</td>
+                          <td>{r.particulars}</td>
+                          <td className="num" style={{ color: r.amount < 0 ? V.maroon : V.green }}>{formatINR(r.amount)}</td>
+                          <td><Badge tone={r.matchStatus === "matched" ? "good" : r.matchStatus === "exception" ? "bad" : r.matchStatus === "ignored" ? "neutral" : "warn"}>{STATUS_LABEL[r.matchStatus ?? "unmatched"] ?? r.matchStatus}</Badge></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </Card>
+              ))}
+            </div>
+          )}
         </>
       )}
 
-      {tab === "mis" && (
-        cReports.length === 0 ? (
-          <EmptyState title="No MIS yet" description="Generate a report for this client and every figure will stay linked to its transactions." action={<button className="v2-btn v2-btn-primary" onClick={() => { generateReport(client.id, period, "Monthly MIS", () => toast.success(`${period} MIS ready`)); toast.success("Narrate agent is preparing the MIS"); }}>Generate MIS</button>} />
-        ) : (
-          <Card style={{ padding: 0 }} className="v2-scroll">
-            <table className="v2-table">
-              <thead><tr><th>Period</th><th>Revenue</th><th>Expenses</th><th>Generated</th></tr></thead>
-              <tbody>
-                {cReports.map((r) => (
-                  <tr key={r.id}>
-                    <td style={{ fontWeight: 600 }}>
-                      <Link to="/v2/reports/$reportId" params={{ reportId: r.id }} style={{ color: V.ink }}>{r.period}</Link>
-                    </td>
-                    <td className="num" style={{ color: V.green }}>{formatINR(r.revenue)}</td>
-                    <td className="num" style={{ color: V.maroon }}>{formatINR(r.expenses)}</td>
-                    <td className="num" style={{ color: V.body }}>{formatDate(r.generated)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Card>
-        )
-      )}
+      {tab === "mis" && <ReportsPage clientId={client.id} />}
 
-      {tab === "chaser" && (
-        cChases.length === 0 ? (
-          <EmptyState title="Nothing pending from this client" description="When something is outstanding, create a chase item and track it to closure." action={<Link className="v2-btn v2-btn-primary" to="/v2/chaser">Go to Chaser</Link>} />
-        ) : (
-          <div style={{ display: "grid", gap: 12 }}>
-            {cChases.map((c) => (
-              <Card key={c.id} hover>
-                <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 12, alignItems: "center" }}>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 14 }}>{c.type}</div>
-                    <div style={{ fontSize: 12.5, color: V.body, marginTop: 3 }}>{c.contact} · due {formatDate(c.due)}</div>
-                  </div>
-                  <Badge tone={c.status === "Escalated" ? "bad" : "warn"}>{c.status}</Badge>
-                </div>
-              </Card>
-            ))}
-          </div>
-        )
-      )}
+      {tab === "chaser" && <ChaserPage clientId={client.id} />}
       {tab === "activity" && (
         timeline.length === 0 ? (
           <EmptyState title="Nothing has happened yet" description="Every document read, row confirmed, recon run and report generated for this client is recorded here." />

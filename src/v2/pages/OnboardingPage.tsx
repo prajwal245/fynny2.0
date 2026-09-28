@@ -43,6 +43,9 @@ export default function OnboardingPage() {
     if (error && /already/i.test(error.message)) {
       const { error: signInError } = await supabase.auth.signInWithPassword({ email, password: account.password });
       if (signInError) { setBusy(false); toast.error(signInError.message); return; }
+      // A returning partner (or an invited teammate) already has a practice:
+      // load it, and the shell takes them straight to the portfolio.
+      await completeOnboarding();
     } else if (error) {
       setBusy(false); toast.error(error.message); return;
     }

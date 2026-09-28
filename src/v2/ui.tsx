@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 /**
  * FynHelp v2 dashboard — design system primitives.
  * Self-contained: does not touch any existing app styling.
@@ -147,8 +148,13 @@ export function ListSkeleton({ rows = 4 }: { rows?: number }) {
   );
 }
 
+// Overlays render on <body> so a transformed (animated) ancestor can't clip them.
+function portal(node: ReactNode) {
+  return typeof document === "undefined" ? node : createPortal(node, document.body);
+}
+
 export function Drawer({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
-  return (
+  return portal(
     <AnimatePresence>
       {open && (
         <div style={{ position: "fixed", inset: 0, zIndex: 80 }}>
@@ -172,12 +178,12 @@ export function Drawer({ open, onClose, title, children }: { open: boolean; onCl
           </motion.aside>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
   );
 }
 
 export function Modal({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
-  return (
+  return portal(
     <AnimatePresence>
       {open && (
         <div style={{ position: "fixed", inset: 0, zIndex: 80, display: "grid", placeItems: "center", padding: 18 }}>
@@ -200,7 +206,7 @@ export function Modal({ open, onClose, title, children }: { open: boolean; onClo
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
   );
 }
 
@@ -226,7 +232,10 @@ export function Tabs({ items, value, onChange }: { items: { value: string; label
 }
 
 export function formatINR(n: number) {
-  return "₹" + new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(n);
+  const abs = Math.abs(n);
+  const paise = Math.round(abs * 100) % 100 !== 0;
+  const body = new Intl.NumberFormat("en-IN", paise ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : { maximumFractionDigits: 0 }).format(abs);
+  return (n < 0 ? "−₹" : "₹") + body;
 }
 
 export function formatDate(iso: string) {

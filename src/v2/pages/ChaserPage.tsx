@@ -177,13 +177,13 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
                     href={waLink(active)}
                     target="_blank"
                     rel="noreferrer"
-                    onClick={() => { sendFollowUp(active.id, "WhatsApp"); toast.success("Follow up logged on the timeline"); }}
+                    onClick={() => { sendFollowUp(active.id, "WhatsApp"); }}
                   >
                     <MessageCircle size={15} /> Send WhatsApp
                   </a>
                 )}
                 {active.status !== "Resolved" && (
-                  <button className="v2-btn v2-btn-ghost" onClick={() => { sendFollowUp(active.id, "Email"); toast.success("Email follow up sent"); }}>
+                  <button className="v2-btn v2-btn-ghost" onClick={() => { sendFollowUp(active.id, "Email"); }}>
                     <Mail size={15} /> Send email follow up
                   </button>
                 )}

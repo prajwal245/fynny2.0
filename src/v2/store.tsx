@@ -1109,6 +1109,8 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
             toast.info(
               "Email service is not configured yet, so the follow up was recorded but not sent.",
             );
+          else if (channel === "Email") toast.success("Email follow up sent");
+          else toast.success("Follow up logged on the timeline");
         })
         .catch((e) => toast.error(errMsg(e)))
         .finally(() => {

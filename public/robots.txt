@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /dashboard/
+Disallow: /ca/
+
+Sitemap: https://www.fynhelp.com/sitemap.xml

@@ -1,0 +1,63 @@
+/* FYNHelp Typography System */
+
+/* Import Google Fonts */
+
+/* Headlines */
+h1, h2, .headline, .hero-title {
+  font-family: 'Instrument Sans', 'Inter', sans-serif;
+  font-weight: 700;
+}
+
+/* Subheadings */
+h3, h4, h5, h6, .subheading {
+  font-family: 'Instrument Sans', 'Inter', sans-serif;
+  font-weight: 600;
+}
+
+/* Body Text */
+p, div, span, li, td, .body-text {
+  font-family: 'Instrument Sans', 'Inter', sans-serif;
+  font-weight: 400;
+}
+
+/* Navigation */
+nav a, nav button, .nav-link {
+  font-family: 'Instrument Sans', 'Inter', sans-serif;
+  font-weight: 500;
+}
+
+/* Buttons */
+button, .btn, .button, a.button {
+  font-family: 'Instrument Sans', 'Inter', sans-serif;
+  font-weight: 600;
+}
+
+/* Form Labels */
+label, input::placeholder, .form-label {
+  font-family: 'Instrument Sans', 'Inter', sans-serif;
+  font-weight: 500;
+}
+
+/* Footer */
+footer, footer * {
+  font-family: 'Instrument Sans', 'Inter', sans-serif;
+  font-weight: 400;
+}
+
+/* Pricing Cards */
+.pricing-card h3, .plan-name, .pricing-title {
+  font-family: 'Instrument Sans', 'Inter', sans-serif;
+  font-weight: 700;
+}
+
+/* Badges */
+.badge, .tag, .status-badge {
+  font-family: 'Instrument Sans', 'Inter', sans-serif;
+  font-weight: 600;
+}
+
+/* Table Headers */
+th, thead, .table-header {
+  font-family: 'Instrument Sans', 'Inter', sans-serif;
+  font-weight: 600;
+}

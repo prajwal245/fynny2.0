@@ -1,0 +1,2 @@
+ALTER TABLE public.bank_transactions ADD COLUMN IF NOT EXISTS source_reference text;
+CREATE UNIQUE INDEX IF NOT EXISTS bank_transactions_source_ref_uniq ON public.bank_transactions (business_id, source_reference) WHERE source_reference IS NOT NULL;

@@ -1,0 +1,1 @@
+ALTER TABLE public.ca_approval_log ALTER COLUMN ca_firm_id DROP NOT NULL;

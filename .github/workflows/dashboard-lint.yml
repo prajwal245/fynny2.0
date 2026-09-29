@@ -1,0 +1,57 @@
+name: Dashboard design-system lint
+
+# Enforces the Fyn dashboard design-system rules on every PR and push:
+#   • fyn-spacing/dashboard-gap-scale  (auto-fixable: gap-3..7 → gap-fyn-*)
+#   • no-restricted-syntax             (banned colors: bg-white, text-gray-*, etc.)
+#
+# A non-zero exit fails the check and — once this job is marked
+# "Required" in branch protection — blocks the merge.
+#
+# To enforce as a merge gate (one-time, in GitHub UI):
+#   Settings → Branches → Branch protection rules → Add rule
+#     Branch name pattern: main
+#     ✓ Require status checks to pass before merging
+#     ✓ Require branches to be up to date
+#     Status checks: select "lint-dashboard"
+#     ✓ Do not allow bypassing the above settings
+
+on:
+  pull_request:
+    paths:
+      - "src/pages/dashboard/**"
+      - "src/components/dashboard/**"
+      - "eslint.config.js"
+      - "eslint-rules/**"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/dashboard-lint.yml"
+  push:
+    branches: [main]
+
+jobs:
+  lint-dashboard:
+    name: lint-dashboard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Scope the lint to dashboard surfaces so unrelated codebase issues
+      # don't gate the merge. The ESLint config already restricts the
+      # design-system rules to these paths via the `files:` selector.
+      - name: Lint /dashboard files
+        run: |
+          bunx eslint \
+            "src/pages/dashboard/**/*.{ts,tsx}" \
+            "src/components/dashboard/**/*.{ts,tsx}" \
+            --max-warnings=0

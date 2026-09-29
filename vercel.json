@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "npm install --no-audit --no-fund",
+  "buildCommand": "npm run build",
+  "crons": [
+    { "path": "/api/public/practice-tick", "schedule": "0 2 * * *" },
+    { "path": "/api/public/ca-poll-gmail", "schedule": "30 2 * * *" },
+    { "path": "/api/public/ca-auto-followup", "schedule": "0 4 * * *" }
+  ]
+}

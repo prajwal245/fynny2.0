@@ -1,0 +1,27 @@
+{
+  "_comment": "Allowlist of Supabase database linter findings that are reviewed and accepted. CI fails on any finding NOT in this list. Each entry is matched on (name, level, metadata.schema, metadata.name) so adding a new policy/function with the same name as an allowlisted one will still be detected.",
+  "_updated": "2026-04-27",
+  "allowed": [
+    {
+      "name": "function_search_path_mutable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "update_updated_at_column",
+      "reason": "Trigger-only function; search_path is set inside the function body."
+    },
+    {
+      "name": "auth_otp_long_expiry",
+      "level": "WARN",
+      "schema": "auth",
+      "object": null,
+      "reason": "OTP expiry left at provider default for now; tracked separately."
+    },
+    {
+      "name": "auth_leaked_password_protection",
+      "level": "WARN",
+      "schema": "auth",
+      "object": null,
+      "reason": "HaveIBeenPwned check disabled in Lovable Cloud; tracked separately."
+    }
+  ]
+}

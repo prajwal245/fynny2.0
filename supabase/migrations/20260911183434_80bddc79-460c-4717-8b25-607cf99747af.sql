@@ -1,0 +1,1 @@
+ALTER TABLE public.ca_gmail_connections ADD COLUMN IF NOT EXISTS refresh_locked_until TIMESTAMPTZ;

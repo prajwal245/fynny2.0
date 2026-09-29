@@ -1,0 +1,1065 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  font-variant-numeric: tabular-nums;
+}
+
+@layer base {
+  :root {
+    /* Core palette */
+    --fyn-ink: 38 49% 6%;
+    --fyn-red: 0 50% 44%;
+    --fyn-beige: 40 33% 93%;
+    --fyn-gold: 38 74% 31%;
+
+    /* Ink scale */
+    --fyn-ink-95: 38 49% 6% / 0.95;
+    --fyn-ink-80: 38 49% 6% / 0.8;
+    --fyn-ink-60: 38 49% 6% / 0.6;
+    --fyn-ink-45: 38 49% 6% / 0.45;
+    --fyn-ink-40: 38 49% 6% / 0.4;
+    --fyn-ink-20: 38 49% 6% / 0.2;
+    --fyn-ink-10: 38 49% 6% / 0.1;
+    --fyn-ink-05: 38 49% 6% / 0.05;
+    --fyn-ink-02: 38 49% 6% / 0.02;
+
+    /* Type scale */
+    --fyn-type-display: 48px;
+    --fyn-type-h1: 32px;
+    --fyn-type-h2: 24px;
+    --fyn-type-h3: 18px;
+    --fyn-type-body: 14px;
+    --fyn-type-small: 13px;
+    --fyn-type-tiny: 12px;
+
+    /* Spacing scale */
+    --fyn-space-xs: 4px;
+    --fyn-space-sm: 8px;
+    --fyn-space-md: 16px;
+    --fyn-space-lg: 24px;
+    --fyn-space-xl: 32px;
+    --fyn-space-2xl: 48px;
+
+    /* Red scale */
+    --fyn-red-dark: 0 73% 36%;
+    --fyn-red-mid: 0 73% 44%;
+    --fyn-red-light: 0 52% 95%;
+    --fyn-red-tint: 0 73% 44% / 0.08;
+
+    /* Beige scale */
+    --fyn-beige-dark: 40 42% 86%;
+    --fyn-beige-deep: 40 38% 80%;
+    --fyn-beige-card: 36 50% 96%;
+
+    /* Gold scale */
+    --fyn-gold-dark: 38 74% 24%;
+    --fyn-gold-mid: 38 74% 41%;
+    --fyn-gold-light: 40 65% 87%;
+
+    /* Semantic */
+    --fyn-success: 150 60% 26%;
+    --fyn-success-bg: 150 40% 93%;
+    --fyn-warning: 38 100% 27%;
+    --fyn-warning-bg: 38 90% 94%;
+    --fyn-danger: 0 73% 44%;
+    --fyn-danger-bg: 0 70% 95%;
+    --fyn-info: 216 66% 33%;
+    --fyn-info-bg: 216 60% 95%;
+
+    /* Chart */
+    --chart-1: 0 73% 44%;
+    --chart-2: 150 60% 26%;
+    --chart-3: 38 74% 31%;
+    --chart-4: 216 66% 33%;
+    --chart-5: 300 60% 26%;
+
+    /* Shadcn tokens — BEIGE intelligence theme (spec: bg #EFE8D8 / card #FFFFFF / red #A93838) */
+    --background: 40 33% 93%;            /* #F2EEE7 home cream */
+    --foreground: 38 49% 6%;             /* #171208 home ink */
+    --card: 40 100% 99%;                 /* #FFFDF9 home card */
+    --card-foreground: 38 49% 6%;
+    --popover: 40 100% 99%;
+    --popover-foreground: 38 49% 6%;
+    --primary: 0 50% 44%;                /* #A93838 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 40 25% 90%;             /* #EBE6DD */
+    --secondary-foreground: 38 49% 6%;
+    --muted: 40 25% 90%;
+    --muted-foreground: 38 49% 6% / 0.62;
+    --accent: 38 74% 31%;                /* #8B6914 gold */
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 50% 44%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 38 49% 6% / 0.09;
+    --input: 38 49% 6% / 0.09;
+    --ring: 0 50% 44%;
+    --radius: 0.5rem;
+
+    /* Override fyn-beige-card to pure white so FynCard primitive renders on white surface */
+    --fyn-beige: 40 33% 93%;
+    --fyn-beige-card: 40 100% 99%;
+    --fyn-red: 0 50% 44%;
+    --fyn-red-mid: 0 50% 44%;
+    --fyn-red-dark: 0 50% 36%;
+
+    --sidebar-background: 24 53% 7%;
+    --sidebar-foreground: 40 52% 91%;
+    --sidebar-primary: 0 73% 44%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 40 42% 86%;
+    --sidebar-accent-foreground: 24 53% 7%;
+    --sidebar-border: 24 53% 7% / 0.08;
+    --sidebar-ring: 0 73% 44%;
+
+    /* Easing */
+    --ease-out: cubic-bezier(0, 0, 0.2, 1);
+    --ease-in: cubic-bezier(0.4, 0, 1, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease-smooth: cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     DARK MODE THEME
+     ═══════════════════════════════════════════════════════════════ */
+  .dark {
+    --background: 24 53% 7%;
+    --foreground: 40 52% 91%;
+
+    --card: 24 53% 15%;
+    --card-foreground: 40 52% 91%;
+
+    --popover: 24 53% 7%;
+    --popover-foreground: 40 52% 91%;
+
+    --primary: 0 73% 44%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 24 53% 15%;
+    --secondary-foreground: 40 52% 91%;
+
+    --muted: 24 53% 12%;
+    --muted-foreground: 40 52% 91% / 0.6;
+
+    --accent: 38 74% 31%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 73% 44%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 40 52% 91% / 0.1;
+    --input: 40 52% 91% / 0.08;
+    --ring: 0 73% 44%;
+
+    --sidebar-background: 24 53% 7%;
+    --sidebar-foreground: 40 52% 91%;
+    --sidebar-primary: 0 73% 44%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 24 53% 15%;
+    --sidebar-accent-foreground: 40 52% 91%;
+    --sidebar-border: 40 52% 91% / 0.08;
+    --sidebar-ring: 0 73% 44%;
+
+    /* Fyn brand tokens, dark mode overrides
+       Invert ink/beige so dashboard surfaces (which use fyn-* tokens
+       by design-system rule) adapt with the theme. Brand red/gold stay. */
+    --fyn-ink: 40 52% 91%;
+    --fyn-ink-95: 40 52% 91% / 0.95;
+    --fyn-ink-80: 40 52% 91% / 0.80;
+    --fyn-ink-60: 40 52% 91% / 0.60;
+    --fyn-ink-45: 40 52% 91% / 0.45;
+    --fyn-ink-40: 40 52% 91% / 0.40;
+    --fyn-ink-20: 40 52% 91% / 0.18;
+    --fyn-ink-10: 40 52% 91% / 0.12;
+    --fyn-ink-05: 40 52% 91% / 0.06;
+    --fyn-ink-02: 40 52% 91% / 0.03;
+
+    --fyn-beige: 24 53% 7%;
+    --fyn-beige-dark: 24 53% 12%;
+    --fyn-beige-deep: 24 53% 15%;
+    --fyn-beige-card: 24 53% 15%;
+  }
+}
+
+/* Smooth theme transitions */
+* {
+  transition-property: background-color, border-color, color, fill, stroke, box-shadow;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+}
+
+/* Prevent flash */
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Instrument Sans", "Inter", system-ui, -apple-system, sans-serif;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: "Instrument Sans", "Inter", sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.035em;
+  }
+  h4,
+  h5,
+  h6 {
+    font-family: "Instrument Sans", "Inter", sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  button {
+    font-family: "Instrument Sans", "Inter", sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  label {
+    font-family: "Instrument Sans", "Inter", sans-serif;
+    font-weight: 500;
+  }
+  th,
+  thead {
+    font-family: "Instrument Sans", "Inter", sans-serif;
+    font-weight: 600;
+  }
+  nav a {
+    font-family: "Instrument Sans", "Inter", sans-serif;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+  }
+  footer,
+  footer p,
+  footer a,
+  footer span,
+  footer li,
+  footer div {
+    font-family: "Instrument Sans", "Inter", system-ui, sans-serif;
+  }
+  [class*="badge"],
+  .fyn-badge,
+  [data-badge] {
+    font-family: "Instrument Sans", "Inter", sans-serif;
+    font-weight: 600;
+  }
+  .font-mono,
+  code,
+  pre {
+    font-family: "SF Mono", "Monaco", "Menlo", monospace;
+    font-feature-settings: "tnum", "lnum";
+  }
+}
+
+/* ═══ ANIMATIONS ═══ */
+.reveal-up,
+.reveal-left,
+.reveal-right,
+.reveal-scale {
+  opacity: 0;
+  transition:
+    opacity 700ms var(--ease-out),
+    transform 700ms var(--ease-out);
+}
+.reveal-up {
+  transform: translateY(40px);
+}
+.reveal-left {
+  transform: translateX(-40px);
+}
+.reveal-right {
+  transform: translateX(40px);
+}
+.reveal-scale {
+  transform: scale(0.95);
+  transition-duration: 600ms;
+}
+.reveal-up.revealed,
+.reveal-left.revealed,
+.reveal-right.revealed,
+.reveal-scale.revealed {
+  opacity: 1;
+  transform: translate(0) scale(1);
+}
+
+.stagger-children > * {
+  opacity: 0;
+  transform: translateY(24px);
+  transition:
+    opacity 500ms var(--ease-out),
+    transform 500ms var(--ease-out);
+}
+.stagger-children.revealed > *:nth-child(1) {
+  transition-delay: 0ms;
+}
+.stagger-children.revealed > *:nth-child(2) {
+  transition-delay: 80ms;
+}
+.stagger-children.revealed > *:nth-child(3) {
+  transition-delay: 160ms;
+}
+.stagger-children.revealed > *:nth-child(4) {
+  transition-delay: 240ms;
+}
+.stagger-children.revealed > *:nth-child(5) {
+  transition-delay: 320ms;
+}
+.stagger-children.revealed > *:nth-child(6) {
+  transition-delay: 400ms;
+}
+.stagger-children.revealed > *:nth-child(7) {
+  transition-delay: 480ms;
+}
+.stagger-children.revealed > *:nth-child(8) {
+  transition-delay: 560ms;
+}
+.stagger-children.revealed > *:nth-child(9) {
+  transition-delay: 640ms;
+}
+.stagger-children.revealed > *:nth-child(10) {
+  transition-delay: 720ms;
+}
+.stagger-children.revealed > * {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@keyframes liquidFloat {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+.liquid-float {
+  animation: liquidFloat 4000ms ease-in-out infinite;
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(196, 30, 30, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 12px rgba(196, 30, 30, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(196, 30, 30, 0);
+  }
+}
+.pulse-ring {
+  animation: pulse-ring 2000ms ease-out infinite;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    transform: scale(0.94);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--fyn-beige-dark)) 25%,
+    hsl(var(--fyn-beige)) 50%,
+    hsl(var(--fyn-beige-dark)) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes float-gentle {
+  0%,
+  100% {
+    transform: translateY(-6px);
+  }
+  50% {
+    transform: translateY(6px);
+  }
+}
+.float-gentle {
+  animation: float-gentle 4s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+.pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(196, 30, 30, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(196, 30, 30, 0);
+  }
+}
+.pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes draw-line {
+  0% {
+    stroke-dashoffset: 100;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes ticker-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+.ticker-scroll {
+  animation: ticker-scroll 30s linear infinite;
+}
+.ticker-scroll:hover {
+  animation-play-state: paused;
+}
+
+@keyframes typing-dot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-6px);
+  }
+}
+.typing-dot:nth-child(1) {
+  animation: typing-dot 1.2s ease-in-out infinite 0ms;
+}
+.typing-dot:nth-child(2) {
+  animation: typing-dot 1.2s ease-in-out infinite 150ms;
+}
+.typing-dot:nth-child(3) {
+  animation: typing-dot 1.2s ease-in-out infinite 300ms;
+}
+
+@keyframes blink {
+  50% {
+    border-color: transparent;
+  }
+}
+
+@keyframes count-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes progress-fill {
+  from {
+    width: 0%;
+  }
+}
+.progress-fill-animate {
+  animation: progress-fill 1200ms var(--ease-out) forwards;
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-6px);
+  }
+  40%,
+  80% {
+    transform: translateX(6px);
+  }
+}
+.shake {
+  animation: shake 400ms ease-in-out;
+}
+
+@keyframes check-draw {
+  0% {
+    stroke-dashoffset: 20;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+.check-draw {
+  stroke-dasharray: 20;
+  animation: check-draw 500ms var(--ease-out) forwards;
+}
+
+@keyframes slide-up-bounce {
+  0% {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  70% {
+    transform: translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.slide-up-bounce {
+  animation: slide-up-bounce 400ms var(--ease-spring);
+}
+
+@layer components {
+  .fyn-container {
+    @apply max-w-[1280px] mx-auto px-6 lg:px-12;
+  }
+  .fyn-section {
+    @apply py-16 md:py-24;
+  }
+  .fyn-label {
+    font-family:
+      "Work Sans",
+      -apple-system,
+      sans-serif;
+    font-weight: 500;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .fyn-caption {
+    font-family:
+      "Work Sans",
+      -apple-system,
+      sans-serif;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 1.5;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .fyn-metric {
+    font-family: "Oswald", Impact, sans-serif;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .fyn-mono {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 13px;
+  }
+  .fyn-display {
+    font-family: "Oswald", Impact, sans-serif;
+    font-weight: 700;
+    font-size: 72px;
+    line-height: 1.05;
+    letter-spacing: -1px;
+  }
+
+  .bg-fyn-ink {
+    background-color: hsl(24 53% 7%);
+  }
+  .bg-fyn-beige {
+    background-color: hsl(40 52% 91%);
+  }
+  .bg-fyn-beige-dark {
+    background-color: hsl(40 42% 86%);
+  }
+  .bg-fyn-beige-deep {
+    background-color: hsl(40 38% 80%);
+  }
+  .bg-fyn-beige-card {
+    background-color: hsl(36 50% 96%);
+  }
+  .bg-fyn-red {
+    background-color: hsl(0 73% 44%);
+  }
+  .bg-fyn-red-dark {
+    background-color: hsl(0 73% 36%);
+  }
+  .bg-fyn-red-light {
+    background-color: hsl(0 52% 95%);
+  }
+  .bg-fyn-red-tint {
+    background-color: hsl(0 73% 44% / 0.08);
+  }
+  .bg-fyn-gold {
+    background-color: hsl(38 74% 31%);
+  }
+  .bg-fyn-gold-light {
+    background-color: hsl(40 65% 87%);
+  }
+  .bg-fyn-success {
+    background-color: hsl(150 60% 26%);
+  }
+  .bg-fyn-success-bg {
+    background-color: hsl(150 40% 93%);
+  }
+  .bg-fyn-warning {
+    background-color: hsl(38 100% 27%);
+  }
+  .bg-fyn-warning-bg {
+    background-color: hsl(38 90% 94%);
+  }
+  .bg-fyn-danger-bg {
+    background-color: hsl(0 70% 95%);
+  }
+  .bg-fyn-info {
+    background-color: hsl(216 66% 33%);
+  }
+  .bg-fyn-info-bg {
+    background-color: hsl(216 60% 95%);
+  }
+
+  .text-fyn-ink {
+    color: hsl(24 53% 7%);
+  }
+  .text-fyn-ink-80 {
+    color: hsl(24 53% 7% / 0.8);
+  }
+  .text-fyn-ink-60 {
+    color: hsl(24 53% 7% / 0.6);
+  }
+  .text-fyn-ink-45 {
+    color: hsl(24 53% 7% / 0.45);
+  }
+  .text-fyn-ink-40 {
+    color: hsl(24 53% 7% / 0.4);
+  }
+  .bg-fyn-ink-05 {
+    background-color: hsl(24 53% 7% / 0.05);
+  }
+  .bg-fyn-ink-02 {
+    background-color: hsl(24 53% 7% / 0.02);
+  }
+  .text-fyn-red {
+    color: hsl(0 73% 44%);
+  }
+  .text-fyn-red-dark {
+    color: hsl(0 73% 36%);
+  }
+  .text-fyn-gold {
+    color: hsl(38 74% 31%);
+  }
+  .text-fyn-gold-mid {
+    color: hsl(38 74% 41%);
+  }
+  .text-fyn-beige {
+    color: hsl(40 52% 91%);
+  }
+  .text-fyn-success {
+    color: hsl(150 60% 26%);
+  }
+  .text-fyn-warning {
+    color: hsl(38 100% 27%);
+  }
+  .text-fyn-info {
+    color: hsl(216 66% 33%);
+  }
+
+  .border-fyn-ink-10 {
+    border-color: hsl(24 53% 7% / 0.1);
+  }
+  .border-fyn-ink-20 {
+    border-color: hsl(24 53% 7% / 0.2);
+  }
+  .border-fyn-ink {
+    border-color: hsl(24 53% 7%);
+  }
+  .border-fyn-red {
+    border-color: hsl(0 73% 44%);
+  }
+
+  .hover-card {
+    @apply transition-all duration-300;
+  }
+  .hover-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(26, 16, 8, 0.12);
+  }
+
+  .hover-btn-primary {
+    @apply transition-all duration-200;
+  }
+  .hover-btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(196, 30, 30, 0.35);
+    filter: brightness(0.92);
+  }
+
+  .hover-btn-secondary {
+    @apply transition-all;
+    transition-duration: 250ms;
+  }
+  .hover-btn-secondary:hover {
+    background-color: hsl(24 53% 7%);
+    color: white;
+  }
+
+  .hover-scale-icon {
+    @apply transition-transform;
+    transition-duration: 250ms;
+    transition-timing-function: var(--ease-spring);
+  }
+  .hover-scale-icon:hover {
+    transform: scale(1.08);
+  }
+
+  .nav-link-underline {
+    @apply relative;
+  }
+  .nav-link-underline::after {
+    content: "";
+    @apply absolute bottom-[-2px] left-0 h-[2px] w-0;
+    background-color: hsl(0 73% 44%);
+    transition: width 250ms var(--ease-smooth);
+  }
+  .nav-link-underline:hover::after {
+    width: 100%;
+  }
+}
+
+@keyframes fyn-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+@keyframes fyn-pulse-live {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+.fyn-badge-live {
+  animation: fyn-pulse-live 1.5s infinite;
+}
+
+.fyn-products-trigger:hover {
+  transform: translateY(-1px);
+}
+
+.fyn-product-item:hover {
+  background: linear-gradient(135deg, #fafaf8 0%, #ffffff 100%);
+  border-left-color: #c41e1e !important;
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(196, 30, 30, 0.1);
+}
+.fyn-product-item:active {
+  transform: translateX(4px) scale(0.98);
+}
+.fyn-product-item:focus-visible {
+  outline: 2px solid #c41e1e;
+  outline-offset: 2px;
+}
+
+.fyn-modal-close:hover {
+  background: #c41e1e !important;
+  color: #ffffff !important;
+  transform: rotate(90deg);
+}
+
+.fyn-cta-btn:hover {
+  background: linear-gradient(135deg, #a01818 0%, #cc3333 100%) !important;
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 12px 32px rgba(196, 30, 30, 0.5) !important;
+}
+.fyn-cta-btn:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 4px 12px rgba(196, 30, 30, 0.3) !important;
+}
+
+.fyn-widget-shell:hover {
+  transform: rotateX(2deg) rotateY(-2deg) translateZ(8px);
+}
+
+.fyn-sim-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  background: linear-gradient(to right, #c41e1e 0%, #ff4444 var(--val, 20%), #f3f4f6 var(--val, 20%));
+  border-radius: 4px;
+  outline: none;
+}
+.fyn-sim-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #c41e1e, #ff4444);
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(196, 30, 30, 0.4);
+  border: 2px solid #ffffff;
+}
+.fyn-sim-slider::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #c41e1e, #ff4444);
+  cursor: pointer;
+  border: 2px solid #ffffff;
+  box-shadow: 0 4px 12px rgba(196, 30, 30, 0.4);
+}
+
+/* ── Global micro-interactions ───────────────────────── */
+button, a, [role="button"] {
+  transition: color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid rgba(57, 73, 171, 0.5);
+  outline-offset: 4px;
+  border-radius: 12px;
+}
+
+/* ── Demo dashboards: typography normalization ───────── */
+.font-mono {
+  font-feature-settings: "tnum", "lnum";
+  letter-spacing: -0.01em;
+}
+.font-serif {
+  letter-spacing: -0.02em;
+}
+
+/* ── FYN intelligence: alive micro-animations ───────────────── */
+
+/* Subtle noise texture on beige page background for "premium paper" feel */
+body {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.10  0 0 0 0 0.06  0 0 0 0 0.03  0 0 0 0.015 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  background-repeat: repeat;
+}
+
+/* Card hover lift */
+.fyn-card-hover {
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  will-change: transform;
+}
+.fyn-card-hover:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(26, 16, 8, 0.1) !important;
+  border-color: rgba(169, 56, 56, 0.15) !important;
+}
+
+/* Stagger entrance for child cards */
+@keyframes fyn-card-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fyn-card-enter {
+  animation: fyn-card-in 0.4s ease-out both;
+}
+.fyn-stagger > * { animation: fyn-card-in 0.4s ease-out both; }
+.fyn-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.fyn-stagger > *:nth-child(2) { animation-delay: 80ms; }
+.fyn-stagger > *:nth-child(3) { animation-delay: 160ms; }
+.fyn-stagger > *:nth-child(4) { animation-delay: 240ms; }
+.fyn-stagger > *:nth-child(5) { animation-delay: 320ms; }
+.fyn-stagger > *:nth-child(6) { animation-delay: 400ms; }
+.fyn-stagger > *:nth-child(7) { animation-delay: 480ms; }
+.fyn-stagger > *:nth-child(8) { animation-delay: 560ms; }
+.fyn-stagger > *:nth-child(9) { animation-delay: 640ms; }
+.fyn-stagger > *:nth-child(n+10) { animation-delay: 720ms; }
+
+/* KPI cards inside a grid also stagger by position */
+.grid > .fyn-card-enter:nth-child(1) { animation-delay: 0ms; }
+.grid > .fyn-card-enter:nth-child(2) { animation-delay: 80ms; }
+.grid > .fyn-card-enter:nth-child(3) { animation-delay: 160ms; }
+.grid > .fyn-card-enter:nth-child(4) { animation-delay: 240ms; }
+.grid > .fyn-card-enter:nth-child(5) { animation-delay: 320ms; }
+.grid > .fyn-card-enter:nth-child(6) { animation-delay: 400ms; }
+
+/* Health glow pulses (border-side shadow loops) */
+@keyframes fyn-glow-green {
+  0%, 100% { box-shadow: 0 2px 8px rgba(26,16,8,0.06), -3px 0 12px -3px rgba(16,185,129,0.05); }
+  50%      { box-shadow: 0 2px 8px rgba(26,16,8,0.06), -3px 0 16px -3px rgba(16,185,129,0.18); }
+}
+@keyframes fyn-glow-gold {
+  0%, 100% { box-shadow: 0 2px 8px rgba(26,16,8,0.06), -3px 0 12px -3px rgba(212,175,55,0.05); }
+  50%      { box-shadow: 0 2px 8px rgba(26,16,8,0.06), -3px 0 16px -3px rgba(212,175,55,0.20); }
+}
+@keyframes fyn-glow-red {
+  0%, 100% { box-shadow: 0 2px 8px rgba(26,16,8,0.06), -3px 0 12px -3px rgba(169,56,56,0.06); }
+  50%      { box-shadow: 0 2px 8px rgba(26,16,8,0.06), -3px 0 18px -3px rgba(169,56,56,0.24); }
+}
+.fyn-pulse-green { animation: fyn-glow-green 3s ease-in-out infinite; }
+.fyn-pulse-gold  { animation: fyn-glow-gold 2.5s ease-in-out infinite; }
+.fyn-pulse-red   { animation: fyn-glow-red 2s ease-in-out infinite; }
+
+/* Breathing status labels (opacity heartbeat) */
+@keyframes fyn-breath-soft  { 0%,100%{ opacity: 0.72; } 50%{ opacity: 1; } }
+.fyn-breath-green { animation: fyn-breath-soft 3s ease-in-out infinite; }
+.fyn-breath-gold  { animation: fyn-breath-soft 2.5s ease-in-out infinite; }
+.fyn-breath-red   { animation: fyn-breath-soft 2s   ease-in-out infinite; }
+
+/* Trend arrow micro-bounce */
+@keyframes fyn-arrow-up   { 0%{ transform: translateY(0); } 40%{ transform: translateY(-4px); } 100%{ transform: translateY(0); } }
+@keyframes fyn-arrow-down { 0%{ transform: translateY(0); } 40%{ transform: translateY(4px); }  100%{ transform: translateY(0); } }
+.fyn-trend-up   .fyn-arrow { display: inline-block; animation: fyn-arrow-up 0.5s cubic-bezier(.34,1.56,.64,1) 1; }
+.fyn-trend-down .fyn-arrow { display: inline-block; animation: fyn-arrow-down 0.5s cubic-bezier(.34,1.56,.64,1) 1; }
+
+/* Live refresh icon: slow rotation */
+@keyframes fyn-slow-spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+.fyn-slow-spin { animation: fyn-slow-spin 8s linear infinite; transform-origin: center; }
+
+/* Table row hover (slide-right) */
+.fyn-row {
+  transition: background-color 0.2s ease, transform 0.2s ease;
+  cursor: pointer;
+}
+.fyn-row:hover {
+  background: rgba(169, 56, 56, 0.03);
+  transform: translateX(4px);
+}
+
+/* Alert ticker — bg pulse when critical, blinking dot */
+@keyframes fyn-alert-bg { 0%,100%{ background-color: rgba(169,56,56,0.03); } 50%{ background-color: rgba(169,56,56,0.08); } }
+.fyn-alert-critical { animation: fyn-alert-bg 2s ease-in-out infinite; }
+@keyframes fyn-dot-blink { 0%,100%{ opacity: 0.4; } 50%{ opacity: 1; } }
+.fyn-dot-blink { animation: fyn-dot-blink 1.5s ease-in-out infinite; }
+
+@media (max-width: 768px) {
+  .fyn-card-enter, .fyn-stagger > * { animation-duration: 0.28s; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fyn-card-enter, .fyn-stagger > *, .fyn-pulse-green, .fyn-pulse-gold, .fyn-pulse-red,
+  .fyn-breath-green, .fyn-breath-gold, .fyn-breath-red, .fyn-slow-spin, .fyn-trend-up .fyn-arrow,
+  .fyn-trend-down .fyn-arrow, .fyn-alert-critical, .fyn-dot-blink {
+    animation: none !important;
+  }
+  .fyn-card-hover { transition: none; }
+}
+
+/* ── Skip to main content (keyboard a11y) ───────────────────────── */
+.fyn-skip-link {
+  position: fixed;
+  top: -60px;
+  left: 12px;
+  z-index: 200;
+  padding: 10px 16px;
+  border-radius: 0 0 10px 10px;
+  background: #A93838;
+  color: #FFFFFF;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: top 160ms ease;
+}
+.fyn-skip-link:focus,
+.fyn-skip-link:focus-visible {
+  top: 0;
+  outline: 2px solid #1A1008;
+  outline-offset: 2px;
+}
+
+/* ── Global print stylesheet ────────────────────────────────────── */
+@media print {
+  @page { margin: 14mm; }
+
+  html, body {
+    background: #FFFFFF !important;
+    color: #000000 !important;
+  }
+
+  header[role="banner"],
+  nav,
+  aside,
+  footer,
+  .fyn-no-print,
+  [data-no-print],
+  [data-sonner-toaster],
+  [role="dialog"] { display: none !important; }
+
+  main, #main-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+
+  * {
+    box-shadow: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
+
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 10px;
+    color: #555;
+  }
+
+  .fyn-card, [class*="rounded"] { break-inside: avoid; page-break-inside: avoid; }
+  h1, h2, h3 { break-after: avoid; page-break-after: avoid; }
+  table { break-inside: auto; }
+  tr { break-inside: avoid; }
+}

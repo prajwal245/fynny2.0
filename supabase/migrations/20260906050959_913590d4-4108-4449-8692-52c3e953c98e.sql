@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.trigger_ca_auto_escalate_chasers() FROM PUBLIC, anon, authenticated;

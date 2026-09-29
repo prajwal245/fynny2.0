@@ -10,7 +10,8 @@ import path from "node:path";
 
 const ref = process.argv[2];
 const dryRun = process.argv.includes("--dry-run");
-const token = process.env.SUPABASE_ACCESS_TOKEN;
+// Tolerate a secret pasted with spaces, a newline, or the token twice over.
+const token = (process.env.SUPABASE_ACCESS_TOKEN ?? "").match(/sbp_[0-9a-f]{40}/)?.[0] ?? process.env.SUPABASE_ACCESS_TOKEN?.trim();
 if (!ref || !token) {
   console.error("usage: SUPABASE_ACCESS_TOKEN=sbp_... node scripts/supabase-apply-migrations.mjs <project-ref> [--dry-run]");
   process.exit(1);

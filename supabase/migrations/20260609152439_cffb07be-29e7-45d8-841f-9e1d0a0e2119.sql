@@ -30,9 +30,13 @@ CREATE POLICY "Anyone can submit a callback request"
 --   business:<uuid>   -> matches caller's business_id
 --   ca_firm:<uuid>    -> matches caller's ca_firm_id
 --   user:<uuid>       -> matches caller's auth.uid()
-ALTER TABLE realtime.messages ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Tenant-scoped realtime subscriptions" ON realtime.messages;
+-- realtime.messages is owned by a system role on hosted Supabase (RLS is on by
+-- default there), so skip rather than fail where we are not allowed to change it.
+DO $realtime$
+BEGIN
+  ALTER TABLE realtime.messages ENABLE ROW LEVEL SECURITY;
+  DROP POLICY IF EXISTS "Tenant-scoped realtime subscriptions" ON realtime.messages;
+  EXECUTE $pol$
 CREATE POLICY "Tenant-scoped realtime subscriptions"
   ON realtime.messages
   FOR SELECT
@@ -50,4 +54,9 @@ CREATE POLICY "Tenant-scoped realtime subscriptions"
       realtime.topic() = 'user:' || auth.uid()::text
       AND auth.uid() IS NOT NULL
     )
-  );
+  )
+  $pol$;
+EXCEPTION WHEN insufficient_privilege OR undefined_table THEN
+  RAISE NOTICE 'Skipping realtime.messages policy: %', SQLERRM;
+END
+$realtime$;

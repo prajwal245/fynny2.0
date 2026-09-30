@@ -145,11 +145,12 @@ export const reprocessPracticeDocument = createServerFn({ method: "POST" })
       if (!doc) throw new Error("Document not found.");
       await db
         .from("ca_document_extractions")
-        .update({ extract_status: "queued", extract_attempts: 0 })
+        .update({ extract_status: "queued", extract_attempts: 0, extract_next_attempt_at: null })
         .eq("id", data.id);
       return (await import("./documents.server")).processExtraction(
         db,
         data.id,
+        { trigger: "user", userId: ctx.userId },
       );
     }),
   );
@@ -224,14 +225,19 @@ export const runPracticeRecon = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ business_id: uuid, period }).parse(d))
   .handler(async ({ data, context }) =>
-    withFirm(context.userId, async (db, ctx) =>
-      (await import("./recon.server")).runRecon(
+    withFirm(context.userId, async (db, ctx) => {
+      const orch = await import("./orchestrator.server");
+      const { parsePeriod } = await import("./core");
+      const label = parsePeriod(data.period).label;
+      const summary = await orch.withRun(
         db,
-        ctx,
-        data.business_id,
-        data.period,
-      ),
-    ),
+        { firmId: ctx.firmId, businessId: data.business_id, agent: "recon", trigger: "user", period: label, userId: ctx.userId },
+        async () => (await import("./recon.server")).runRecon(db, ctx, data.business_id, data.period),
+        (s) => ({ summary: s.message, detail: { run_id: s.run_id, matched_by_stage: s.matched_by_stage, exceptions: s.exceptions_by_reason } }),
+      );
+      await orch.afterRecon(db, ctx.firmId, data.business_id, label).catch(() => false);
+      return summary;
+    }),
   );
 
 export const resolvePracticeException = createServerFn({ method: "POST" })
@@ -248,15 +254,30 @@ export const resolvePracticeException = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) =>
     withFirm(context.userId, async (db, ctx) =>
-      (await import("./recon.server")).resolveException(
+    {
+      const result = await (await import("./recon.server")).resolveException(
         db,
         ctx,
         data.id,
         data.action,
         data.counterpart_ids,
         data.note,
-      ),
-    ),
+      );
+      // Clearing the last exception can make the month ready for its MIS.
+      const { data: ex } = await db
+        .from("ca_exceptions")
+        .select("business_id, period_start, period_end")
+        .eq("id", data.id)
+        .maybeSingle();
+      if (ex?.business_id && ex.period_start && ex.period_end) {
+        const { parsePeriod } = await import("./core");
+        const orch = await import("./orchestrator.server");
+        await orch
+          .afterRecon(db, ctx.firmId, ex.business_id, parsePeriod(String(ex.period_start).slice(0, 7)).label)
+          .catch(() => false);
+      }
+      return result;
+    }),
   );
 
 export const reversePracticeMatch = createServerFn({ method: "POST" })
@@ -301,12 +322,29 @@ export const generatePracticeReport = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) =>
     withFirm(context.userId, async (db, ctx) =>
-      (await import("./narrate.server")).generateReport(
+      (await import("./orchestrator.server")).withRun(
         db,
-        ctx,
-        data.business_id,
-        data.period,
-        data.template,
+        {
+          firmId: ctx.firmId,
+          businessId: data.business_id,
+          agent: "narrate",
+          trigger: "user",
+          period: data.period,
+          subjectLabel: data.template,
+          userId: ctx.userId,
+        },
+        async () =>
+          (await import("./narrate.server")).generateReport(
+            db,
+            ctx,
+            data.business_id,
+            data.period,
+            data.template,
+          ),
+        (r) => ({
+          summary: `${r.template} generated for ${r.period}`,
+          detail: { report_id: r.id },
+        }),
       ),
     ),
   );
@@ -613,4 +651,63 @@ export const getPracticeIntegrations = createServerFn({ method: "GET" })
     withFirm(context.userId, async (db, ctx) =>
       (await import("./team.server")).integrationStatus(db, ctx),
     ),
+  );
+
+// ── Orchestration: agent memory and automation settings ─────────────────────
+
+export const getPracticeMemory = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) =>
+    withFirm(context.userId, async (db, ctx) =>
+      (await import("./orchestrator.server")).listMemory(db, ctx),
+    ),
+  );
+
+export const forgetPracticeMemory = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z.object({ kind: z.enum(["lesson", "alias"]), id: uuid }).parse(d),
+  )
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) =>
+      (await import("./orchestrator.server")).forgetMemory(
+        db,
+        ctx,
+        data.kind,
+        data.id,
+      ),
+    ),
+  );
+
+export const getPracticePipelineSettings = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) =>
+    withFirm(context.userId, async (db, ctx) =>
+      (await import("./orchestrator.server")).getPipelineSettings(db, ctx),
+    ),
+  );
+
+export const updatePracticePipelineSettings = createServerFn({
+  method: "POST",
+})
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z
+      .object({
+        auto_recon: z.boolean().optional(),
+        auto_chase_day: z.number().int().min(1).max(28).nullable().optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      const { canSignOff } = await import("./db.server");
+      if (!canSignOff(ctx))
+        throw new Error("Only a partner can change the firm's automation.");
+      return (await import("./orchestrator.server")).updatePipelineSettings(
+        db,
+        ctx,
+        data,
+      );
+    }),
   );

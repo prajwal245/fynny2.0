@@ -122,10 +122,51 @@ still read deterministically; only scanned files and AI insights need a key.
 - The older rule-based follow-up cron skips chases owned by this chaser
   (`managed_by = 'practice'`), so nobody is emailed twice.
 
+## Orchestration, runs and memory
+
+`orchestrator.server.ts` (rules in `orchestrate.ts` and `memory.ts`, all unit tested).
+
+**Chaining.** After Extract reads a document, Recon runs by itself for every
+month the document touched once that month has both a bank side and a books
+side (`ca_firms.auto_recon`, on by default). Recon is idempotent, so a second
+document simply re-runs it. After any Recon run or exception resolution, a
+month with matched lines and nothing open in Review or Exceptions raises one
+"Ready for MIS" notice (`ca_notifications.type = 'mis_ready'`). Narrate is
+never started automatically: the spec leaves that to the junior. Matching
+never uses AI.
+
+**Runs.** Every Extract, Recon, Narrate and scheduled Chaser run is a row in
+`ca_agent_runs`. Each row records the trigger (`user`, `pipeline`, `schedule`,
+`retry`, `channel`), the attempt number, a summary or error, and the duration.
+The client workspace shows them under Activity → Agent runs, with a Retry
+button on failed reads.
+
+**Retries.** A read that fails for a temporary reason (no AI provider
+answered, storage or database hiccup) gets `extract_next_attempt_at`. The
+schedule retries it after 2 minutes, then 10 (3 attempts in all). Permanent
+failures (password-protected PDF, unsupported file) are not retried.
+
+**Memory.** When a person confirms or corrects a Review Queue line, the
+direction and party are remembered per client in `ca_agent_memory`, keyed by
+the narration with dates, amounts and references removed. Next month the same
+line settles itself. Memory never supplies a date or an amount, and never
+clears a doubtful amount, a foreign-currency line or a suspected duplicate. A
+manual match between differently named parties teaches Recon an alias
+(`ca_counterparty_aliases.source = 'learned'`). Settings → Agent memory lists
+everything learned, with a Forget button on each.
+
+**Automatic chase.** After the firm's chase day (`ca_firms.auto_chase_day`,
+default the 5th, set in Settings → Automation), each client with no bank
+statement for last month gets one "Missing bank statement" chase. Clients
+added after the chase day wait until the next month. A chase for a month
+closes only when a document covering that month arrives.
+
 ## Background work
 
 The existing `ca-poll-gmail` cron (every 15 minutes) now also:
-- extracts queued documents (Gmail and WhatsApp arrivals, and retries);
+- extracts queued documents (Gmail and WhatsApp arrivals) and retries
+  temporary failures once their backoff has passed;
+- opens the automatic missing-bank-statement chases;
 - sends follow-ups that have fallen due.
 
 To trigger this by hand, POST to `/api/public/practice-tick` with the header

@@ -17,6 +17,7 @@ import {
 import { Badge, Card, PageHeader, V, formatDate } from "../ui";
 import { RowSkeleton } from "../agents";
 import { useV2 } from "../store";
+import { AgentSettings } from "../components/AgentSettings";
 
 type Team = Awaited<ReturnType<typeof listPracticeTeam>>;
 type Integrations = Awaited<ReturnType<typeof getPracticeIntegrations>>;
@@ -563,6 +564,8 @@ export default function SettingsPage() {
           </div>
         )}
       </Section>
+
+      <AgentSettings />
 
       <Section title="Profile">
         <div

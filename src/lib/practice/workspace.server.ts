@@ -49,7 +49,7 @@ function chaseStatus(r: {
 
 export async function loadWorkspace(db: Db, ctx: FirmContext) {
   const f = ctx.firmId;
-  const [cRes, xRes, rvRes, eRes, rRes, qRes, evRes, nRes, aRes] =
+  const [cRes, xRes, rvRes, eRes, rRes, qRes, evRes, nRes, aRes, runRes, misRes] =
     await Promise.all([
       db
         .from("ca_clients")
@@ -116,6 +116,21 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
         .from("ca_activity_log")
         .select("id, business_id, action_type, description, created_at")
         .eq("ca_firm_id", f)
+        .order("created_at", { ascending: false })
+        .limit(200),
+      db
+        .from("ca_agent_runs")
+        .select(
+          "id, business_id, agent, trigger, period, subject_id, subject_label, status, attempt, summary, error, detail, started_at, duration_ms",
+        )
+        .eq("ca_firm_id", f)
+        .order("started_at", { ascending: false })
+        .limit(200),
+      db
+        .from("ca_notifications")
+        .select("business_id, metadata, created_at")
+        .eq("ca_firm_id", f)
+        .eq("type", "mis_ready")
         .order("created_at", { ascending: false })
         .limit(200),
     ]);
@@ -427,6 +442,30 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       : undefined,
   }));
 
+  const agentRuns = (runRes.data ?? []).map((r) => ({
+    id: r.id as string,
+    clientId: (r.business_id as string | null) ?? "",
+    agent: r.agent as string,
+    trigger: r.trigger as string,
+    period: (r.period as string | null) ?? undefined,
+    subjectId: (r.subject_id as string | null) ?? undefined,
+    subject: (r.subject_label as string | null) ?? undefined,
+    status: r.status as string,
+    attempt: (r.attempt as number) ?? 1,
+    summary: (r.summary as string | null) ?? "",
+    error: (r.error as string | null) ?? undefined,
+    retryAt:
+      ((r.detail as { retry_at?: string | null } | null)?.retry_at ?? undefined) || undefined,
+    memoryReleased:
+      (r.detail as { memory_released?: number } | null)?.memory_released ?? 0,
+    at: String(r.started_at ?? ""),
+    ms: (r.duration_ms as number | null) ?? undefined,
+  }));
+  const readyForMis = (misRes.data ?? []).map((n) => ({
+    clientId: (n.business_id as string | null) ?? "",
+    period: String((n.metadata as { period?: string } | null)?.period ?? ""),
+  }));
+
   return {
     firm: { id: ctx.firmId, name: ctx.firmName, role: ctx.role },
     clients,
@@ -437,5 +476,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
     chases,
     recon,
     activity,
+    agentRuns,
+    readyForMis,
   };
 }

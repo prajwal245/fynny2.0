@@ -373,6 +373,8 @@ type Store = {
   canSignOff: boolean;
   activity: Activity[];
   activityFor: (clientId: string) => Activity[];
+  /** Recorded agent runs across the firm, newest first. */
+  agentRuns: AgentRunRecord[];
   /** Recorded agent runs for one client, newest first. */
   agentRunsFor: (clientId: string) => AgentRunRecord[];
   /** True once the orchestrator found nothing left for a person in this month. */
@@ -868,20 +870,13 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
         work,
       )
         .then((res) => {
+          // The live Extract card already shows the outcome; only problems also toast.
           if (res.duplicate)
             toast.info(
               `${name} was already received earlier. Nothing was added twice.`,
             );
           else if (res.extract_status === "failed")
             toast.error(`${name}: ${res.error_message ?? "could not be read"}`);
-          else if (res.review_count)
-            toast.info(
-              `${name}: ${res.txn_count ?? 0} transactions extracted, ${res.review_count} need review.`,
-            );
-          else if (res.extract_status === "parsed")
-            toast.success(
-              `${name}: ${res.txn_count ?? 0} transactions extracted.`,
-            );
         })
         .catch((e) => {
           setDocs((p) =>
@@ -1502,6 +1497,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       activity,
       activityFor,
       agentRunsFor,
+      agentRuns,
       isReadyForMis,
       closeStateFor,
     }),
@@ -1511,6 +1507,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       isRunning,
       dismissRun,
       agentRunsFor,
+      agentRuns,
       isReadyForMis,
       matchedTxns,
       signOffReport,

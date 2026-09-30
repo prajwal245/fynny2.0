@@ -21,7 +21,12 @@ export default function ClientWorkspacePage() {
   const { clientId } = useParams({ from: "/v2/clients/$clientId" });
   const { clients, docs, exceptions, reports, chases, review, runs, recon, runRecon, generateReport, period, closeStateFor, activityFor, agentRunsFor, isReadyForMis, dismissRun } = useV2();
   const client = clients.find((c) => c.id === clientId);
-  const [tab, setTab] = useState("overview");
+  // Deep links from Today ("Resolve exceptions") open the right tab: /v2/clients/:id?tab=exceptions
+  const [tab, setTab] = useState(() => {
+    if (typeof window === "undefined") return "overview";
+    const t = new URLSearchParams(window.location.search).get("tab");
+    return t && ["overview", "documents", "review", "exceptions", "recon", "mis", "chaser", "activity"].includes(t) ? t : "overview";
+  });
 
   if (!client) {
     return (

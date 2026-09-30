@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { V, V2_STYLES } from "./ui";
 import { AGENT_STYLES } from "./agents";
+import { CommandMenu, useCommandMenu } from "./components/CommandMenu";
 import { PERIODS, V2StoreProvider, useV2 } from "./store";
 
 /** Partners live in Portfolio and MIS. Juniors also work the queues. */
@@ -52,6 +53,7 @@ function ShellBody() {
     (pathname.startsWith("/v2/clients/") ? "Client workspace" : pathname.startsWith("/v2/reports/") ? "MIS report" : "FynHelp");
 
   const onboarding = pathname === "/v2/onboarding";
+  const command = useCommandMenu();
   // The reset link signs the user in only to set a password: no redirects there.
   const resetting = pathname === "/v2/reset-password";
 
@@ -78,7 +80,7 @@ function ShellBody() {
 
   if (onboarding || resetting) {
     return (
-      <div className="v2" style={{ minHeight: "100vh", padding: "48px 20px" }}>
+      <div className="v2" style={{ minHeight: "100vh", padding: onboarding ? 0 : "48px 20px" }}>
         <Outlet />
       </div>
     );
@@ -166,6 +168,14 @@ function ShellBody() {
               <h2 className="truncate" style={{ fontSize: 16, fontWeight: 600 }}>{title}</h2>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <button
+                className="v2-btn v2-btn-ghost v2-btn-sm v2-hide-sm"
+                onClick={() => command.setOpen(true)}
+                aria-label="Open command menu"
+                style={{ color: V.muted, gap: 10 }}
+              >
+                Search or run an agent… <span className="v2-kbd">⌘K</span>
+              </button>
               <label className="v2-hide-sm" style={{ fontSize: 11.5, color: V.muted }}>Period</label>
               <select
                 className="v2-input"
@@ -186,6 +196,7 @@ function ShellBody() {
           <main style={{ padding: 24, flex: 1, maxWidth: 1280, width: "100%" }}>
             <Outlet />
           </main>
+          <CommandMenu open={command.open} onClose={() => command.setOpen(false)} />
         </div>
       </div>
       <style>{`

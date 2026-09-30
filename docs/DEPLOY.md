@@ -59,7 +59,7 @@ Optional (each feature degrades gracefully and says so in the UI when unset):
 | Feature | Variables |
 | --- | --- |
 | Scanned PDFs and photos | `OCR_SPACE_API_KEY` (free key at ocr.space; 1 MB and 3 pages per file on the free tier). OCR text goes through the same checks as a text PDF. Without it, scans need `GEMINI_API_KEY` |
-| AI refinement of low-confidence rows | `GROQ_API_KEY` (+ `GROQ_MODEL`), or `GEMINI_API_KEY` (+ `GEMINI_MODEL`); `PRACTICE_AI_DISABLED=1` turns it off |
+| AI refinement of low-confidence rows | `GROQ_API_KEY` (+ `GROQ_MODEL`), or `GEMINI_API_KEY` (+ `GEMINI_MODEL`, default `gemini-flash-latest`); `PRACTICE_AI_DISABLED=1` turns it off |
 | Chaser and invite emails | `RESEND_API_KEY`, `PRACTICE_FROM_EMAIL` (a verified Resend sender) |
 | Gmail intake | `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_ENCRYPTION_KEY` (any long random string), optionally `GMAIL_REDIRECT_URI` |
 | WhatsApp intake | `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_ACCESS_TOKEN` |

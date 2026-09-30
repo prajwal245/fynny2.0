@@ -1,6 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
-import CAOnboardingPage from "@/pages/ca/CAOnboardingPage";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
+// CA firms now use the FynHelp practice app: every old CA entry point leads there.
 export const Route = createFileRoute("/_caAuth/ca/onboarding")({
-  component: CAOnboardingPage,
+  beforeLoad: () => {
+    throw redirect({ href: "/v2/onboarding" });
+  },
 });

@@ -53,7 +53,7 @@ export default function AddClientModal({ open, onClose, editing }: { open: boole
           <label className="v2-label">GSTIN (optional)</label>
           <input className="v2-input" value={form.gstin} onChange={set("gstin")} placeholder="27AABCS1429B1ZP" />
         </div>
-        <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))" }}>
+        <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit,minmax(min(180px, 100%), 1fr))" }}>
           <div>
             <label className="v2-label">Contact name</label>
             <input className="v2-input" value={form.contactName} onChange={set("contactName")} />

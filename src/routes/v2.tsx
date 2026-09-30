@@ -4,11 +4,11 @@ import V2Shell from "@/v2/Shell";
 export const Route = createFileRoute("/v2")({
   head: () => ({
     meta: [
-      { title: "FynHelp Practice OS — Version 2 preview" },
-      { name: "description", content: "Preview of the new FynHelp practice dashboard for CA firms: portfolio, documents, review, reconciliation exceptions, MIS and chasers." },
+      { title: "FynHelp — Practice OS for CA firms" },
+      { name: "description", content: "FynHelp for CA firms: collect client documents, reconcile bank and books, and prepare source-traceable MIS." },
       { name: "robots", content: "noindex" },
-      { property: "og:title", content: "FynHelp Practice OS — Version 2 preview" },
-      { property: "og:description", content: "Preview of the new FynHelp practice dashboard for CA firms." },
+      { property: "og:title", content: "FynHelp — Practice OS for CA firms" },
+      { property: "og:description", content: "Collect documents, reconcile bank and books, and prepare source-traceable MIS." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],

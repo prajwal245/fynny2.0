@@ -28,7 +28,7 @@ const row: React.CSSProperties = {
 
 /** Settings: how the agents hand work to each other, and what they have learned. */
 export function AgentSettings() {
-  const { clientName, role } = useV2();
+  const { clientName, canSignOff } = useV2();
   const getMemory = useServerFn(getPracticeMemory);
   const forget = useServerFn(forgetPracticeMemory);
   const getPipeline = useServerFn(getPracticePipelineSettings);
@@ -76,7 +76,7 @@ export function AgentSettings() {
     }
   };
 
-  const partner = role === "Partner";
+  const partner = canSignOff;
 
   return (
     <>

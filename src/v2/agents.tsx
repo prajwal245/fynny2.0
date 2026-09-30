@@ -27,6 +27,7 @@ export const AGENT_STYLES = `
 .v2-btn:active { transform:translateY(1px) scale(.985); }
 .v2-bar { height:3px; border-radius:999px; overflow:hidden; background:rgba(20,20,20,.07); }
 .v2-bar > i { display:block; height:100%; border-radius:999px; animation:v2sweep 1.5s ease-in-out infinite; }
+.v2-link { background:none; border:0; padding:0; color:inherit; font:inherit; font-weight:600; text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
 @keyframes v2sweep { 0%{ margin-left:-40%; width:40% } 100%{ margin-left:100%; width:40% } }
 `;
 

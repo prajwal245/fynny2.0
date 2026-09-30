@@ -283,7 +283,7 @@ export default function ReviewPage({
               style={{
                 display: "grid",
                 gap: 12,
-                gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
+                gridTemplateColumns: "repeat(auto-fit,minmax(min(150px, 100%), 1fr))",
               }}
             >
               <div>
@@ -342,7 +342,7 @@ export default function ReviewPage({
               style={{
                 display: "grid",
                 gap: 12,
-                gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
+                gridTemplateColumns: "repeat(auto-fit,minmax(min(180px, 100%), 1fr))",
               }}
             >
               <div>

@@ -37,6 +37,7 @@ import { Route as V2ChaserRouteImport } from './routes/v2/chaser'
 import { Route as V2DocumentsRouteImport } from './routes/v2/documents'
 import { Route as V2ExceptionsRouteImport } from './routes/v2/exceptions'
 import { Route as V2OnboardingRouteImport } from './routes/v2/onboarding'
+import { Route as V2ResetPasswordRouteImport } from './routes/v2/reset-password'
 import { Route as V2ReviewRouteImport } from './routes/v2/review'
 import { Route as V2SettingsRouteImport } from './routes/v2/settings'
 import { Route as AdminAuthAdminProtectedRouteImport } from './routes/_adminAuth/admin/_protected'
@@ -332,6 +333,11 @@ const V2ExceptionsRoute = V2ExceptionsRouteImport.update({
 const V2OnboardingRoute = V2OnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
+  getParentRoute: () => V2Route,
+} as any)
+const V2ResetPasswordRoute = V2ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => V2Route,
 } as any)
 const V2ReviewRoute = V2ReviewRouteImport.update({
@@ -1254,6 +1260,7 @@ export interface FileRoutesByFullPath {
   '/v2/documents': typeof V2DocumentsRoute
   '/v2/exceptions': typeof V2ExceptionsRoute
   '/v2/onboarding': typeof V2OnboardingRoute
+  '/v2/reset-password': typeof V2ResetPasswordRoute
   '/v2/review': typeof V2ReviewRoute
   '/v2/settings': typeof V2SettingsRoute
   '/demo/': typeof DemoIndexRoute
@@ -1439,6 +1446,7 @@ export interface FileRoutesByTo {
   '/v2/documents': typeof V2DocumentsRoute
   '/v2/exceptions': typeof V2ExceptionsRoute
   '/v2/onboarding': typeof V2OnboardingRoute
+  '/v2/reset-password': typeof V2ResetPasswordRoute
   '/v2/review': typeof V2ReviewRoute
   '/v2/settings': typeof V2SettingsRoute
   '/demo': typeof DemoIndexRoute
@@ -1627,6 +1635,7 @@ export interface FileRoutesById {
   '/v2/documents': typeof V2DocumentsRoute
   '/v2/exceptions': typeof V2ExceptionsRoute
   '/v2/onboarding': typeof V2OnboardingRoute
+  '/v2/reset-password': typeof V2ResetPasswordRoute
   '/v2/review': typeof V2ReviewRoute
   '/v2/settings': typeof V2SettingsRoute
   '/_main/': typeof MainIndexRoute
@@ -1816,6 +1825,7 @@ export interface FileRouteTypes {
     | '/v2/documents'
     | '/v2/exceptions'
     | '/v2/onboarding'
+    | '/v2/reset-password'
     | '/v2/review'
     | '/v2/settings'
     | '/demo/'
@@ -2001,6 +2011,7 @@ export interface FileRouteTypes {
     | '/v2/documents'
     | '/v2/exceptions'
     | '/v2/onboarding'
+    | '/v2/reset-password'
     | '/v2/review'
     | '/v2/settings'
     | '/demo'
@@ -2188,6 +2199,7 @@ export interface FileRouteTypes {
     | '/v2/documents'
     | '/v2/exceptions'
     | '/v2/onboarding'
+    | '/v2/reset-password'
     | '/v2/review'
     | '/v2/settings'
     | '/_main/'
@@ -2577,6 +2589,13 @@ declare module '@tanstack/react-router' {
       path: '/onboarding'
       fullPath: '/v2/onboarding'
       preLoaderRoute: typeof V2OnboardingRouteImport
+      parentRoute: typeof V2Route
+    }
+    '/v2/reset-password': {
+      id: '/v2/reset-password'
+      path: '/reset-password'
+      fullPath: '/v2/reset-password'
+      preLoaderRoute: typeof V2ResetPasswordRouteImport
       parentRoute: typeof V2Route
     }
     '/v2/review': {
@@ -4123,6 +4142,7 @@ interface V2RouteChildren {
   V2DocumentsRoute: typeof V2DocumentsRoute
   V2ExceptionsRoute: typeof V2ExceptionsRoute
   V2OnboardingRoute: typeof V2OnboardingRoute
+  V2ResetPasswordRoute: typeof V2ResetPasswordRoute
   V2ReviewRoute: typeof V2ReviewRoute
   V2SettingsRoute: typeof V2SettingsRoute
   V2IndexRoute: typeof V2IndexRoute
@@ -4137,6 +4157,7 @@ const V2RouteChildren: V2RouteChildren = {
   V2DocumentsRoute: V2DocumentsRoute,
   V2ExceptionsRoute: V2ExceptionsRoute,
   V2OnboardingRoute: V2OnboardingRoute,
+  V2ResetPasswordRoute: V2ResetPasswordRoute,
   V2ReviewRoute: V2ReviewRoute,
   V2SettingsRoute: V2SettingsRoute,
   V2IndexRoute: V2IndexRoute,

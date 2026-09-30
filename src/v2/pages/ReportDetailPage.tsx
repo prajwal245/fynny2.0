@@ -10,7 +10,7 @@ import { toast } from "sonner";
 
 export default function ReportDetailPage() {
   const { reportId } = useParams({ from: "/v2/reports/$reportId" });
-  const { reports, clientName, firm, role, session, signOffReport, requestCorrection } = useV2();
+  const { reports, clientName, firm, role, session, signOffReport, requestCorrection, canSignOff } = useV2();
   const report = reports.find((r) => r.id === reportId);
   const [source, setSource] = useState<{ label: string; rows: Txn[] } | null>(null);
   const [insightsReady, setInsightsReady] = useState(false);
@@ -71,22 +71,22 @@ export default function ReportDetailPage() {
           <div>
             <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: V.muted, fontWeight: 700 }}>Correction requested</div>
             <div style={{ fontSize: 14, marginTop: 6 }}>{report.correction.note}</div>
-            {role === "Partner" && (
-              <button className="v2-btn v2-btn-primary" style={{ marginTop: 12 }} onClick={() => { signOffReport(report.id, session?.name ?? "Partner"); toast.success("Report signed off"); }}>Sign off now</button>
+            {role === "Partner" && canSignOff && (
+              <button className="v2-btn v2-btn-primary" style={{ marginTop: 12 }} onClick={() => { signOffReport(report.id, session?.name ?? "Partner"); }}>Sign off now</button>
             )}
           </div>
-        ) : role === "Partner" ? (
+        ) : role === "Partner" && canSignOff ? (
           <div>
             <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: V.muted, fontWeight: 700 }}>Partner review</div>
             <div style={{ fontSize: 14, marginTop: 6, marginBottom: 12 }}>Open any number to see the transactions behind it, then accept or send it back.</div>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-              <button className="v2-btn v2-btn-primary" onClick={() => { signOffReport(report.id, session?.name ?? "Partner"); toast.success("Report signed off"); }}>Sign off</button>
+              <button className="v2-btn v2-btn-primary" onClick={() => { signOffReport(report.id, session?.name ?? "Partner"); }}>Sign off</button>
               <input className="v2-input" style={{ width: 280 }} placeholder="What needs correcting" value={note} onChange={(e) => setNote(e.target.value)} />
               <button className="v2-btn v2-btn-ghost" disabled={!note.trim()} onClick={() => { requestCorrection(report.id, note.trim()); setNote(""); toast.success("Sent back to the team"); }}>Request correction</button>
             </div>
           </div>
         ) : (
-          <div style={{ fontSize: 13.5, color: V.body }}>Waiting for partner sign off. Tally or Zoho stays the source of truth for the books.</div>
+          <div style={{ fontSize: 13.5, color: V.body }} data-testid="awaiting-signoff">Waiting for partner sign off. Only a partner can sign off an MIS. Tally or Zoho stays the source of truth for the books.</div>
         )}
       </Card>
 

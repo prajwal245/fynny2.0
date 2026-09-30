@@ -582,7 +582,7 @@ export default function DocumentsPage({
                 style={{
                   display: "grid",
                   gap: 10,
-                  gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))",
+                  gridTemplateColumns: "repeat(auto-fit,minmax(min(160px, 100%), 1fr))",
                 }}
               >
                 <select

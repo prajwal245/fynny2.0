@@ -181,7 +181,7 @@ export default function ClientWorkspacePage() {
           {bankSide.length === 0 && bookSide.length === 0 ? (
             <EmptyState title={`Nothing dated in ${period} yet`} description="Upload the bank statement and the Tally export or ledger for this month, then run recon." action={<button className="v2-btn v2-btn-primary" onClick={() => setTab("documents")}>Upload documents</button>} />
           ) : (
-            <div style={{ display: "grid", gap: 18, gridTemplateColumns: "repeat(auto-fit,minmax(420px,1fr))" }}>
+            <div style={{ display: "grid", gap: 18, gridTemplateColumns: "repeat(auto-fit,minmax(min(420px, 100%), 1fr))" }}>
               {([["Bank side", bankSide], ["Books side", bookSide]] as const).map(([label, rows]) => (
                 <Card key={label} style={{ padding: 0 }} className="v2-scroll">
                   <div style={{ padding: "14px 16px 0", fontWeight: 600 }}>{label} <span style={{ color: V.muted, fontWeight: 400 }}>· {rows.length}</span></div>

@@ -33,15 +33,22 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server(
   async ({ next }) => {
     
-    const SUPABASE_URL = process.env['SUPABASE_URL'];
-    const SUPABASE_PUBLISHABLE_KEY = process.env['SUPABASE_PUBLISHABLE_KEY'];
+    // Also accept the names Vercel's Supabase integration sets, and fall back to
+    // the public values baked in at build time (both are safe to expose).
+    const SUPABASE_URL =
+      process.env['SUPABASE_URL'] ?? process.env['NEXT_PUBLIC_SUPABASE_URL'] ?? import.meta.env.VITE_SUPABASE_URL;
+    const SUPABASE_PUBLISHABLE_KEY =
+      process.env['SUPABASE_PUBLISHABLE_KEY'] ??
+      process.env['SUPABASE_ANON_KEY'] ??
+      process.env['NEXT_PUBLIC_SUPABASE_ANON_KEY'] ??
+      import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
     if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
       const missing = [
         ...(!SUPABASE_URL ? ['SUPABASE_URL'] : []),
         ...(!SUPABASE_PUBLISHABLE_KEY ? ['SUPABASE_PUBLISHABLE_KEY'] : []),
       ];
-      const message = `Missing Supabase environment variable(s): ${missing.join(', ')}. Connect Supabase in Lovable Cloud.`;
+      const message = `Missing Supabase environment variable(s): ${missing.join(', ')}. Set them in Vercel → Settings → Environment Variables (see docs/DEPLOY.md).`;
       console.error(`[Supabase] ${message}`);
       throw new Error(message);
     }

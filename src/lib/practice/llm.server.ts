@@ -56,7 +56,8 @@ function providers(): Provider[] {
       name: "gemini",
       url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
       key: gemini,
-      model: env("GEMINI_MODEL") ?? "gemini-2.5-flash",
+      // A rolling alias: pinned versions get retired for new keys (2.5 Flash already is).
+      model: env("GEMINI_MODEL") ?? "gemini-flash-latest",
       vision: true,
     });
   return list;

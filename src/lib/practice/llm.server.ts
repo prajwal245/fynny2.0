@@ -27,6 +27,9 @@ function env(name: string): string | undefined {
   return v && v.trim() ? v.trim() : undefined;
 }
 
+const supabaseUrl = () =>
+  env("SUPABASE_URL") ?? env("NEXT_PUBLIC_SUPABASE_URL") ?? import.meta.env.VITE_SUPABASE_URL;
+
 function providers(): Provider[] {
   const list: Provider[] = [];
   const groq = env("GROQ_API_KEY");
@@ -146,7 +149,7 @@ async function callProvider(
 }
 
 async function viaEdgeFunction(req: LlmJsonRequest): Promise<LlmJsonResult> {
-  const url = env("SUPABASE_URL");
+  const url = supabaseUrl();
   const key = env("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !key) throw new Error("No AI provider configured");
   const started = Date.now();
@@ -197,7 +200,7 @@ export function practiceLlm(
 ): LlmClient | null {
   const list = providers();
   const edgeAvailable =
-    Boolean(env("SUPABASE_URL") && env("SUPABASE_SERVICE_ROLE_KEY")) &&
+    Boolean(supabaseUrl() && env("SUPABASE_SERVICE_ROLE_KEY")) &&
     env("PRACTICE_AI_DISABLED") !== "1";
   if (!list.length && !edgeAvailable) return null;
   const timeoutMs = opts.timeoutMs ?? 45_000;

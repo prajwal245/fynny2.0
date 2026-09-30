@@ -7,6 +7,7 @@ import { Badge, Card, EmptyState, PageHeader, Stat, Tabs, V, formatDate, formatI
 import { AgentStatusBadge, AgentTimeline, AnimatedCounter, ProcessingCard } from "../agents";
 import { useV2 } from "../store";
 import { CloseProgress, NextAction } from "../components/CloseProgress";
+import { AgentRunsCard } from "../components/AgentRuns";
 import DocumentsPage from "./DocumentsPage";
 import ReviewPage from "./ReviewPage";
 import ExceptionsPage from "./ExceptionsPage";
@@ -18,7 +19,7 @@ const STATUS_LABEL: Record<string, string> = { matched: "Matched", exception: "E
 
 export default function ClientWorkspacePage() {
   const { clientId } = useParams({ from: "/v2/clients/$clientId" });
-  const { clients, docs, exceptions, reports, chases, review, runs, recon, runRecon, generateReport, period, closeStateFor, activityFor } = useV2();
+  const { clients, docs, exceptions, reports, chases, review, runs, recon, runRecon, generateReport, period, closeStateFor, activityFor, agentRunsFor, isReadyForMis } = useV2();
   const client = clients.find((c) => c.id === clientId);
   const [tab, setTab] = useState("overview");
 
@@ -102,12 +103,27 @@ export default function ClientWorkspacePage() {
           { value: "recon", label: "Recon" },
           { value: "mis", label: "MIS", count: cReports.length },
           { value: "chaser", label: "Chaser", count: cChases.length },
-          { value: "activity", label: "Activity", count: timeline.length },
+          { value: "activity", label: "Activity", count: timeline.length + agentRunsFor(client.id).length },
         ]}
       />
 
       {tab === "overview" && (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+          {isReadyForMis(client.id, period) && cEx.length === 0 && cReview.length === 0 && !cReports.some((r) => r.period === period) && (
+            <Card style={{ marginBottom: 18, background: "rgba(31,90,70,0.07)", borderColor: "rgba(31,90,70,0.25)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <div>
+                  <div style={{ fontWeight: 600 }}>{period} is ready for its MIS</div>
+                  <div style={{ fontSize: 13, color: V.body, marginTop: 3 }}>
+                    The agents reconciled the month and nothing is waiting in Review or Exceptions.
+                  </div>
+                </div>
+                <button className="v2-btn v2-btn-primary" onClick={() => { generateReport(client.id, period, "Monthly MIS", () => toast.success(`${period} MIS ready`)); toast.success("Narrate agent is preparing the MIS"); setTab("mis"); }}>
+                  Generate MIS
+                </button>
+              </div>
+            </Card>
+          )}
           <div style={{ marginBottom: 18 }}>
             <NextAction state={close} onGo={runNext} />
           </div>
@@ -194,6 +210,11 @@ export default function ClientWorkspacePage() {
       {tab === "mis" && <ReportsPage clientId={client.id} />}
 
       {tab === "chaser" && <ChaserPage clientId={client.id} />}
+      {tab === "activity" && (
+        <div style={{ marginBottom: 18 }}>
+          <AgentRunsCard clientId={client.id} />
+        </div>
+      )}
       {tab === "activity" && (
         timeline.length === 0 ? (
           <EmptyState title="Nothing has happened yet" description="Every document read, row confirmed, recon run and report generated for this client is recorded here." />

@@ -28,6 +28,22 @@ import {
 } from "./extract/pipeline";
 import { loadSheetReader, pdfText } from "./files.server";
 import { practiceLlm } from "./llm.server";
+import { applyMemory } from "./memory";
+import {
+  isRetryable,
+  MAX_EXTRACT_ATTEMPTS,
+  nextAttemptAt,
+  periodsOf,
+} from "./orchestrate";
+import {
+  afterExtraction,
+  finishRun,
+  loadMemories,
+  markMemoriesApplied,
+  startRun,
+  teachFromReview,
+  type RunTrigger,
+} from "./orchestrator.server";
 
 export const BUCKET = "ca-client-documents";
 const MAX_BYTES = 25 * 1024 * 1024;
@@ -147,7 +163,11 @@ export async function registerDocument(
     }
     throw new PracticeError("db_error", error.message);
   }
-  if (input.process !== false) await processExtraction(db, data.id);
+  if (input.process !== false)
+    await processExtraction(db, data.id, {
+      trigger: input.channel === "Manual" ? "user" : "channel",
+      userId: ctx.userId,
+    });
   return { extraction_id: data.id, duplicate: false };
 }
 
@@ -176,12 +196,15 @@ async function logAiCalls(
 export async function processExtraction(
   db: Db,
   extractionId: string,
+  opts: { trigger?: RunTrigger; userId?: string | null } = {},
 ): Promise<{
   status: string;
   txns: number;
   review: number;
   duplicates: number;
   error?: string;
+  retry_at?: string | null;
+  pipeline?: { period: string; status: string }[];
 }> {
   const COLS =
     "id, ca_firm_id, business_id, original_filename, storage_path, side, extract_status, extract_started_at, request_id, source_type, extracted, uploaded_by, extract_attempts";
@@ -219,8 +242,25 @@ export async function processExtraction(
     return { status: "processing", txns: 0, review: 0, duplicates: 0 };
   const doc = current as ExtractionRow & { extract_attempts: number };
   const filename = doc.original_filename ?? "document";
+  const attempt = (current.extract_attempts ?? 0) + 1;
+  const runStarted = Date.now();
+  const runId = await startRun(db, {
+    firmId: doc.ca_firm_id,
+    businessId: doc.business_id,
+    agent: "extract",
+    trigger: opts.trigger ?? (attempt > 1 ? "retry" : "user"),
+    subjectId: doc.id,
+    subjectLabel: filename,
+    attempt,
+    userId: opts.userId ?? null,
+  });
 
-  const failWith = async (message: string) => {
+  // A temporary failure (AI provider down, storage hiccup) is retried with
+  // backoff by the schedule; a permanent one (password, unsupported file) is not.
+  const failWith = async (message: string, code?: string) => {
+    const retryAt = isRetryable({ code, message })
+      ? nextAttemptAt(attempt)
+      : null;
     await db
       .from("ca_document_extractions")
       .update({
@@ -228,6 +268,7 @@ export async function processExtraction(
         review_state: "failed",
         error_message: message,
         extract_finished_at: new Date().toISOString(),
+        extract_next_attempt_at: retryAt?.toISOString() ?? null,
       })
       .eq("id", doc.id);
     await logActivity(
@@ -235,14 +276,21 @@ export async function processExtraction(
       doc.ca_firm_id,
       doc.business_id,
       "extract",
-      `${filename} could not be read: ${message}`,
+      `${filename} could not be read: ${message}${retryAt ? ` Trying again automatically (attempt ${attempt + 1} of ${MAX_EXTRACT_ATTEMPTS}).` : ""}`,
     );
+    await finishRun(db, runId, runStarted, {
+      status: "failed",
+      summary: `Could not read ${filename}`,
+      error: message,
+      detail: { code: code ?? null, retry_at: retryAt?.toISOString() ?? null },
+    });
     return {
       status: "failed",
       txns: 0,
       review: 0,
       duplicates: 0,
       error: message,
+      retry_at: retryAt?.toISOString() ?? null,
     };
   };
 
@@ -290,7 +338,12 @@ export async function processExtraction(
     },
   );
   await logAiCalls(db, doc.ca_firm_id, doc.id, outcome.aiCalls);
-  if (outcome.error) return failWith(outcome.error.message);
+  if (outcome.error) return failWith(outcome.error.message, outcome.error.code);
+
+  // What people taught this client's Extract agent in earlier months.
+  const memories = await loadMemories(db, doc.business_id);
+  const remembered = applyMemory(outcome.rows, memories);
+  const rows = remembered.rows;
 
   // Replace the previous run's unconfirmed output.
   await db
@@ -305,7 +358,7 @@ export async function processExtraction(
     .eq("extraction_id", doc.id)
     .eq("status", "open");
 
-  const txnRows = outcome.rows
+  const txnRows = rows
     .filter(
       (r) => r.route === "transaction" && r.date && r.amount && r.direction,
     )
@@ -354,7 +407,7 @@ export async function processExtraction(
   }
   const crossDocDuplicates = txnRows.length - inserted;
 
-  const reviewRows = outcome.rows
+  const reviewRows = rows
     .filter((r) => r.route === "review")
     .map((r) => ({
       ca_firm_id: doc.ca_firm_id,
@@ -390,7 +443,7 @@ export async function processExtraction(
     .eq("extraction_id", doc.id)
     .eq("status", "open");
 
-  const confidences = outcome.rows.map((r) => r.confidence);
+  const confidences = rows.map((r) => r.confidence);
   const avg = confidences.length
     ? round2(confidences.reduce((s, c) => s + c, 0) / confidences.length)
     : 0;
@@ -406,12 +459,12 @@ export async function processExtraction(
       file_kind: outcome.kind,
       side,
       confidence: avg,
-      row_count: outcome.rows.length,
+      row_count: rows.length,
       txn_count: inserted,
       review_count: openReview ?? 0,
       duplicate_count: outcome.duplicateRows + crossDocDuplicates,
       error_message:
-        outcome.rows.length === 0
+        rows.length === 0
           ? "No transactions were found in this file."
           : null,
       extracted: {
@@ -428,6 +481,11 @@ export async function processExtraction(
   const parts = [
     `${filename} read: ${inserted} transaction${inserted === 1 ? "" : "s"} extracted`,
   ];
+  const releasedByMemory = remembered.applied.filter((a) => a.released).length;
+  if (releasedByMemory)
+    parts.push(
+      `${releasedByMemory} settled from your earlier corrections`,
+    );
   if (openReview) parts.push(`${openReview} sent to review`);
   if (outcome.duplicateRows + crossDocDuplicates)
     parts.push(
@@ -442,11 +500,36 @@ export async function processExtraction(
   );
 
   if (doc.business_id) await autoResolveChases(db, { ...doc, side }, filename);
+  if (remembered.applied.length)
+    await markMemoriesApplied(
+      db,
+      remembered.applied.map((a) => a.memoryId),
+    );
+  const released = remembered.applied.filter((a) => a.released).length;
+  await finishRun(db, runId, runStarted, {
+    summary: `${parts.join(", ")}.`,
+    detail: {
+      txns: inserted,
+      review: openReview ?? 0,
+      duplicates: outcome.duplicateRows + crossDocDuplicates,
+      memory_applied: remembered.applied.length,
+      memory_released: released,
+    },
+  });
+
+  // Chain: once both sides of a month are in, Recon runs by itself.
+  let pipeline: { period: string; status: string }[] = [];
+  try {
+    pipeline = await afterExtraction(db, doc);
+  } catch (e) {
+    console.error(`[practice] pipeline after ${doc.id} failed: ${(e as Error).message}`);
+  }
   return {
     status,
     txns: inserted,
     review: openReview ?? 0,
     duplicates: outcome.duplicateRows + crossDocDuplicates,
+    pipeline,
   };
 }
 
@@ -461,14 +544,27 @@ async function autoResolveChases(
   doc: ExtractionRow & { side: Side },
   filename: string,
 ) {
-  const { data: open } = await db
+  const { data: openAll } = await db
     .from("ca_document_requests")
-    .select("id, title, doc_types, business_id")
+    .select("id, title, doc_types, business_id, period")
     .eq("ca_firm_id", doc.ca_firm_id)
     .eq("business_id", doc.business_id)
     .eq("status", "open")
     .order("created_at", { ascending: true });
-  if (!open?.length) return;
+  if (!openAll?.length) return;
+  // A chase for a named month closes only when this document covers that month.
+  const { data: dates } = await db
+    .from("ca_txns")
+    .select("txn_date")
+    .eq("extraction_id", doc.id)
+    .limit(5000);
+  const covered = new Set(periodsOf((dates ?? []).map((d) => d.txn_date as string)));
+  const open = openAll.filter((r) => {
+    if (r.id === doc.request_id) return true;
+    if (!r.period) return true;
+    return covered.has(r.period);
+  });
+  if (!open.length) return;
   const linked = doc.request_id
     ? open.find((r) => r.id === doc.request_id)
     : undefined;
@@ -516,30 +612,44 @@ export async function processQueue(
   limit = 5,
 ): Promise<{ processed: number; results: { id: string; status: string }[] }> {
   const db = await adminDb();
+  const now = new Date().toISOString();
   const staleBefore = new Date(Date.now() - STALE_PROCESSING_MS).toISOString();
   const { data } = await db
     .from("ca_document_extractions")
-    .select("id")
+    .select("id, extract_status, source_type")
     .or(
-      `extract_status.eq.queued,and(extract_status.eq.processing,extract_started_at.lt.${staleBefore})`,
+      `extract_status.eq.queued,and(extract_status.eq.processing,extract_started_at.lt.${staleBefore}),and(extract_status.eq.failed,extract_next_attempt_at.lte.${now})`,
     )
-    .lt("extract_attempts", 3)
+    .lt("extract_attempts", MAX_EXTRACT_ATTEMPTS)
     .order("created_at", { ascending: true })
     .limit(limit);
   const results: { id: string; status: string }[] = [];
   for (const row of data ?? []) {
     try {
-      const r = await processExtraction(db, row.id);
+      const r = await processExtraction(db, row.id, {
+        trigger:
+          row.extract_status === "queued" && row.source_type !== "upload"
+            ? "channel"
+            : "retry",
+      });
       results.push({ id: row.id, status: r.status });
     } catch (e) {
       console.error(
         `[practice] queue item ${row.id} failed: ${(e as Error).message}`,
       );
+      const { data: after } = await db
+        .from("ca_document_extractions")
+        .select("extract_attempts")
+        .eq("id", row.id)
+        .maybeSingle();
+      // An unexpected error is treated as temporary: retried with backoff.
+      const retryAt = nextAttemptAt(after?.extract_attempts ?? MAX_EXTRACT_ATTEMPTS);
       await db
         .from("ca_document_extractions")
         .update({
           extract_status: "failed",
           error_message: (e as Error).message.slice(0, 500),
+          extract_next_attempt_at: retryAt?.toISOString() ?? null,
         })
         .eq("id", row.id);
       results.push({ id: row.id, status: "failed" });
@@ -585,9 +695,10 @@ export async function assignDocument(
       ...(side ? { side } : {}),
       extract_status: "queued",
       extract_attempts: 0,
+      extract_next_attempt_at: null,
     })
     .eq("id", extractionId);
-  return processExtraction(db, extractionId);
+  return processExtraction(db, extractionId, { trigger: "user", userId: ctx.userId });
 }
 
 export async function documentUrl(
@@ -723,6 +834,21 @@ export async function resolveReviewItem(
       .single();
     if (error) throw new PracticeError("db_error", error.message);
     txnId = txn.id;
+    // Remember how this line was settled, so next month's copy goes straight through.
+    try {
+      await teachFromReview(
+        db,
+        ctx,
+        {
+          business_id: item.business_id,
+          raw_text: item.raw_text,
+          proposed: p,
+        },
+        { direction, counterparty: counterparty ?? null, description },
+      );
+    } catch (e) {
+      console.error(`[practice] memory teach failed: ${(e as Error).message}`);
+    }
   }
 
   const corrected = patch

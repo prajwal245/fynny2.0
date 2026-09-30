@@ -204,6 +204,25 @@ export type Activity = {
   agent?: AgentKey;
 };
 
+/** One recorded run of an agent (Extract / Recon / Narrate / Chaser). */
+export type AgentRunRecord = {
+  id: string;
+  clientId: string;
+  agent: string;
+  trigger: string;
+  period?: string;
+  subjectId?: string;
+  subject?: string;
+  status: string;
+  attempt: number;
+  summary: string;
+  error?: string;
+  retryAt?: string;
+  memoryReleased: number;
+  at: string;
+  ms?: number;
+};
+
 export type Role = "Partner" | "Junior";
 
 /** The monthly close cycle every client moves through. */
@@ -342,6 +361,10 @@ type Store = {
   setRole: (r: Role) => void;
   activity: Activity[];
   activityFor: (clientId: string) => Activity[];
+  /** Recorded agent runs for one client, newest first. */
+  agentRunsFor: (clientId: string) => AgentRunRecord[];
+  /** True once the orchestrator found nothing left for a person in this month. */
+  isReadyForMis: (clientId: string, period: string) => boolean;
   closeStateFor: (clientId: string) => CloseState;
 };
 
@@ -369,6 +392,8 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
   const [period, setPeriod] = useState(PERIODS[0]);
   const [role, setRole] = useState<Role>("Partner");
   const [activity, setActivity] = useState<Activity[]>([]);
+  const [agentRuns, setAgentRuns] = useState<AgentRunRecord[]>([]);
+  const [readyForMis, setReadyForMis] = useState<{ clientId: string; period: string }[]>([]);
 
   const firmId = useRef<string | null>(null);
   const userId = useRef<string | null>(null);
@@ -416,6 +441,8 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
     setChases(w.chases as Chase[]);
     setRecon(w.recon);
     setActivity(w.activity as Activity[]);
+    setAgentRuns((w.agentRuns ?? []) as AgentRunRecord[]);
+    setReadyForMis(w.readyForMis ?? []);
   }, []);
 
   /** Reloads everything from the server; the server is the source of truth. */
@@ -1139,6 +1166,16 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
     [refresh],
   );
 
+  const agentRunsFor = useCallback(
+    (clientId: string) => agentRuns.filter((r) => r.clientId === clientId),
+    [agentRuns],
+  );
+  const isReadyForMis = useCallback(
+    (clientId: string, p: string) =>
+      readyForMis.some((r) => r.clientId === clientId && r.period === p),
+    [readyForMis],
+  );
+
   const activityFor = useCallback(
     (clientId: string) => activity.filter((a) => a.clientId === clientId),
     [activity],
@@ -1324,9 +1361,13 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       setRole,
       activity,
       activityFor,
+      agentRunsFor,
+      isReadyForMis,
       closeStateFor,
     }),
     [
+      agentRunsFor,
+      isReadyForMis,
       matchedTxns,
       signOffReport,
       requestCorrection,

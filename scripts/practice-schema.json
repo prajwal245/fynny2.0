@@ -31,6 +31,40 @@
   "description",
   "id"
  ],
+ "ca_agent_memory": [
+  "business_id",
+  "ca_firm_id",
+  "created_at",
+  "created_by",
+  "example",
+  "id",
+  "kind",
+  "last_applied_at",
+  "lesson",
+  "pattern",
+  "times_applied",
+  "times_taught",
+  "updated_at"
+ ],
+ "ca_agent_runs": [
+  "agent",
+  "attempt",
+  "business_id",
+  "ca_firm_id",
+  "created_by",
+  "detail",
+  "duration_ms",
+  "error",
+  "finished_at",
+  "id",
+  "period",
+  "started_at",
+  "status",
+  "subject_id",
+  "subject_label",
+  "summary",
+  "trigger"
+ ],
  "ca_ai_calls": [
   "ca_firm_id",
   "created_at",
@@ -107,7 +141,10 @@
   "canonical",
   "created_at",
   "created_by",
-  "id"
+  "hits",
+  "id",
+  "last_used_at",
+  "source"
  ],
  "ca_document_extractions": [
   "business_id",
@@ -123,6 +160,7 @@
   "error_message",
   "extract_attempts",
   "extract_finished_at",
+  "extract_next_attempt_at",
   "extract_started_at",
   "extract_status",
   "extracted",
@@ -235,6 +273,8 @@
  "ca_firms": [
   "aadhaar_document_path",
   "aadhaar_last4",
+  "auto_chase_day",
+  "auto_recon",
   "brain_enabled",
   "brain_last_run_at",
   "ca_name",

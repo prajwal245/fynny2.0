@@ -621,6 +621,12 @@ export async function resolveException(
     "recon",
     `Matched manually: ${txn.description ?? ""} with ${parts.length} entr${parts.length === 1 ? "y" : "ies"}${diff ? ` (difference ₹${diff})` : ""}.`,
   );
+  // Memory: a person matched two differently named parties, so the rules
+  // stage can match them by itself next time.
+  if (bookSide.length === 1) {
+    const { learnAlias } = await import("./orchestrator.server");
+    await learnAlias(db, ctx, bankSide[0], bookSide[0]).catch(() => null);
+  }
   return { status: "resolved", amount_difference: diff };
 }
 

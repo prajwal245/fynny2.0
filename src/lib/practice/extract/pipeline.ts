@@ -83,6 +83,8 @@ export interface ExtractInput {
   mime: string | null;
   side: Side;
   businessId: string | null;
+  /** The client whose books these are: tells the AI which way money moves. */
+  clientName?: string | null;
 }
 
 export interface ExtractOutcome {
@@ -336,12 +338,33 @@ async function readViaOcr(
   return { text, rows: rowsFromAiRead(read.rows, text), kind: read.kind, ai: true };
 }
 
+const LEGAL = /\b(pvt|private|ltd|limited|llp|llc|inc|co|company|the|and)\b/g;
+function partyTokens(name: string): string[] {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(LEGAL, " ").split(/\s+/).filter((t) => t.length > 1);
+}
+/** True when two names refer to the same business ("Sundara Textiles" vs "SUNDARA TEXTILES PVT LTD"). */
+export function sameParty(a: string, b: string): boolean {
+  const x = partyTokens(a);
+  const y = partyTokens(b);
+  if (!x.length || !y.length) return false;
+  const common = x.filter((t) => y.includes(t)).length;
+  return common / Math.min(x.length, y.length) >= 0.8;
+}
+
 export async function runExtract(
   input: ExtractInput,
   deps: ExtractDeps,
 ): Promise<ExtractOutcome> {
   const threshold = deps.threshold ?? CONFIDENCE_THRESHOLD;
   const calls: AiCallRecord[] = [];
+  // Every AI read knows whose books these are, so "in" and "out" are from the
+  // client's side and the client is never its own counterparty.
+  const client = input.clientName?.trim();
+  if (client && deps.llm) {
+    const base = deps.llm;
+    const who = `These are the books of the client "${client}". Direction is from the client's side: money the client receives is "in"; money the client pays, including bills and invoices addressed to the client, is "out". The counterparty is always the other party, never "${client}".\n\n`;
+    deps = { ...deps, llm: { json: (req) => base.json({ ...req, user: who + req.user }) } };
+  }
   const kind = detectKind(input.bytes, input.filename, input.mime);
   let parsed: ExtractedRow[] | null = null;
   let sourceText = "";
@@ -572,6 +595,17 @@ export async function runExtract(
       route: "review" as const,
       confidence: Math.min(r.confidence, 0.5),
       reason: `Identical to row ${first + 1} in the same file. Confirm only if it is a genuine second transaction.`,
+    };
+  }).map((r) => {
+    // An AI-read line naming the client as its own counterparty has its direction
+    // backwards or is misread. (Statements read in code keep own-account transfers.)
+    if (!aiReadUsed || !client || !r.counterparty || !sameParty(r.counterparty, client)) return r;
+    return {
+      ...r,
+      counterparty: null,
+      route: "review" as const,
+      confidence: Math.min(r.confidence, 0.5),
+      reason: [r.reason, "The reader named the client as the other party, so money in/out may be reversed"].filter(Boolean).join("; "),
     };
   });
 

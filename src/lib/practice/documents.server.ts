@@ -330,8 +330,24 @@ export async function processExtraction(
 
   const kind = detectKind(bytes, filename, null);
   const side: Side = doc.side ?? inferSide(filename, kind);
+  const { data: clientRow } = doc.business_id
+    ? await db
+        .from("ca_clients")
+        .select("client_name")
+        .eq("ca_firm_id", doc.ca_firm_id)
+        .eq("business_id", doc.business_id)
+        .limit(1)
+        .maybeSingle()
+    : { data: null };
   const outcome = await runExtract(
-    { bytes, filename, mime: null, side, businessId: doc.business_id },
+    {
+      bytes,
+      filename,
+      mime: null,
+      side,
+      businessId: doc.business_id,
+      clientName: clientRow?.client_name ?? null,
+    },
     {
       llm: practiceLlm(),
       ocr: practiceOcr(),

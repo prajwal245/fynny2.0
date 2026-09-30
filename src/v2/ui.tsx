@@ -53,8 +53,17 @@ export const V2_STYLES = `
 .v2-scroll { overflow-x:auto; }
 .v2-skel { background:linear-gradient(90deg, ${V.gray} 25%, #ECECEC 50%, ${V.gray} 75%); background-size:200% 100%; animation:v2shimmer 1.3s infinite linear; border-radius:10px; }
 @keyframes v2shimmer { from { background-position:200% 0; } to { background-position:-200% 0; } }
-.v2-grid-cards { display:grid; gap:16px; grid-template-columns:repeat(auto-fill, minmax(280px,1fr)); }
-@media (max-width:900px){ .v2-sidebar { position:fixed; z-index:60; transform:translateX(-100%); } .v2-sidebar.open { transform:translateX(0); } }
+.v2-grid-cards { display:grid; gap:16px; grid-template-columns:repeat(auto-fill, minmax(min(280px, 100%), 1fr)); }
+@media (max-width:900px){
+  /* The sidebar's inline sticky position must not keep it in the layout on phones. */
+  .v2-sidebar { position:fixed !important; left:0; top:0; z-index:60; transform:translateX(-100%); }
+  .v2-sidebar.open { transform:translateX(0); }
+}
+@media (max-width:640px){
+  .v2 main { padding:16px !important; }
+  .v2 select.v2-input, .v2 input.v2-input { min-width:0 !important; max-width:100%; }
+  .v2 header { padding:12px 16px !important; }
+}
 `;
 
 export function Card({ children, style, className = "", onClick, hover = false }: { children: ReactNode; style?: CSSProperties; className?: string; onClick?: () => void; hover?: boolean }) {

@@ -126,7 +126,7 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
               {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
-          <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))" }}>
+          <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit,minmax(min(180px, 100%), 1fr))" }}>
             <div>
               <label className="v2-label">Contact</label>
               <input className="v2-input" value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} required />

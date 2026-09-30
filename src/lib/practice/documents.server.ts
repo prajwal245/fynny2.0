@@ -357,6 +357,11 @@ export async function processExtraction(
   );
   await logAiCalls(db, doc.ca_firm_id, doc.id, outcome.aiCalls);
   if (outcome.error) return failWith(outcome.error.message, outcome.error.code);
+  if (outcome.rows.length === 0)
+    return failWith(
+      "No transactions were found in this file. Check that it is the statement or ledger export itself, not a summary or cover page.",
+      "empty",
+    );
 
   // What people taught this client's Extract agent in earlier months.
   const memories = await loadMemories(db, doc.business_id);

@@ -44,7 +44,7 @@ export default function V2Shell() {
 
 function ShellBody() {
   const [open, setOpen] = useState(false);
-  const { hydrated, session, onboarded, firm, signOut, period, setPeriod, role, setRole, review, exceptions, chases } = useV2();
+  const { hydrated, session, onboarded, firm, signOut, period, setPeriod, role, setRole, review, exceptions, chases, firmRole, canSignOff } = useV2();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const title =
@@ -52,6 +52,8 @@ function ShellBody() {
     (pathname.startsWith("/v2/clients/") ? "Client workspace" : pathname.startsWith("/v2/reports/") ? "MIS report" : "FynHelp");
 
   const onboarding = pathname === "/v2/onboarding";
+  // The reset link signs the user in only to set a password: no redirects there.
+  const resetting = pathname === "/v2/reset-password";
 
   const COUNTS: Record<string, number> = {
     "/v2/review": review.filter((r) => r.status === "open").length,
@@ -60,12 +62,13 @@ function ShellBody() {
   };
 
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || resetting) return;
     if ((!session || !onboarded) && !onboarding) navigate({ to: "/v2/onboarding" });
-    if (session && onboarded && onboarding) navigate({ to: "/v2" });
-  }, [hydrated, session, onboarded, onboarding, navigate]);
+    // Leaving onboarding for the portfolio is decided by the onboarding page, so a
+    // new partner is not pulled out halfway (the firm exists after step two).
+  }, [hydrated, session, onboarded, onboarding, resetting, navigate]);
 
-  if (!hydrated) {
+  if (!hydrated && !resetting) {
     return (
       <div className="v2" style={{ minHeight: "100vh", display: "grid", placeItems: "center", color: V.muted, fontSize: 13 }}>
         Loading your workspace
@@ -73,7 +76,7 @@ function ShellBody() {
     );
   }
 
-  if (onboarding) {
+  if (onboarding || resetting) {
     return (
       <div className="v2" style={{ minHeight: "100vh", padding: "48px 20px" }}>
         <Outlet />
@@ -103,6 +106,7 @@ function ShellBody() {
             <button className="v2-btn v2-btn-quiet" style={{ display: "none" }} onClick={() => setOpen(false)}><X size={15} /></button>
           </div>
 
+          {canSignOff && (
           <div style={{ padding: "0 8px 14px" }}>
             <div style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: V.muted, fontWeight: 700, marginBottom: 6 }}>Working as</div>
             <div style={{ display: "flex", gap: 4, background: V.gray, padding: 3, borderRadius: 999 }}>
@@ -121,6 +125,7 @@ function ShellBody() {
               ))}
             </div>
           </div>
+          )}
 
           <nav className="v2-nav" style={{ flex: 1, overflowY: "auto" }}>
             {NAV.filter((n) => role === "Junior" || PARTNER_NAV.includes(n.to)).map(({ to, label, icon: Icon, ...rest }) => (
@@ -171,8 +176,8 @@ function ShellBody() {
                 {PERIODS.map((p) => <option key={p} value={p}>{p}</option>)}
               </select>
               <div style={{ textAlign: "right", lineHeight: 1.25 }} className="v2-hide-sm">
-                <div style={{ fontSize: 12.5, fontWeight: 600 }}>{session?.name || "Partner"}</div>
-                <div style={{ fontSize: 11, color: V.muted }}>{role} · {firm?.name || "Your firm"}</div>
+                <div style={{ fontSize: 12.5, fontWeight: 600 }}>{session?.name || session?.email || ""}</div>
+                <div style={{ fontSize: 11, color: V.muted }} data-testid="firm-role">{firmRole ? firmRole[0].toUpperCase() + firmRole.slice(1) : role} · {firm?.name || "Your firm"}</div>
               </div>
               <div style={{ width: 34, height: 34, borderRadius: 999, background: V.beige, display: "grid", placeItems: "center", fontSize: 12.5, fontWeight: 700 }}>{(session?.name || "F").split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()}</div>
             </div>

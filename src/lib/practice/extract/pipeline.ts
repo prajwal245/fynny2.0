@@ -129,6 +129,8 @@ export function detectKind(
     return "image";
   if (/\.(jpe?g|png|webp|heic)$/.test(name) || mime?.startsWith("image/"))
     return "image";
+  // Word, PowerPoint and similar share Excel's zip container: name them before sniffing.
+  if (/\.(docx?|pptx?|odt|pages|rtf|zip|rar|7z)$/.test(name)) return "unsupported";
   if (looksLikeSpreadsheetBinary(bytes)) return "xlsx"; // includes Excel renamed to .csv
   if (
     head.startsWith("<") &&
@@ -375,7 +377,9 @@ export async function runExtract(
     return fail(
       kind,
       "unsupported_type",
-      "Only CSV, Excel, Tally XML, PDF and image files can be read.",
+      /\.(docx?|odt|pages|rtf)$/i.test(input.filename)
+        ? "Word documents are not read. Upload the bank statement or ledger as PDF, CSV or Excel, or the Tally XML export."
+        : "Only CSV, Excel, Tally XML, PDF and image files can be read.",
     );
   }
 

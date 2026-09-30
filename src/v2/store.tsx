@@ -294,7 +294,8 @@ type Store = {
   onboarded: boolean;
   signIn: (name: string, email: string) => void;
   signOut: () => void;
-  saveFirm: (patch: Partial<Firm>) => void;
+  /** Resolves true once the practice is saved on the server. */
+  saveFirm: (patch: Partial<Firm>) => Promise<boolean>;
   completeOnboarding: () => Promise<void>;
   refresh: () => Promise<void>;
   /** The practice id (null until onboarding creates it). */
@@ -366,6 +367,10 @@ type Store = {
   setPeriod: (p: string) => void;
   role: Role;
   setRole: (r: Role) => void;
+  /** The person's real role in the firm, from the server. */
+  firmRole: string | null;
+  /** Owners, admins and partners may sign off an MIS and change firm automation. */
+  canSignOff: boolean;
   activity: Activity[];
   activityFor: (clientId: string) => Activity[];
   /** Recorded agent runs for one client, newest first. */
@@ -398,6 +403,8 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
   const [firm, setFirm] = useState<Firm | null>(null);
   const [period, setPeriod] = useState(PERIODS[0]);
   const [role, setRole] = useState<Role>("Partner");
+  const [firmRole, setFirmRole] = useState<string | null>(null);
+  const canSignOff = firmRole === null || ["owner", "admin", "partner"].includes(firmRole);
   const [activity, setActivity] = useState<Activity[]>([]);
   const [agentRuns, setAgentRuns] = useState<AgentRunRecord[]>([]);
   const [readyForMis, setReadyForMis] = useState<{ clientId: string; period: string }[]>([]);
@@ -449,6 +456,10 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
     setRecon(w.recon);
     setActivity(w.activity as Activity[]);
     setAgentRuns((w.agentRuns ?? []) as AgentRunRecord[]);
+    const r = String(w.firm?.role ?? "");
+    setFirmRole(r || null);
+    // Teammates who cannot sign off work in the junior view.
+    if (r && !["owner", "admin", "partner"].includes(r)) setRole("Junior");
     setReadyForMis(w.readyForMis ?? []);
   }, []);
 
@@ -472,6 +483,12 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       return;
     }
     userId.current = user.id;
+    // Remembered so an expired session later offers "Sign in", not "Create account".
+    try {
+      localStorage.setItem("fynhelp.v2.known", "1");
+    } catch {
+      /* private mode */
+    }
     const meta = (user.user_metadata ?? {}) as { full_name?: string };
     setSession({
       name: meta.full_name ?? user.email ?? "",
@@ -522,7 +539,18 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
   // up by onboarding itself (completeOnboarding) or by the page load that follows
   // an email confirmation, so onboarding is never cut short.
   useEffect(() => {
-    const { data } = sb.auth.onAuthStateChange((event) => {
+    const { data } = sb.auth.onAuthStateChange((event, session) => {
+      // Arriving from an email link (confirmation, invite) or signing in in
+      // another tab: load that user's practice once.
+      if (
+        (event === "SIGNED_IN" || event === "INITIAL_SESSION") &&
+        session?.user &&
+        session.user.id !== userId.current
+      ) {
+        userId.current = session.user.id;
+        setTimeout(() => void boot(), 0);
+        return;
+      }
       if (event !== "SIGNED_OUT") return;
       userId.current = null;
       firmId.current = null;
@@ -530,7 +558,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       setFirm(null);
     });
     return () => data.subscription.unsubscribe();
-  }, []);
+  }, [boot]);
 
   // Documents from Gmail / WhatsApp and scheduled chaser emails arrive in the
   // background, so the workspace refreshes itself while the tab is open.
@@ -553,7 +581,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /** Creates or updates the real practice record for the signed in user. */
-  const saveFirm = useCallback((patch: Partial<Firm>) => {
+  const saveFirm = useCallback((patch: Partial<Firm>): Promise<boolean> => {
     setFirm((p) => ({
       name: "",
       partnerName: "",
@@ -571,7 +599,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
         toast.error(
           "Confirm your email address, then sign in to finish setting up your practice.",
         );
-        return firmId.current;
+        return null;
       }
       userId.current = sess.session.user.id;
       try {
@@ -587,9 +615,11 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
         firmId.current = res.id;
       } catch (e) {
         toast.error(errMsg(e));
+        return null;
       }
       return firmId.current;
     })();
+    return firmReady.current.then((id) => Boolean(id));
   }, []);
 
   /** Loads the workspace for the practice onboarding just created; resolves when ready. */
@@ -1094,6 +1124,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
         ),
       );
       void signOffPracticeReport({ data: { id: reportId, by } })
+        .then(() => toast.success("Report signed off"))
         .catch((e) => toast.error(errMsg(e)))
         .finally(() => {
           void refresh();
@@ -1466,6 +1497,8 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       setPeriod,
       role,
       setRole,
+      firmRole,
+      canSignOff,
       activity,
       activityFor,
       agentRunsFor,
@@ -1473,6 +1506,8 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       closeStateFor,
     }),
     [
+      firmRole,
+      canSignOff,
       isRunning,
       dismissRun,
       agentRunsFor,

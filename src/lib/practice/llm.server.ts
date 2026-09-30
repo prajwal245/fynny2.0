@@ -60,6 +60,15 @@ function providers(): Provider[] {
       model: env("GEMINI_MODEL") ?? "gemini-flash-latest",
       vision: true,
     });
+  // Flash is often "experiencing high demand" (503); Flash-Lite usually is not.
+  if (gemini)
+    list.push({
+      name: "gemini-lite",
+      url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      key: gemini,
+      model: env("GEMINI_FALLBACK_MODEL") ?? "gemini-flash-lite-latest",
+      vision: true,
+    });
   return list;
 }
 
@@ -209,9 +218,11 @@ export function practiceLlm(
     async json(req) {
       const usable = list.filter((p) => !req.attachment || p.vision);
       const errors: string[] = [];
-      for (const p of usable) {
+      for (const [i, p] of usable.entries()) {
+        // Move on quickly when another provider can answer instead.
+        const attempts = i < usable.length - 1 || edgeAvailable ? 2 : 3;
         try {
-          return await withRetries(() => callProvider(p, req, timeoutMs));
+          return await withRetries(() => callProvider(p, req, timeoutMs), attempts);
         } catch (e) {
           errors.push(e instanceof Error ? e.message : String(e));
         }

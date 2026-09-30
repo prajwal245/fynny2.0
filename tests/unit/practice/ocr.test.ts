@@ -136,3 +136,33 @@ describe("OCR.space client", () => {
     await expect(ocrSpaceText(bytes, "image/png")).rejects.toThrow(/not configured/);
   });
 });
+
+describe("the AI knows whose books these are", () => {
+  const invoice = new TextEncoder().encode("NORTHLINE LOGISTICS\nTax invoice 1042 dated 12/09/2026\nBill to: Sundara Textiles Pvt Ltd\nTotal 11,800.00");
+  const reader = (row: Record<string, unknown>, seen: string[]): LlmClient => ({
+    async json(req) {
+      seen.push(req.user);
+      return { data: { document_kind: "invoice", rows: [{ date: "2026-09-12", amount: 11800, source_text: "Total 11,800.00", confidence: 0.9, description: "Invoice 1042", ...row }] }, provider: "t", model: "m", latency_ms: 1, raw: "{}" };
+    },
+  });
+
+  it("tells the reader the client's name and which way money moves", async () => {
+    const seen: string[] = [];
+    await runExtract(
+      { bytes: invoice, filename: "inv.txt", mime: "text/plain", side: "books", businessId: "b1", clientName: "Sundara Textiles Pvt Ltd" },
+      { llm: reader({ direction: "out", counterparty: "Northline Logistics" }, seen) },
+    );
+    expect(seen[0]).toMatch(/books of the client "Sundara Textiles Pvt Ltd"/);
+    expect(seen[0]).toMatch(/invoices addressed to the client, is "out"/);
+  });
+
+  it("sends a line that names the client as its own counterparty to review", async () => {
+    const out = await runExtract(
+      { bytes: invoice, filename: "inv.txt", mime: "text/plain", side: "books", businessId: "b1", clientName: "Sundara Textiles Pvt Ltd" },
+      { llm: reader({ direction: "in", counterparty: "SUNDARA TEXTILES" }, []) },
+    );
+    expect(out.rows[0].route).toBe("review");
+    expect(out.rows[0].counterparty).toBeNull();
+    expect(out.rows[0].reason).toMatch(/money in\/out may be reversed/);
+  });
+});

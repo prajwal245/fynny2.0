@@ -123,18 +123,30 @@ async function matchClient(
     .select("business_id, client_phone")
     .eq("ca_firm_id", firmId)
     .not("client_phone", "is", null);
-  const hit = (data ?? []).find((c) => last10(c.client_phone) === want);
-  if (hit?.business_id) return hit.business_id;
+  // Only a number that belongs to exactly one client files automatically.
+  const hits = [
+    ...new Set(
+      (data ?? [])
+        .filter((c) => last10(c.client_phone) === want && c.business_id)
+        .map((c) => c.business_id as string),
+    ),
+  ];
+  if (hits.length === 1) return hits[0];
+  if (hits.length > 1) return null;
   const { data: chase } = await db
     .from("ca_document_requests")
     .select("business_id, contact_phone")
     .eq("ca_firm_id", firmId)
     .eq("status", "open")
     .not("contact_phone", "is", null);
-  return (
-    (chase ?? []).find((c) => last10(c.contact_phone) === want)?.business_id ??
-    null
-  );
+  const chaseHits = [
+    ...new Set(
+      (chase ?? [])
+        .filter((c) => last10(c.contact_phone) === want && c.business_id)
+        .map((c) => c.business_id as string),
+    ),
+  ];
+  return chaseHits.length === 1 ? chaseHits[0] : null;
 }
 
 export async function handleWhatsappWebhook(payload: {

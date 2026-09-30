@@ -164,14 +164,38 @@ export async function revokeToken(accessToken: string): Promise<void> {
 /* ---------------- 5-layer client identification ---------------- */
 
 export interface ClientMatch {
+  /** Set only when the sender identifies exactly one client for certain. */
   businessId: string | null;
-  method: "exact" | "learned" | "domain" | "name" | "gstin" | "none";
+  method: "exact" | "learned" | "domain" | "name" | "gstin" | "ambiguous" | "none";
   confidence: number;
+  /** A likely client that a person must confirm. Never filed automatically. */
+  suggestedBusinessId?: string | null;
+}
+
+/**
+ * Filing under the wrong client puts its lines into someone else's
+ * reconciliation, so only certain matches file automatically: the exact
+ * sender address on exactly one client, or a mapping a person confirmed.
+ * Everything else goes to the Unassigned inbox with a suggestion.
+ */
+function suggestOnly(m: ClientMatch): ClientMatch {
+  if (m.method === "exact" || m.method === "learned") return m;
+  return { ...m, businessId: null, suggestedBusinessId: m.businessId ?? m.suggestedBusinessId ?? null };
 }
 
 const GSTIN_RE = /[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}/;
 
 export async function identifyClient(
+  admin: Admin,
+  firmId: string,
+  senderEmail: string,
+  senderName: string,
+  subject: string,
+): Promise<ClientMatch> {
+  return suggestOnly(await matchSender(admin, firmId, senderEmail, senderName, subject));
+}
+
+async function matchSender(
   admin: Admin,
   firmId: string,
   senderEmail: string,
@@ -186,9 +210,17 @@ export async function identifyClient(
     .eq("ca_firm_id", firmId);
   const list = (clients ?? []).filter((c: any) => c.business_id);
 
-  // Layer 1 — exact sender email on the client record.
-  const exact = list.find((c: any) => (c.client_email ?? "").toLowerCase() === senderEmail.toLowerCase());
-  if (exact) return { businessId: exact.business_id, method: "exact", confidence: 1 };
+  // Layer 1 — exact sender email on exactly one client record.
+  const exactIds = [
+    ...new Set(
+      list
+        .filter((c: any) => (c.client_email ?? "").toLowerCase() === senderEmail.toLowerCase())
+        .map((c: any) => c.business_id as string),
+    ),
+  ];
+  if (exactIds.length === 1) return { businessId: exactIds[0], method: "exact", confidence: 1 };
+  // The same address on two clients (a shared accountant, say) is not proof of either.
+  if (exactIds.length > 1) return { businessId: null, method: "ambiguous", confidence: 0 };
 
   // Layer 2 — a mapping a human already confirmed.
   const { data: learned } = await admin

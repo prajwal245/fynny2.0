@@ -9,7 +9,7 @@ import { CloseProgress } from "../components/CloseProgress";
 import AddClientModal from "../components/AddClientModal";
 
 export default function PortfolioPage() {
-  const { clients, docs, review, exceptions, chases, runs, period, role, closeStateFor } = useV2();
+  const { clients, docs, review, exceptions, chases, runs, dismissRun, period, role, closeStateFor } = useV2();
   const [adding, setAdding] = useState(false);
 
   const openEx = exceptions.filter((e) => e.status === "open");
@@ -28,14 +28,14 @@ export default function PortfolioPage() {
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
         {(["extract", "recon", "narrate", "chaser"] as const).map((a) => (
-          <AgentStatusBadge key={a} agent={a} active={runs.some((r) => r.agent === a)} />
+          <AgentStatusBadge key={a} agent={a} active={runs.some((r) => r.agent === a && r.status === "running")} />
         ))}
       </div>
 
       <div style={{ display: "grid", gap: 12, marginBottom: runs.length ? 18 : 0 }}>
         <AnimatePresence>
           {runs.map((r) => (
-            <ProcessingCard key={r.id} agent={r.agent} title={r.title} steps={r.steps} current={r.current} />
+            <ProcessingCard key={r.id} run={r} onDismiss={() => dismissRun(r.id)} />
           ))}
         </AnimatePresence>
       </div>

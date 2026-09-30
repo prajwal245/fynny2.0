@@ -31,7 +31,7 @@ export default function ExceptionsPage({
   const [picked, setPicked] = useState<string[]>([]);
   const [note, setNote] = useState("");
 
-  const reconRunning = runs.some((r) => r.agent === "recon");
+  const reconRunning = runs.some((r) => r.agent === "recon" && r.status === "running");
   const list = exceptions.filter(
     (e) =>
       e.status === "open" &&

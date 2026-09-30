@@ -319,12 +319,26 @@ export async function setChaseStatus(
   db: Db,
   ctx: FirmContext,
   id: string,
-  status: "Resolved" | "Open",
+  status: "Resolved" | "Open" | "Escalated",
   note?: string,
 ) {
   const row = await loadChase(db, ctx, id);
   const now = new Date().toISOString();
-  if (status === "Resolved") {
+  if (status === "Escalated") {
+    // A person escalates before the schedule would: follow-ups stop, the partner owns it.
+    await db
+      .from("ca_document_requests")
+      .update({ escalated_at: now, next_follow_up_at: null })
+      .eq("id", row.id);
+    await chaserEvent(db, {
+      chaser_id: row.id,
+      ca_firm_id: ctx.firmId,
+      business_id: row.business_id,
+      event_type: "escalated",
+      note: note ?? "Escalated to the partner by the team.",
+      actor_id: ctx.userId,
+    });
+  } else if (status === "Resolved") {
     await db
       .from("ca_document_requests")
       .update({
@@ -368,7 +382,7 @@ export async function setChaseStatus(
     ctx.firmId,
     row.business_id,
     "chaser",
-    `Chase "${row.title}" ${status === "Resolved" ? "resolved" : "reopened"}.`,
+    `Chase "${row.title}" ${status === "Resolved" ? "resolved" : status === "Escalated" ? "escalated to the partner" : "reopened"}.`,
   );
   return { status };
 }

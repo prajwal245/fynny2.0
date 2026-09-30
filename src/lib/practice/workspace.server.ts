@@ -22,13 +22,15 @@ const channelOf = (
   return "Manual";
 };
 
+/** Uploaded → Queued → Processing → Parsed / Needs review / Failed. */
 function docStatus(
   extractStatus: string | null,
   reviewState: string,
-): "Processing" | "Parsed" | "Failed" {
-  if (extractStatus === "queued" || extractStatus === "processing")
-    return "Processing";
+): "Queued" | "Processing" | "Parsed" | "Needs review" | "Failed" {
+  if (extractStatus === "queued") return "Queued";
+  if (extractStatus === "processing") return "Processing";
   if (extractStatus === "failed" || reviewState === "failed") return "Failed";
+  if (extractStatus === "needs_review") return "Needs review";
   return "Parsed";
 }
 
@@ -61,7 +63,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       db
         .from("ca_document_extractions")
         .select(
-          "id, business_id, original_filename, source_type, extracted, review_state, extract_status, side, file_kind, error_message, txn_count, review_count, duplicate_count, row_count, created_at, gmail_sender_email, gmail_subject, source_metadata",
+          "id, business_id, original_filename, source_type, extracted, review_state, extract_status, extract_next_attempt_at, extract_attempts, side, file_kind, error_message, txn_count, review_count, duplicate_count, row_count, created_at, gmail_sender_email, gmail_subject, source_metadata",
         )
         .eq("ca_firm_id", f)
         .order("created_at", { ascending: false })
@@ -217,6 +219,17 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       side: r.side ?? undefined,
       kind: r.file_kind ?? undefined,
       error: r.error_message ?? undefined,
+      retryAt:
+        r.extract_status === "failed" && r.extract_next_attempt_at
+          ? String(r.extract_next_attempt_at)
+          : undefined,
+      attempts: r.extract_attempts ?? 0,
+      suggestedClientId:
+        (r.source_metadata as { suggested_business_id?: string | null } | null)
+          ?.suggested_business_id ?? undefined,
+      suggestedBy:
+        (r.source_metadata as { suggested_by?: string | null } | null)
+          ?.suggested_by ?? undefined,
       txnCount: r.txn_count ?? rows.length,
       reviewCount: r.review_count ?? 0,
       duplicateCount: r.duplicate_count ?? 0,

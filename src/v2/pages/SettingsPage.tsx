@@ -561,6 +561,32 @@ export default function SettingsPage() {
                   : "Not configured (RESEND_API_KEY)"}
               </Badge>
             </Row>
+
+            <Row>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 600 }}>
+                  Document reading
+                </div>
+                <div style={{ fontSize: 12.5, color: V.body, marginTop: 3 }}>
+                  CSV, Excel, Tally and text PDFs are read in code with no AI.
+                  Scans and photos need OCR (or a vision model). The AI only
+                  classifies, and every amount it reads must appear in the
+                  document.
+                </div>
+              </div>
+              <div style={{ display: "grid", gap: 6, justifyItems: "end" }}>
+                <Badge tone={intg.reading.ocr || intg.reading.vision ? "good" : "warn"}>
+                  {intg.reading.ocr
+                    ? "Scans: OCR on"
+                    : intg.reading.vision
+                      ? "Scans: vision on"
+                      : "Scans: add OCR_SPACE_API_KEY"}
+                </Badge>
+                <Badge tone={intg.reading.ai ? "good" : "neutral"}>
+                  {intg.reading.ai ? "AI classification on" : "Rules only (no AI key)"}
+                </Badge>
+              </div>
+            </Row>
           </div>
         )}
       </Section>

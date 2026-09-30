@@ -39,7 +39,7 @@ import {
   signOffPracticeReport,
   updatePracticeClient,
 } from "@/lib/practice/practice.functions";
-import type { AgentKey } from "./agents";
+import type { AgentKey, LiveRun } from "./agents";
 
 export type Txn = {
   counterparty?: string | null;
@@ -69,7 +69,14 @@ export type Doc = {
   name: string;
   clientId: string;
   source: "Manual" | "Gmail" | "WhatsApp";
-  status: "Processing" | "Parsed" | "Failed";
+  /** Uploading (in the browser) → Queued → Processing → Parsed / Needs review / Failed. */
+  status: "Uploading" | "Queued" | "Processing" | "Parsed" | "Needs review" | "Failed";
+  /** When a temporary failure will be retried automatically. */
+  retryAt?: string;
+  attempts?: number;
+  /** A likely client for an unassigned arrival. A person must confirm it. */
+  suggestedClientId?: string;
+  suggestedBy?: string;
   date: string;
   rows: Txn[];
   side?: "bank" | "books";
@@ -261,14 +268,11 @@ function periodList() {
 }
 export const PERIODS = periodList();
 
-export type AgentRun = {
-  id: string;
-  agent: AgentKey;
-  title: string;
-  steps: string[];
-  current: number;
+export type AgentRun = LiveRun & {
   /** entity this run belongs to: doc id, client id or report id */
   target: string;
+  /** client the run is for, so every screen of that client can show it */
+  clientId?: string;
 };
 
 const iso = (daysAgo: number) =>
@@ -316,6 +320,9 @@ type Store = {
   runs: AgentRun[];
   recon: Record<string, ReconResult>;
   runsFor: (target: string) => AgentRun[];
+  /** True while this agent is already working on this target. */
+  isRunning: (agent: AgentKey, target: string) => boolean;
+  dismissRun: (id: string) => void;
   addClient: (c: Omit<Client, "id">) => Client;
   updateClient: (id: string, patch: Partial<Client>) => void;
   addDoc: (
@@ -588,48 +595,92 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
   /** Loads the workspace for the practice onboarding just created; resolves when ready. */
   const completeOnboarding = useCallback(() => boot(), [boot]);
 
+  const runsRef = useRef<AgentRun[]>([]);
+  useEffect(() => {
+    runsRef.current = runs;
+  }, [runs]);
+
+  /** True while this agent is already working on this target (blocks double triggers). */
+  const isRunning = useCallback(
+    (agent: AgentKey, target: string) =>
+      runsRef.current.some(
+        (r) => r.agent === agent && r.target === target && r.status === "running",
+      ),
+    [],
+  );
+
+  const dismissRun = useCallback((id: string) => {
+    setRuns((p) => p.filter((r) => r.id !== id));
+  }, []);
+
   /**
-   * Shows an agent's steps while the real server call runs. Steps advance on a
-   * timer but the run only finishes when the server answers.
+   * Shows an agent working while the real call runs. The stage text changes
+   * only when the work itself moves on (e.g. upload finished, server reading);
+   * nothing advances on a timer. The card then shows the real outcome, or the
+   * reason it failed with a way to try again.
    */
   const track = useCallback(
     <T,>(
       agent: AgentKey,
       title: string,
-      steps: string[],
       target: string,
-      work: Promise<T>,
+      opts: {
+        stage: string;
+        clientId?: string;
+        describe: (v: T) => string;
+        onRetry?: () => void;
+      },
+      work: (setStage: (stage: string) => void) => Promise<T>,
     ): Promise<T> => {
       const id = uid();
-      setRuns((p) => [...p, { id, agent, title, steps, current: 0, target }]);
-      steps.slice(0, -1).forEach((_, i) => {
-        timers.current.push(
-          setTimeout(
-            () =>
-              setRuns((p) =>
-                p.map((r) =>
-                  r.id === id && r.current < i + 1
-                    ? { ...r, current: i + 1 }
-                    : r,
-                ),
-              ),
-            700 * (i + 1),
-          ),
+      // Registered synchronously so a second click in the same tick is refused too.
+      const run: AgentRun = {
+        id,
+        agent,
+        title,
+        target,
+        clientId: opts.clientId,
+        stage: opts.stage,
+        status: "running",
+        startedAt: Date.now(),
+      };
+      runsRef.current = [...runsRef.current, run];
+      setRuns((p) => [...p, run]);
+      const patch = (next: Partial<AgentRun>) =>
+        setRuns((p) => p.map((r) => (r.id === id ? { ...r, ...next } : r)));
+      const later = (ms: number) =>
+        timers.current.push(setTimeout(() => dismissRun(id), ms));
+      const settle = () => {
+        runsRef.current = runsRef.current.map((r) =>
+          r.id === id ? { ...r, status: "succeeded" } : r,
         );
-      });
-      const done = () => setRuns((p) => p.filter((r) => r.id !== id));
-      return work.then(
+      };
+      return work((stage) => patch({ stage })).then(
         (v) => {
-          done();
+          settle();
+          patch({ status: "succeeded", result: opts.describe(v), finishedAt: Date.now() });
+          later(6000);
           return v;
         },
         (e) => {
-          done();
+          settle();
+          patch({
+            status: "failed",
+            error: errMsg(e),
+            finishedAt: Date.now(),
+            onRetry: opts.onRetry
+              ? () => {
+                  dismissRun(id);
+                  opts.onRetry?.();
+                }
+              : undefined,
+          });
+          later(30000);
           throw e;
         },
       );
     },
-    [],
+    [dismissRun],
   );
 
   const waitForClient = useCallback(async (clientId: string) => {
@@ -732,14 +783,14 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
           name,
           clientId,
           source,
-          status: "Processing",
+          status: "Uploading",
           date: today(),
           rows: [],
         },
         ...p,
       ]);
 
-      const work = (async () => {
+      const work = async (setStage: (s: string) => void) => {
         await waitForClient(clientId);
         const fid = firmId.current ?? (await firmReady.current);
         if (!fid) throw new Error("Create your practice first.");
@@ -751,6 +802,14 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
             upsert: false,
           });
         if (upErr) throw new Error(`Upload failed: ${upErr.message}`);
+        setDocs((p) =>
+          p.map((d) => (d.id === tempId ? { ...d, status: "Processing" } : d)),
+        );
+        setStage(
+          /statement|bank/i.test(name)
+            ? "Extract agent is reading the statement"
+            : "Extract agent is structuring the document",
+        );
         return registerPracticeUpload({
           data: {
             storage_path: path,
@@ -760,13 +819,22 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
             source,
           },
         });
-      })();
+      };
 
       void track(
         "extract",
         name,
-        ["Reading file", "Identifying transaction lines", "Scoring confidence"],
         tempId,
+        {
+          stage: "Uploading securely",
+          clientId,
+          describe: (res) =>
+            res.duplicate
+              ? "Already received earlier. Nothing was added twice."
+              : res.extract_status === "failed"
+                ? `Could not be read: ${res.error_message ?? "unknown reason"}`
+                : `${res.txn_count ?? 0} transactions structured${res.review_count ? `, ${res.review_count} sent to Review Queue` : ""}${res.duplicate_count ? `, ${res.duplicate_count} duplicates skipped` : ""}`,
+        },
         work,
       )
         .then((res) => {
@@ -809,26 +877,36 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
 
   const reprocessDoc = useCallback(
     async (id: string) => {
+      if (isRunning("extract", id)) return;
+      const doc = docs.find((d) => d.id === id);
       setDocs((p) =>
         p.map((d) =>
-          d.id === id ? { ...d, status: "Processing", error: undefined } : d,
+          d.id === id ? { ...d, status: "Processing", error: undefined, retryAt: undefined } : d,
         ),
       );
       try {
-        const r = await reprocessPracticeDocument({ data: { id } });
-        if (r.status === "failed")
-          toast.error(r.error ?? "The file still could not be read.");
-        else
-          toast.success(
-            `Re-read: ${r.txns} transactions${r.review ? `, ${r.review} to review` : ""}.`,
-          );
+        await track(
+          "extract",
+          doc?.name ?? "Document",
+          id,
+          {
+            stage: "Extract agent is reading the document again",
+            clientId: doc?.clientId || undefined,
+            describe: (r) =>
+              r.status === "failed"
+                ? `Still could not be read: ${r.error ?? "unknown reason"}${r.retry_at ? ". Another automatic try is scheduled." : ""}`
+                : `${r.txns} transactions structured${r.review ? `, ${r.review} sent to Review Queue` : ""}`,
+            onRetry: () => void reprocessDoc(id),
+          },
+          () => reprocessPracticeDocument({ data: { id } }),
+        );
       } catch (e) {
         toast.error(errMsg(e));
       } finally {
         void refresh();
       }
     },
-    [refresh],
+    [refresh, track, isRunning, docs],
   );
 
   const assignDoc = useCallback(
@@ -960,21 +1038,27 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
   /** Workflow B — deterministic matching of bank lines against the books, on the server. */
   const runRecon = useCallback(
     (clientId: string, onDone?: (r: ReconResult) => void) => {
-      const work = (async () => {
-        await waitForClient(clientId);
-        return runPracticeRecon({ data: { business_id: clientId, period } });
-      })();
+      if (isRunning("recon", clientId)) {
+        toast.info("Recon is already matching this client. It will finish shortly.");
+        return;
+      }
       void track(
         "recon",
-        "Reconciling bank and books",
-        [
-          "Loading bank lines",
-          "Exact match pass",
-          "Fuzzy match pass",
-          "Flagging exceptions",
-        ],
+        `Reconciling ${period}`,
         clientId,
-        work,
+        {
+          stage: "Recon agent is matching transactions",
+          clientId,
+          describe: (s) =>
+            s.run_id
+              ? `${s.matched_total} matched · ${s.exceptions} exception${s.exceptions === 1 ? "" : "s"} with reason codes`
+              : s.message,
+          onRetry: () => runRecon(clientId, onDone),
+        },
+        async () => {
+          await waitForClient(clientId);
+          return runPracticeRecon({ data: { business_id: clientId, period } });
+        },
       )
         .then((s) => {
           if (!s.run_id) {
@@ -996,7 +1080,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
           void refresh();
         });
     },
-    [period, refresh, track, waitForClient],
+    [period, refresh, track, waitForClient, isRunning],
   );
 
   /** Stage 7 — the partner either accepts the MIS or sends it back. */
@@ -1044,22 +1128,27 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       template: ReportTemplate,
       onDone: (r: Report) => void,
     ) => {
-      const work = (async () => {
-        await waitForClient(clientId);
-        return generatePracticeReport({
-          data: { business_id: clientId, period: reportPeriod, template },
-        });
-      })();
+      if (isRunning("narrate", clientId)) {
+        toast.info("Narrate is already preparing an MIS for this client.");
+        return;
+      }
       void track(
         "narrate",
         `${template} for ${reportPeriod}`,
-        [
-          "Collecting matched transactions",
-          "Computing figures",
-          "Writing insights",
-        ],
         clientId,
-        work,
+        {
+          stage: "Narrate agent is preparing MIS from matched transactions",
+          clientId,
+          describe: (r) =>
+            `Ready. ${r.content.insights?.length ?? 0} cited insight${(r.content.insights?.length ?? 0) === 1 ? "" : "s"}; every number is source-traceable.`,
+          onRetry: () => generateReport(clientId, reportPeriod, template, onDone),
+        },
+        async () => {
+          await waitForClient(clientId);
+          return generatePracticeReport({
+            data: { business_id: clientId, period: reportPeriod, template },
+          });
+        },
       )
         .then(async (r) => {
           const c = r.content;
@@ -1130,7 +1219,24 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
   /** Workflow D — email goes out from the server; WhatsApp is logged (the page opens wa.me). */
   const sendFollowUp = useCallback(
     (id: string, channel: "Email" | "WhatsApp") => {
-      void sendPracticeFollowUp({ data: { id, channel } })
+      if (isRunning("chaser", id)) return;
+      const chase = chases.find((c) => c.id === id);
+      void track(
+        "chaser",
+        chase ? `${chase.type} · ${clients.find((c) => c.id === chase.clientId)?.name ?? ""}` : "Follow up",
+        id,
+        {
+          stage: channel === "Email" ? "Chaser is sending follow-up" : "Chaser is logging the WhatsApp follow-up",
+          clientId: chase?.clientId,
+          describe: (res) =>
+            channel === "Email" && "simulated" in res && res.simulated
+              ? "Recorded on the timeline. Email is not connected yet, so nothing was sent."
+              : channel === "Email"
+                ? "Follow-up emailed and logged. The chase stops automatically when the document arrives."
+                : "WhatsApp follow-up logged on the timeline.",
+        },
+        () => sendPracticeFollowUp({ data: { id, channel } }),
+      )
         .then((res) => {
           if (channel === "Email" && "simulated" in res && res.simulated)
             toast.info(
@@ -1144,18 +1250,15 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
           void refresh();
         });
     },
-    [refresh],
+    [refresh, track, isRunning, chases, clients],
   );
 
   const setChaseStatus = useCallback(
     (id: string, status: Chase["status"], note?: string) => {
-      const target = status === "Resolved" ? "Resolved" : "Open";
+      const target: "Resolved" | "Open" | "Escalated" =
+        status === "Resolved" ? "Resolved" : status === "Escalated" ? "Escalated" : "Open";
       setChases((p) =>
-        p.map((c) =>
-          c.id === id
-            ? { ...c, status: target === "Resolved" ? "Resolved" : "Open" }
-            : c,
-        ),
+        p.map((c) => (c.id === id ? { ...c, status: target } : c)),
       );
       void setPracticeChaseStatus({ data: { id, status: target, note } })
         .catch((e) => toast.error(errMsg(e)))
@@ -1188,7 +1291,9 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
   const closeStateFor = useCallback(
     (clientId: string): CloseState => {
       const cDocs = docs.filter((d) => d.clientId === clientId);
-      const parsed = cDocs.filter((d) => d.status === "Parsed");
+      const parsed = cDocs.filter(
+        (d) => d.status === "Parsed" || d.status === "Needs review",
+      );
       const openReview = review.filter(
         (r) => r.clientId === clientId && r.status === "open",
       );
@@ -1339,6 +1444,8 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       runs,
       recon,
       runsFor: (target: string) => runs.filter((r) => r.target === target),
+      isRunning,
+      dismissRun,
       addClient,
       updateClient,
       addDoc,
@@ -1366,6 +1473,8 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       closeStateFor,
     }),
     [
+      isRunning,
+      dismissRun,
       agentRunsFor,
       isReadyForMis,
       matchedTxns,

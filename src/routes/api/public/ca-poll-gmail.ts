@@ -313,7 +313,13 @@ async function run(request: Request): Promise<Response> {
             source_type: "gmail",
             // The practice Extract agent re-reads the stored file into ca_txns.
             extract_status: "queued",
-            source_metadata: { gmail_message_id: msg.id, from: senderEmail, subject },
+            source_metadata: {
+              gmail_message_id: msg.id,
+              from: senderEmail,
+              subject,
+              suggested_business_id: match.suggestedBusinessId ?? null,
+              suggested_by: match.suggestedBusinessId ? match.method : null,
+            },
             gmail_message_id: msg.id,
             gmail_sender_email: senderEmail,
             gmail_subject: subject,
@@ -324,7 +330,9 @@ async function run(request: Request): Promise<Response> {
               ? isPdfOrImage && !ocrAttempted && rows.length === 0
                 ? "PDF received but OCR not run. Assign the client, then re-extract from the Review Queue."
                 : null
-              : `Sender ${senderEmail} could not be matched to a client. Assign the client in the Intake inbox.`,
+              : match.suggestedBusinessId
+                ? `Sender ${senderEmail} looks like a client (matched by ${match.method}), but only a certain match is filed automatically. Confirm the client in the Unassigned inbox.`
+                : `Sender ${senderEmail} could not be matched to a client. Assign the client in the Unassigned inbox.`,
           } as never);
 
           if (insertErr) {

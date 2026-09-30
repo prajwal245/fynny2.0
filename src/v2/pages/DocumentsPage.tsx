@@ -25,10 +25,42 @@ import { AgentStatusBadge, ProcessingCard, RowSkeleton } from "../agents";
 import { Doc, useV2 } from "../store";
 
 const TONE: Record<Doc["status"], Tone> = {
+  Uploading: "info",
+  Queued: "neutral",
   Processing: "info",
   Parsed: "good",
+  "Needs review": "warn",
   Failed: "bad",
 };
+const STATUS_TABS = ["Queued", "Processing", "Parsed", "Needs review", "Failed"] as const;
+
+const clock = (iso: string) =>
+  new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+
+/** The status cell: what the Extract agent is doing with this file, honestly. */
+function DocStatus({ d }: { d: Doc }) {
+  if (d.status === "Uploading")
+    return <AgentStatusBadge agent="extract" active label="Uploading" />;
+  if (d.status === "Processing")
+    return <AgentStatusBadge agent="extract" active label="Reading" />;
+  if (d.status === "Queued")
+    return (
+      <span title="Arrived by email or WhatsApp. The Extract agent reads it on the next sync.">
+        <Badge tone="neutral">Queued</Badge>
+        <div style={{ fontSize: 11.5, color: V.muted, marginTop: 3 }}>Reads on next sync</div>
+      </span>
+    );
+  if (d.status === "Failed")
+    return (
+      <span>
+        <Badge tone="bad">Failed</Badge>
+        <div style={{ fontSize: 11.5, color: d.retryAt ? V.muted : V.maroon, marginTop: 3 }}>
+          {d.retryAt ? `Retrying automatically at ${clock(d.retryAt)}` : "Needs your action"}
+        </div>
+      </span>
+    );
+  return <Badge tone={TONE[d.status]}>{d.status}</Badge>;
+}
 const SOURCES = ["All sources", "Manual", "Gmail", "WhatsApp"] as const;
 const ACCEPT = ".csv,.tsv,.txt,.xml,.pdf,.xlsx,.xls,.jpg,.jpeg,.png,.webp";
 
@@ -45,6 +77,7 @@ export default function DocumentsPage({
     clientName,
     addDoc,
     runs,
+    dismissRun,
     reprocessDoc,
     assignDoc,
     openDocument,
@@ -71,7 +104,8 @@ export default function DocumentsPage({
     : docs;
   const unassigned = scopedClient ? [] : docs.filter((d) => !d.clientId);
   const active = docs.find((d) => d.id === open) ?? null;
-  const extractRuns = runs.filter((r) => r.agent === "extract");
+  // Inside a client workspace the workspace itself shows the live cards.
+  const extractRuns = scopedClient ? [] : runs.filter((r) => r.agent === "extract");
   const targetClient = scopedClient ?? uploadClient;
 
   const upload = (files: FileList | null) => {
@@ -94,8 +128,11 @@ export default function DocumentsPage({
   const list = base.filter((d) => {
     if (tab === "Unassigned email" && d.source !== "Gmail") return false;
     if (tab === "Unassigned WhatsApp" && d.source !== "WhatsApp") return false;
-    if (["Processing", "Parsed", "Failed"].includes(tab) && d.status !== tab)
-      return false;
+    if ((STATUS_TABS as readonly string[]).includes(tab)) {
+      // "Processing" also covers files still uploading in this browser.
+      const st = d.status === "Uploading" ? "Processing" : d.status;
+      if (st !== tab) return false;
+    }
     if (sourceFilter !== "All sources" && d.source !== sourceFilter)
       return false;
     if (
@@ -112,7 +149,8 @@ export default function DocumentsPage({
 
   const openDoc = (d: Doc) => {
     setOpen(d.id);
-    setAssign({ clientId: d.clientId || "", side: d.side ?? "" });
+    // An unassigned arrival may carry a suggestion; it is only pre-selected, never filed.
+    setAssign({ clientId: d.clientId || d.suggestedClientId || "", side: d.side ?? "" });
   };
 
   const fileIt = async () => {
@@ -252,13 +290,7 @@ export default function DocumentsPage({
       >
         <AnimatePresence>
           {extractRuns.map((r) => (
-            <ProcessingCard
-              key={r.id}
-              agent="extract"
-              title={r.title}
-              steps={r.steps}
-              current={r.current}
-            />
+            <ProcessingCard key={r.id} run={r} onDismiss={() => dismissRun(r.id)} />
           ))}
         </AnimatePresence>
       </div>
@@ -272,13 +304,14 @@ export default function DocumentsPage({
             label: "All",
             count: scoped.filter((d) => d.clientId || scopedClient).length,
           },
-          {
-            value: "Processing",
-            label: "Processing",
-            count: count("Processing"),
-          },
-          { value: "Parsed", label: "Parsed", count: count("Parsed") },
-          { value: "Failed", label: "Failed", count: count("Failed") },
+          ...STATUS_TABS.map((st) => ({
+            value: st,
+            label: st,
+            count:
+              st === "Processing"
+                ? count("Processing") + count("Uploading")
+                : count(st),
+          })),
           ...(scopedClient
             ? []
             : [
@@ -413,15 +446,7 @@ export default function DocumentsPage({
                     )}
                     <td style={{ color: V.body }}>{d.source}</td>
                     <td>
-                      {d.status === "Processing" ? (
-                        <AgentStatusBadge
-                          agent="extract"
-                          active
-                          label="Extracting"
-                        />
-                      ) : (
-                        <Badge tone={TONE[d.status]}>{d.status}</Badge>
-                      )}
+                      <DocStatus d={d} />
                     </td>
                     <td className="num" style={{ color: V.body }}>
                       {d.txnCount ?? d.rows.length}
@@ -501,8 +526,19 @@ export default function DocumentsPage({
                   color: V.maroon,
                 }}
               >
-                {active.error ?? "This file could not be read."} Retry it, or
-                replace it with a clearer copy.
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>Why it failed</div>
+                {active.error ?? "This file could not be read."}
+                <div style={{ color: V.body, marginTop: 8 }}>
+                  {active.retryAt
+                    ? `This looks temporary. The Extract agent will try again at ${clock(active.retryAt)} (attempt ${(active.attempts ?? 1) + 1} of 3), or retry it now.`
+                    : "Retry it, or upload a clearer copy (a text PDF, CSV or Excel export reads best)."}
+                </div>
+              </div>
+            )}
+
+            {active.status === "Queued" && (
+              <div style={{ background: V.gray, borderRadius: 14, padding: 14, fontSize: 13, color: V.body }}>
+                Received and waiting for the Extract agent. It reads on the next sync, or you can read it now.
               </div>
             )}
 
@@ -513,13 +549,17 @@ export default function DocumentsPage({
               >
                 <ExternalLink size={15} /> Open original
               </button>
-              {active.status !== "Processing" && (
+              {active.status !== "Processing" && active.status !== "Uploading" && (
                 <button
                   className="v2-btn v2-btn-ghost"
                   onClick={() => reprocessDoc(active.id)}
                 >
                   <RotateCw size={15} />{" "}
-                  {active.status === "Failed" ? "Retry" : "Read again"}
+                  {active.status === "Failed"
+                    ? "Retry now"
+                    : active.status === "Queued"
+                      ? "Read now"
+                      : "Read again"}
                 </button>
               )}
             </div>
@@ -528,6 +568,16 @@ export default function DocumentsPage({
               <label className="v2-label">
                 {active.clientId ? "Filed under" : "Assign to client"}
               </label>
+              {!active.clientId && active.suggestedClientId && (
+                <div
+                  data-testid="assign-suggestion"
+                  style={{ fontSize: 12.5, color: V.body, background: V.gray, borderRadius: 12, padding: "9px 12px", marginBottom: 10 }}
+                >
+                  Looks like <b>{clientName(active.suggestedClientId)}</b>
+                  {active.suggestedBy ? ` (matched by ${active.suggestedBy === "domain" ? "email domain" : active.suggestedBy === "gstin" ? "GSTIN in the subject" : "sender name"})` : ""}.
+                  Only a certain match is filed automatically, so please confirm.
+                </div>
+              )}
               <div
                 style={{
                   display: "grid",
@@ -585,7 +635,7 @@ export default function DocumentsPage({
               </div>
             </div>
 
-            {active.status === "Processing" ? (
+            {active.status === "Processing" || active.status === "Uploading" ? (
               <RowSkeleton rows={4} />
             ) : active.rows.length === 0 ? (
               <p style={{ fontSize: 13.5, color: V.body, margin: 0 }}>

@@ -50,11 +50,41 @@ export function AgentStatusBadge({ agent, label, active = false }: { agent: Agen
   );
 }
 
-/** Live "agent is working" card with stepper and sweeping progress bar. */
-export function ProcessingCard({
-  agent, title, steps, current,
-}: { agent: AgentKey; title: string; steps: string[]; current: number }) {
-  const a = AGENTS[agent];
+/** A live agent run as the UI sees it. Stages change only on real events. */
+export type LiveRun = {
+  id: string;
+  agent: AgentKey;
+  title: string;
+  /** What the agent is doing right now, e.g. "Extract agent is reading the statement". */
+  stage: string;
+  status: "running" | "succeeded" | "failed";
+  result?: string;
+  error?: string;
+  startedAt: number;
+  finishedAt?: number;
+  onRetry?: () => void;
+};
+
+function Elapsed({ from, to }: { from: number; to?: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (to) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [to]);
+  const s = Math.max(0, Math.round(((to ?? now) - from) / 1000));
+  return <span className="num">{s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`}</span>;
+}
+
+/**
+ * Live agent card. While running: the agent's name pulses, the current stage
+ * is shown as it really is and the bar sweeps (no invented percentages).
+ * When done: the real outcome, or the reason it failed and a way to recover.
+ */
+export function ProcessingCard({ run, onDismiss }: { run: LiveRun; onDismiss?: () => void }) {
+  const a = AGENTS[run.agent];
+  const failed = run.status === "failed";
+  const done = run.status === "succeeded";
   return (
     <motion.div
       layout
@@ -63,46 +93,64 @@ export function ProcessingCard({
       exit={{ opacity: 0, y: -8 }}
       transition={{ duration: 0.28, ease: "easeOut" }}
       className="v2-card"
-      style={{ padding: 18, borderColor: a.tint, background: "#fff" }}
+      role="status"
+      aria-live="polite"
+      data-agent={run.agent}
+      data-run-state={run.status}
+      style={{
+        padding: 18,
+        borderColor: failed ? "rgba(122,31,43,.35)" : a.tint,
+        background: failed ? "rgba(122,31,43,.03)" : "#fff",
+      }}
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-          <AgentStatusBadge agent={agent} active />
-          <span style={{ fontSize: 13.5, fontWeight: 600 }}>{title}</span>
+          <AgentStatusBadge agent={run.agent} active={run.status === "running"} />
+          <span style={{ fontSize: 13.5, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{run.title}</span>
         </div>
-        <AnimatePresence mode="wait">
-          <motion.span
-            key={current}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.22 }}
-            style={{ fontSize: 12.5, color: V.body }}
-          >
-            {steps[Math.min(current, steps.length - 1)]}
-          </motion.span>
-        </AnimatePresence>
+        <span style={{ fontSize: 12, color: V.muted, display: "inline-flex", gap: 10, alignItems: "center" }}>
+          <Elapsed from={run.startedAt} to={run.finishedAt} />
+          {!run.status.startsWith("run") && onDismiss && (
+            <button className="v2-btn v2-btn-quiet" style={{ padding: "3px 10px", fontSize: 12 }} onClick={onDismiss}>
+              Dismiss
+            </button>
+          )}
+        </span>
       </div>
 
-      <div className="v2-bar" style={{ marginTop: 14 }}>
-        <i style={{ background: a.dot }} />
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={`${run.status}:${run.stage}`}
+          initial={{ opacity: 0, y: 5 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -5 }}
+          transition={{ duration: 0.22 }}
+          style={{ marginTop: 10, fontSize: 13, color: failed ? V.maroon : V.body }}
+        >
+          {run.status === "running" && `${run.stage}…`}
+          {done && (run.result ?? "Done")}
+          {failed && (run.error ?? "Something went wrong")}
+        </motion.div>
+      </AnimatePresence>
+
+      <div className="v2-bar" style={{ marginTop: 12 }}>
+        {run.status === "running" ? (
+          <i style={{ background: a.dot }} />
+        ) : (
+          <motion.i
+            initial={{ width: "40%" }}
+            animate={{ width: "100%" }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+            style={{ background: failed ? V.maroon : a.dot, animation: "none", marginLeft: 0 }}
+          />
+        )}
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-        {steps.map((s, i) => (
-          <span
-            key={s}
-            style={{
-              fontSize: 11, padding: "3px 9px", borderRadius: 999,
-              background: i < current ? a.tint : V.gray,
-              color: i < current ? a.ink : V.muted,
-              fontWeight: 600, transition: "all .3s ease",
-            }}
-          >
-            {i < current ? "Done" : `0${i + 1}`} {s}
-          </span>
-        ))}
-      </div>
+      {failed && run.onRetry && (
+        <div style={{ marginTop: 12 }}>
+          <button className="v2-btn v2-btn-ghost" onClick={run.onRetry}>Try again</button>
+        </div>
+      )}
     </motion.div>
   );
 }

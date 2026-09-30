@@ -6,10 +6,12 @@ import { Badge, Card, EmptyState, PageHeader, Stat, V, formatDate, Tone } from "
 import { AgentStatusBadge, AnimatedCounter, ProcessingCard } from "../agents";
 import { useV2 } from "../store";
 import { CloseProgress } from "../components/CloseProgress";
+import { AgentActivity, NeedsYou, SetupChecklist, TODAY_STYLES, agentSummary, greeting, useNeedsYou } from "../components/Today";
 import AddClientModal from "../components/AddClientModal";
 
 export default function PortfolioPage() {
-  const { clients, docs, review, exceptions, chases, runs, dismissRun, period, role, closeStateFor } = useV2();
+  const { clients, docs, review, exceptions, chases, runs, dismissRun, period, closeStateFor, session, agentRuns } = useV2();
+  const needs = useNeedsYou();
   const [adding, setAdding] = useState(false);
 
   const openEx = exceptions.filter((e) => e.status === "open");
@@ -18,18 +20,18 @@ export default function PortfolioPage() {
 
   return (
     <>
+      <style>{TODAY_STYLES}</style>
       <PageHeader
-        title="Portfolio"
-        subtitle={role === "Partner"
-          ? `Where every client stands in the ${period} close.`
-          : `What needs you today across the ${period} close.`}
+        title={greeting(session?.name ?? "")}
+        subtitle={clients.length ? `${agentSummary(agentRuns, needs.length)} Closing ${period}.` : "Add a client and the agents take it from there."}
         action={<button className="v2-btn v2-btn-primary" onClick={() => setAdding(true)}><Plus size={15} /> Add client</button>}
       />
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
-        {(["extract", "recon", "narrate", "chaser"] as const).map((a) => (
-          <AgentStatusBadge key={a} agent={a} active={runs.some((r) => r.agent === a && r.status === "running")} />
-        ))}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }} aria-label="Agent status">
+        {(["extract", "recon", "narrate", "chaser"] as const).map((a) => {
+          const busy = runs.some((r) => r.agent === a && r.status === "running");
+          return <AgentStatusBadge key={a} agent={a} active={busy} label={busy ? `${a[0].toUpperCase() + a.slice(1)} working` : `${a[0].toUpperCase() + a.slice(1)} ready`} />;
+        })}
       </div>
 
       <div style={{ display: "grid", gap: 12, marginBottom: runs.length ? 18 : 0 }}>
@@ -49,13 +51,32 @@ export default function PortfolioPage() {
         />
       ) : (
         <>
-          <div className="v2-grid-cards" style={{ marginBottom: 22 }}>
-            <Stat label="Clients" value={<AnimatedCounter value={clients.length} />} hint="Active engagements" />
-            <Stat label="Open exceptions" value={<AnimatedCounter value={openEx.length} />} tone={openEx.length ? "bad" : "neutral"} hint="Across the portfolio" />
-            <Stat label="Awaiting review" value={<AnimatedCounter value={openRev.length} />} hint="Low confidence extractions" />
-            <Stat label="Open chases" value={<AnimatedCounter value={openChase.length} />} hint="Documents still pending" />
+          <Card style={{ padding: 0, marginBottom: 18 }}>
+            <div className="today-kpis">
+              {[
+                { label: "Clients", v: clients.length, hint: "active" },
+                { label: "Open exceptions", v: openEx.length, hint: "across clients", tone: openEx.length ? V.maroon : undefined },
+                { label: "Awaiting review", v: openRev.length, hint: "unsure lines" },
+                { label: "Open chases", v: openChase.length, hint: "documents pending" },
+              ].map((k) => (
+                <div key={k.label}>
+                  <div style={{ fontSize: 11, letterSpacing: ".09em", textTransform: "uppercase", color: V.muted, fontWeight: 600 }}>{k.label}</div>
+                  <div className="num" style={{ fontSize: 24, fontWeight: 600, marginTop: 4, color: k.tone ?? V.ink }}><AnimatedCounter value={k.v} /></div>
+                  <div style={{ fontSize: 11.5, color: V.muted }}>{k.hint}</div>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <div className="today-grid" style={{ marginBottom: 26 }}>
+            <NeedsYou items={needs} />
+            <div style={{ display: "grid", gap: 18 }}>
+              <SetupChecklist />
+              <AgentActivity runs={agentRuns} />
+            </div>
           </div>
 
+          <h3 style={{ fontSize: 15.5, margin: "0 0 12px" }}>Clients</h3>
           <div className="v2-grid-cards">
             <AnimatePresence initial={false}>
               {clients.map((c, i) => {

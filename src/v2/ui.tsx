@@ -38,9 +38,20 @@ export const V2_STYLES = `
 .v2-btn-ghost { background:${V.card}; color:${V.ink}; border-color:${V.line}; }
 .v2-btn-ghost:hover { background:${V.gray}; }
 .v2-btn-quiet { background:transparent; color:${V.body}; padding:7px 12px; font-size:12.5px; border-color:${V.line}; }
-.v2-btn:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+.v2-btn:disabled, .v2-btn[aria-disabled="true"] { opacity:.5; cursor:not-allowed; transform:none !important; }
+.v2-btn:focus-visible, .v2-link:focus-visible, .v2-nav a:focus-visible { outline:2px solid ${V.ink}; outline-offset:2px; }
+.v2-btn-sm { padding:6px 12px; font-size:12.5px; }
+.v2-btn-lg { padding:13px 22px; font-size:14.5px; }
+.v2-btn-block { width:100%; justify-content:center; }
+.v2-btn-danger { background:transparent; color:${V.maroon}; border-color:rgba(169,56,56,.35); }
+.v2-btn-danger:hover { background:rgba(169,56,56,.06); }
+/* Busy: keeps its width, shows a spinner, ignores clicks. */
+.v2-btn[data-busy="true"] { pointer-events:none; position:relative; }
+.v2-btn[data-busy="true"]::before { content:""; width:12px; height:12px; border-radius:999px; border:2px solid currentColor; border-right-color:transparent; animation:v2spin .7s linear infinite; }
+@keyframes v2spin { to { transform:rotate(360deg); } }
+.v2-kbd { display:inline-flex; align-items:center; gap:2px; font-size:11px; font-weight:600; color:${V.muted}; border:1px solid ${V.line}; border-bottom-width:2px; border-radius:6px; padding:1px 6px; background:${V.card}; font-family:inherit; }
+.v2-input:focus { outline:none; border-color:${V.ink}; box-shadow:0 0 0 3px rgba(20,20,20,.08); }
 .v2-input, .v2 select.v2-input, .v2 textarea.v2-input { width:100%; background:${V.card}; border:1px solid ${V.line}; border-radius:12px; padding:10px 13px; font-size:13.5px; color:${V.ink}; outline:none; transition:border-color .18s ease; }
-.v2-input:focus { border-color:rgba(20,20,20,.28); }
 .v2-label { display:block; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:${V.muted}; margin-bottom:6px; font-weight:600; }
 .v2-table { width:100%; border-collapse:collapse; }
 .v2-table th { text-align:left; font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:${V.muted}; font-weight:600; padding:12px 16px; border-bottom:1px solid ${V.line}; }
@@ -66,9 +77,9 @@ export const V2_STYLES = `
 }
 `;
 
-export function Card({ children, style, className = "", onClick, hover = false }: { children: ReactNode; style?: CSSProperties; className?: string; onClick?: () => void; hover?: boolean }) {
+export function Card({ children, style, className = "", onClick, hover = false, ...rest }: { children: ReactNode; style?: CSSProperties; className?: string; onClick?: () => void; hover?: boolean; "data-testid"?: string }) {
   return (
-    <div className={`v2-card ${hover || onClick ? "v2-lift" : ""} ${className}`} style={{ padding: 20, ...style }} onClick={onClick}>
+    <div className={`v2-card ${hover || onClick ? "v2-lift" : ""} ${className}`} style={{ padding: 20, ...style }} onClick={onClick} {...rest}>
       {children}
     </div>
   );

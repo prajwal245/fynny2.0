@@ -6,6 +6,7 @@ import {
   Scripts,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
 } from "@tanstack/react-router";
 import { HelmetProvider } from "react-helmet-async";
 
@@ -167,6 +168,12 @@ function RouteTracker() {
   return null;
 }
 
+/** Marketing-site widgets (search, contact bubble, waitlist) stay out of the practice app. */
+function SiteOnly({ children }: { children: React.ReactNode }) {
+  const inApp = useRouterState({ select: (s) => s.location.pathname.startsWith("/v2") });
+  return inApp ? null : <>{children}</>;
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
@@ -204,9 +211,11 @@ function RootComponent() {
             <RouteTracker />
             <SkipToContent />
             <ScrollManager />
-            <SearchPalette />
-            <FloatingContact />
-            <WaitlistPopup />
+            <SiteOnly>
+              <SearchPalette />
+              <FloatingContact />
+              <WaitlistPopup />
+            </SiteOnly>
             <div id="main-content" tabIndex={-1}>
               <Outlet />
             </div>

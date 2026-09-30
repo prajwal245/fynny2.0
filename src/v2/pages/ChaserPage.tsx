@@ -12,7 +12,7 @@ const FILTERS = ["All", "Open", "Following Up", "Escalated", "Resolved"] as cons
 
 /** Chaser. All follow-ups as a page; the client's Chaser tab when given a clientId. */
 export default function ChaserPage({ clientId: scopedClient }: { clientId?: string } = {}) {
-  const { chases: allChases, clients, clientName, addChase, sendFollowUp, setChaseStatus } = useV2();
+  const { chases: allChases, clients, clientName, addChase, sendFollowUp, setChaseStatus, runs } = useV2();
   const chases = scopedClient ? allChases.filter((c) => c.clientId === scopedClient) : allChases;
   const [creating, setCreating] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -182,11 +182,15 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
                     <MessageCircle size={15} /> Send WhatsApp
                   </a>
                 )}
-                {active.status !== "Resolved" && (
-                  <button className="v2-btn v2-btn-ghost" onClick={() => { sendFollowUp(active.id, "Email"); }}>
-                    <Mail size={15} /> Send email follow up
-                  </button>
-                )}
+                {active.status !== "Resolved" && (() => {
+                  const sending = runs.some((r) => r.agent === "chaser" && r.target === active.id && r.status === "running");
+                  return (
+                    <button className="v2-btn v2-btn-ghost" disabled={sending} onClick={() => { sendFollowUp(active.id, "Email"); }}>
+                      {sending ? <span className="v2-dot" style={{ background: "#C9962A" }} /> : <Mail size={15} />}
+                      {sending ? " Chaser is sending follow-up…" : " Send email follow up"}
+                    </button>
+                  );
+                })()}
               </div>
             </div>
 
@@ -198,8 +202,16 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
             {active.status === "Resolved" ? (
               <div style={{ fontSize: 13, color: V.green }}>Resolved. The Chaser agent has stopped for this item.</div>
             ) : (
+              <div style={{ display: "grid", gap: 16 }}>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <button className="v2-btn v2-btn-primary" onClick={() => { setChaseStatus(active.id, "Resolved", "Document received. Chase closed."); toast.success("Chase resolved"); }}>Mark resolved</button>
+                <button className="v2-btn v2-btn-primary" onClick={() => { setChaseStatus(active.id, "Resolved", "Document received. Chase closed."); toast.success("Chase resolved. Follow-ups have stopped."); }}>Mark resolved</button>
+                {active.status !== "Escalated" && (
+                  <button className="v2-btn v2-btn-ghost" onClick={() => { setChaseStatus(active.id, "Escalated", "Escalated to the partner by the team."); toast.success("Escalated to the partner. Automatic follow-ups have stopped."); }}>Escalate to partner</button>
+                )}
+              </div>
+              <div style={{ fontSize: 12.5, color: V.muted }}>
+                The chase stops automatically when the document arrives, on any channel.
+              </div>
               </div>
             )}
           </div>

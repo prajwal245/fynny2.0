@@ -458,7 +458,7 @@ export const setPracticeChaseStatus = createServerFn({ method: "POST" })
     z
       .object({
         id: uuid,
-        status: z.enum(["Resolved", "Open"]),
+        status: z.enum(["Resolved", "Open", "Escalated"]),
         note: z.string().max(500).optional(),
       })
       .parse(d),

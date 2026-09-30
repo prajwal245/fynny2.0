@@ -19,7 +19,7 @@ const STATUS_LABEL: Record<string, string> = { matched: "Matched", exception: "E
 
 export default function ClientWorkspacePage() {
   const { clientId } = useParams({ from: "/v2/clients/$clientId" });
-  const { clients, docs, exceptions, reports, chases, review, runs, recon, runRecon, generateReport, period, closeStateFor, activityFor, agentRunsFor, isReadyForMis } = useV2();
+  const { clients, docs, exceptions, reports, chases, review, runs, recon, runRecon, generateReport, period, closeStateFor, activityFor, agentRunsFor, isReadyForMis, dismissRun } = useV2();
   const client = clients.find((c) => c.id === clientId);
   const [tab, setTab] = useState("overview");
 
@@ -43,13 +43,11 @@ export default function ClientWorkspacePage() {
   const runNext = () => {
     if (close.next.action === "recon") {
       runRecon(client.id, (r) => toast.success(`Recon complete. Matched ${r.matched}, exceptions ${r.exceptions}.`));
-      toast.success("Recon agent is matching transactions");
       setTab("recon");
       return;
     }
     if (close.next.action === "mis") {
       generateReport(client.id, period, "Monthly MIS", () => toast.success(`${period} MIS ready`));
-      toast.success("Narrate agent is preparing the MIS");
       setTab("mis");
       return;
     }
@@ -63,8 +61,9 @@ export default function ClientWorkspacePage() {
   const bookSide = inPeriod.filter((r) => r.side === "books");
   const matchedBank = bankSide.filter((r) => r.matchStatus === "matched").length;
   const ignoredBank = bankSide.filter((r) => r.matchStatus === "ignored").length;
-  const clientRuns = runs.filter((r) => r.target === client.id);
-  const reconRunning = clientRuns.some((r) => r.agent === "recon");
+  const clientRuns = runs.filter((r) => r.target === client.id || r.clientId === client.id);
+  const reconRunning = clientRuns.some((r) => r.agent === "recon" && r.status === "running");
+  const narrateRunning = clientRuns.some((r) => r.agent === "narrate" && r.status === "running");
   const result = recon[client.id];
 
   const status = cEx.length > 0
@@ -87,7 +86,7 @@ export default function ClientWorkspacePage() {
       <div style={{ display: "grid", gap: 12, marginBottom: clientRuns.length ? 18 : 0 }}>
         <AnimatePresence>
           {clientRuns.map((r) => (
-            <ProcessingCard key={r.id} agent={r.agent} title={r.title} steps={r.steps} current={r.current} />
+            <ProcessingCard key={r.id} run={r} onDismiss={() => dismissRun(r.id)} />
           ))}
         </AnimatePresence>
       </div>
@@ -118,7 +117,7 @@ export default function ClientWorkspacePage() {
                     The agents reconciled the month and nothing is waiting in Review or Exceptions.
                   </div>
                 </div>
-                <button className="v2-btn v2-btn-primary" onClick={() => { generateReport(client.id, period, "Monthly MIS", () => toast.success(`${period} MIS ready`)); toast.success("Narrate agent is preparing the MIS"); setTab("mis"); }}>
+                <button className="v2-btn v2-btn-primary" onClick={() => { generateReport(client.id, period, "Monthly MIS", () => toast.success(`${period} MIS ready`)); setTab("mis"); }}>
                   Generate MIS
                 </button>
               </div>
@@ -139,11 +138,11 @@ export default function ClientWorkspacePage() {
           <Card>
             <h3 style={{ fontSize: 15 }}>Quick actions</h3>
             <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
-              <button className="v2-btn v2-btn-primary" disabled={reconRunning} onClick={() => { runRecon(client.id, (r) => toast.success(`Recon complete. Matched ${r.matched}, exceptions ${r.exceptions}.`)); toast.success("Recon agent is matching transactions"); }}>
-                Run recon
+              <button className="v2-btn v2-btn-primary" disabled={reconRunning} onClick={() => { runRecon(client.id, (r) => toast.success(`Recon complete. Matched ${r.matched}, exceptions ${r.exceptions}.`)); }}>
+                {reconRunning ? "Recon is matching…" : "Run recon"}
               </button>
-              <button className="v2-btn v2-btn-ghost" onClick={() => { generateReport(client.id, period, "Monthly MIS", () => toast.success(`${period} MIS ready`)); toast.success("Narrate agent is preparing the MIS"); }}>
-                Generate MIS
+              <button className="v2-btn v2-btn-ghost" disabled={narrateRunning} onClick={() => { generateReport(client.id, period, "Monthly MIS", () => toast.success(`${period} MIS ready`)); }}>
+                {narrateRunning ? "Narrate is preparing…" : "Generate MIS"}
               </button>
               <Link className="v2-btn v2-btn-ghost" to="/v2/documents">Upload documents</Link>
             </div>
@@ -172,7 +171,7 @@ export default function ClientWorkspacePage() {
             <button
               className="v2-btn v2-btn-primary"
               disabled={reconRunning}
-              onClick={() => { runRecon(client.id, (r) => toast.success(`Recon complete. Matched ${r.matched}, exceptions ${r.exceptions}.`)); toast.success("Recon agent is matching transactions"); }}
+              onClick={() => { runRecon(client.id, (r) => toast.success(`Recon complete. Matched ${r.matched}, exceptions ${r.exceptions}.`)); }}
             >
               {reconRunning ? "Recon agent is working" : `Run recon for ${period}`}
             </button>

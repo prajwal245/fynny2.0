@@ -70,6 +70,8 @@ export interface ExtractDeps {
   pdfText?: (bytes: Uint8Array) => Promise<{ text: string; pages: number }>;
   /** Rows of the first sheet with data in an Excel workbook. */
   sheetRows?: (bytes: Uint8Array) => string[][];
+  /** Text of a scanned PDF or photo (OCR.space). Null when OCR is not configured. */
+  ocr?: ((bytes: Uint8Array, mime: string) => Promise<string>) | null;
   threshold?: number;
   /** Rows sent to the AI classifier per document; the rest use rules only. */
   maxAiRows?: number;
@@ -288,6 +290,52 @@ function fail(
   };
 }
 
+
+/** OCR text must carry at least this much before it is worth reading. */
+const MIN_OCR_CHARS = 40;
+/** Lines read from a scan never outrank a person's glance unless the balances verify. */
+const OCR_CONFIDENCE_CAP = 0.8;
+
+/**
+ * Scans and photos: OCR first, then the same grounded text route as a text
+ * PDF (statement parser with running-balance checks, then the AI reading the
+ * OCR text). Amounts stay tied to the printed text. Returns null when OCR is
+ * not configured or read nothing, so the caller can fall back to vision.
+ */
+async function readViaOcr(
+  deps: ExtractDeps,
+  calls: AiCallRecord[],
+  bytes: Uint8Array,
+  mime: string,
+): Promise<{ text: string; rows: ExtractedRow[]; kind: string | null; ai: boolean } | null> {
+  if (!deps.ocr) return null;
+  let text = "";
+  const started = Date.now();
+  try {
+    text = (await deps.ocr(bytes, mime)).slice(0, MAX_TEXT_CHARS);
+    calls.push({ purpose: "extract_ocr", provider: "ocr.space", model: null, input: mime, output: text.slice(0, 2000), latency_ms: Date.now() - started, status: "success", error: null });
+  } catch (e) {
+    calls.push({ purpose: "extract_ocr", provider: "ocr.space", model: null, input: mime, output: null, latency_ms: Date.now() - started, status: "error", error: e instanceof Error ? e.message : String(e) });
+    return null;
+  }
+  if (text.replace(/\s/g, "").length < MIN_OCR_CHARS) return null;
+  const statement = rowsFromStatementText(text);
+  if (statement.rows.length >= 3 && statement.verifiedShare >= 0.7)
+    return {
+      text,
+      rows: statement.rows.map((r) => ({ ...r, parse_confidence: Math.min(r.parse_confidence, OCR_CONFIDENCE_CAP) })),
+      kind: "bank_statement",
+      ai: false,
+    };
+  const read = await aiRead(deps, calls, {
+    purpose: "extract_read_ocr",
+    system: READ_SYSTEM_PROMPT,
+    user: `Text read by OCR from a scanned document. OCR can confuse similar characters (0/O, 1/l, 5/S); lower confidence where a value is doubtful.\n\n${text}`,
+  });
+  if (!read) return null;
+  return { text, rows: rowsFromAiRead(read.rows, text), kind: read.kind, ai: true };
+}
+
 export async function runExtract(
   input: ExtractInput,
   deps: ExtractDeps,
@@ -405,22 +453,31 @@ export async function runExtract(
           "too_large",
           "Scanned PDFs larger than 15 MB must be split before upload.",
         );
-      const read = await aiRead(deps, calls, {
+      const ocr = await readViaOcr(deps, calls, input.bytes, "application/pdf");
+      if (ocr) {
+        sourceText = ocr.text;
+        parsed = ocr.rows;
+        documentKind = ocr.kind;
+        aiReadUsed = ocr.ai;
+      }
+      const read = parsed ? null : await aiRead(deps, calls, {
         purpose: "extract_read_scan",
         system: READ_SYSTEM_PROMPT,
         user: "This is a scanned document. Read it carefully.",
         attachment: { mime: "application/pdf", base64: toBase64(input.bytes) },
       });
-      if (!read)
+      if (!parsed && !read)
         return fail(
           kind,
           "needs_ai",
-          "This PDF is scanned (no text layer). Configure the AI reader (LOVABLE_API_KEY or GEMINI_API_KEY) to read scanned files.",
+          "This PDF is scanned (no text layer). Configure OCR (OCR_SPACE_API_KEY) or a vision reader (GEMINI_API_KEY) to read scanned files.",
           calls,
         );
-      aiReadUsed = true;
-      parsed = rowsFromAiRead(read.rows, "");
-      documentKind = read.kind;
+      if (read) {
+        aiReadUsed = true;
+        parsed = rowsFromAiRead(read.rows, "");
+        documentKind = read.kind;
+      }
     }
   } else if (kind === "image") {
     if (input.bytes.length > 10_000_000)
@@ -429,7 +486,15 @@ export async function runExtract(
         "too_large",
         "Images larger than 10 MB cannot be read.",
       );
-    const read = await aiRead(deps, calls, {
+    const imageMime = input.mime?.startsWith("image/") ? input.mime : "image/jpeg";
+    const ocr = await readViaOcr(deps, calls, input.bytes, imageMime);
+    if (ocr) {
+      sourceText = ocr.text;
+      parsed = ocr.rows;
+      documentKind = ocr.kind;
+      aiReadUsed = ocr.ai;
+    }
+    const read = parsed ? null : await aiRead(deps, calls, {
       purpose: "extract_read_image",
       system: READ_SYSTEM_PROMPT,
       user: "This is a photo of a financial document. Read it carefully; photos may be blurred or tilted.",
@@ -438,16 +503,18 @@ export async function runExtract(
         base64: toBase64(input.bytes),
       },
     });
-    if (!read)
+    if (!parsed && !read)
       return fail(
         kind,
         "needs_ai",
-        "Photos need the AI reader. Configure LOVABLE_API_KEY or GEMINI_API_KEY.",
+        "Photos need OCR (OCR_SPACE_API_KEY) or a vision reader (GEMINI_API_KEY).",
         calls,
       );
-    aiReadUsed = true;
-    parsed = rowsFromAiRead(read.rows, "");
-    documentKind = read.kind;
+    if (read) {
+      aiReadUsed = true;
+      parsed = rowsFromAiRead(read.rows, "");
+      documentKind = read.kind;
+    }
   }
 
   if (parsed === null) {

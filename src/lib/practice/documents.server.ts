@@ -28,6 +28,7 @@ import {
 } from "./extract/pipeline";
 import { loadSheetReader, pdfText } from "./files.server";
 import { practiceLlm } from "./llm.server";
+import { practiceOcr } from "./ocr.server";
 import { applyMemory } from "./memory";
 import {
   isRetryable,
@@ -333,6 +334,7 @@ export async function processExtraction(
     { bytes, filename, mime: null, side, businessId: doc.business_id },
     {
       llm: practiceLlm(),
+      ocr: practiceOcr(),
       pdfText,
       sheetRows: kind === "xlsx" ? await loadSheetReader() : undefined,
     },

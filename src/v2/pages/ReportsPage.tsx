@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { BarChart3, Plus } from "lucide-react";
 import { Card, EmptyState, Modal, PageHeader, V, formatDate, formatINR } from "../ui";
 import { AgentStatusBadge, ProcessingCard } from "../agents";
+import { parsePeriod } from "@/lib/practice/core";
 import { PERIODS, REPORT_TEMPLATES, ReportTemplate, useV2 } from "../store";
 
 const TEMPLATE_HINT: Record<ReportTemplate, string> = {
@@ -17,7 +18,7 @@ const TEMPLATE_HINT: Record<ReportTemplate, string> = {
 
 /** MIS and Reports. All clients as a page; the client's MIS tab when given a clientId. */
 export default function ReportsPage({ clientId: scopedClient }: { clientId?: string } = {}) {
-  const { reports: allReports, clients, clientName, generateReport, runs, period: currentPeriod } = useV2();
+  const { reports: allReports, clients, clientName, generateReport, runs, dismissRun, isRunning, matchedTxns, period: currentPeriod } = useV2();
   const reports = scopedClient ? allReports.filter((r) => r.clientId === scopedClient) : allReports;
   const [open, setOpen] = useState(false);
   const [clientId, setClientId] = useState(scopedClient ?? clients[0]?.id ?? "");
@@ -25,12 +26,20 @@ export default function ReportsPage({ clientId: scopedClient }: { clientId?: str
   const [template, setTemplate] = useState<ReportTemplate>(REPORT_TEMPLATES[0]);
   const navigate = useNavigate();
 
-  const narrateRuns = runs.filter((r) => r.agent === "narrate" && (!scopedClient || r.target === scopedClient));
+  // Inside a client workspace the workspace itself shows the live cards.
+  const narrateRuns = scopedClient ? [] : runs.filter((r) => r.agent === "narrate");
+  // Only matched transactions may enter an MIS: say so before anyone presses Generate.
+  let matchedInPeriod = 0;
+  try {
+    const p = parsePeriod(period);
+    matchedInPeriod = clientId ? matchedTxns(clientId).filter((t) => t.date >= p.start && t.date <= p.end).length : 0;
+  } catch { matchedInPeriod = 0; }
+  const narrating = clientId ? runs.some((r) => r.agent === "narrate" && r.target === clientId && r.status === "running") : false;
 
   const generate = () => {
     if (!clientId) { toast.error("Add a client first"); return; }
+    if (isRunning("narrate", clientId)) return;
     setOpen(false);
-    toast.success("Narrate agent is preparing the report");
     generateReport(clientId, period, template, (r) => {
       toast.success(`${r.template} ready`);
       navigate({ to: "/v2/reports/$reportId", params: { reportId: r.id } });
@@ -55,16 +64,16 @@ export default function ReportsPage({ clientId: scopedClient }: { clientId?: str
       <div style={{ display: "grid", gap: 12, marginBottom: narrateRuns.length ? 18 : 0 }}>
         <AnimatePresence>
           {narrateRuns.map((r) => (
-            <ProcessingCard key={r.id} agent="narrate" title={r.title} steps={r.steps} current={r.current} />
+            <ProcessingCard key={r.id} run={r} onDismiss={() => dismissRun(r.id)} />
           ))}
         </AnimatePresence>
       </div>
 
-      {reports.length === 0 && narrateRuns.length === 0 ? (
+      {reports.length === 0 && !runs.some((r) => r.agent === "narrate" && r.status === "running" && (!scopedClient || r.clientId === scopedClient)) ? (
         <EmptyState
           icon={<BarChart3 size={22} />}
           title="No reports yet"
-          description="Generate an MIS for a client and period. Every figure is computed from the transactions we already read."
+          description="Generate an MIS after reconciliation has matched transactions. Only matched transactions are used, and every number is source-traceable."
           action={<button className="v2-btn v2-btn-primary" onClick={() => setOpen(true)}><Plus size={15} /> Generate MIS</button>}
         />
       ) : reports.length > 0 && (
@@ -134,9 +143,26 @@ export default function ReportsPage({ clientId: scopedClient }: { clientId?: str
             </div>
           </div>
 
+          <div
+            data-testid="mis-basis"
+            style={{
+              fontSize: 12.5,
+              borderRadius: 12,
+              padding: "10px 12px",
+              background: matchedInPeriod ? "rgba(31,90,70,0.07)" : "rgba(176,122,24,.08)",
+              color: matchedInPeriod ? V.green : V.body,
+            }}
+          >
+            {matchedInPeriod
+              ? `${matchedInPeriod} matched transaction${matchedInPeriod === 1 ? "" : "s"} in ${period}. Only these are used, and every number links to its source.`
+              : `Generate MIS after reconciliation has matched transactions. Nothing in ${period} is matched yet.`}
+          </div>
+
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
             <button className="v2-btn v2-btn-ghost" onClick={() => setOpen(false)}>Cancel</button>
-            <button className="v2-btn v2-btn-primary" onClick={generate}>Generate</button>
+            <button className="v2-btn v2-btn-primary" onClick={generate} disabled={!matchedInPeriod || narrating}>
+              {narrating ? "Narrate is preparing…" : "Generate"}
+            </button>
           </div>
         </div>
       </Modal>

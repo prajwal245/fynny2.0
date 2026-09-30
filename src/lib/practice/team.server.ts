@@ -207,5 +207,12 @@ export async function integrationStatus(db: Db, ctx: FirmContext) {
       channels: wa ?? [],
     },
     email: { available: env("RESEND_API_KEY") },
+    reading: {
+      ocr: env("OCR_SPACE_API_KEY"),
+      ai:
+        !env("PRACTICE_AI_DISABLED") &&
+        (env("GROQ_API_KEY") || env("GEMINI_API_KEY") || env("LOVABLE_API_KEY")),
+      vision: env("GEMINI_API_KEY") || env("LOVABLE_API_KEY"),
+    },
   };
 }

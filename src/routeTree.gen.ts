@@ -24,10 +24,12 @@ import { Route as MainLoginRouteImport } from './routes/_main/login'
 import { Route as MainOnboardingRouteImport } from './routes/_main/onboarding'
 import { Route as MainPipelineRouteImport } from './routes/_main/pipeline'
 import { Route as MainPricingRouteImport } from './routes/_main/pricing'
+import { Route as MainPrivacyRouteImport } from './routes/_main/privacy'
 import { Route as MainResetPasswordRouteImport } from './routes/_main/reset-password'
 import { Route as MainResourcesRouteImport } from './routes/_main/resources'
 import { Route as MainSecurityRouteImport } from './routes/_main/security'
 import { Route as MainSignupRouteImport } from './routes/_main/signup'
+import { Route as MainTermsRouteImport } from './routes/_main/terms'
 import { Route as MainUseCasesRouteImport } from './routes/_main/use-cases'
 import { Route as MainWaitlistRouteImport } from './routes/_main/waitlist'
 import { Route as DemoIndexRouteImport } from './routes/demo.index'
@@ -270,6 +272,11 @@ const MainPricingRoute = MainPricingRouteImport.update({
   path: '/pricing',
   getParentRoute: () => MainRoute,
 } as any)
+const MainPrivacyRoute = MainPrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => MainRoute,
+} as any)
 const MainResetPasswordRoute = MainResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
@@ -288,6 +295,11 @@ const MainSecurityRoute = MainSecurityRouteImport.update({
 const MainSignupRoute = MainSignupRouteImport.update({
   id: '/signup',
   path: '/signup',
+  getParentRoute: () => MainRoute,
+} as any)
+const MainTermsRoute = MainTermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => MainRoute,
 } as any)
 const MainUseCasesRoute = MainUseCasesRouteImport.update({
@@ -1249,10 +1261,12 @@ export interface FileRoutesByFullPath {
   '/onboarding': typeof MainOnboardingRoute
   '/pipeline': typeof MainPipelineRoute
   '/pricing': typeof MainPricingRoute
+  '/privacy': typeof MainPrivacyRoute
   '/reset-password': typeof MainResetPasswordRoute
   '/resources': typeof MainResourcesRoute
   '/security': typeof MainSecurityRoute
   '/signup': typeof MainSignupRoute
+  '/terms': typeof MainTermsRoute
   '/use-cases': typeof MainUseCasesRoute
   '/waitlist': typeof MainWaitlistRoute
   '/demo/$': typeof DemoSplatRoute
@@ -1435,10 +1449,12 @@ export interface FileRoutesByTo {
   '/onboarding': typeof MainOnboardingRoute
   '/pipeline': typeof MainPipelineRoute
   '/pricing': typeof MainPricingRoute
+  '/privacy': typeof MainPrivacyRoute
   '/reset-password': typeof MainResetPasswordRoute
   '/resources': typeof MainResourcesRoute
   '/security': typeof MainSecurityRoute
   '/signup': typeof MainSignupRoute
+  '/terms': typeof MainTermsRoute
   '/use-cases': typeof MainUseCasesRoute
   '/waitlist': typeof MainWaitlistRoute
   '/demo/$': typeof DemoSplatRoute
@@ -1624,10 +1640,12 @@ export interface FileRoutesById {
   '/_main/onboarding': typeof MainOnboardingRoute
   '/_main/pipeline': typeof MainPipelineRoute
   '/_main/pricing': typeof MainPricingRoute
+  '/_main/privacy': typeof MainPrivacyRoute
   '/_main/reset-password': typeof MainResetPasswordRoute
   '/_main/resources': typeof MainResourcesRoute
   '/_main/security': typeof MainSecurityRoute
   '/_main/signup': typeof MainSignupRoute
+  '/_main/terms': typeof MainTermsRoute
   '/_main/use-cases': typeof MainUseCasesRoute
   '/_main/waitlist': typeof MainWaitlistRoute
   '/demo/$': typeof DemoSplatRoute
@@ -1814,10 +1832,12 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/pipeline'
     | '/pricing'
+    | '/privacy'
     | '/reset-password'
     | '/resources'
     | '/security'
     | '/signup'
+    | '/terms'
     | '/use-cases'
     | '/waitlist'
     | '/demo/$'
@@ -2000,10 +2020,12 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/pipeline'
     | '/pricing'
+    | '/privacy'
     | '/reset-password'
     | '/resources'
     | '/security'
     | '/signup'
+    | '/terms'
     | '/use-cases'
     | '/waitlist'
     | '/demo/$'
@@ -2188,10 +2210,12 @@ export interface FileRouteTypes {
     | '/_main/onboarding'
     | '/_main/pipeline'
     | '/_main/pricing'
+    | '/_main/privacy'
     | '/_main/reset-password'
     | '/_main/resources'
     | '/_main/security'
     | '/_main/signup'
+    | '/_main/terms'
     | '/_main/use-cases'
     | '/_main/waitlist'
     | '/demo/$'
@@ -2500,6 +2524,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MainPricingRouteImport
       parentRoute: typeof MainRoute
     }
+    '/_main/privacy': {
+      id: '/_main/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof MainPrivacyRouteImport
+      parentRoute: typeof MainRoute
+    }
     '/_main/reset-password': {
       id: '/_main/reset-password'
       path: '/reset-password'
@@ -2526,6 +2557,13 @@ declare module '@tanstack/react-router' {
       path: '/signup'
       fullPath: '/signup'
       preLoaderRoute: typeof MainSignupRouteImport
+      parentRoute: typeof MainRoute
+    }
+    '/_main/terms': {
+      id: '/_main/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof MainTermsRouteImport
       parentRoute: typeof MainRoute
     }
     '/_main/use-cases': {
@@ -4026,10 +4064,12 @@ interface MainRouteChildren {
   MainOnboardingRoute: typeof MainOnboardingRoute
   MainPipelineRoute: typeof MainPipelineRoute
   MainPricingRoute: typeof MainPricingRoute
+  MainPrivacyRoute: typeof MainPrivacyRoute
   MainResetPasswordRoute: typeof MainResetPasswordRoute
   MainResourcesRoute: typeof MainResourcesRoute
   MainSecurityRoute: typeof MainSecurityRoute
   MainSignupRoute: typeof MainSignupRoute
+  MainTermsRoute: typeof MainTermsRoute
   MainUseCasesRoute: typeof MainUseCasesRoute
   MainWaitlistRoute: typeof MainWaitlistRoute
   MainIndexRoute: typeof MainIndexRoute
@@ -4085,10 +4125,12 @@ const MainRouteChildren: MainRouteChildren = {
   MainOnboardingRoute: MainOnboardingRoute,
   MainPipelineRoute: MainPipelineRoute,
   MainPricingRoute: MainPricingRoute,
+  MainPrivacyRoute: MainPrivacyRoute,
   MainResetPasswordRoute: MainResetPasswordRoute,
   MainResourcesRoute: MainResourcesRoute,
   MainSecurityRoute: MainSecurityRoute,
   MainSignupRoute: MainSignupRoute,
+  MainTermsRoute: MainTermsRoute,
   MainUseCasesRoute: MainUseCasesRoute,
   MainWaitlistRoute: MainWaitlistRoute,
   MainIndexRoute: MainIndexRoute,

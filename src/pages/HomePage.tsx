@@ -691,7 +691,7 @@ export default function HomePage() {
                     exactly where it is, and start with the entities that hurt most.
                   </p>
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 26 }}>
-                    <Link to="/waitlist" className="fh-btn fh-btn-coral">
+                    <Link to="/v2/onboarding?mode=signup" className="fh-btn fh-btn-coral">
                       Get started <ArrowUpRight size={15} />
                     </Link>
                     <Link to="/ca-firms" className="fh-btn fh-btn-ghost">
@@ -952,7 +952,7 @@ export default function HomePage() {
                       </li>
                     ))}
                   </ul>
-                  <Link to="/waitlist" className={`fh-btn ${p.popular ? "fh-btn-coral" : "fh-btn-primary"}`}>
+                  <Link to={p.name === "Starter" ? "/v2/onboarding?mode=signup" : "/waitlist"} className={`fh-btn ${p.popular ? "fh-btn-coral" : "fh-btn-primary"}`}>
                     {p.cta} <ArrowUpRight size={15} />
                   </Link>
                 </div>

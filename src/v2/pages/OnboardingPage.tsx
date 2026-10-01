@@ -5,7 +5,7 @@ import { startGmailConnect } from "@/lib/caGmail.functions";
  * how much the agents may do on their own → intake channels → you're set.
  * Connecting Gmail leaves for Google, so it comes after the value moment.
  */
-import { useEffect, useRef, useState } from "react";
+import { cloneElement, isValidElement, useEffect, useId, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -42,6 +42,11 @@ export default function OnboardingPage() {
     if (typeof window === "undefined") return "signup";
     const m = new URLSearchParams(window.location.search).get("mode");
     if (m === "signin" || m === "forgot" || m === "signup") return m;
+    try {
+      if (sessionStorage.getItem("fynhelp.v2.expired")) return "signin";
+    } catch {
+      /* private mode */
+    }
     // Someone who has signed in on this device before most likely wants to sign in again.
     try {
       if (localStorage.getItem("fynhelp.v2.known")) return "signin";
@@ -50,6 +55,22 @@ export default function OnboardingPage() {
     }
     return "signup";
   });
+  // Shown once when an expired session sent the user here.
+  const [expired] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return !!sessionStorage.getItem("fynhelp.v2.expired");
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      sessionStorage.removeItem("fynhelp.v2.expired");
+    } catch {
+      /* private mode */
+    }
+  }, []);
   // Set while this person is creating their firm here, so we do not treat the
   // new firm as "already onboarded" and leave before the client steps.
   const settingUp = useRef(false);
@@ -299,8 +320,13 @@ export default function OnboardingPage() {
                         : "Extract, Recon, Narrate and Chaser do the month-end work. You review and sign off."}
                   </p>
                 </div>
+                {expired && mode === "signin" && (
+                  <div role="status" data-testid="session-expired" style={{ fontSize: 13, padding: "10px 12px", borderRadius: 10, background: "#FFF6E5", color: "#7A4B00" }}>
+                    Your session ended. Sign in again to pick up where you left off.
+                  </div>
+                )}
                 {mode === "signup" && (
-                  <Field label="Full name"><input className="v2-input" required autoFocus autoComplete="name" value={account.name} onChange={(e) => setAccount({ ...account, name: e.target.value })} placeholder="Prajwal Vakode" /></Field>
+                  <Field label="Full name"><input className="v2-input" required autoFocus autoComplete="name" value={account.name} onChange={(e) => setAccount({ ...account, name: e.target.value })} placeholder="Priya Rao" /></Field>
                 )}
                 <Field label="Work email"><input className="v2-input" type="email" required autoFocus={mode !== "signup"} autoComplete="email" value={account.email} onChange={(e) => setAccount({ ...account, email: e.target.value })} placeholder="you@firm.com" /></Field>
                 {mode !== "forgot" && (
@@ -322,7 +348,11 @@ export default function OnboardingPage() {
                   )}
                 </p>
                 {mode === "signup" && (
-                  <p className="onb-foot" style={{ textAlign: "center", marginTop: -6 }}>Free to start. No card needed. Your data stays in your firm's workspace.</p>
+                  <p className="onb-foot" style={{ textAlign: "center", marginTop: -6 }}>
+                    Free to start. No card needed. By creating an account you agree to the{" "}
+                    <a className="v2-link" href="/terms" target="_blank" rel="noreferrer">Terms</a> and{" "}
+                    <a className="v2-link" href="/privacy" target="_blank" rel="noreferrer">Privacy policy</a>.
+                  </p>
                 )}
               </form>
             )}
@@ -562,16 +592,21 @@ function Intro({ icon, title, text }: { icon: React.ReactNode; title: string; te
 }
 
 function Field({ label, children, optional, aside }: { label: string; children: React.ReactNode; optional?: boolean; aside?: React.ReactNode }) {
+  // Ties the label to its control so clicking it focuses the input and
+  // screen readers announce the field name.
+  const auto = useId();
+  const child = isValidElement<{ id?: string }>(children) ? children : null;
+  const id = child?.props.id ?? auto;
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <label className="v2-label">
+        <label className="v2-label" htmlFor={child ? id : undefined}>
           {label}
           {optional && <span style={{ textTransform: "none", letterSpacing: 0, fontWeight: 400, marginLeft: 6 }}>optional</span>}
         </label>
         {aside}
       </div>
-      {children}
+      {child ? cloneElement(child, { id }) : children}
     </div>
   );
 }

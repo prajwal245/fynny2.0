@@ -202,32 +202,32 @@ export default function SettingsPage() {
           }}
         >
           <div>
-            <label className="v2-label">Firm name</label>
-            <input
+            <label className="v2-label" htmlFor="settings-firm-name">Firm name</label>
+            <input id="settings-firm-name"
               className="v2-input"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
           </div>
           <div>
-            <label className="v2-label">City</label>
-            <input
+            <label className="v2-label" htmlFor="settings-city">City</label>
+            <input id="settings-city"
               className="v2-input"
               value={form.city}
               onChange={(e) => setForm({ ...form, city: e.target.value })}
             />
           </div>
           <div>
-            <label className="v2-label">Firm registration number</label>
-            <input
+            <label className="v2-label" htmlFor="settings-firm-registration-number">Firm registration number</label>
+            <input id="settings-firm-registration-number"
               className="v2-input"
               value={form.frn}
               onChange={(e) => setForm({ ...form, frn: e.target.value })}
             />
           </div>
           <div>
-            <label className="v2-label">Reply-to email</label>
-            <input
+            <label className="v2-label" htmlFor="settings-reply-to-email">Reply-to email</label>
+            <input id="settings-reply-to-email"
               className="v2-input"
               type="email"
               value={form.email}
@@ -602,16 +602,16 @@ export default function SettingsPage() {
           }}
         >
           <div>
-            <label className="v2-label">Name</label>
-            <input
+            <label className="v2-label" htmlFor="settings-name">Name</label>
+            <input id="settings-name"
               className="v2-input"
               value={profileName}
               onChange={(e) => setProfileName(e.target.value)}
             />
           </div>
           <div>
-            <label className="v2-label">Email</label>
-            <input className="v2-input" value={session?.email ?? ""} disabled />
+            <label className="v2-label" htmlFor="settings-email">Email</label>
+            <input id="settings-email" className="v2-input" value={session?.email ?? ""} disabled />
           </div>
         </div>
         <button

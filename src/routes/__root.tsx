@@ -22,6 +22,7 @@ import NotFound from "@/pages/NotFound";
 import { Sentry } from "@/lib/monitoring";
 import { usePageTracking } from "@/hooks/usePageTracking";
 import { reportLovableError } from "@/lib/lovable-error-reporting";
+import "@/v2/sessionWatch";
 
 import appCss from "../styles.css?url";
 

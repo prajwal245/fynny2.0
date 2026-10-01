@@ -609,10 +609,10 @@ const Navbar = () => {
               {openMenu === "signin" && SignInMenu}
             </div>
             <Link
-              to="/waitlist"
+              to="/v2/onboarding?mode=signup"
               className="bg-fyn-red hover:bg-fyn-red-dark text-white text-[15px] font-semibold px-5 py-2.5 rounded-lg shadow-xs transition-colors"
             >
-              Join waitlist
+              Start free
             </Link>
           </div>
 
@@ -779,11 +779,11 @@ const Navbar = () => {
                 <Briefcase size={16} /> CA login
               </Link>
               <Link
-                to="/waitlist"
+                to="/v2/onboarding?mode=signup"
                 onClick={() => setMobileOpen(false)}
                 className="block bg-fyn-red text-white text-center py-3 rounded-lg font-semibold"
               >
-                Join waitlist
+                Start free
               </Link>
             </div>
           </div>

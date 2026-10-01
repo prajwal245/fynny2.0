@@ -40,6 +40,7 @@ import {
   updatePracticeClient,
 } from "@/lib/practice/practice.functions";
 import type { AgentKey, LiveRun } from "./agents";
+import { setSigningOutByUser } from "./sessionWatch";
 
 export type Txn = {
   counterparty?: string | null;
@@ -267,6 +268,8 @@ function periodList() {
   return out;
 }
 export const PERIODS = periodList();
+/** The month being closed: in the first half of a month that is still last month. */
+export const DEFAULT_PERIOD = new Date().getDate() <= 15 ? PERIODS[1] : PERIODS[0];
 
 export type AgentRun = LiveRun & {
   /** entity this run belongs to: doc id, client id or report id */
@@ -283,7 +286,16 @@ const uid = () =>
   `${Date.now().toString(16)}-0000-4000-8000-${Math.random().toString(16).slice(2, 14).padEnd(12, "0")}`;
 const safeName = (s: string) =>
   s.replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 120) || "document";
-const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
+/** Set by the provider: called when the server rejects an expired session. */
+let onSessionEnded: (() => void) | null = null;
+const errMsg = (e: unknown) => {
+  const m = e instanceof Error ? e.message : String(e);
+  if (/^Unauthorized\b/.test(m)) {
+    onSessionEnded?.();
+    return "Your session has ended. Please sign in again.";
+  }
+  return m;
+};
 
 type Workspace = Awaited<ReturnType<typeof getPracticeWorkspace>>;
 
@@ -403,7 +415,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
   const [session, setSession] = useState<Store["session"]>(null);
   const [firm, setFirm] = useState<Firm | null>(null);
-  const [period, setPeriod] = useState(PERIODS[0]);
+  const [period, setPeriod] = useState(DEFAULT_PERIOD);
   const [role, setRole] = useState<Role>("Partner");
   const [firmRole, setFirmRole] = useState<string | null>(null);
   const canSignOff = firmRole === null || ["owner", "admin", "partner"].includes(firmRole);
@@ -431,9 +443,10 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
     try {
       const raw = window.localStorage.getItem(PREF_KEY);
       if (raw) {
-        const saved = JSON.parse(raw) as { role?: Role; period?: string };
+        const saved = JSON.parse(raw) as { role?: Role; period?: string; month?: string };
         if (saved.role) setRole(saved.role);
-        if (saved.period && PERIODS.includes(saved.period))
+        // A period picked last month is stale: start from the month being closed.
+        if (saved.period && PERIODS.includes(saved.period) && saved.month === PERIODS[0])
           setPeriod(saved.period);
       }
     } catch {
@@ -442,7 +455,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
   }, []);
   useEffect(() => {
     try {
-      window.localStorage.setItem(PREF_KEY, JSON.stringify({ role, period }));
+      window.localStorage.setItem(PREF_KEY, JSON.stringify({ role, period, month: PERIODS[0] }));
     } catch {
       /* ignore */
     }
@@ -471,7 +484,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
     try {
       apply(await getPracticeWorkspace());
     } catch (e) {
-      console.error("[v2] workspace load failed", e);
+      console.error("[v2] workspace load failed", errMsg(e));
     }
   }, [apply]);
 
@@ -537,6 +550,22 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
     void boot();
   }, [boot]);
 
+  // A server call that comes back Unauthorized means the session is gone:
+  // sign out locally so the Shell sends the user to sign in.
+  useEffect(() => {
+    let fired = false;
+    onSessionEnded = () => {
+      if (fired || !userId.current) return;
+      fired = true;
+      void sb.auth.signOut({ scope: "local" }).finally(() => {
+        fired = false;
+      });
+    };
+    return () => {
+      onSessionEnded = null;
+    };
+  }, []);
+
   // Signing out (here or in another tab) clears the workspace. Sign-in is picked
   // up by onboarding itself (completeOnboarding) or by the page load that follows
   // an email confirmation, so onboarding is never cut short.
@@ -575,6 +604,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
     /* authentication happens on the practice sign in page */
   }, []);
   const signOut = useCallback(() => {
+    setSigningOutByUser();
     void sb.auth.signOut().then(() => {
       setSession(null);
       setFirm(null);
@@ -806,6 +836,14 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
     ) => {
       if (!file) {
         toast.error("Choose a file to upload.");
+        return;
+      }
+      if (file.size === 0) {
+        toast.error(`${name} is empty.`);
+        return;
+      }
+      if (file.size > 25 * 1024 * 1024) {
+        toast.error(`${name} is larger than 25 MB. Split it or export a smaller range.`);
         return;
       }
       const tempId = uid();

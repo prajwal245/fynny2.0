@@ -78,12 +78,12 @@ export default function ResetPasswordPage() {
         {ready === "ready" && (
           <form onSubmit={submit} style={{ display: "grid", gap: 14 }}>
             <div>
-              <label className="v2-label">New password</label>
-              <input className="v2-input" type="password" autoComplete="new-password" minLength={6} required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least six characters" />
+              <label className="v2-label" htmlFor="reset-new-password">New password</label>
+              <input id="reset-new-password" className="v2-input" type="password" autoComplete="new-password" minLength={6} required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least six characters" />
             </div>
             <div>
-              <label className="v2-label">Confirm new password</label>
-              <input className="v2-input" type="password" autoComplete="new-password" minLength={6} required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+              <label className="v2-label" htmlFor="reset-confirm-new-password">Confirm new password</label>
+              <input id="reset-confirm-new-password" className="v2-input" type="password" autoComplete="new-password" minLength={6} required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
             </div>
             <button className="v2-btn v2-btn-primary" type="submit" disabled={busy} style={{ justifySelf: "start" }}>
               {busy ? "Saving" : "Save password"}

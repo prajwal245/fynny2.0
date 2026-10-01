@@ -42,6 +42,12 @@ jobs:
 
       - name: Run Supabase linter gate
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-        run: node scripts/check-supabase-lint.mjs
+          RAW_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          # The secret wins; otherwise the project this repo deploys to.
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF || 'qfowcjyueonpwmxzthmz' }}
+        run: |
+          # Tolerate a secret pasted with spaces, a newline, or the token twice over.
+          SUPABASE_ACCESS_TOKEN=$(printf '%s' "$RAW_TOKEN" | grep -o 'sbp_[0-9a-f]\{40\}' | head -n1 || true)
+          echo "::add-mask::$SUPABASE_ACCESS_TOKEN"
+          export SUPABASE_ACCESS_TOKEN
+          node scripts/check-supabase-lint.mjs

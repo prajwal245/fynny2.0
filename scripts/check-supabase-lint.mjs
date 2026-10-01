@@ -69,17 +69,29 @@ function isAllowed(finding, allowlist) {
 }
 
 async function fetchLintFindings() {
-  const url = `https://api.supabase.com/v1/projects/${PROJECT_REF}/database/lint`;
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${TOKEN}` },
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(
-      `Supabase API ${res.status} ${res.statusText}: ${body.slice(0, 400)}`,
-    );
+  // Current endpoint first; the older database/lint path was removed.
+  const paths = ["advisors/security", "database/lint"];
+  let last = "";
+  for (const path of paths) {
+    const url = `https://api.supabase.com/v1/projects/${PROJECT_REF}/${path}`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${TOKEN}` },
+    });
+    if (res.status === 404) {
+      last = `${path}: 404`;
+      continue;
+    }
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(
+        `Supabase API ${res.status} ${res.statusText}: ${body.slice(0, 400)}`,
+      );
+    }
+    const body = await res.json();
+    // advisors/security returns { lints: [...] }; database/lint returned an array.
+    return Array.isArray(body) ? body : (body.lints ?? []);
   }
-  return res.json();
+  throw new Error(`No linter endpoint found (${last})`);
 }
 
 function formatFinding(f) {

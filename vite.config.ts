@@ -6,10 +6,17 @@
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
+// On Vercel, document reading (OCR + AI) can take longer than the default
+// function timeout. Other presets ignore this. (Cast, because the
+// wrapper's types list only a few nitro keys; nitro accepts all of them.)
+type NitroOption = NonNullable<Parameters<typeof defineConfig>[0]>["nitro"];
+const nitro = { vercel: { functions: { maxDuration: 60 } } } as unknown as NitroOption;
+
 export default defineConfig({
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  nitro,
 });

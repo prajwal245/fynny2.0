@@ -40,32 +40,32 @@ export default function AddClientModal({ open, onClose, editing }: { open: boole
     <Modal open={open} onClose={onClose} title={editing ? "Edit client" : "Add client"}>
       <form onSubmit={submit} style={{ display: "grid", gap: 14 }}>
         <div>
-          <label className="v2-label">Client name</label>
-          <input className="v2-input" value={form.name} onChange={set("name")} placeholder="Sundar Textiles Pvt Ltd" required />
+          <label className="v2-label" htmlFor="client-client-name">Client name</label>
+          <input id="client-client-name" className="v2-input" value={form.name} onChange={set("name")} placeholder="Sundar Textiles Pvt Ltd" required />
         </div>
         <div>
-          <label className="v2-label">Entity type</label>
-          <select className="v2-input" value={form.entityType} onChange={set("entityType")}>
+          <label className="v2-label" htmlFor="client-entity-type">Entity type</label>
+          <select id="client-entity-type" className="v2-input" value={form.entityType} onChange={set("entityType")}>
             {ENTITY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
         <div>
-          <label className="v2-label">GSTIN (optional)</label>
-          <input className="v2-input" value={form.gstin} onChange={set("gstin")} placeholder="27AABCS1429B1ZP" />
+          <label className="v2-label" htmlFor="client-gstin-optional">GSTIN (optional)</label>
+          <input id="client-gstin-optional" className="v2-input" value={form.gstin} onChange={set("gstin")} placeholder="27AABCS1429B1ZP" />
         </div>
         <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit,minmax(min(180px, 100%), 1fr))" }}>
           <div>
-            <label className="v2-label">Contact name</label>
-            <input className="v2-input" value={form.contactName} onChange={set("contactName")} />
+            <label className="v2-label" htmlFor="client-contact-name">Contact name</label>
+            <input id="client-contact-name" className="v2-input" value={form.contactName} onChange={set("contactName")} />
           </div>
           <div>
-            <label className="v2-label">Email</label>
-            <input className="v2-input" type="email" value={form.email} onChange={set("email")} />
+            <label className="v2-label" htmlFor="client-email">Email</label>
+            <input id="client-email" className="v2-input" type="email" value={form.email} onChange={set("email")} />
           </div>
         </div>
         <div>
-          <label className="v2-label">Phone</label>
-          <input className="v2-input" value={form.phone} onChange={set("phone")} placeholder="919820011223" />
+          <label className="v2-label" htmlFor="client-phone">Phone</label>
+          <input id="client-phone" className="v2-input" value={form.phone} onChange={set("phone")} placeholder="919820011223" />
         </div>
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
           <button type="button" className="v2-btn v2-btn-ghost" onClick={onClose}>Cancel</button>

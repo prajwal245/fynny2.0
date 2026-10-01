@@ -9,7 +9,7 @@ Two browser suites ran against a full local Supabase stack (auth, database,
 storage) with email confirmation on, as on hosted Supabase. Real confirmation
 and password-reset emails were delivered to a local mail catcher and followed.
 
-**Product flow (30 steps):**
+**Product flow (32 steps):**
 
 - Sign-up through onboarding.
 - Documents: CSV and Tally upload, Review Queue, recon (chained automatically),
@@ -35,6 +35,10 @@ and password-reset emails were delivered to a local mail catcher and followed.
 | Periods and clients | A second client updates the portfolio; a period with nothing matched says so and cannot generate an MIS |
 | Export | MIS Excel download |
 | Phone | All 8 screens fit a 390 px phone with no sideways scroll |
+
+A third check covers the launch pieces: the Terms and Privacy pages, the
+"Start free" button opening sign-up with the consent line, and an expired
+session landing on sign-in with "Your session ended".
 
 The codebase also has 150 unit tests, a clean typecheck and a Vercel
 production build.
@@ -70,15 +74,37 @@ go out from `PRACTICE_FROM_EMAIL`, which defaults to `noreply@fynhelp.com`.
 - **Testing mode:** while the app is in Testing, add each Gmail account that
   will connect as a test user. Google expires those connections after 7 days.
   Publish the app, which needs Google's verification for the `gmail.readonly`
-  scope, before inviting clients widely.
+  scope, before inviting clients widely. The consent screen needs the privacy
+  policy (`https://<domain>/privacy`, which includes Google's Limited Use
+  statement) and terms (`https://<domain>/terms`).
 
 ## Entry points
 
 - The marketing site's "CA login" and "CA sign in" links lead to the practice
   app's sign-in page (`/ca/login` → `/v2/onboarding?mode=signin`).
 - `/ca/register` and `/ca/onboarding` lead to sign-up.
-- "Get started" and "Book a demo" still go to `/waitlist`. Change them to
-  `/v2/onboarding` to open sign-up to everyone.
+- Sign-up is open: the navbar's "Start free", the pricing "Get started" and
+  the Starter plan button open `/v2/onboarding?mode=signup`. "Book a demo" and
+  the larger plans still go to `/waitlist`.
+- Sign-up shows "By creating an account you agree to the Terms and Privacy
+  policy", linking to `/terms` and `/privacy`. **Have counsel review both
+  pages** before launch: they describe what the product does today (data
+  read, providers, deletion on request within 30 days), but they are not
+  legal advice.
+
+## Limits and safeguards
+
+- Uploads: 25 MB per file, checked in the browser, by the storage bucket
+  (migration `20261001090000_document_upload_limits.sql`) and by the server.
+  A file path outside the firm's folder is refused.
+- Server functions run for up to 60 seconds on Vercel (`vite.config.ts`), so
+  long OCR and AI reads are not cut off.
+- Every server function requires a signed-in user, except the waitlist
+  notifier. Scheduled endpoints require `CRON_SECRET` (Vercel sends it on its
+  own crons; **set it in Vercel or the daily jobs are refused**). The WhatsApp
+  and Razorpay webhooks check their signatures.
+- When a session expires, the app signs out and shows sign-in with a notice
+  instead of failing requests.
 
 ## After launch
 

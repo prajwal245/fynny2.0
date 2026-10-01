@@ -65,6 +65,8 @@ export function SiteFooter() {
             <Link to="/security">Security</Link>
             <Link to="/community">Community</Link>
             <Link to="/contact">Contact</Link>
+            <Link to="/privacy">Privacy</Link>
+            <Link to="/terms">Terms</Link>
             <Link to="/login">Sign in</Link>
           </div>
         </div>

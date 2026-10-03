@@ -4,6 +4,8 @@ import FynLogo from "@/components/FynLogo";
 import Navbar from "@/components/Navbar";
 import { C, SITE_STYLES } from "./siteTheme";
 import { AGENTS } from "./agents";
+import { CTA_DEMO, CTA_NOTE, CTA_START, SIGNUP_URL, trackCta } from "./cta";
+import { DemoLink } from "./BookDemo";
 
 export function Reveal({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
   return (
@@ -42,7 +44,7 @@ export function SiteFooter() {
             <Link to="/pipeline">The pipeline</Link>
             <Link to="/pricing">Pricing</Link>
             <Link to="/#faq">FAQ</Link>
-            <Link to="/waitlist">Book a demo</Link>
+            <DemoLink location="footer">Book a demo</DemoLink>
           </div>
           <div>
             <h4>Modules</h4>
@@ -186,15 +188,14 @@ export function CtaBand({
   title,
   italic,
   lead,
-  primary = { to: "/waitlist", label: "Book a demo" },
-  secondary,
+  location = "cta-band",
 }: {
   kicker?: string;
   title: string;
   italic?: string;
   lead?: string;
-  primary?: { to: string; label: string };
-  secondary?: { to: string; label: string };
+  /** Where on the site this band is, for click tracking. */
+  location?: string;
 }) {
   return (
     <section style={{ padding: "0 22px 96px" }}>
@@ -213,15 +214,14 @@ export function CtaBand({
             </h2>
             {lead && <p className="fh-lead" style={{ marginInline: "auto" }}>{lead}</p>}
             <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", marginTop: 26 }}>
-              <Link to={primary.to} className="fh-btn fh-btn-coral">
-                {primary.label}
+              <Link to={SIGNUP_URL} className="fh-btn fh-btn-coral" onClick={() => trackCta("start", location)}>
+                {CTA_START}
               </Link>
-              {secondary && (
-                <Link to={secondary.to} className="fh-btn fh-btn-ghost">
-                  {secondary.label}
-                </Link>
-              )}
+              <DemoLink location={location} className="fh-btn fh-btn-ghost">
+                {CTA_DEMO}
+              </DemoLink>
             </div>
+            <p style={{ marginTop: 14, fontSize: 13, opacity: 0.7 }}>{CTA_NOTE}</p>
           </div>
         </Reveal>
       </div>

@@ -3,6 +3,8 @@ import { Link } from "@/lib/router-compat";
 import SiteShell, { Section, Reveal, CtaBand } from "@/components/site/SiteShell";
 import { C } from "@/components/site/siteTheme";
 import { AGENTS } from "@/components/site/agents";
+import { CTA_DEMO, CTA_START, SIGNUP_URL, trackCta } from "@/components/site/cta";
+import { DemoLink } from "@/components/site/BookDemo";
 
 /* ================================================================
    FynHelp — Pipeline: Extract → Recon → Narrate → Chaser (animated)
@@ -152,8 +154,8 @@ export default function PipelinePage() {
                   Chaser. Each one is visible, reviewable, and traceable back to its source.
                 </p>
                 <div className="acts" style={{ justifyContent: "center" }}>
-                  <Link to="/signup" className="fh-btn fh-btn-primary">Start 30-day trial</Link>
-                  <Link to="/waitlist" className="fh-btn fh-btn-ghost">Book a demo</Link>
+                  <Link to={SIGNUP_URL} className="fh-btn fh-btn-primary" onClick={() => trackCta("start", "pipeline-hero")}>{CTA_START}</Link>
+                  <DemoLink location="pipeline-hero" className="fh-btn fh-btn-ghost">{CTA_DEMO}</DemoLink>
                 </div>
               </div>
             </Reveal>
@@ -256,8 +258,7 @@ export default function PipelinePage() {
         title="Watch the pipeline run"
         italic="on your own books."
         lead="Thirty days free. Upload one client's documents and see Extract, Recon and Narrate work end to end."
-        primary={{ to: "/signup", label: "Start 30-day trial" }}
-        secondary={{ to: "/pricing", label: "See pricing" }}
+        location="pipeline-final"
       />
     </SiteShell>
   );

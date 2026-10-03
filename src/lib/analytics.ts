@@ -51,6 +51,8 @@ export function trackPageView(path: string, properties?: Record<string, unknown>
 
 export type FynHelpEvent =
   | "waitlist_signup"
+  | "cta_click"
+  | "demo_requested"
   | "demo_started"
   | "demo_data_uploaded"
   | "dashboard_viewed"

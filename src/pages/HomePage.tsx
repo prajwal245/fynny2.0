@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "@/lib/router-compat";
+import { CTA_DEMO, CTA_NOTE, CTA_START, SIGNUP_URL, signupUrl, trackCta } from "@/components/site/cta";
+import { DemoLink, openDemo } from "@/components/site/BookDemo";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -364,8 +366,8 @@ const TRUST = [
 ];
 
 const PLANS = [
-  { name: "Starter", monthly: 2999, clients: "15 client entities included", extra: "Extra client \u20B9149 (cap 25)", adds: ["Extract, Recon, Narrate", "Full audit trail", "Unlimited users"], cta: "Start with Starter" },
-  { name: "Professional", monthly: 5999, clients: "40 client entities included", extra: "Extra client \u20B9119", adds: ["Everything in Starter", "Chaser follow-ups", "White-label client packs", "Priority processing"], cta: "Book a firm demo", popular: true },
+  { name: "Starter", monthly: 2999, clients: "15 client entities included", extra: "Extra client \u20B9149 (cap 25)", adds: ["Extract, Recon, Narrate", "Full audit trail", "Unlimited users"], cta: "Start free" },
+  { name: "Professional", monthly: 5999, clients: "40 client entities included", extra: "Extra client \u20B9119", adds: ["Everything in Starter", "Chaser follow-ups", "White-label client packs", "Priority processing"], cta: "Start free", popular: true },
   { name: "Scale", monthly: 12999, clients: "100 client entities included", extra: "Extra client \u20B999 (no cap)", adds: ["Everything in Professional", "Multi-partner dashboards", "API access", "Dedicated success manager"], cta: "Talk to us" },
 ];
 
@@ -527,15 +529,23 @@ export default function HomePage() {
               className="fh-capture"
               onSubmit={(e) => {
                 e.preventDefault();
-                window.location.href = "/waitlist";
+                const email = String(new FormData(e.currentTarget).get("email") ?? "");
+                trackCta("start", "home-hero");
+                // The email they typed is already filled in on the next screen.
+                window.location.href = signupUrl(email);
               }}
             >
-              <input type="email" placeholder="Enter your work email" aria-label="Work email" required />
+              <input type="email" name="email" placeholder="Enter your work email" aria-label="Work email" autoComplete="email" required />
               <button type="submit" className="fh-btn fh-btn-primary">
-                Book a Demo <ArrowRight size={15} />
+                {CTA_START} <ArrowRight size={15} />
               </button>
             </form>
-            <div className="fh-hero-note">Read-only access · No ledger migration · Revocable anytime</div>
+            <div className="fh-hero-note">
+              {CTA_NOTE} ·{" "}
+              <DemoLink location="home-hero" style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: 3 }}>
+                or book a demo
+              </DemoLink>
+            </div>
           </Reveal>
           <Reveal delay={140}>
             <HeroVisual />
@@ -691,8 +701,8 @@ export default function HomePage() {
                     exactly where it is, and start with the entities that hurt most.
                   </p>
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 26 }}>
-                    <Link to="/v2/onboarding?mode=signup" className="fh-btn fh-btn-coral">
-                      Get started <ArrowUpRight size={15} />
+                    <Link to={SIGNUP_URL} className="fh-btn fh-btn-coral" onClick={() => trackCta("start", "home-pricing-teaser")}>
+                      {CTA_START} <ArrowUpRight size={15} />
                     </Link>
                     <Link to="/ca-firms" className="fh-btn fh-btn-ghost">
                       For CA firms
@@ -737,9 +747,14 @@ export default function HomePage() {
                 One workspace for every entity: what came in, what matched, what needs a decision and what is
                 ready for partner sign-off.
               </p>
-              <Link to="/waitlist" className="fh-btn fh-btn-primary" style={{ marginTop: 24 }}>
-                Book a demo <ArrowRight size={15} />
-              </Link>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 24 }}>
+                <Link to={SIGNUP_URL} className="fh-btn fh-btn-primary" onClick={() => trackCta("start", "home-workspace")}>
+                  {CTA_START} <ArrowRight size={15} />
+                </Link>
+                <DemoLink location="home-workspace" className="fh-btn fh-btn-ghost">
+                  {CTA_DEMO}
+                </DemoLink>
+              </div>
             </div>
           </Reveal>
           <Reveal delay={110}>
@@ -952,7 +967,16 @@ export default function HomePage() {
                       </li>
                     ))}
                   </ul>
-                  <Link to={p.name === "Starter" ? "/v2/onboarding?mode=signup" : "/waitlist"} className={`fh-btn ${p.popular ? "fh-btn-coral" : "fh-btn-primary"}`}>
+                  <Link
+                    to={SIGNUP_URL}
+                    className={`fh-btn ${p.popular ? "fh-btn-coral" : "fh-btn-primary"}`}
+                    onClick={(e) => {
+                      if (p.name === "Scale") {
+                        e.preventDefault();
+                        openDemo("home-plan-scale");
+                      } else trackCta("start", `home-plan-${p.name.toLowerCase()}`);
+                    }}
+                  >
                     {p.cta} <ArrowUpRight size={15} />
                   </Link>
                 </div>
@@ -995,21 +1019,22 @@ export default function HomePage() {
         <div className="fh-wrap" style={{ padding: 0 }}>
           <Reveal>
             <div className="fh-ctaband fh-dark">
-              <span className="fh-kicker">Limited first cohort</span>
+              <span className="fh-kicker">Ready when you are</span>
               <h2 className="fh-h2">
                 Run your next monthly close <span className="ital">through FynHelp</span>
               </h2>
               <p className="fh-lead" style={{ marginInline: "auto" }}>
-                We&rsquo;re onboarding firms managing 5 to 40+ client entities directly — set up by the
-                founding team, not a self-serve signup form.
+                Set up your firm and read your first statement in five minutes, on your own. Prefer a
+                walkthrough? A founder will set it up with you on a 20-minute call.
+                <span style={{ display: "block", marginTop: 10, fontSize: 13.5, opacity: 0.75 }}>{CTA_NOTE}</span>
               </p>
               <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", marginTop: 26 }}>
-                <Link to="/waitlist" className="fh-btn fh-btn-coral">
-                  Book a Firm Demo <ArrowRight size={16} />
+                <Link to={SIGNUP_URL} className="fh-btn fh-btn-coral" onClick={() => trackCta("start", "home-final")}>
+                  {CTA_START} <ArrowRight size={16} />
                 </Link>
-                <Link to="/ca-firms" className="fh-btn fh-btn-ghost">
-                  For CA firms
-                </Link>
+                <DemoLink location="home-final" className="fh-btn fh-btn-ghost">
+                  {CTA_DEMO}
+                </DemoLink>
               </div>
             </div>
           </Reveal>

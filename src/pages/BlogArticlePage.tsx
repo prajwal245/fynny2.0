@@ -6,6 +6,7 @@ import Layout from "@/components/Layout";
 import { ArrowLeft, Clock, Eye } from "lucide-react";
 import { sanitizeForStorage } from "@/lib/sanitizeHtml";
 import { cleanArticleHtml } from "@/lib/cleanArticleHtml";
+import { SIGNUP_URL, trackCta } from "@/components/site/cta";
 
 
 const INK = "#171208";
@@ -214,9 +215,9 @@ export default function BlogArticlePage() {
 
 
           <div style={{ background: "white", border: "1px solid rgba(23,18,8,0.08)", borderRadius: 12, padding: 24, marginTop: 48, textAlign: "center" }}>
-            <div style={{ fontFamily: "Georgia, serif", fontWeight: 600, fontSize: 18, color: INK, marginBottom: 8 }}>Want financial intelligence like this, built into your dashboard?</div>
-            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, color: "rgba(23,18,8,0.65)", marginBottom: 20 }}>FYNHelp gives Indian SMEs real-time AI CFO access. Free for 30 days for the first 100 founders.</p>
-            <Link to="/waitlist" style={{ display: "inline-block", padding: "11px 28px", background: RED, color: "white", fontFamily: "Inter, sans-serif", fontWeight: 600, fontSize: 14, borderRadius: 8, textDecoration: "none" }}>Join the waitlist</Link>
+            <div style={{ fontFamily: "Georgia, serif", fontWeight: 600, fontSize: 18, color: INK, marginBottom: 8 }}>Close your clients' month-end with four agents</div>
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, color: "rgba(23,18,8,0.65)", marginBottom: 20 }}>FynHelp reads statements and Tally exports, matches bank to books and drafts the MIS. Free to start, no card needed.</p>
+            <Link to={SIGNUP_URL} onClick={() => trackCta("start", "blog-article")} style={{ display: "inline-block", padding: "11px 28px", background: RED, color: "white", fontFamily: "Inter, sans-serif", fontWeight: 600, fontSize: 14, borderRadius: 8, textDecoration: "none" }}>Start free</Link>
           </div>
         </div>
       </div>

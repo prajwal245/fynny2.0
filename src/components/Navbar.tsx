@@ -35,6 +35,7 @@ import { isAdminEmail } from "@/lib/adminEmails";
 ──────────────────────────────────────────────────────────────── */
 
 import type { LucideIcon } from "lucide-react";
+import { SIGNUP_URL, trackCta } from "@/components/site/cta";
 type IconType = LucideIcon;
 
 type ModuleKey = "extract" | "recon" | "narrate" | "chaser";
@@ -421,10 +422,11 @@ const Navbar = () => {
                 ctaHref={active.href}
               />
               <Link
-                to="/waitlist"
+                to={SIGNUP_URL}
+                onClick={() => trackCta("start", "nav-menu")}
                 className="group inline-flex items-center gap-1.5 self-end text-[12.5px] font-semibold text-fyn-ink/70 hover:text-fyn-red transition-colors"
               >
-                <PlayCircle size={14} /> Or start from demo login <span aria-hidden>→</span>
+                <PlayCircle size={14} /> Or try it free on your own statement <span aria-hidden>→</span>
               </Link>
             </div>
           );
@@ -532,19 +534,6 @@ const Navbar = () => {
       }}
     >
       <Link
-        to="/login"
-        className="flex items-center gap-3 rounded-lg px-3 py-3 hover:bg-fyn-ink/5 transition-colors"
-      >
-        <span className="flex h-9 w-9 items-center justify-center rounded-md bg-fyn-red/10 text-fyn-red">
-          <Store size={16} />
-        </span>
-        <span className="flex flex-col">
-          <span className="text-[15px] font-semibold text-fyn-ink">Client login</span>
-          <span className="text-[12.5px] text-fyn-ink/60">Business owners & founders</span>
-        </span>
-      </Link>
-      <div className="my-1 h-px bg-fyn-ink/8" />
-      <Link
         to="/ca/login"
         className="flex items-center gap-3 rounded-lg px-3 py-3 hover:bg-fyn-ink/5 transition-colors"
       >
@@ -554,6 +543,19 @@ const Navbar = () => {
         <span className="flex flex-col">
           <span className="text-[15px] font-semibold text-fyn-ink">CA login</span>
           <span className="text-[12.5px] text-fyn-ink/60">Chartered accountants & firms</span>
+        </span>
+      </Link>
+      <div className="my-1 h-px bg-fyn-ink/8" />
+      <Link
+        to="/login"
+        className="flex items-center gap-3 rounded-lg px-3 py-3 hover:bg-fyn-ink/5 transition-colors"
+      >
+        <span className="flex h-9 w-9 items-center justify-center rounded-md bg-fyn-red/10 text-fyn-red">
+          <Store size={16} />
+        </span>
+        <span className="flex flex-col">
+          <span className="text-[15px] font-semibold text-fyn-ink">Client login</span>
+          <span className="text-[12.5px] text-fyn-ink/60">Business owners & founders</span>
         </span>
       </Link>
     </div>
@@ -609,7 +611,8 @@ const Navbar = () => {
               {openMenu === "signin" && SignInMenu}
             </div>
             <Link
-              to="/v2/onboarding?mode=signup"
+              to={SIGNUP_URL}
+              onClick={() => trackCta("start", "nav")}
               className="bg-fyn-red hover:bg-fyn-red-dark text-white text-[15px] font-semibold px-5 py-2.5 rounded-lg shadow-xs transition-colors"
             >
               Start free
@@ -691,11 +694,14 @@ const Navbar = () => {
                   </Link>
                 ))}
                 <Link
-                  to="/waitlist"
-                  onClick={() => setMobileOpen(false)}
+                  to={SIGNUP_URL}
+                  onClick={() => {
+                    trackCta("start", "nav-mobile-menu");
+                    setMobileOpen(false);
+                  }}
                   className="mt-3 mb-1 flex items-center gap-2 text-fyn-red text-[13.5px] font-semibold"
                 >
-                  <PlayCircle size={16} /> Demo login →
+                  <PlayCircle size={16} /> Try it free →
                 </Link>
               </div>
             )}
@@ -765,13 +771,6 @@ const Navbar = () => {
 
             <div className="mt-6 space-y-3">
               <Link
-                to="/login"
-                onClick={() => setMobileOpen(false)}
-                className="flex items-center justify-center gap-2 py-3 rounded-lg border border-white/20 text-white text-[14px] font-semibold"
-              >
-                <Store size={16} /> Client login
-              </Link>
-              <Link
                 to="/ca/login"
                 onClick={() => setMobileOpen(false)}
                 className="flex items-center justify-center gap-2 py-3 rounded-lg border border-white/20 text-white text-[14px] font-semibold"
@@ -779,8 +778,18 @@ const Navbar = () => {
                 <Briefcase size={16} /> CA login
               </Link>
               <Link
-                to="/v2/onboarding?mode=signup"
+                to="/login"
                 onClick={() => setMobileOpen(false)}
+                className="flex items-center justify-center gap-2 py-3 rounded-lg border border-white/20 text-white text-[14px] font-semibold"
+              >
+                <Store size={16} /> Client login
+              </Link>
+              <Link
+                to={SIGNUP_URL}
+                onClick={() => {
+                  trackCta("start", "nav-mobile");
+                  setMobileOpen(false);
+                }}
                 className="block bg-fyn-red text-white text-center py-3 rounded-lg font-semibold"
               >
                 Start free

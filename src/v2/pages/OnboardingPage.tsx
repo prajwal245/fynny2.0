@@ -86,7 +86,16 @@ export default function OnboardingPage() {
     if (typeof window !== "undefined" && window.location.pathname !== "/v2/onboarding") return;
     if (session && firm && !settingUp.current && step <= 1) navigate({ to: "/v2" });
   }, [session, firm, step, navigate]);
-  const [account, setAccount] = useState({ name: session?.name ?? "", email: session?.email ?? "", password: "" });
+  // An email typed on the website (hero box, demo form) carries over, so nobody types it twice.
+  const [account, setAccount] = useState(() => {
+    let fromLink = "";
+    try {
+      if (typeof window !== "undefined") fromLink = new URLSearchParams(window.location.search).get("email")?.trim().slice(0, 254) ?? "";
+    } catch {
+      /* ignore */
+    }
+    return { name: session?.name ?? "", email: session?.email ?? fromLink, password: "" };
+  });
   const [firmForm, setFirmForm] = useState({ name: firm?.name ?? "", city: firm?.city ?? "", frn: firm?.frn ?? "" });
   const [client, setClient] = useState({ name: "", entityType: ENTITY_TYPES[0], gstin: "", contactName: "", email: "", phone: "" });
   const [clientId, setClientId] = useState<string | null>(null);

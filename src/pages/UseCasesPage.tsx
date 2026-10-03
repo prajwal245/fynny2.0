@@ -3,6 +3,8 @@ import { ArrowRight, Check } from "lucide-react";
 import SiteShell, { PageHero, Section, CtaBand, Reveal } from "@/components/site/SiteShell";
 import { AGENTS } from "@/components/site/agents";
 import { C } from "@/components/site/siteTheme";
+import { CTA_DEMO, CTA_START, SIGNUP_URL, trackCta } from "@/components/site/cta";
+import { DemoLink } from "@/components/site/BookDemo";
 
 const SEGMENTS = [
   {
@@ -37,12 +39,12 @@ export default function UseCasesPage() {
         sub="Each module owns a part of the month end. Together they read your books, reconcile them against source, and hand you the handful of things that genuinely need a decision."
         actions={
           <>
-            <Link to="/waitlist" className="fh-btn fh-btn-primary">
-              Book a demo <ArrowRight size={15} />
+            <Link to={SIGNUP_URL} className="fh-btn fh-btn-primary" onClick={() => trackCta("start", "use-cases-hero")}>
+              {CTA_START} <ArrowRight size={15} />
             </Link>
-            <Link to="/waitlist" className="fh-btn fh-btn-ghost">
-              Book a demo
-            </Link>
+            <DemoLink location="use-cases-hero" className="fh-btn fh-btn-ghost">
+              {CTA_DEMO}
+            </DemoLink>
           </>
         }
       />
@@ -116,7 +118,7 @@ export default function UseCasesPage() {
         title="See it run"
         italic="on your own numbers"
         lead="Bring one month of statements. You leave with the findings whether or not you sign up."
-        secondary={{ to: "/pricing", label: "See pricing" }}
+        location="use-cases-final"
       />
     </SiteShell>
   );

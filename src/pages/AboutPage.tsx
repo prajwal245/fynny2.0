@@ -1,6 +1,8 @@
 import { Link } from "@/lib/router-compat";
 import { ArrowRight, Check } from "lucide-react";
 import SiteShell, { PageHero, Section, CtaBand, Reveal } from "@/components/site/SiteShell";
+import { CTA_DEMO, CTA_START, SIGNUP_URL, trackCta } from "@/components/site/cta";
+import { DemoLink } from "@/components/site/BookDemo";
 
 const BELIEFS = [
   {
@@ -37,12 +39,12 @@ export default function AboutPage() {
         sub="FynHelp reads what an Indian business already produces, invoices, statements, filings, and turns it into the handful of decisions a CFO would actually raise this week."
         actions={
           <>
-            <Link to="/waitlist" className="fh-btn fh-btn-primary">
-              Book a demo <ArrowRight size={15} />
+            <Link to={SIGNUP_URL} className="fh-btn fh-btn-primary" onClick={() => trackCta("start", "about-hero")}>
+              {CTA_START} <ArrowRight size={15} />
             </Link>
-            <Link to="/use-cases" className="fh-btn fh-btn-ghost">
-              See the agents
-            </Link>
+            <DemoLink location="about-hero" className="fh-btn fh-btn-ghost">
+              {CTA_DEMO}
+            </DemoLink>
           </>
         }
       />
@@ -134,7 +136,7 @@ export default function AboutPage() {
         title="Thirty minutes with"
         italic="your own books"
         lead="No slides. We run the agents on one month of your data and read the findings together."
-        secondary={{ to: "/ca-firms", label: "For CA firms" }}
+        location="about-final"
       />
     </SiteShell>
   );

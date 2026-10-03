@@ -3,6 +3,8 @@ import { Check, ArrowRight } from "lucide-react";
 import SiteShell, { PageHero, Section, CtaBand, Reveal } from "@/components/site/SiteShell";
 import { AGENTS, agentBySlug } from "@/components/site/agents";
 import { C } from "@/components/site/siteTheme";
+import { CTA_DEMO, CTA_START, SIGNUP_URL, trackCta } from "@/components/site/cta";
+import { DemoLink } from "@/components/site/BookDemo";
 
 export default function AgentPage({ slug }: { slug: string }) {
   const agent = agentBySlug(slug);
@@ -36,12 +38,12 @@ export default function AgentPage({ slug }: { slug: string }) {
         sub={agent.sub}
         actions={
           <>
-            <Link to="/waitlist" className="fh-btn fh-btn-primary">
-              Book a demo <ArrowRight size={15} />
+            <Link to={SIGNUP_URL} className="fh-btn fh-btn-primary" onClick={() => trackCta("start", "agent-hero")}>
+              {CTA_START} <ArrowRight size={15} />
             </Link>
-            <Link to="/waitlist" className="fh-btn fh-btn-ghost">
-              See it running
-            </Link>
+            <DemoLink location="agent-hero" className="fh-btn fh-btn-ghost">
+              {CTA_DEMO}
+            </DemoLink>
           </>
         }
       />
@@ -136,7 +138,7 @@ export default function AgentPage({ slug }: { slug: string }) {
         title={`Put the ${agent.name.toLowerCase()}`}
         italic="on your books"
         lead="Thirty minutes with your own data. You keep whatever it finds, whether or not you continue."
-        secondary={{ to: "/pricing", label: "See pricing" }}
+        location="agent-final"
       />
     </SiteShell>
   );

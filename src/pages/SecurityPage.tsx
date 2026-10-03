@@ -3,6 +3,7 @@ import { Link } from "@/lib/router-compat";
 import { motion } from "framer-motion";
 import { Shield, Lock, Eye, RefreshCw, CheckCircle2, X, KeyRound, Server, Users, FileCheck, Clock, Calendar, Rocket, ShieldCheck, ArrowRight, MessageCircle, CreditCard, XCircle, Sparkles, Mail } from "lucide-react";
 import Layout from "@/components/Layout";
+import { SIGNUP_URL, trackCta } from "@/components/site/cta";
 
 const INK = "#171208";
 const RED = "#C41E1E";
@@ -361,8 +362,8 @@ const SecurityPage = () => {
               <span>View Security Whitepaper</span>
             </button>
 
-            <Link to="/waitlist" className="security-btn-primary">
-              <span>Start Free Trial</span>
+            <Link to={SIGNUP_URL} className="security-btn-primary" onClick={() => trackCta("start", "security-hero")}>
+              <span>Start free</span>
               <Rocket size={20} />
             </Link>
           </div>
@@ -991,10 +992,10 @@ const SecurityPage = () => {
             transition={{ duration: 0.7, delay: 0.6, ease: [0.4, 0, 0.2, 1] as const }}
             className="fyn-cta-btnrow"
           >
-            <Link to="/waitlist" className="fyn-cta-btn-primary">
+            <Link to={SIGNUP_URL} className="fyn-cta-btn-primary" onClick={() => trackCta("start", "security-final")}>
               <span className="fyn-cta-btn-shine" aria-hidden />
               <span style={{ position: "relative", zIndex: 1, display: "inline-flex", alignItems: "center", gap: 12 }}>
-                START YOUR FREE TRIAL
+                Start free
                 <ArrowRight size={22} />
               </span>
             </Link>

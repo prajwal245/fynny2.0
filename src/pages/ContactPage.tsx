@@ -1,6 +1,7 @@
 import { useState } from "react";
 import SiteShell, { Section, Reveal } from "@/components/site/SiteShell";
 import { C } from "@/components/site/siteTheme";
+import { DemoLink } from "@/components/site/BookDemo";
 
 /* ================================================================
    FynHelp — Contact
@@ -102,7 +103,7 @@ export default function ContactPage() {
                 <h3>Prefer a walkthrough?</h3>
                 <p>
                   Book a twenty-minute demo and we will run the pipeline on a sample book with you.{" "}
-                  <a href="/waitlist">Book a demo</a>
+                  <DemoLink location="contact">Book a demo</DemoLink>
                 </p>
               </div>
             </Reveal>

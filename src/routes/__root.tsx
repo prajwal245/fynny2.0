@@ -17,7 +17,6 @@ import SkipToContent from "@/components/system/SkipToContent";
 import ScrollManager from "@/components/system/ScrollManager";
 import SearchPalette from "@/components/system/SearchPalette";
 import FloatingContact from "@/components/system/FloatingContact";
-import WaitlistPopup from "@/components/WaitlistPopup";
 import NotFound from "@/pages/NotFound";
 import { Sentry } from "@/lib/monitoring";
 import { usePageTracking } from "@/hooks/usePageTracking";
@@ -215,7 +214,6 @@ function RootComponent() {
             <SiteOnly>
               <SearchPalette />
               <FloatingContact />
-              <WaitlistPopup />
             </SiteOnly>
             <div id="main-content" tabIndex={-1}>
               <Outlet />

@@ -1,796 +1,179 @@
-import { useState, useEffect, useRef } from "react";
+/**
+ * Site header: four links, one sign-in, two actions. Every link goes to a
+ * real page about the product that exists today; no mega-menus.
+ */
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "@/lib/router-compat";
-import {
-  Menu,
-  X,
-  ChevronDown,
-  Store,
-  Briefcase,
-  PlayCircle,
-  FileSearch,
-  GitCompareArrows,
-  PenLine,
-  Send,
-  Rocket,
-  ShoppingBag,
-  Factory,
-  ShieldCheck,
-  LayoutDashboard,
-  FileStack,
-  Brain,
-  CalendarCheck,
-  FileCheck,
-  AlertTriangle,
-  Users,
-  BarChart3,
-  FileText,
-} from "lucide-react";
+import { Menu, X } from "lucide-react";
 import FynLogo from "@/components/FynLogo";
-import { supabase } from "@/integrations/supabase/client";
-import { isAdminEmail } from "@/lib/adminEmails";
+import { C } from "@/components/site/siteTheme";
+import {
+  CTA_DEMO,
+  CTA_START,
+  SIGNUP_URL,
+  trackCta,
+} from "@/components/site/cta";
+import { DemoLink } from "@/components/site/BookDemo";
 
+const SIGNIN_URL = "/v2/onboarding?mode=signin";
 
-/* ────────────────────────────────────────────────────────────────
-   Data
-──────────────────────────────────────────────────────────────── */
-
-import type { LucideIcon } from "lucide-react";
-type IconType = LucideIcon;
-
-type ModuleKey = "extract" | "recon" | "narrate" | "chaser";
-
-type ModuleStat = { label: string; value: string; sub?: string; tone?: "healthy" | "warning" | "critical" | "neutral" };
-type ModulePreview = { title: string; sub: string; stats: ModuleStat[]; footer?: string };
-
-const PRODUCT_MODULES: { key: ModuleKey; icon: IconType; label: string; href: string; desc: string; preview: ModulePreview }[] = [
-  {
-    key: "extract",
-    icon: FileSearch,
-    label: "Extract",
-    href: "/agents/extract",
-    desc: "Documents to structured lines",
-    preview: {
-      title: "Extract",
-      sub: "Reading INV-4515.pdf",
-      stats: [
-        { label: "Amount",    value: "₹1,24,500", sub: "Field lifted",      tone: "healthy" },
-        { label: "GSTIN",     value: "27AAB…1Z5", sub: "Format valid",      tone: "healthy" },
-        { label: "Fields",    value: "3",         sub: "Extracted",         tone: "neutral" },
-        { label: "Confidence",value: "98%",       sub: "Shown, not hidden", tone: "healthy" },
-      ],
-      footer: "Classified · read · structured",
-    },
-  },
-  {
-    key: "recon",
-    icon: GitCompareArrows,
-    label: "Recon",
-    href: "/agents/recon",
-    desc: "Bank matched to ledger",
-    preview: {
-      title: "Recon",
-      sub: "Matching 423 transactions",
-      stats: [
-        { label: "Matched",    value: "421",     sub: "Exact · fuzzy · rules", tone: "healthy" },
-        { label: "Exceptions", value: "2",       sub: "Visible, not hidden",   tone: "warning" },
-        { label: "INV-2288",   value: "₹41,200", sub: "Locked to bank line",   tone: "healthy" },
-        { label: "Unmatched",  value: "₹4,120",  sub: "Queued with reason",    tone: "warning" },
-      ],
-      footer: "A step, not a failure",
-    },
-  },
-  {
-    key: "narrate",
-    icon: PenLine,
-    label: "Narrate",
-    href: "/agents/narrate",
-    desc: "Drafts with sources attached",
-    preview: {
-      title: "Narrate",
-      sub: "Drafting GSTR-3B note",
-      stats: [
-        { label: "Draft",    value: "ITC reversed", sub: "Under Rule 42",        tone: "neutral" },
-        { label: "Amount",   value: "₹12,480",      sub: "Working shown",        tone: "neutral" },
-        { label: "Source",   value: "GSTR-2B_Aug",  sub: "Clipped to the draft", tone: "healthy" },
-        { label: "Posted",   value: "0 unseen",     sub: "You approve first",    tone: "healthy" },
-      ],
-      footer: "Deliberate · reviewable",
-    },
-  },
-  {
-    key: "chaser",
-    icon: Send,
-    label: "Chaser",
-    href: "/agents/chaser",
-    desc: "Polite follow-ups that send themselves",
-    preview: {
-      title: "Chaser",
-      sub: "Nudging 4 clients",
-      stats: [
-        { label: "Nudges sent", value: "4",      sub: "Polite, on schedule",  tone: "neutral" },
-        { label: "Replied",     value: "2",      sub: "Payment promised",     tone: "healthy" },
-        { label: "Asked again", value: "1",      sub: "Once more, then you",  tone: "warning" },
-        { label: "Escalated",   value: "1",      sub: "With full history",    tone: "warning" },
-      ],
-      footer: "Sends · fades · asks once more",
-    },
-  },
+const LINKS: { label: string; href: string }[] = [
+  { label: "Product", href: "/pipeline" },
+  { label: "Pricing", href: "/pricing" },
+  { label: "Security", href: "/security" },
+  { label: "About", href: "/about" },
 ];
 
-const PRODUCT_USECASES: { icon: IconType; label: string; href: string }[] = [
-  { icon: Rocket,      label: "Startups & founders",       href: "/use-cases" },
-  { icon: ShoppingBag, label: "D2C brands",                href: "/use-cases" },
-  { icon: Factory,     label: "Trading & manufacturing",   href: "/use-cases" },
-  { icon: ShieldCheck, label: "Security & compliance",     href: "/security" },
-];
+const STYLES = `
+.sh { position:sticky; top:env(safe-area-inset-top,0px); z-index:50; background:rgba(242,238,231,.86); backdrop-filter:saturate(1.4) blur(12px); -webkit-backdrop-filter:saturate(1.4) blur(12px); border-bottom:1px solid transparent; transition:border-color .2s, box-shadow .2s; font-family:'Instrument Sans','Inter',system-ui,sans-serif; }
+.sh.scrolled { border-bottom-color:${C.line}; box-shadow:0 8px 24px -20px rgba(23,18,8,.35); }
+.sh-in { max-width:1200px; margin:0 auto; padding:0 22px; height:66px; display:flex; align-items:center; gap:28px; }
+.sh-logo { display:inline-flex; align-items:center; gap:9px; flex:0 0 auto; text-decoration:none; }
+.sh-word { font-size:20px; font-weight:700; letter-spacing:-0.035em; color:${C.ink}; }
+.sh-nav { display:flex; align-items:center; gap:4px; flex:1; }
+.sh-link { font-size:15px; font-weight:500; color:${C.body}; text-decoration:none; padding:8px 12px; border-radius:999px; transition:color .15s, background .15s; }
+.sh-link:hover { color:${C.ink}; background:rgba(23,18,8,.05); }
+.sh-link[aria-current="page"] { color:${C.ink}; }
+.sh-right { display:flex; align-items:center; gap:10px; }
+.sh-btn { display:inline-flex; align-items:center; justify-content:center; height:40px; padding:0 18px; border-radius:999px; font-size:14.5px; font-weight:600; text-decoration:none; white-space:nowrap; transition:transform .15s, background .15s, border-color .15s; }
+.sh-btn:hover { transform:translateY(-1px); }
+.sh-primary { background:${C.ink}; color:${C.onDark}; }
+.sh-primary:hover { background:${C.inkDeep}; }
+.sh-ghost { color:${C.ink}; border:1px solid rgba(23,18,8,.16); background:transparent; }
+.sh-ghost:hover { border-color:rgba(23,18,8,.4); }
+.sh a:focus-visible, .sh button:focus-visible { outline:2px solid ${C.coral}; outline-offset:2px; }
+.sh-menu-btn { display:none; width:40px; height:40px; border-radius:999px; border:1px solid rgba(23,18,8,.16); background:transparent; color:${C.ink}; align-items:center; justify-content:center; cursor:pointer; }
+.sh-sheet { position:fixed; inset:66px 0 0 0; background:${C.page}; z-index:49; padding:12px 22px calc(24px + env(safe-area-inset-bottom,0px)); display:flex; flex-direction:column; gap:4px; overflow-y:auto; }
+.sh-sheet a.sh-m { font-size:20px; font-weight:600; color:${C.ink}; text-decoration:none; padding:14px 2px; border-bottom:1px solid ${C.line}; letter-spacing:-0.01em; }
+.sh-sheet .sh-actions { display:grid; gap:10px; margin-top:22px; }
+.sh-sheet .sh-btn { height:50px; font-size:16px; }
+@media (max-width: 900px) {
+  .sh-nav, .sh-right .sh-hide-m { display:none; }
+  .sh-menu-btn { display:inline-flex; }
+  .sh-in { gap:12px; justify-content:space-between; }
+  .sh-right .sh-btn { height:38px; padding:0 14px; font-size:14px; }
+}
+@media (prefers-reduced-motion: reduce) { .sh-btn, .sh-link { transition:none; } .sh-btn:hover { transform:none; } }
+`;
 
-const CA_PRACTICE: { icon: IconType; label: string; href: string; desc: string }[] = [
-  { icon: FileSearch,       label: "Document intake",       href: "/ca-firms", desc: "workflow" },
-  { icon: GitCompareArrows, label: "Reconciliation",         href: "/ca-firms", desc: "workflow" },
-  { icon: AlertTriangle,    label: "Exception queue",        href: "/ca-firms", desc: "workflow" },
-  { icon: Send,             label: "Chaser automation",      href: "/ca-firms", desc: "workflow" },
-  { icon: CalendarCheck,    label: "Compliance calendar",    href: "/ca-firms", desc: "workflow" },
-  { icon: FileCheck,        label: "Month-end close",        href: "/ca-firms", desc: "workflow" },
-  { icon: LayoutDashboard,  label: "Portfolio dashboard",    href: "/ca-firms", desc: "intelligence" },
-  { icon: Brain,            label: "Learning brain",         href: "/ca-firms", desc: "intelligence" },
-  { icon: BarChart3,        label: "Practice analytics",     href: "/ca-firms", desc: "intelligence" },
-  { icon: FileText,         label: "MIS reports",            href: "/ca-firms", desc: "intelligence" },
-  { icon: Users,            label: "Client portal",          href: "/ca-firms", desc: "intelligence" },
-  { icon: ShieldCheck,      label: "Audit trail",            href: "/ca-firms", desc: "intelligence" },
-];
-
-const CA_PREVIEW_STATS: ModuleStat[] = [
-  { label: "Active clients",        value: "48",    sub: "3 new this month",       tone: "neutral"  },
-  { label: "Filings this week",     value: "12",    sub: "GSTR-3B 8 · GSTR-1 4",  tone: "warning"  },
-  { label: "Exceptions open",       value: "5",     sub: "Ranked by rupee impact", tone: "critical" },
-  { label: "ITC at risk",           value: "₹8.4L", sub: "Across 6 clients",       tone: "warning"  },
-];
-
-const TOP_LINKS: { label: string; href: string }[] = [
-  { label: "Pipeline",  href: "/pipeline" },
-  { label: "Pricing",   href: "/pricing" },
-  { label: "Resources", href: "/resources" },
-  { label: "About",     href: "/about" },
-  { label: "Contact",   href: "/contact" },
-];
-
-/* ────────────────────────────────────────────────────────────────
-   Component
-──────────────────────────────────────────────────────────────── */
-
-type MenuKey = "products" | "ca" | "signin" | null;
-
-const NAV_HEIGHT = 76;
-
-const Navbar = () => {
-  const location = useLocation();
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [openMenu, setOpenMenu] = useState<MenuKey>(null);
-  const [previewModule, setPreviewModule] = useState<ModuleKey>("extract");
-  const [mProducts, setMProducts] = useState(false);
-  const [mCA, setMCA] = useState(false);
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const scheduleClose = () => {
-    clearTimeout(closeTimer.current);
-    closeTimer.current = setTimeout(() => setOpenMenu(null), 220);
-  };
-  const openNow = (key: MenuKey) => {
-    clearTimeout(closeTimer.current);
-    setOpenMenu(key);
-  };
+export default function Navbar() {
+  const { pathname } = useLocation();
+  const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
-    setMobileOpen(false);
-    setOpenMenu(null);
-  }, [location.pathname, location.search]);
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
+  // Close the phone menu on navigation, lock the page behind it, Esc closes.
+  useEffect(() => setOpen(false), [pathname]);
   useEffect(() => {
-    const onDown = (e: MouseEvent) => {
-      if (!containerRef.current) return;
-      if (!containerRef.current.contains(e.target as Node)) setOpenMenu(null);
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
     };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, []);
+  }, [open]);
 
-  const [isAdmin, setIsAdmin] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    supabase.auth.getUser().then(({ data }) => {
-      if (!cancelled) setIsAdmin(isAdminEmail(data.user?.email));
-    });
-    return () => { cancelled = true; };
-  }, []);
-
-  const isActive = (href: string) => location.pathname === href;
-
-
-  // Top-level trigger button
-  const Trigger = ({
-    label,
-    menuKey,
-    active,
-  }: {
-    label: string;
-    menuKey: Exclude<MenuKey, null>;
-    active?: boolean;
-  }) => {
-    const isOpen = openMenu === menuKey;
-    return (
-      <button
-        onMouseEnter={() => openNow(menuKey)}
-        onMouseLeave={scheduleClose}
-        onClick={() => setOpenMenu(isOpen ? null : menuKey)}
-        aria-haspopup="true"
-        aria-expanded={isOpen}
-        className="relative flex items-center gap-1.5 py-6 text-[15.5px] font-medium text-white/75 hover:text-white transition-colors"
-      >
-        <span className={active || isOpen ? "text-white" : ""}>{label}</span>
-        <ChevronDown
-          size={13}
-          className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
-        />
-        <span
-          className={`absolute left-0 right-0 -bottom-[1px] h-[2px] rounded-full transition-all duration-200 ${
-            active || isOpen ? "bg-fyn-red opacity-100" : "opacity-0"
-          }`}
-        />
-      </button>
-    );
-  };
-
-  const PlainLink = ({ href, label }: { href: string; label: string }) => (
-    <Link
-      to={href}
-      className="relative py-6 text-[15.5px] font-medium text-white/75 hover:text-white transition-colors"
-    >
-      <span className={isActive(href) ? "text-white" : ""}>{label}</span>
-      <span
-        className={`absolute left-0 right-0 -bottom-[1px] h-[2px] rounded-full transition-all duration-200 ${
-          isActive(href) ? "bg-fyn-red opacity-100" : "opacity-0"
-        }`}
-      />
-    </Link>
-  );
-
-  /* ── Dashboard-styled preview panel (matches IntelCard from real product) ── */
-
-  const toneColor = (t?: ModuleStat["tone"]) =>
-    t === "critical" ? "#A93838" : t === "warning" ? "#8B6914" : t === "healthy" ? "#1F5A46" : "transparent";
-
-  const DashboardPreviewCard = ({
-    eyebrow,
-    title,
-    sub,
-    stats,
-    footer,
-    ctaLabel,
-    ctaHref,
-  }: {
-    eyebrow: string;
-    title: string;
-    sub: string;
-    stats: ModuleStat[];
-    footer?: string;
-    ctaLabel: string;
-    ctaHref: string;
-  }) => (
-    <Link
-      to={ctaHref}
-      className="group flex flex-col rounded-lg overflow-hidden bg-white transition-all hover:-translate-y-0.5"
-      style={{
-        border: "1px solid rgba(23,18,8,0.10)",
-        borderLeft: "3px solid #A93838",
-        boxShadow: "0 8px 24px -8px rgba(23,18,8,0.16), 0 2px 8px rgba(23,18,8,0.06)",
-      }}
-    >
-      {/* Header strip — mimics IntelCard title area */}
-      <div className="flex items-center justify-between px-5 pt-4 pb-3" style={{ borderBottom: "1px solid rgba(23,18,8,0.06)" }}>
-        <div>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-fyn-ink/45">
-            {eyebrow} · live preview
-          </div>
-          <div className="mt-0.5 flex items-baseline gap-2">
-            <span className="text-[15px] font-semibold text-fyn-ink" style={{ fontFamily: "Georgia, ui-serif, serif" }}>{title}</span>
-            <span className="text-[11.5px] text-[rgba(23,18,8,0.62)]">{sub}</span>
-          </div>
-        </div>
-        <span className="flex items-center gap-1 text-[10px] text-fyn-ink/50">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          Demo data
-        </span>
-      </div>
-
-      {/* KPI grid */}
-      <div className="grid grid-cols-2 gap-px bg-[rgba(23,18,8,0.06)]">
-        {stats.map((s) => (
-          <div key={s.label} className="bg-white px-4 py-3">
-            <div className="text-[10px] font-medium uppercase tracking-wider text-[rgba(23,18,8,0.62)]">{s.label}</div>
-            <div
-              className="mt-1 font-mono text-[17px] font-semibold tabular-nums text-fyn-ink"
-              style={{ color: s.tone === "critical" ? "#A93838" : "#171208" }}
-            >
-              {s.value}
-            </div>
-            {s.sub && (
-              <div className="mt-0.5 flex items-center gap-1.5 text-[10.5px] text-[rgba(23,18,8,0.62)]">
-                {s.tone && s.tone !== "neutral" && (
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: toneColor(s.tone) }} />
-                )}
-                {s.sub}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Footer */}
-      <div className="flex items-center justify-between px-5 py-3 bg-[#FAF7F0]" style={{ borderTop: "1px solid rgba(23,18,8,0.06)" }}>
-        <span className="text-[11px] text-[rgba(23,18,8,0.62)] truncate pr-3">{footer}</span>
-        <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-fyn-red group-hover:gap-2 transition-all whitespace-nowrap">
-          {ctaLabel} <span aria-hidden>→</span>
-        </span>
-      </div>
-    </Link>
-  );
-
-  /* ── Mega menu shells ─────────────────────────────────────── */
-
-
-
-  const ProductsMenu = (
-    <div
-      onMouseEnter={() => openNow("products")}
-      onMouseLeave={scheduleClose}
-      className="absolute inset-x-0 top-full"
-      style={{
-        background: "hsl(var(--fyn-beige))",
-        borderTop: "1px solid rgba(23,18,8,0.08)",
-        boxShadow: "0 24px 48px -12px rgba(23,18,8,0.18)",
-        animation: "fade-in 180ms ease-out",
-      }}
-    >
-      <div className="max-w-[1400px] mx-auto px-14 py-10 grid grid-cols-[1fr_1fr_360px] gap-14">
-        {/* Column 1 */}
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-fyn-ink/50 mb-4">
-            By module
-          </div>
-          <div className="flex flex-col gap-1.5">
-            {PRODUCT_MODULES.map((m) => {
-              const isActivePreview = previewModule === m.key;
-              return (
-                <Link
-                  key={m.label}
-                  to={m.href}
-                  onMouseEnter={() => setPreviewModule(m.key)}
-                  onFocus={() => setPreviewModule(m.key)}
-                  className={`flex items-start gap-3 rounded-lg px-3 py-3 transition-colors ${
-                    isActivePreview ? "bg-white" : "hover:bg-fyn-ink/5"
-                  }`}
-                  style={isActivePreview ? { boxShadow: "0 1px 3px rgba(23,18,8,0.06)" } : undefined}
-                >
-                  <span className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-md bg-fyn-red/10 text-fyn-red">
-                    <m.icon size={16} />
-                  </span>
-                  <span className="flex flex-col">
-                    <span className="text-[15px] font-semibold text-fyn-ink">{m.label}</span>
-                    <span className="text-[13.5px] text-fyn-ink/60">{m.desc}</span>
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Column 2 */}
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-fyn-ink/50 mb-4">
-            By use case
-          </div>
-          <div className="flex flex-col gap-1.5">
-            {PRODUCT_USECASES.map((u) => (
-              <Link
-                key={u.label}
-                to={u.href}
-                className="flex items-center gap-3 rounded-lg px-3 py-3 hover:bg-fyn-ink/5 transition-colors"
-              >
-                <span className="flex h-8 w-8 items-center justify-center rounded-md bg-fyn-gold/15 text-fyn-gold">
-                  <u.icon size={16} />
-                </span>
-                <span className="text-[15px] font-medium text-fyn-ink">{u.label}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        {/* Column 3 — live dashboard preview (styled to match real product) */}
-        {(() => {
-          const active = PRODUCT_MODULES.find((m) => m.key === previewModule) ?? PRODUCT_MODULES[0];
-          return (
-            <div className="flex flex-col gap-3">
-              <DashboardPreviewCard
-                eyebrow={active.preview.title}
-                title={active.preview.title}
-                sub={active.preview.sub}
-                stats={active.preview.stats}
-                footer={active.preview.footer}
-                ctaLabel="Open live demo"
-                ctaHref={active.href}
-              />
-              <Link
-                to="/waitlist"
-                className="group inline-flex items-center gap-1.5 self-end text-[12.5px] font-semibold text-fyn-ink/70 hover:text-fyn-red transition-colors"
-              >
-                <PlayCircle size={14} /> Or start from demo login <span aria-hidden>→</span>
-              </Link>
-            </div>
-          );
-        })()}
-      </div>
-    </div>
-  );
-
-  const CAMenu = (
-    <div
-      onMouseEnter={() => openNow("ca")}
-      onMouseLeave={scheduleClose}
-      className="absolute inset-x-0 top-full"
-      style={{
-        background: "hsl(var(--fyn-beige))",
-        borderTop: "1px solid rgba(23,18,8,0.08)",
-        boxShadow: "0 24px 48px -12px rgba(23,18,8,0.18)",
-        animation: "fade-in 180ms ease-out",
-      }}
-    >
-      <div className="max-w-[1400px] mx-auto px-14 py-10 grid grid-cols-[1fr_400px] gap-14">
-        <div className="grid grid-cols-[1fr_1fr] gap-8">
-          <div>
-            <div className="text-[9.5px] font-semibold uppercase tracking-[0.16em] text-fyn-ink/35 mb-3">
-              Workflow
-            </div>
-            <div className="flex flex-col gap-1.5">
-              {CA_PRACTICE.filter((c) => c.desc === "workflow").map((c) => (
-                <Link
-                  key={c.label}
-                  to={c.href}
-                  className="flex items-center gap-3 rounded-lg px-3 py-3 hover:bg-fyn-ink/5 transition-colors"
-                >
-                  <span
-                    className="flex h-8 w-8 items-center justify-center rounded-md"
-                    style={{ background: "rgba(169,56,56,0.09)", color: "#A93838" }}
-                  >
-                    <c.icon size={16} />
-                  </span>
-                  <span className="text-[15px] font-semibold text-fyn-ink">{c.label}</span>
-                </Link>
-              ))}
-            </div>
-          </div>
-          <div>
-            <div className="text-[9.5px] font-semibold uppercase tracking-[0.16em] text-fyn-ink/35 mb-3">
-              Intelligence
-            </div>
-            <div className="flex flex-col gap-1.5">
-              {CA_PRACTICE.filter((c) => c.desc === "intelligence").map((c) => (
-                <Link
-                  key={c.label}
-                  to={c.href}
-                  className="flex items-center gap-3 rounded-lg px-3 py-3 hover:bg-fyn-ink/5 transition-colors"
-                >
-                  <span
-                    className="flex h-8 w-8 items-center justify-center rounded-md"
-                    style={{ background: "rgba(139,105,20,0.09)", color: "#8B6914" }}
-                  >
-                    <c.icon size={16} />
-                  </span>
-                  <span className="text-[15px] font-semibold text-fyn-ink">{c.label}</span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-3">
-          <DashboardPreviewCard
-            eyebrow="CA Portal"
-            title="Portfolio"
-            sub="Live snapshot"
-            stats={CA_PREVIEW_STATS}
-            footer="393 auto-matched · 1 open"
-            ctaLabel="Explore CA portal"
-            ctaHref="/ca-firms"
-          />
-          <Link
-            to="/ca/register"
-            className="group inline-flex items-center gap-1.5 self-end text-[12.5px] font-semibold text-fyn-ink/70 hover:text-fyn-red transition-colors"
-          >
-            <Briefcase size={14} /> Register as CA <span aria-hidden>→</span>
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
-
-  const SignInMenu = (
-    <div
-      onMouseEnter={() => openNow("signin")}
-      onMouseLeave={scheduleClose}
-      className="absolute right-0 top-full"
-      style={{
-        width: 300,
-        marginTop: 10,
-        background: "#FFFFFF",
-        border: "1px solid rgba(23,18,8,0.08)",
-        borderRadius: 14,
-        boxShadow: "0 20px 48px -12px rgba(23,18,8,0.28)",
-        padding: 8,
-        animation: "fade-in 180ms ease-out",
-        zIndex: 60,
-      }}
-    >
-      <Link
-        to="/login"
-        className="flex items-center gap-3 rounded-lg px-3 py-3 hover:bg-fyn-ink/5 transition-colors"
-      >
-        <span className="flex h-9 w-9 items-center justify-center rounded-md bg-fyn-red/10 text-fyn-red">
-          <Store size={16} />
-        </span>
-        <span className="flex flex-col">
-          <span className="text-[15px] font-semibold text-fyn-ink">Client login</span>
-          <span className="text-[12.5px] text-fyn-ink/60">Business owners & founders</span>
-        </span>
-      </Link>
-      <div className="my-1 h-px bg-fyn-ink/8" />
-      <Link
-        to="/ca/login"
-        className="flex items-center gap-3 rounded-lg px-3 py-3 hover:bg-fyn-ink/5 transition-colors"
-      >
-        <span className="flex h-9 w-9 items-center justify-center rounded-md bg-fyn-gold/15 text-fyn-gold">
-          <Briefcase size={16} />
-        </span>
-        <span className="flex flex-col">
-          <span className="text-[15px] font-semibold text-fyn-ink">CA login</span>
-          <span className="text-[12.5px] text-fyn-ink/60">Chartered accountants & firms</span>
-        </span>
-      </Link>
-    </div>
-  );
-
-  /* ── Render ───────────────────────────────────────────────── */
+  const current = (href: string) =>
+    pathname === href || pathname.startsWith(`${href}/`) ? "page" : undefined;
 
   return (
     <>
-      <nav
-        className="fixed top-0 inset-x-0 z-50 bg-fyn-ink border-b border-white/10"
-        style={{ minHeight: NAV_HEIGHT }}
-      >
-        <div
-          ref={containerRef}
-          className="relative w-full flex items-center justify-between px-6 md:px-10 lg:px-14"
-          style={{ minHeight: NAV_HEIGHT }}
-        >
-          {/* Logo */}
-          <Link to="/" className="flex items-center shrink-0 mr-6 lg:mr-10 group">
-            <FynLogo variant="light" size="md" />
+      <header className={`sh${scrolled || open ? " scrolled" : ""}`}>
+        <style>{STYLES}</style>
+        <div className="sh-in">
+          <Link to="/" className="sh-logo" aria-label="FynHelp home">
+            <FynLogo iconOnly size="sm" />
+            <span className="sh-word">FynHelp</span>
           </Link>
 
-          {/* Desktop nav */}
-          <div className="hidden lg:flex items-center gap-10 flex-1">
-            <Trigger label="Products"    menuKey="products" />
-            <Trigger label="CA partners" menuKey="ca" />
-            {TOP_LINKS.map((l) => (
-              <PlainLink key={l.href} href={l.href} label={l.label} />
-            ))}
-          </div>
-
-          {/* Right cluster */}
-          <div className="hidden lg:flex items-center gap-4 shrink-0">
-
-
-
-            <div className="relative">
-              <button
-                onMouseEnter={() => openNow("signin")}
-                onMouseLeave={scheduleClose}
-                onClick={() => setOpenMenu(openMenu === "signin" ? null : "signin")}
-                aria-haspopup="true"
-                aria-expanded={openMenu === "signin"}
-                className="flex items-center gap-1.5 text-[15px] font-medium text-white/85 hover:text-white transition-colors py-2"
-              >
-                Sign in
-                <ChevronDown
-                  size={13}
-                  className={`transition-transform duration-200 ${openMenu === "signin" ? "rotate-180" : ""}`}
-                />
-              </button>
-              {openMenu === "signin" && SignInMenu}
-            </div>
-            <Link
-              to="/v2/onboarding?mode=signup"
-              className="bg-fyn-red hover:bg-fyn-red-dark text-white text-[15px] font-semibold px-5 py-2.5 rounded-lg shadow-xs transition-colors"
-            >
-              Start free
-            </Link>
-          </div>
-
-          {/* Mobile toggle */}
-          <button
-            className="lg:hidden text-white p-2"
-            onClick={() => setMobileOpen(!mobileOpen)}
-            aria-label={mobileOpen ? "Close menu" : "Open menu"}
-            aria-expanded={mobileOpen}
-          >
-            {mobileOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
-
-          {/* Mega menus */}
-          {openMenu === "products" && ProductsMenu}
-          {openMenu === "ca" && CAMenu}
-        </div>
-      </nav>
-
-      {/* Spacer */}
-      <div style={{ height: NAV_HEIGHT, background: "#171208" }} />
-
-      {/* Mobile drawer */}
-      <div
-        className={`lg:hidden fixed inset-0 z-40 transition-opacity duration-300 ${
-          mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-        }`}
-      >
-        <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
-        <div
-          className={`absolute right-0 top-0 bottom-0 w-[320px] bg-fyn-ink overflow-y-auto transition-transform duration-300 ${
-            mobileOpen ? "translate-x-0" : "translate-x-full"
-          }`}
-        >
-          <div className="flex flex-col gap-1 pt-24 px-6 pb-10">
-            {/* Products accordion */}
-            <button
-              onClick={() => setMProducts((v) => !v)}
-              className="flex items-center justify-between py-3 border-b border-white/10 text-white text-base font-medium"
-              aria-expanded={mProducts}
-            >
-              Products
-              <ChevronDown
-                size={18}
-                className={`transition-transform ${mProducts ? "rotate-180" : ""}`}
-              />
-            </button>
-            {mProducts && (
-              <div className="pl-3 pb-2 border-b border-white/5 flex flex-col">
-                <div className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-white/40 mt-3 mb-1">
-                  By module
-                </div>
-                {PRODUCT_MODULES.map((m) => (
-                  <Link
-                    key={m.label}
-                    to={m.href}
-                    onClick={() => setMobileOpen(false)}
-                    className="flex items-center gap-2.5 py-2.5 text-white/80 text-[14px]"
-                  >
-                    <m.icon size={16} className="text-fyn-red" />
-                    {m.label}
-                  </Link>
-                ))}
-                <div className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-white/40 mt-3 mb-1">
-                  By use case
-                </div>
-                {PRODUCT_USECASES.map((u) => (
-                  <Link
-                    key={u.label}
-                    to={u.href}
-                    onClick={() => setMobileOpen(false)}
-                    className="flex items-center gap-2.5 py-2.5 text-white/80 text-[14px]"
-                  >
-                    <u.icon size={16} className="text-fyn-gold" />
-                    {u.label}
-                  </Link>
-                ))}
-                <Link
-                  to="/waitlist"
-                  onClick={() => setMobileOpen(false)}
-                  className="mt-3 mb-1 flex items-center gap-2 text-fyn-red text-[13.5px] font-semibold"
-                >
-                  <PlayCircle size={16} /> Demo login →
-                </Link>
-              </div>
-            )}
-
-            {/* CA partners accordion */}
-            <button
-              onClick={() => setMCA((v) => !v)}
-              className="flex items-center justify-between py-3 border-b border-white/10 text-white text-base font-medium"
-              aria-expanded={mCA}
-            >
-              CA partners
-              <ChevronDown
-                size={18}
-                className={`transition-transform ${mCA ? "rotate-180" : ""}`}
-              />
-            </button>
-            {mCA && (
-              <div className="pl-3 pb-2 border-b border-white/5 flex flex-col">
-                <div className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-white/40 mt-3 mb-1">
-                  Workflow
-                </div>
-                {CA_PRACTICE.filter((c) => c.desc === "workflow").map((c) => (
-                  <Link
-                    key={c.label}
-                    to={c.href}
-                    onClick={() => setMobileOpen(false)}
-                    className="flex items-center gap-2.5 py-2.5 text-white/80 text-[14px]"
-                  >
-                    <c.icon size={16} className="text-fyn-red" />
-                    {c.label}
-                  </Link>
-                ))}
-                <div className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-white/40 mt-3 mb-1">
-                  Intelligence
-                </div>
-                {CA_PRACTICE.filter((c) => c.desc === "intelligence").map((c) => (
-                  <Link
-                    key={c.label}
-                    to={c.href}
-                    onClick={() => setMobileOpen(false)}
-                    className="flex items-center gap-2.5 py-2.5 text-white/80 text-[14px]"
-                  >
-                    <c.icon size={16} className="text-fyn-gold" />
-                    {c.label}
-                  </Link>
-                ))}
-                <Link
-                  to="/ca/register"
-                  onClick={() => setMobileOpen(false)}
-                  className="mt-3 mb-1 flex items-center gap-2 text-fyn-red text-[13.5px] font-semibold"
-                >
-                  <Briefcase size={16} /> Register as CA →
-                </Link>
-              </div>
-            )}
-
-            {TOP_LINKS.map((l) => (
+          <nav className="sh-nav" aria-label="Main">
+            {LINKS.map((l) => (
               <Link
                 key={l.href}
                 to={l.href}
-                onClick={() => setMobileOpen(false)}
-                className="py-3 border-b border-white/10 text-white text-base font-medium"
+                className="sh-link"
+                aria-current={current(l.href)}
               >
                 {l.label}
               </Link>
             ))}
+          </nav>
 
-            <div className="mt-6 space-y-3">
-              <Link
-                to="/login"
-                onClick={() => setMobileOpen(false)}
-                className="flex items-center justify-center gap-2 py-3 rounded-lg border border-white/20 text-white text-[14px] font-semibold"
-              >
-                <Store size={16} /> Client login
-              </Link>
-              <Link
-                to="/ca/login"
-                onClick={() => setMobileOpen(false)}
-                className="flex items-center justify-center gap-2 py-3 rounded-lg border border-white/20 text-white text-[14px] font-semibold"
-              >
-                <Briefcase size={16} /> CA login
-              </Link>
-              <Link
-                to="/v2/onboarding?mode=signup"
-                onClick={() => setMobileOpen(false)}
-                className="block bg-fyn-red text-white text-center py-3 rounded-lg font-semibold"
-              >
-                Start free
-              </Link>
-            </div>
+          <div className="sh-right">
+            <Link
+              to={SIGNIN_URL}
+              className="sh-link sh-hide-m"
+              onClick={() => trackCta("signin", "nav")}
+            >
+              Sign in
+            </Link>
+            <DemoLink location="nav" className="sh-btn sh-ghost sh-hide-m">
+              {CTA_DEMO}
+            </DemoLink>
+            <Link
+              to={SIGNUP_URL}
+              className="sh-btn sh-primary"
+              onClick={() => trackCta("start", "nav")}
+            >
+              {CTA_START}
+            </Link>
+            <button
+              type="button"
+              className="sh-menu-btn"
+              aria-label={open ? "Close menu" : "Open menu"}
+              aria-expanded={open}
+              aria-controls="sh-sheet"
+              onClick={() => setOpen((v) => !v)}
+            >
+              {open ? <X size={18} /> : <Menu size={18} />}
+            </button>
           </div>
         </div>
-      </div>
+      </header>
+
+      {/* Outside <header>: its backdrop blur would trap a fixed panel inside the bar. */}
+      {open && (
+        <div className="sh-sheet" id="sh-sheet">
+          {LINKS.map((l) => (
+            <Link
+              key={l.href}
+              to={l.href}
+              className="sh-m"
+              aria-current={current(l.href)}
+            >
+              {l.label}
+            </Link>
+          ))}
+          <Link
+            to={SIGNIN_URL}
+            className="sh-m"
+            onClick={() => trackCta("signin", "nav-mobile")}
+          >
+            Sign in
+          </Link>
+          <div className="sh-actions">
+            <Link
+              to={SIGNUP_URL}
+              className="sh-btn sh-primary"
+              onClick={() => trackCta("start", "nav-mobile")}
+            >
+              {CTA_START}
+            </Link>
+            <DemoLink location="nav-mobile" className="sh-btn sh-ghost">
+              {CTA_DEMO}
+            </DemoLink>
+          </div>
+        </div>
+      )}
     </>
   );
-};
-
-export default Navbar;
+}

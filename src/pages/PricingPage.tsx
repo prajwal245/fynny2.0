@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link } from "@/lib/router-compat";
 import SiteShell, { Section, Reveal, CtaBand } from "@/components/site/SiteShell";
 import { C } from "@/components/site/siteTheme";
+import { SIGNUP_URL, trackCta } from "@/components/site/cta";
+import { openDemo } from "@/components/site/BookDemo";
 
 /* ================================================================
    FynHelp — Pricing · Pay per active client (Finvora design system)
@@ -122,7 +124,7 @@ const TIERS: Tier[] = [
         ],
       },
     ],
-    cta: { label: "Start 30-day trial", to: "/signup" },
+    cta: { label: "Start free", to: SIGNUP_URL },
     trialNote: "30 days free · no card required",
   },
   {
@@ -148,7 +150,7 @@ const TIERS: Tier[] = [
         ],
       },
     ],
-    cta: { label: "Start 30-day trial", to: "/signup", primary: true },
+    cta: { label: "Start free", to: SIGNUP_URL, primary: true },
     trialNote: "30 days free · no card required",
   },
   {
@@ -173,7 +175,7 @@ const TIERS: Tier[] = [
         ],
       },
     ],
-    cta: { label: "Talk to us", to: "/contact" },
+    cta: { label: "Book a demo", to: "demo" },
     trialNote: "Custom onboarding for large books",
   },
 ];
@@ -328,9 +330,16 @@ export default function PricingPage() {
 
                 <div className="spacer" />
                 <Link
-                  to={t.cta.to}
+                  to={t.cta.to === "demo" ? "/pricing" : t.cta.to}
                   className={`fh-btn ${t.cta.primary ? "fh-btn-primary" : "fh-btn-ghost"}`}
                   style={{ justifyContent: "center", marginTop: 22 }}
+                  onClick={(e) => {
+                    // "Book a demo" opens the calendar here; the rest go straight to sign-up.
+                    if (t.cta.to === "demo") {
+                      e.preventDefault();
+                      openDemo(`pricing-plan-${t.name.toLowerCase()}`);
+                    } else trackCta("start", `pricing-plan-${t.name.toLowerCase()}`);
+                  }}
                 >
                   {t.cta.label}
                 </Link>
@@ -420,8 +429,8 @@ export default function PricingPage() {
               The full Extract, Recon, Narrate pipeline for up to 3 client entities. No card, no
               clock — we only ask for feedback while we build alongside you.
             </p>
-            <Link to="/waitlist" className="fh-btn fh-btn-coral">
-              Apply for the free Pilot
+            <Link to={SIGNUP_URL} className="fh-btn fh-btn-coral" onClick={() => trackCta("start", "pricing-pilot")}>
+              Start the free Pilot
             </Link>
           </div>
         </Reveal>
@@ -443,8 +452,7 @@ export default function PricingPage() {
         title="Start with one client."
         italic="Scale when the book does."
         lead="Thirty days free on any plan. Unlimited users from day one, and every number stays traceable to its source document."
-        primary={{ to: "/signup", label: "Start 30-day trial" }}
-        secondary={{ to: "/contact", label: "Talk to us" }}
+        location="pricing-final"
       />
     </SiteShell>
   );

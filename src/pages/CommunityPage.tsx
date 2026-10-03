@@ -5,6 +5,7 @@ import { Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import SiteShell, { PageHero, Section, Reveal } from "@/components/site/SiteShell";
 import { C } from "@/components/site/siteTheme";
+import { CTA_START, SIGNUP_URL, trackCta } from "@/components/site/cta";
 
 const PLANNED = [
   { t: "Practice circles", d: "Small, invite only rooms where CAs compare how they handle the same filing edge case." },
@@ -108,7 +109,7 @@ export default function CommunityPage() {
 
       <Section center kicker="In the meantime" title="The product is" italic="already running">
         <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", marginTop: 26 }}>
-          <Link to="/waitlist" className="fh-btn fh-btn-primary">Book a demo</Link>
+          <Link to={SIGNUP_URL} className="fh-btn fh-btn-primary" onClick={() => trackCta("start", "community")}>{CTA_START}</Link>
           <Link to="/blog" className="fh-btn fh-btn-ghost">Read the blog</Link>
         </div>
       </Section>

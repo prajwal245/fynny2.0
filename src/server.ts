@@ -44,12 +44,31 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
+import { normalizeUrl, robotsHeaderFor } from "./lib/searchPolicy";
+
+function withSearchHeaders(request: Request, response: Response): Response {
+  const url = new URL(request.url);
+  const host = (request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? url.host).split(",")[0].trim();
+  const headers = new Headers(response.headers);
+  const robots = robotsHeaderFor(host, url.pathname);
+  if (robots) headers.set("x-robots-tag", robots);
+  if ((headers.get("content-type") ?? "").includes("text/html")) {
+    headers.set("strict-transport-security", "max-age=31536000; includeSubDomains");
+    headers.set("x-content-type-options", "nosniff");
+    headers.set("referrer-policy", "strict-origin-when-cross-origin");
+    headers.set("x-frame-options", "SAMEORIGIN");
+  }
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const redirect = normalizeUrl(request);
+      if (redirect) return redirect;
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      return withSearchHeaders(request, await normalizeCatastrophicSsrResponse(response));
     } catch (error) {
       console.error(error);
       return new Response(renderErrorPage(), {

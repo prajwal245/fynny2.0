@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "@/lib/router-compat";
+import { PRICING_FAQS } from "@/content/faqs";
 import SiteShell, { Section, Reveal, CtaBand } from "@/components/site/SiteShell";
 import { C } from "@/components/site/siteTheme";
 import { SIGNUP_URL, trackCta } from "@/components/site/cta";
@@ -196,32 +197,7 @@ const COMPARE: [string, string, string, string][] = [
   ["Success manager and quarterly reviews", "n", "n", "y"],
 ];
 
-const FAQS: [string, string][] = [
-  [
-    "What counts as an active client entity?",
-    "Any client entity with at least one document processed or reconciliation run in the calendar month. Clients you did not touch that month cost you nothing — you pay for work you actually did.",
-  ],
-  [
-    "What happens if we exceed our included clients?",
-    "Extra active clients are billed at your tier's rate (₹149 / ₹119 / ₹99). Starter caps at 25 total; Professional and Scale have no cap. You can also upgrade anytime — monthly switches are instant, annual switches are pro-rated.",
-  ],
-  [
-    "Is GST included in these prices?",
-    "No — all prices are exclusive of GST. You will be invoiced as a SaaS subscription with GST added at the applicable rate.",
-  ],
-  [
-    "How does the annual discount work?",
-    "Paying yearly saves 15%, applied upfront. For example, Professional is ₹61,190 per year instead of ₹71,988 paid monthly — a saving of ₹10,798.",
-  ],
-  [
-    "Do you train AI models on our clients' data?",
-    "No. Every extracted number carries a source-traceable audit trail back to the original document, your data stays in India, and nothing is shared or used for training.",
-  ],
-  [
-    "Can we switch to one flat price for the firm instead?",
-    "Yes — at renewal, or by talking to us. Some partners prefer a single budget number; we will quote one that fits your book size.",
-  ],
-];
+
 
 const cell = (v: string) =>
   v === "y" ? <span className="y">✓</span> : v === "n" ? <span className="n">—</span> : <span className="num">{v}</span>;
@@ -439,7 +415,7 @@ export default function PricingPage() {
       {/* FAQ */}
       <Section id="faq" kicker="FAQ" title="Fair questions," italic="straight answers." center>
         <div className="fh-faq" style={{ textAlign: "left" }}>
-          {FAQS.map(([q, a]) => (
+          {PRICING_FAQS.map(([q, a]) => (
             <details key={q}>
               <summary>{q}</summary>
               <p>{a}</p>

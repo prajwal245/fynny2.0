@@ -1,7 +1,3 @@
-import { useState } from "react";
-import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-import { Helmet } from "react-helmet-async";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
@@ -24,6 +20,9 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import Layout from "@/components/Layout";
+import { Link } from "@/lib/router-compat";
+import { CTA_DEMO, CTA_NOTE, CTA_START, SIGNUP_URL, trackCta } from "@/components/site/cta";
+import { DemoLink } from "@/components/site/BookDemo";
 
 /**
  * /ca-firms — landing page for CA firms & accounting practices.
@@ -92,20 +91,17 @@ function Hero() {
           </p>
 
           <div className="mt-9 flex flex-wrap items-center gap-5">
-            <a
-              href="#early-access"
+            <Link
+              to={SIGNUP_URL}
+              onClick={() => trackCta("start", "ca-firms-hero")}
               className="inline-flex items-center gap-2 px-7 h-12 rounded-md font-semibold text-white transition-transform hover:-translate-y-0.5"
               style={{ background: RED }}
             >
-              Request Early Access <ArrowRight size={18} />
-            </a>
-            <a
-              href="#how-it-works"
-              className="inline-flex items-center gap-1.5 font-semibold"
-              style={{ color: DARK }}
-            >
-              See How It Works <ArrowDown size={16} />
-            </a>
+              {CTA_START} <ArrowRight size={18} />
+            </Link>
+            <DemoLink location="ca-firms-hero" className="inline-flex items-center gap-1.5 font-semibold" style={{ color: DARK }}>
+              {CTA_DEMO} <ArrowRight size={16} />
+            </DemoLink>
           </div>
 
           <p className="mt-8 text-sm" style={{ color: "rgba(23,18,8,0.55)" }}>
@@ -208,18 +204,19 @@ function ProofStrip() {
     <section style={{ background: DARK }}>
       <div className="mx-auto max-w-4xl px-6 py-16 text-center">
         <p className="text-2xl md:text-3xl leading-snug" style={{ ...serif, color: "#fff" }}>
-          Be among the first CA firms to experience FynHelp.
+          Set up your firm and read your first statement in five minutes.
         </p>
         <p className="mt-4 text-base" style={{ color: "rgba(255,255,255,0.6)" }}>
-          Share your feedback and shape the product.
+          {CTA_NOTE}
         </p>
-        <a
-          href="#early-access"
+        <Link
+          to={SIGNUP_URL}
+          onClick={() => trackCta("start", "ca-firms-strip")}
           className="inline-flex items-center gap-2 mt-8 rounded-md px-6 py-3 font-semibold text-white"
           style={{ background: RED }}
         >
-          Reserve Early Access →
-        </a>
+          {CTA_START} →
+        </Link>
       </div>
     </section>
   );
@@ -406,212 +403,12 @@ function Features() {
   );
 }
 
-/* ---------- QUOTES ---------- */
-function Quotes() {
-  const quotes = [
-    {
-      q: "The first month we used FynHelp, we recovered 11 days of team time. We used it to onboard three new clients.",
-      who: "Managing Partner, 8-Partner CA Firm",
-    },
-    {
-      q: "Our clients comment that our reports look better now. They have no idea we're spending a fraction of the time.",
-      who: "Senior Manager, Accounting Practice",
-    },
-  ];
-  return (
-    <section style={{ background: CREAM }}>
-      <div className="mx-auto max-w-6xl px-6 py-24">
-        <span
-          className="inline-block text-[11px] font-semibold tracking-[0.18em] uppercase px-3 py-1.5 rounded-full"
-          style={{ color: RED, background: RED_TINT }}
-        >
-          What Firms Say
-        </span>
-        <h2
-          className="mt-5 font-bold leading-tight"
-          style={{ ...serif, color: DARK, fontSize: "clamp(32px, 4vw, 48px)" }}
-        >
-          Built with firms like yours.
-        </h2>
-
-        <div className="mt-12 grid md:grid-cols-2 gap-6">
-          {quotes.map((q) => (
-            <div
-              key={q.who}
-              className="rounded-lg p-8"
-              style={{ background: CARD, borderLeft: `4px solid ${RED}` }}
-            >
-              <p
-                className="text-xl leading-snug italic"
-                style={{ ...serif, color: DARK }}
-              >
-                “{q.q}”
-              </p>
-              <p
-                className="mt-6 text-[11px] font-bold tracking-[0.18em] uppercase"
-                style={{ color: "rgba(23,18,8,0.6)" }}
-              >
-                {q.who}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ---------- LEAD FORM ---------- */
-function LeadForm() {
-  const [submitted, setSubmitted] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState({
-    name: "",
-    firm: "",
-    role: "Partner",
-    city: "",
-    clients: "30–75",
-    pain: "",
-    email: "",
-  });
-
-
-  const onChange = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
-    setForm({ ...form, [k]: e.target.value });
-
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email)) { toast.error("Please enter a valid email"); return; }
-    setSubmitting(true);
-    const { error } = await (supabase.from("early_access_requests") as any).insert({
-      email: form.email,
-      module: "ca_firms",
-      user_id: null,
-      details: { name: form.name, firm: form.firm, role: form.role, city: form.city, client_count: form.clients, pain_point: form.pain },
-    });
-    setSubmitting(false);
-    if (error) toast.error(error.message);
-    else { setSubmitted(true); toast.success("Spot reserved — we'll be in touch"); }
-  };
-
-
-  const label = "block text-[12px] font-semibold mb-1.5";
-  const field =
-    "w-full h-11 px-3 rounded-md border bg-white text-[14px] outline-hidden focus:ring-2";
-  const fieldStyle = { borderColor: "rgba(23,18,8,0.12)", color: DARK } as const;
-
-  return (
-    <section id="early-access" style={{ background: RED }}>
-      <div className="mx-auto max-w-5xl px-6 py-24 text-center">
-        <span
-          className="inline-block text-[11px] font-semibold tracking-[0.18em] uppercase px-3 py-1.5 rounded-full"
-          style={{ color: "#fff", background: "rgba(255,255,255,0.18)" }}
-        >
-          Early Access
-        </span>
-        <h2
-          className="mt-5 font-bold leading-tight"
-          style={{ ...serif, color: "#fff", fontSize: "clamp(32px, 4vw, 52px)" }}
-        >
-          Your firm's next growth stage starts here.
-        </h2>
-        <p className="mt-4 max-w-xl mx-auto text-lg" style={{ color: "rgba(255,255,255,0.85)" }}>
-          We're onboarding a limited number of CA and accounting firms. Early members get priority
-          pricing forever.
-        </p>
-
-        <div
-          className="mt-12 mx-auto text-left rounded-xl p-6"
-          style={{
-            background: CARD,
-            maxWidth: 520,
-            boxShadow: "0 30px 60px -20px rgba(0,0,0,0.25)",
-          }}
-        >
-          {submitted ? (
-            <div className="py-8 text-center">
-              <CheckCircle2 size={40} style={{ color: RED }} className="mx-auto" />
-              <h3 className="mt-4 text-2xl font-bold" style={{ ...serif, color: DARK }}>
-                Spot reserved.
-              </h3>
-              <p className="mt-2 text-[15px]" style={{ color: "rgba(23,18,8,0.7)" }}>
-                We'll reach out within 48 hours to set up your firm.
-              </p>
-            </div>
-          ) : (
-            <form onSubmit={onSubmit} className="space-y-4">
-              <div>
-                <label className={label} style={{ color: DARK }}>Your Name</label>
-                <input required value={form.name} onChange={onChange("name")} className={field} style={fieldStyle} />
-              </div>
-              <div>
-                <label className={label} style={{ color: DARK }}>Firm Name</label>
-                <input required value={form.firm} onChange={onChange("firm")} className={field} style={fieldStyle} />
-              </div>
-              <div>
-                <label className={label} style={{ color: DARK }}>Email</label>
-                <input required type="email" value={form.email} onChange={onChange("email")} className={field} style={fieldStyle} />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className={label} style={{ color: DARK }}>Your Role</label>
-                  <select value={form.role} onChange={onChange("role")} className={field} style={fieldStyle}>
-                    <option>Partner</option>
-                    <option>Senior Manager</option>
-                    <option>Manager</option>
-                    <option>Other</option>
-                  </select>
-                </div>
-                <div>
-                  <label className={label} style={{ color: DARK }}>City</label>
-                  <input required value={form.city} onChange={onChange("city")} className={field} style={fieldStyle} />
-                </div>
-              </div>
-              <div>
-                <label className={label} style={{ color: DARK }}>Clients managed</label>
-                <select value={form.clients} onChange={onChange("clients")} className={field} style={fieldStyle}>
-                  <option>Under 30</option>
-                  <option>30–75</option>
-                  <option>75–150</option>
-                  <option>150+</option>
-                </select>
-              </div>
-              <div>
-                <label className={label} style={{ color: DARK }}>What takes the most time right now?</label>
-                <textarea
-                  rows={2}
-                  value={form.pain}
-                  onChange={onChange("pain")}
-                  className="w-full px-3 py-2 rounded-md border bg-white text-[14px] outline-hidden focus:ring-2"
-                  style={fieldStyle}
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full inline-flex items-center justify-center gap-2 font-semibold text-white rounded-md disabled:opacity-60"
-                style={{ background: RED, height: 48 }}
-              >
-                {submitting ? "Reserving…" : <>Reserve My Spot <ArrowRight size={18} /></>}
-              </button>
-              <p className="text-center text-xs" style={{ color: "rgba(23,18,8,0.55)" }}>
-                No commitment. No credit card. We'll reach out within 48 hours.
-              </p>
-            </form>
-          )}
-        </div>
-      </div>
-    </section>
-  );
-}
-
 /* ---------- FOOTER STRIP (dark) ---------- */
 function FooterStrip() {
   const trust = [
     { icon: LayoutGrid, label: "Multi-Client Ready" },
     { icon: Lock, label: "Secure Data Handling" },
     { icon: Building2, label: "Built for Accounting Firms" },
-    { icon: Shield, label: "SOC 2 In Progress (Q4 2026)" },
   ];
   return (
     <section style={{ background: DARK }}>
@@ -636,22 +433,12 @@ function FooterStrip() {
 export default function CAFirmsPage() {
   return (
     <Layout>
-      <Helmet>
-        <title>FynHelp for CA Firms — Automate Client MIS & Reporting</title>
-        <meta
-          name="description"
-          content="FynHelp automates monthly client MIS, dashboards, and alerts for CA firms and accounting practices managing 30–150 business clients."
-        />
-        <link rel="canonical" href="https://fynhelp.com/ca-firms" />
-      </Helmet>
       <div style={{ background: CREAM }}>
         <Hero />
         <ProofStrip />
         <Problem />
         <HowItWorks />
         <Features />
-        <Quotes />
-        <LeadForm />
         <FooterStrip />
       </div>
     </Layout>

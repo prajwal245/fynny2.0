@@ -109,3 +109,43 @@ export const AGENTS: Agent[] = [
 ];
 
 export const agentBySlug = (slug: string) => AGENTS.find((a) => a.slug === slug);
+
+/**
+ * Search titles and descriptions per module, written for how CA firms
+ * search (bank reconciliation, MIS reports, document collection) rather
+ * than how the product names things.
+ */
+export const AGENT_SEO: Record<string, { title: string; description: string; keyword: string; h1: string; h1Italic: string }> = {
+  extract: {
+    h1: "Bank statement extraction",
+    h1Italic: "for CA firms",
+    title: "Bank statement & Tally export extraction for CA firms",
+    description:
+      "Turn client bank statements (PDF, Excel, CSV, scans and photos) and Tally or Zoho exports into clean, dated transactions. Unsure lines go to review, never into the books.",
+    keyword: "Bank statement extraction",
+  },
+  recon: {
+    h1: "Bank reconciliation",
+    h1Italic: "for CA firms",
+    title: "Bank reconciliation software for CA firms",
+    description:
+      "Reconcile every client's bank statement to their Tally or Zoho books: exact matches, close matches within ₹1 (or 0.1%) and 3 days, then your firm's rules. Only real exceptions reach your team.",
+    keyword: "Bank reconciliation",
+  },
+  narrate: {
+    h1: "MIS reports your clients",
+    h1Italic: "can trace to source",
+    title: "Source-traceable MIS reports for chartered accountants",
+    description:
+      "Monthly MIS, bank reconciliation summaries and variance reports drafted from matched transactions only. Every number opens its source lines, and nothing goes out before partner sign-off.",
+    keyword: "MIS reports",
+  },
+  chaser: {
+    h1: "Client document collection,",
+    h1Italic: "without the chasing",
+    title: "Client document collection for CA practices",
+    description:
+      "Stop chasing clients for bank statements and bills. Polite email and WhatsApp follow-ups in your firm's name that stop the moment the document arrives.",
+    keyword: "Document collection",
+  },
+};

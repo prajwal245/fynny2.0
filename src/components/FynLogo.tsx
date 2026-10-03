@@ -10,9 +10,11 @@ interface FynLogoProps {
   className?: string;
   iconOnly?: boolean;
   size?: "sm" | "md" | "lg";
+  /** "lazy" for logos below the fold (e.g. the footer). */
+  loading?: "eager" | "lazy";
 }
 
-const FynLogo = ({ variant = "dark", className = "", iconOnly = false, size = "md" }: FynLogoProps) => {
+const FynLogo = ({ variant = "dark", className = "", iconOnly = false, size = "md", loading }: FynLogoProps) => {
   const heightPx = size === "sm" ? 28 : size === "lg" ? 44 : 36;
   const isLight = variant === "light";
 
@@ -23,6 +25,9 @@ const FynLogo = ({ variant = "dark", className = "", iconOnly = false, size = "m
         src={src}
         alt="FynHelp"
         className={className}
+        loading={loading}
+        width={heightPx}
+        height={heightPx}
         style={{ height: heightPx, width: heightPx, objectFit: "contain", display: "block", flexShrink: 0 }}
       />
     );
@@ -34,6 +39,7 @@ const FynLogo = ({ variant = "dark", className = "", iconOnly = false, size = "m
       src={src}
       alt="FynHelp"
       className={className}
+      loading={loading}
       style={{ height: heightPx, width: "auto", objectFit: "contain", display: "block", flexShrink: 0, aspectRatio: "519 / 99" }}
     />
   );

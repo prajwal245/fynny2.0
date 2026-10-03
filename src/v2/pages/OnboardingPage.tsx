@@ -1,4 +1,5 @@
 import { startGmailConnect } from "@/lib/caGmail.functions";
+import { track } from "@/lib/analytics";
 /**
  * FynHelp — first run journey, value first:
  * account → firm → first client → first document (watch Extract work) →
@@ -158,6 +159,7 @@ export default function OnboardingPage() {
         return;
       }
       if (error) { toast.error(authError(error.message)); return; }
+      if (!(data.user && data.user.identities?.length === 0)) track("sign_up", { method: "email" });
       if (!data.session) {
         // Supabase hides whether an address is taken: an existing, confirmed
         // account comes back with no identities.
@@ -255,6 +257,7 @@ export default function OnboardingPage() {
     // Wait for the workspace to load, so the shell does not bounce the user
     // back to onboarding (or the portfolio) while it reloads.
     await completeOnboarding();
+    track("onboarding_completed", { role: "practice", with_client: Boolean(clientId), with_document: Boolean(uploaded) });
     // Land inside the client, where the next best action is already waiting.
     if (clientId) navigate({ to: "/v2/clients/$clientId", params: { clientId } });
     else navigate({ to: "/v2" });

@@ -1,32 +1,25 @@
 # FynHelp
 
-> India's AI CFO platform. Real-time financial intelligence for startups and SMEs — cash flow, runway, GST compliance, and revenue, powered by CFO Fynny.
+> FynHelp is month-end close software for chartered accountant (CA) firms in India. It collects client documents, reconciles bank statements to Tally or Zoho books, and drafts a source-traceable MIS that a partner signs off.
 
-FynHelp is a virtual-CFO SaaS built for Indian small and mid-size businesses. The product surfaces liquidity, revenue, cost, GST and tax, governance, HR, and investor-ready metrics in a single intelligence cockpit, with an AI assistant (Fynny) that answers finance questions in plain English.
+FynHelp works on top of the ledger a firm already uses; it does not replace Tally or Zoho. Four agents run each client's month: Extract reads bank statements (PDF, Excel, CSV, scans and photos) and Tally or Zoho exports into transactions; Recon matches bank to books (exact matches, then close matches within ₹1 or 0.1% and 3 days, then the firm's own rules); Narrate drafts the monthly MIS from matched transactions only, with every figure linked to its source lines; Chaser follows up with clients for missing documents by email and WhatsApp and stops when they arrive. Unsure lines and unmatched transactions always go to a person, and only a partner can sign off a report.
 
-## Pages
+Pricing is per active client entity with unlimited users: a free Pilot for up to 3 clients, Starter ₹2,999/month (15 clients), Professional ₹5,999/month (40 clients) and Scale ₹12,999/month (100 clients), exclusive of GST.
 
-- [Home](/): Product overview and why an AI CFO matters for Indian SMEs.
-- [About](/about): Company background, founding story, and team.
-- [Pricing](/pricing): Plans and pricing for FynHelp.
-- [Security](/security): How customer financial data is protected.
-- [Use Cases](/use-cases): Worked examples for founders, finance leads, and CAs.
-- [Resources](/resources): Guides, templates, and reference material on Indian SME finance.
-- [Blog](/blog): Articles on cash flow, GST, runway, and CFO craft.
-- [Community](/community): Customer and operator community.
-- [Waitlist](/waitlist): Request access to FynHelp.
+## Product
 
-## Demo
+- [How it works](https://www.fynhelp.com/pipeline): The month-end close pipeline for CA firms.
+- [Extract](https://www.fynhelp.com/agents/extract): Bank statement and Tally export extraction.
+- [Recon](https://www.fynhelp.com/agents/recon): Bank reconciliation for CA firms.
+- [Narrate](https://www.fynhelp.com/agents/narrate): Source-traceable MIS reports for chartered accountants.
+- [Chaser](https://www.fynhelp.com/agents/chaser): Automated client document follow-ups.
+- [For CA firms](https://www.fynhelp.com/ca-firms): Workflow automation for practices with 30 to 150 clients.
+- [Pricing](https://www.fynhelp.com/pricing): Plans per client entity.
 
-- [Liquidity](/demo/liquidity): Cash balance, runway, 13-week forecast, AR aging.
-- [Revenue](/demo/revenue): NRR, churn, LTV:CAC, revenue trend, sales pipeline.
-- [Cost](/demo/cost): OPEX structure, top vendors, maverick spend, project economics.
-- [GST & Tax](/demo/gst): Filings, ITC reconciliation, notice risk.
-- [Governance](/demo/governance): Risk score, balance sheet, audit readiness.
-- [HR & Workforce](/demo/hr): Headcount, compensation, hiring pipeline.
-- [Investor](/demo/investor): Investor-ready KPIs and reporting.
-- [Ask Fynny](/demo/fynny): Chat-based AI CFO over the demo dataset.
+## Company
 
-## Optional
-
-- [Blog index](/blog): Latest posts.
+- [About](https://www.fynhelp.com/about): FynHelp Technologies, Bengaluru, India.
+- [Security](https://www.fynhelp.com/security): How client data is protected.
+- [Blog](https://www.fynhelp.com/blog): Guides for CA practices.
+- [Contact](https://www.fynhelp.com/contact): support@fynhelp.com.
+- [Privacy](https://www.fynhelp.com/privacy) and [Terms](https://www.fynhelp.com/terms).

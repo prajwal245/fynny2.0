@@ -205,7 +205,9 @@ export default function OnboardingPage() {
       const { url } = await startGmailConnect({ data: { firmId: fid, origin: window.location.origin } });
       window.location.href = url;
     } catch (e) {
-      toast.error(`Gmail could not be connected here: ${e instanceof Error ? e.message : String(e)}. You can connect it later from Settings.`);
+      // The technical reason goes to the console; the person gets a next step.
+      console.warn("[onboarding] Gmail connect failed", e);
+      toast.info("Gmail isn't available just yet. Carry on, and connect it later from Settings.");
     }
   };
 

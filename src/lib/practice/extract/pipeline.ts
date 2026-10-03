@@ -497,7 +497,8 @@ export async function runExtract(
         return fail(
           kind,
           "needs_ai",
-          "This PDF is scanned (no text layer). Configure OCR (OCR_SPACE_API_KEY) or a vision reader (GEMINI_API_KEY) to read scanned files.",
+          // Said to the firm in plain words; Settings → Integrations tells the owner what to switch on.
+          "This PDF is a scan, and reading scans isn't switched on yet. Upload the statement your bank lets you download (Excel, CSV or PDF) instead, or try again later.",
           calls,
         );
       if (read) {
@@ -534,7 +535,7 @@ export async function runExtract(
       return fail(
         kind,
         "needs_ai",
-        "Photos need OCR (OCR_SPACE_API_KEY) or a vision reader (GEMINI_API_KEY).",
+        "Reading photos isn't switched on yet. Upload the document as a PDF, Excel or CSV instead, or try again later.",
         calls,
       );
     if (read) {

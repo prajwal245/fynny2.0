@@ -294,6 +294,16 @@ const errMsg = (e: unknown) => {
     onSessionEnded?.();
     return "Your session has ended. Please sign in again.";
   }
+  // People using FynHelp are accountants, not engineers: say what happened
+  // and what to do, and keep the technical detail in the console.
+  if (/failed to fetch|networkerror|load failed|network request failed/i.test(m)) {
+    console.error("[v2]", m);
+    return "Can't reach FynHelp right now. Check your internet connection and try again.";
+  }
+  if (/violates|constraint|relation "|syntax error|unexpected token|is not valid json|internal server error|\b5\d\d\b|timed? ?out|econn|fetch failed/i.test(m)) {
+    console.error("[v2]", m);
+    return "Something went wrong on our side. Please try again in a minute; if it keeps happening, write to support@fynhelp.com.";
+  }
   return m;
 };
 

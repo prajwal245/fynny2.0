@@ -86,7 +86,7 @@ describe("scans and photos through OCR", () => {
   it("explains what to configure when neither OCR nor vision is available", async () => {
     const out = await runExtract(photo(), { llm: null, ocr: null });
     expect(out.error?.code).toBe("needs_ai");
-    expect(out.error?.message).toMatch(/OCR_SPACE_API_KEY/);
+    expect(out.error?.message).toMatch(/isn't switched on yet/);
   });
 
   it("uses OCR for scanned PDFs too", async () => {

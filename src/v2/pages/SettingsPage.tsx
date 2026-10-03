@@ -139,11 +139,11 @@ export default function SettingsPage() {
       });
       if (r.simulated)
         toast.info(
-          `Invite created. Email is not configured yet, so share this link: ${r.link}`,
+          `Invite ready. Send this link to them on WhatsApp or email: ${r.link}`,
         );
       else if (!r.emailed)
         toast.error(
-          `Invite created but the email failed: ${r.error}. Share this link: ${r.link}`,
+          `The invite email didn't go out. Send this link to them on WhatsApp or email instead: ${r.link}`,
         );
       else toast.success(`Invite emailed to ${invite.email}`);
       setInvite({ ...invite, email: "" });
@@ -386,8 +386,8 @@ export default function SettingsPage() {
                 )}
                 {!intg.gmail.available && (
                   <div style={{ fontSize: 12, color: V.muted, marginTop: 3 }}>
-                    Gmail sign-in is not configured on this server yet
-                    (GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET).
+                    Gmail isn't switched on for FynHelp yet. Until it is,
+                    upload files on the Documents page.
                   </div>
                 )}
               </div>
@@ -482,14 +482,10 @@ export default function SettingsPage() {
                       : ""}
                   </div>
                 ))}
-                <div style={{ fontSize: 12, color: V.muted, marginTop: 6 }}>
-                  Webhook URL for Meta: <span className="num">{webhook}</span>
-                </div>
                 {!intg.whatsapp.available && (
                   <div style={{ fontSize: 12, color: V.muted, marginTop: 3 }}>
-                    The WhatsApp Cloud API keys are not configured on this
-                    server yet (WHATSAPP_ACCESS_TOKEN, WHATSAPP_APP_SECRET,
-                    WHATSAPP_VERIFY_TOKEN).
+                    WhatsApp isn't switched on for FynHelp yet. Write to
+                    support@fynhelp.com and we will set it up with you.
                   </div>
                 )}
               </div>
@@ -507,43 +503,58 @@ export default function SettingsPage() {
                 </Badge>
               </div>
             </Row>
+            {intg.whatsapp.available && (
+              <details>
+                <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
+                  Link your WhatsApp Business number
+                </summary>
+                <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
+                  <div style={{ fontSize: 12.5, color: V.body }}>
+                    In Meta's WhatsApp Manager, open your number and copy its
+                    "Phone number ID". Paste it here with the number your
+                    clients see. Webhook address for Meta:{" "}
+                    <span className="num">{webhook}</span>
+                  </div>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <input
-                className="v2-input"
-                style={{ flex: "1 1 200px" }}
-                placeholder="Phone number ID from WhatsApp Manager"
-                value={wa.phoneNumberId}
-                onChange={(e) =>
-                  setWa({ ...wa, phoneNumberId: e.target.value })
-                }
-              />
-              <input
-                className="v2-input"
-                style={{ flex: "1 1 160px" }}
-                placeholder="Display number, e.g. +91 98450 12345"
-                value={wa.display}
-                onChange={(e) => setWa({ ...wa, display: e.target.value })}
-              />
-              <button
-                className="v2-btn v2-btn-ghost"
-                disabled={!wa.phoneNumberId.trim() || busy === "wa"}
-                onClick={() =>
-                  run(
-                    "wa",
-                    () =>
-                      connectPracticeWhatsapp({
-                        data: {
-                          phone_number_id: wa.phoneNumberId.trim(),
-                          display_phone: wa.display.trim() || undefined,
-                        },
-                      }),
-                    "WhatsApp number linked to this practice",
-                  )
-                }
-              >
-                Link number
-              </button>
-            </div>
+                  <input
+                    className="v2-input"
+                    style={{ flex: "1 1 200px" }}
+                    placeholder="Phone number ID from WhatsApp Manager"
+                    value={wa.phoneNumberId}
+                    onChange={(e) =>
+                      setWa({ ...wa, phoneNumberId: e.target.value })
+                    }
+                  />
+                  <input
+                    className="v2-input"
+                    style={{ flex: "1 1 160px" }}
+                    placeholder="Display number, e.g. +91 98450 12345"
+                    value={wa.display}
+                    onChange={(e) => setWa({ ...wa, display: e.target.value })}
+                  />
+                  <button
+                    className="v2-btn v2-btn-ghost"
+                    disabled={!wa.phoneNumberId.trim() || busy === "wa"}
+                    onClick={() =>
+                      run(
+                        "wa",
+                        () =>
+                          connectPracticeWhatsapp({
+                            data: {
+                              phone_number_id: wa.phoneNumberId.trim(),
+                              display_phone: wa.display.trim() || undefined,
+                            },
+                          }),
+                        "WhatsApp number linked to this practice",
+                      )
+                    }
+                  >
+                    Link number
+                  </button>
+                </div>
+                </div>
+              </details>
+            )}
 
             <Row>
               <div style={{ minWidth: 0 }}>
@@ -558,7 +569,7 @@ export default function SettingsPage() {
               <Badge tone={intg.email.available ? "good" : "warn"}>
                 {intg.email.available
                   ? "Sending"
-                  : "Not configured (RESEND_API_KEY)"}
+                  : "Not switched on yet"}
               </Badge>
             </Row>
 
@@ -580,10 +591,10 @@ export default function SettingsPage() {
                     ? "Scans: OCR on"
                     : intg.reading.vision
                       ? "Scans: vision on"
-                      : "Scans: add OCR_SPACE_API_KEY"}
+                      : "Scans and photos: not switched on yet"}
                 </Badge>
                 <Badge tone={intg.reading.ai ? "good" : "neutral"}>
-                  {intg.reading.ai ? "AI classification on" : "Rules only (no AI key)"}
+                  {intg.reading.ai ? "Smart reading on" : "Standard reading"}
                 </Badge>
               </div>
             </Row>

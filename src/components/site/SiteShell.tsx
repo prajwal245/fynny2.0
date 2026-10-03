@@ -27,56 +27,68 @@ export function useReveal() {
   }, []);
 }
 
+const FOOT_STYLES = `
+.sf { background:${C.inkDeep}; color:rgba(247,241,230,.62); font-family:'Instrument Sans','Inter',system-ui,sans-serif; }
+.sf-wrap { max-width:1200px; margin:0 auto; padding:0 22px; }
+.sf-cols { display:grid; grid-template-columns:1.4fr repeat(4, minmax(0,1fr)); gap:32px; padding:64px 0 48px; }
+.sf-cols h4 { color:${C.onDark}; font-size:13px; font-weight:600; margin:0 0 14px; letter-spacing:0; text-transform:none; }
+.sf-cols a { display:block; color:rgba(247,241,230,.62); text-decoration:none; font-size:14px; padding:5px 0; transition:color .15s; }
+.sf-cols a:hover { color:${C.onDark}; }
+.sf-about { font-size:14px; line-height:1.6; max-width:30ch; margin:14px 0 0; }
+.sf-mail { color:${C.onDark}; font-size:14px; user-select:all; }
+.sf-bottom { border-top:1px solid rgba(247,241,230,.1); padding:20px 0 calc(28px + env(safe-area-inset-bottom,0px)); display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; font-size:13px; }
+.sf a:focus-visible { outline:2px solid ${C.coral}; outline-offset:2px; border-radius:4px; }
+@media (max-width: 900px) { .sf-cols { grid-template-columns:1fr 1fr; } .sf-brand { grid-column:1 / -1; } }
+`;
+
+/** Site footer: where everything is. Pages end with their own call to action. */
 export function SiteFooter() {
   return (
-    <footer className="fh-foot">
-      <div className="fh-wrap">
-        <div className="fh-foot-grid">
-          <div>
-            <FynLogo variant="dark" size="md" />
-            <p style={{ fontSize: 13.5, lineHeight: 1.65, marginTop: 12, color: C.body, maxWidth: "34ch" }}>
-              The intelligence layer between your documents and your ledger. Built in India, for Indian
-              practices.
+    <footer className="sf">
+      <style>{FOOT_STYLES}</style>
+      <div className="sf-wrap">
+        <div className="sf-cols">
+          <div className="sf-brand">
+            <FynLogo variant="light" size="sm" />
+            <p className="sf-about">
+              Practice software for Indian CA firms. Statements in, matched books and a signed-off MIS out.
             </p>
           </div>
-          <div>
+          <nav aria-label="Product">
             <h4>Product</h4>
-            <Link to="/pipeline">The pipeline</Link>
-            <Link to="/pricing">Pricing</Link>
-            <Link to="/#faq">FAQ</Link>
-            <DemoLink location="footer">Book a demo</DemoLink>
-          </div>
-          <div>
-            <h4>Modules</h4>
+            <Link to="/pipeline">How it works</Link>
             {AGENTS.map((a) => (
               <Link key={a.slug} to={`/agents/${a.slug}`}>
-                {a.name} — {a.footerUse}
+                {a.name}
               </Link>
             ))}
-          </div>
-          <div>
-            <h4>For firms</h4>
-            <Link to="/ca-firms">CA firms</Link>
-            <Link to="/ca/login">CA sign in</Link>
-            <Link to="/use-cases">Use cases</Link>
-            <Link to="/blog">Blog</Link>
-          </div>
-          <div>
+            <Link to="/pricing">Pricing</Link>
+          </nav>
+          <nav aria-label="Company">
             <h4>Company</h4>
             <Link to="/about">About</Link>
             <Link to="/security">Security</Link>
-            <Link to="/community">Community</Link>
+            <Link to="/blog">Blog</Link>
             <Link to="/contact">Contact</Link>
+          </nav>
+          <nav aria-label="Legal">
+            <h4>Legal</h4>
             <Link to="/privacy">Privacy</Link>
             <Link to="/terms">Terms</Link>
-            <Link to="/login">Sign in</Link>
+          </nav>
+          <div>
+            <h4>Talk to us</h4>
+            <span className="sf-mail">support@fynhelp.com</span>
+            <Link to="/v2/onboarding?mode=signin" style={{ marginTop: 8 }}>
+              Sign in
+            </Link>
           </div>
         </div>
-        <div className="fh-foot-bottom">
-          <span>© 2026 FynHelp Technologies · Bengaluru, India</span>
-          <span>support@fynhelp.com</span>
+
+        <div className="sf-bottom">
+          <span>&copy; {new Date().getFullYear()} FynHelp Technologies · Bengaluru, India</span>
+          <span>Built for chartered accountants</span>
         </div>
-        <div className="fh-wordmark" aria-hidden="true">FYNHELP</div>
       </div>
     </footer>
   );

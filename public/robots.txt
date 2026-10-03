@@ -1,7 +1,17 @@
+# FynHelp — month-end close software for CA firms in India
+# https://www.fynhelp.com
+
 User-agent: *
 Allow: /
-Disallow: /admin/
-Disallow: /dashboard/
-Disallow: /ca/
+
+# Admin, internal tools and APIs: nothing for search here.
+Disallow: /admin
+Disallow: /intern
+Disallow: /blog-admin
+Disallow: /api/
+Disallow: /dashboard
+
+# The practice app (/v2), sign-in and sign-up stay crawlable on purpose:
+# they answer with "noindex", which search engines can only see if allowed in.
 
 Sitemap: https://www.fynhelp.com/sitemap.xml

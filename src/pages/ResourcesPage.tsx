@@ -1,30 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useNavigate } from "@/lib/router-compat";
-import { Helmet } from "react-helmet-async";
 import Layout from "@/components/Layout";
 
-const TAB_SEO: Record<string, { title: string; description: string }> = {
-  videos: {
-    title: "Resources — Video Guides for Indian SMEs | FynHelp",
-    description: "Short video walkthroughs on cash flow, GST, and running finance like a founder — built for Indian SMEs.",
-  },
-  templates: {
-    title: "Free Finance Templates for Indian SMEs | FynHelp",
-    description: "Download ready-to-use cash flow, GST, invoicing, and payroll templates for Indian businesses.",
-  },
-  glossary: {
-    title: "Financial Glossary for Indian SMEs | FynHelp",
-    description: "Plain-English definitions of finance, GST, and compliance terms every Indian business owner should know.",
-  },
-  blog: {
-    title: "FynHelp Blog — Financial Intelligence for Indian SMEs",
-    description: "Guides and insights on cash flow, runway, GST compliance, and finance operations for Indian SMEs.",
-  },
-  community: {
-    title: "FynHelp Community for Indian Founders & CAs",
-    description: "Join Indian founders, finance leads, and CAs sharing playbooks on cash flow, compliance, and growth.",
-  },
-};
 import { isSelfHostedVideo } from "@/lib/videoSource";
 import { supabase } from "@/integrations/supabase/client";
 import { Search, X } from "lucide-react";
@@ -491,22 +468,9 @@ const ResourcesPage = () => {
     return "rs-fmt";
   };
 
-  const seoTab = TAB_SEO[activeTab] ?? TAB_SEO.videos;
 
   return (
     <Layout>
-      <Helmet>
-        <title>{seoTab.title}</title>
-        <meta name="description" content={seoTab.description} />
-        <link rel="canonical" href={`https://www.fynhelp.com/resources?tab=${activeTab}`} />
-        <meta property="og:title" content={seoTab.title} />
-        <meta property="og:description" content={seoTab.description} />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content={`https://www.fynhelp.com/resources?tab=${activeTab}`} />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content={seoTab.title} />
-        <meta name="twitter:description" content={seoTab.description} />
-      </Helmet>
       <div ref={pageRef} className="rs-page">
         <style>{STYLES}</style>
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "@/lib/router-compat";
+import { HOME_FAQS } from "@/content/faqs";
 import { CTA_DEMO, CTA_NOTE, CTA_START, SIGNUP_URL, signupUrl, trackCta } from "@/components/site/cta";
 import { DemoLink, openDemo } from "@/components/site/BookDemo";
 import {
@@ -350,7 +351,7 @@ const PIPELINE = [
 ];
 
 const STEPS = [
-  ["Connect your data", "Read-only links to Tally, Zoho and bank feeds. No migration, nothing switched off."],
+  ["Bring in the documents", "Upload bank statements and Tally or Zoho exports, or let clients email them in. No migration, nothing switched off."],
   ["We extract & match", "Documents classified and reconciled — exact, then fuzzy, then your firm's rules."],
   ["Review exceptions only", "Genuine mismatches surface with a reason code and a link to source."],
   ["Client gets a clean MIS", "A source-linked pack with a narrative your client can actually read."],
@@ -380,13 +381,7 @@ const QUOTES = [
   ["The chaser alone gave a junior back most of her week. Clients reply where they already are.", "Practice manager", "22-entity practice · Pune"],
 ];
 
-const FAQS = [
-  ["Do we have to switch off Tally or Zoho?", "No. FynHelp reads from them. Your ledger stays where it is and stays the system of record — we add the extraction, reconciliation and review layer on top."],
-  ["What does my team stop doing?", "Line-by-line matching of transactions that were always going to tie out, and chasing documents by hand. Your team keeps the judgement: exceptions, treatment decisions and sign-off."],
-  ["What counts as an active client entity?", "One set of books you process in a given month — a company, LLP or proprietorship with its own ledger. Entities you don't process that month don't count."],
-  ["How is client data kept safe?", "Read-only, revocable connections, India-hosted data, and an exportable audit trail on every action. We publish certifications only once independently verified."],
-  ["Do you train AI models on our data?", "No. Your clients' books never train shared or global models. Pattern learning is scoped to your firm and the individual client it came from."],
-];
+
 
 function Reveal({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
   return (
@@ -515,14 +510,14 @@ export default function HomePage() {
             <div className="fh-pills">
               <span className="fh-pill a">Built for CA firms</span>
               <span className="fh-pill">Exception-first</span>
-              <span className="fh-pill">India-hosted</span>
+              <span className="fh-pill">Works with Tally &amp; Zoho</span>
             </div>
             <h1>
-              Built to make <span className="ital">month-end</span> feel finished
+              Month-end close for CA firms, <span className="ital">without the scramble</span>
             </h1>
             <p className="sub">
-              Documents extracted, transactions matched, narrations drafted and clients followed up —
-              automatically, so your close is a review, not a scramble.
+              FynHelp collects your clients&rsquo; documents, reconciles bank to Tally or Zoho books and drafts
+              a source-traceable MIS, so your team reviews exceptions instead of matching every line.
             </p>
 
             <form
@@ -1003,7 +998,7 @@ export default function HomePage() {
           </Reveal>
           <Reveal delay={80}>
             <div className="fh-faq">
-              {FAQS.map(([q, a]) => (
+              {HOME_FAQS.map(([q, a]) => (
                 <details key={q}>
                   <summary>{q}</summary>
                   <p>{a}</p>

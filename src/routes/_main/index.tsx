@@ -1,23 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 import Index from "@/pages/Index";
+import { HOME_FAQS } from "@/content/faqs";
+import { faqLd, seo, softwareLd, webPageLd } from "@/lib/seo";
 
-const title = "FynHelp — Exception-only close for CA firms";
 const description =
-  "FynHelp sits on top of Tally, Zoho and bank feeds: it classifies documents, auto-matches what's correct, and gives your team an exception-only review queue. Every number is one click from source.";
+  "Month-end close software for CA firms in India. FynHelp collects client documents, reconciles bank to Tally or Zoho books, and drafts source-traceable MIS for partner sign-off.";
 
 export const Route = createFileRoute("/_main/")({
-  head: () => ({
-    meta: [
-      { title },
-      { name: "description", content: description },
-      { property: "og:title", content: title },
-      { property: "og:description", content: description },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: title },
-      { name: "twitter:description", content: description },
-    ],
-    links: [{ rel: "canonical", href: "https://www.fynhelp.com/" }],
-  }),
+  head: () =>
+    seo({
+      title: "FynHelp — Month-end close software for CA firms in India",
+      rawTitle: true,
+      description,
+      path: "/",
+      jsonLd: [softwareLd(), webPageLd({ name: "FynHelp", description, path: "/" }), faqLd(HOME_FAQS)],
+    }),
   component: Index,
 });

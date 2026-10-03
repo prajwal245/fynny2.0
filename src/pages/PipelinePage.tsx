@@ -147,7 +147,7 @@ export default function PipelinePage() {
               <div>
                 <span className="fh-kicker">The pipeline</span>
                 <h1>
-                  Documents in. <span className="ital">Decisions out.</span>
+                  How FynHelp closes the month <span className="ital">for CA firms</span>
                 </h1>
                 <p className="sub" style={{ marginInline: "auto" }}>
                   Four deliberate steps run on every client entity: Extract, Recon, Narrate and

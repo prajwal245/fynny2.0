@@ -1,16 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
 import PipelinePage from "@/pages/PipelinePage";
+import { breadcrumbLd, seo, softwareLd, webPageLd } from "@/lib/seo";
+
+const description =
+  "How FynHelp automates a CA firm's month-end close: Extract reads statements and Tally exports, Recon matches bank to books, Narrate drafts the MIS, and Chaser collects missing documents.";
 
 export const Route = createFileRoute("/_main/pipeline")({
   component: PipelinePage,
-  head: () => ({
-    meta: [
-      { title: "The FynHelp pipeline — Extract, Recon, Narrate, Chaser" },
-      { name: "description", content: "Four deliberate steps run on every client entity: documents extracted into structured lines, bank matched to books, narrations drafted with sources attached, and polite follow-ups sent automatically." },
-      { property: "og:title", content: "The FynHelp pipeline — Extract, Recon, Narrate, Chaser" },
-      { property: "og:description", content: "Four deliberate steps run on every client entity: Extract, Recon, Narrate and Chaser — visible, reviewable, and source-traceable." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-    ],
-  }),
+  head: () =>
+    seo({
+      title: "How it works: month-end close automation for CA firms",
+      description,
+      path: "/pipeline",
+      jsonLd: [
+        webPageLd({ name: "How FynHelp works", description, path: "/pipeline" }),
+        softwareLd(),
+        breadcrumbLd([{ name: "Product", path: "/pipeline" }]),
+      ],
+    }),
 });

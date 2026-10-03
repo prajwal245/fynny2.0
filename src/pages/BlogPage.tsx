@@ -1,22 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "@/lib/router-compat";
-import { Helmet } from "react-helmet-async";
 import Layout from "@/components/Layout";
-import { supabase } from "@/integrations/supabase/client";
-import { articleExcerpt } from "@/lib/cleanArticleHtml";
-
-interface ListPost {
-  id: string;
-  slug: string;
-  title: string;
-  excerpt: string | null;
-  content: string | null;
-  category: string | null;
-  reading_time_minutes: number | null;
-  published_at: string | null;
-  cover_image_url: string | null;
-  is_featured: boolean | null;
-}
+import { listExcerpt, type ListPost } from "@/lib/blog";
 
 const INK = "#171208";
 const RED = "#C41E1E";
@@ -24,30 +9,9 @@ const RED = "#C41E1E";
 const formatDate = (d: string | null) =>
   d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "";
 
-const SEO_BRIEF_RE = /(seo information|meta description|url slug|primary keyword|featured snippet)/i;
-
-const excerptOf = (p: ListPost) => {
-  const stored = p.excerpt?.trim();
-  if (stored && !SEO_BRIEF_RE.test(stored)) return stored;
-  return articleExcerpt(p.content ?? "", 200, { title: p.title, coverImageUrl: p.cover_image_url });
-};
-
-const BlogPage = () => {
-  const [posts, setPosts] = useState<ListPost[]>([]);
-  const [loading, setLoading] = useState(true);
+const BlogPage = ({ posts }: { posts: ListPost[] }) => {
+  // Category chips filter in place; there are no ?category= URLs to index twice.
   const [activeCat, setActiveCat] = useState<string>("All");
-
-  useEffect(() => {
-    supabase
-      .from("blog_posts")
-      .select("id, slug, title, excerpt, content, category, reading_time_minutes, published_at, cover_image_url, is_featured")
-      .eq("status", "published")
-      .order("published_at", { ascending: false })
-      .then(({ data }) => {
-        setPosts((data ?? []) as ListPost[]);
-        setLoading(false);
-      });
-  }, []);
 
   const categories = useMemo(() => {
     const set = new Set<string>();
@@ -65,16 +29,6 @@ const BlogPage = () => {
 
   return (
     <Layout>
-      <Helmet>
-        <title>FynHelp Blog — Financial Intelligence for Indian SMEs</title>
-        <meta name="description" content="Tips, guides, and insights on cash flow management, GST compliance, and financial intelligence for Indian startups and SMEs." />
-        <link rel="canonical" href="https://fynhelp.com/blog" />
-        <meta property="og:type" content="website" />
-        <meta property="og:title" content="FynHelp Blog — Financial Intelligence for Indian SMEs" />
-        <meta property="og:description" content="Insights on cash flow, GST compliance, and finance for Indian SMEs." />
-        <meta property="og:url" content="https://fynhelp.com/blog" />
-        <meta name="twitter:card" content="summary_large_image" />
-      </Helmet>
 
       <style>{`
         .bl-wrap { background: #EFE8D8; padding: 64px 0 96px; }
@@ -113,9 +67,9 @@ const BlogPage = () => {
 
       <div className="bl-wrap">
         <div className="fyn-container">
-          <div className="bl-eyebrow">Resources</div>
-          <h1 className="bl-h1">The FynHelp Journal</h1>
-          <p className="bl-sub">Playbooks on cash flow, GST compliance, and running finance like a founder — written for Indian SMEs.</p>
+          <div className="bl-eyebrow">Blog</div>
+          <h1 className="bl-h1">Month-end close, reconciliation and MIS for CA firms</h1>
+          <p className="bl-sub">Practical guides for chartered accountants in India: closing clients’ books faster, reconciling bank to Tally, producing MIS clients trust, and keeping GST on schedule.</p>
 
           {categories.length > 1 && (
             <div className="bl-chips">
@@ -127,9 +81,7 @@ const BlogPage = () => {
             </div>
           )}
 
-          {loading ? (
-            <p className="bl-empty">Loading articles…</p>
-          ) : filtered.length === 0 ? (
+          {filtered.length === 0 ? (
             <p className="bl-empty">No articles in this category yet.</p>
           ) : (
             <>
@@ -137,7 +89,7 @@ const BlogPage = () => {
                 <Link to={`/blog/${featured.slug}`} className="bl-card bl-featured">
                   <div className="bl-cover">
                     {featured.cover_image_url ? (
-                      <img src={featured.cover_image_url} alt={featured.title} loading="lazy" />
+                      <img src={featured.cover_image_url} alt={featured.title} width={1280} height={720} fetchPriority="high" />
                     ) : (
                       <div className="ph">FynHelp</div>
                     )}
@@ -149,7 +101,7 @@ const BlogPage = () => {
                       {featured.reading_time_minutes ? <span className="bl-dot">{featured.reading_time_minutes} min read</span> : null}
                     </div>
                     <h2 className="bl-title">{featured.title}</h2>
-                    <p className="bl-ex">{excerptOf(featured)}</p>
+                    <p className="bl-ex">{listExcerpt(featured)}</p>
                     <span className="bl-read">Read article <span className="arw">→</span></span>
                   </div>
                 </Link>
@@ -172,7 +124,7 @@ const BlogPage = () => {
                         {p.reading_time_minutes ? <span className="bl-dot">{p.reading_time_minutes} min read</span> : null}
                       </div>
                       <h3 className="bl-title">{p.title}</h3>
-                      <p className="bl-ex">{excerptOf(p)}</p>
+                      <p className="bl-ex">{listExcerpt(p)}</p>
                       <span className="bl-read">Read article <span className="arw">→</span></span>
                     </div>
                   </Link>

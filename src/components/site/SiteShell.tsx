@@ -49,7 +49,7 @@ export function SiteFooter() {
       <div className="sf-wrap">
         <div className="sf-cols">
           <div className="sf-brand">
-            <FynLogo variant="light" size="sm" />
+            <FynLogo variant="light" size="sm" loading="lazy" />
             <p className="sf-about">
               Practice software for Indian CA firms. Statements in, matched books and a signed-off MIS out.
             </p>

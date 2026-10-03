@@ -1,16 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
 import UseCasesPage from "@/pages/UseCasesPage";
+import { breadcrumbLd, seo, webPageLd } from "@/lib/seo";
+
+const description =
+  "Where FynHelp saves a CA firm time each month: collecting client statements, reconciling bank to books, clearing exceptions and producing MIS your clients can trace to source.";
 
 export const Route = createFileRoute("/_main/use-cases")({
   component: UseCasesPage,
-  head: () => ({
-    meta: [
-      { title: "Use cases — eight AI finance agents | FynHelp" },
-      { name: "description", content: "Cash, revenue, cost, GST, governance, workforce, investor reporting and Ask Fynny. See which FynHelp agent owns your worst week of the month." },
-      { property: "og:title", content: "Use cases — eight AI finance agents | FynHelp" },
-      { property: "og:description", content: "Cash, revenue, cost, GST, governance, workforce, investor reporting and Ask Fynny. See which FynHelp agent owns your worst week of the month." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-    ],
-  }),
+  head: () =>
+    seo({
+      title: "Use cases: month-end close for CA practices",
+      description,
+      path: "/use-cases",
+      jsonLd: [
+        webPageLd({ name: "FynHelp use cases", description, path: "/use-cases" }),
+        breadcrumbLd([{ name: "Use cases", path: "/use-cases" }]),
+      ],
+    }),
 });

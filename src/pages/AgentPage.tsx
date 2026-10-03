@@ -1,7 +1,7 @@
 import { Link } from "@/lib/router-compat";
 import { Check, ArrowRight } from "lucide-react";
 import SiteShell, { PageHero, Section, CtaBand, Reveal } from "@/components/site/SiteShell";
-import { AGENTS, agentBySlug } from "@/components/site/agents";
+import { AGENT_SEO, AGENTS, agentBySlug } from "@/components/site/agents";
 import { C } from "@/components/site/siteTheme";
 import { CTA_DEMO, CTA_START, SIGNUP_URL, trackCta } from "@/components/site/cta";
 import { DemoLink } from "@/components/site/BookDemo";
@@ -33,8 +33,8 @@ export default function AgentPage({ slug }: { slug: string }) {
     <SiteShell>
       <PageHero
         kicker={`${agent.kicker} · ${agent.name}`}
-        title={agent.headline}
-        italic={agent.italic}
+        title={AGENT_SEO[agent.slug]?.h1 ?? agent.headline}
+        italic={AGENT_SEO[agent.slug]?.h1Italic ?? agent.italic}
         sub={agent.sub}
         actions={
           <>

@@ -18,7 +18,7 @@ Upload / Gmail / WhatsApp ─► Extract ─► Review Queue ─► Recon ─►
 | Database access per agent | `src/lib/practice/*.server.ts` |
 | Tables, columns, RLS | `supabase/migrations/20260927120000_practice_backend.sql` |
 | WhatsApp Business webhook | `src/routes/api/public/whatsapp-webhook.ts` |
-| Background tick (queue + chaser) | `src/routes/api/public/practice-tick.ts`, also run by the existing 15-minute Gmail cron |
+| Background tick (Gmail, queue, chaser) | `src/routes/api/public/practice-tick.ts` (`ca-poll-gmail` runs the same tick) |
 | AI proxy (uses the Lovable Cloud AI key) | `supabase/functions/practice-ai` |
 | v2 store (connects the screens) | `src/v2/store.tsx` |
 
@@ -163,14 +163,51 @@ closes only when a document covering that month arrives.
 
 ## Background work
 
-The existing `ca-poll-gmail` cron (every 15 minutes) now also:
+`/api/public/practice-tick` (and `/api/public/ca-poll-gmail`, which runs the
+same tick) does, in order:
+- checks every connected Gmail inbox for new attachments (see below);
 - extracts queued documents (Gmail and WhatsApp arrivals) and retries
   temporary failures once their backoff has passed;
 - opens the automatic missing-bank-statement chases;
 - sends follow-ups that have fallen due.
 
-To trigger this by hand, POST to `/api/public/practice-tick` with the header
-`x-cron-secret: <CA_CRON_SECRET>`.
+To trigger this by hand, call `/api/public/practice-tick` with
+`Authorization: Bearer <CRON_SECRET>` (or `x-cron-secret: <CA_CRON_SECRET>`).
+
+## Gmail intake
+
+`src/lib/practice/gmailIntake.server.ts` fetches and stores;
+`src/lib/practice/gmailRules.ts` decides (pure, unit-tested).
+
+- **What it reads:** emails with attachments received since the last
+  complete check (6-hour overlap; the first check covers 7 days, never more
+  than 30). Sent mail, drafts, spam, trash and chats are excluded, as is mail
+  from FynHelp itself and mail servers.
+- **What it takes:** PDF, CSV, TSV, TXT, Excel, Tally XML and photos. Zip and
+  Word files are taken so Extract can tell the firm to send PDF or Excel.
+  Signature logos, inline images, calendar invites, digital signatures,
+  `winmail.dat`, empty files and files over 25 MB are skipped and recorded.
+- **Who it files under:** the sender's email matched against client emails
+  and learned senders. Only an exact or confirmed match files automatically;
+  anything ambiguous, unknown, or failing Gmail's SPF/DMARC check goes to
+  Unassigned with the reason and a suggestion. Emails forwarded by firm staff
+  use the original sender; `Reply-To` is used when `From` is unknown. When a
+  person files an Unassigned document, the sender is learned for next time
+  (a sender already mapped to another client is flagged, not overwritten).
+- **Never twice:** `ca_gmail_processed` records every email and attachment
+  (claimed atomically, so overlapping checks cannot both file it), and
+  `registerDocument` drops identical files by content hash. Storage paths
+  are deterministic, so a retried upload overwrites rather than duplicates.
+- **Tokens:** refreshed 5 minutes before expiry under an atomic lock
+  (`claim_gmail_token_refresh`). Google being unavailable keeps the
+  connection; a revoked grant disconnects it and notifies the firm. A
+  connection without the `gmail.readonly` permission is refused at connect.
+- **Time limit:** each check stops before the function's time limit and
+  continues from the oldest unprocessed email on the next tick; the
+  checkpoint only advances after a complete pass.
+- **Tests:** `tests/unit/practice/gmail-rules.test.ts`, and
+  `tests/integration/gmail-intake.e2e.test.ts` (fake Gmail and Google token
+  server against the local stack; run with `GMAIL_E2E=1`).
 
 ## Tests
 

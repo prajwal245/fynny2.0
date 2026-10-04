@@ -44,27 +44,23 @@ export const startGmailConnect = createServerFn({ method: "POST" })
     return { url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`, redirectUri };
   });
 
-/** Run the Gmail poller once, on demand, for a firm the caller belongs to. */
+/** "Check now": check this firm's inboxes immediately and read what arrived. */
 export const pollGmailNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { firmId: string; origin?: string }) => {
     if (!input?.firmId) throw new Error("firmId is required");
     return input;
   })
-  .handler(async ({ data, context }): Promise<{ ok: boolean; detail: string }> => {
+  .handler(async ({ data, context }): Promise<{ ok: boolean; detail: string; documents: number }> => {
     await assertFirmMember(context.supabase as never, data.firmId);
-    const secret = process.env["CA_CRON_SECRET"] ?? process.env["CRON_SECRET"];
-    if (!secret) throw new Error("The scheduled job secret is not configured");
-    const { redirectUriFor, CALLBACK_PATH } = await import("@/lib/caGmail.server");
-    const base = redirectUriFor(data.origin ?? null).replace(CALLBACK_PATH, "");
-    const res = await fetch(`${base}/api/public/ca-poll-gmail`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-cron-secret": secret },
-      body: JSON.stringify({ source: "manual_test" }),
-    });
-    const detail = (await res.text()).slice(0, 300);
-    console.log(`[fyn:gmail] manual poll — status=${res.status} body=${detail}`);
-    return { ok: res.ok, detail };
+    const { pollGmailInboxes, describePoll } = await import("@/lib/practice/gmailIntake.server");
+    const summary = await pollGmailInboxes({ firmId: data.firmId, budgetMs: 30_000 });
+    if (summary.documents > 0) {
+      const { processQueue } = await import("@/lib/practice/documents.server");
+      await processQueue(3).catch(() => undefined);
+    }
+    const failed = summary.inboxes.some((i) => i.error);
+    return { ok: !failed, detail: describePoll(summary), documents: summary.documents };
   });
 
 /** Exchange the Google code for tokens and store the connection. */
@@ -107,6 +103,14 @@ export const completeGmailConnect = createServerFn({ method: "POST" })
     } catch (exchangeErr) {
       console.error("[fyn:gmail] token exchange failed:", exchangeErr instanceof Error ? exchangeErr.message : exchangeErr);
       throw exchangeErr;
+    }
+    // Google lets people untick "read your email" on the consent screen; the
+    // connection would then look fine but never see a single message.
+    if (tokens.scope && !tokens.scope.includes("gmail.readonly")) {
+      await g.revokeToken(tokens.access_token);
+      throw new Error(
+        "Google did not give FynHelp permission to read this inbox. Connect again and tick the box that lets FynHelp view your email messages.",
+      );
     }
     if (!tokens.refresh_token) {
       throw new Error("Google did not return a refresh token. Remove FynHelp from your Google account permissions and connect again.");

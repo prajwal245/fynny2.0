@@ -109,6 +109,8 @@ export interface GoogleTokens {
   access_token: string;
   refresh_token?: string;
   expires_in: number;
+  /** Space-separated scopes the person actually granted. */
+  scope?: string;
 }
 
 export async function exchangeCode(code: string, redirectUri: string): Promise<GoogleTokens> {
@@ -127,6 +129,39 @@ export async function exchangeCode(code: string, redirectUri: string): Promise<G
   const body = (await res.json()) as GoogleTokens & { error?: string; error_description?: string };
   if (!res.ok || body.error) throw new Error(body.error_description ?? body.error ?? "Token exchange failed");
   return body;
+}
+
+export type RefreshResult =
+  | { ok: true; access_token: string; expires_in: number }
+  | { ok: false; kind: "revoked" | "transient"; error: string };
+
+/**
+ * Refresh with the reason when it fails: "revoked" (the firm removed access
+ * or the grant expired; reconnecting is the only fix) versus "transient"
+ * (network trouble or Google busy; retry next time, keep the connection).
+ */
+export async function refreshAccessTokenDetailed(refreshToken: string): Promise<RefreshResult> {
+  const { refreshFailure } = await import("@/lib/practice/gmailRules");
+  const { clientId, clientSecret } = gmailCredentials();
+  let res: Response;
+  try {
+    // GOOGLE_TOKEN_URL exists only so tests can use a fake Google.
+    res = await fetch(process.env.GOOGLE_TOKEN_URL || "https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        refresh_token: refreshToken,
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: "refresh_token",
+      }),
+    });
+  } catch (e) {
+    return { ok: false, kind: "transient", error: e instanceof Error ? e.message : String(e) };
+  }
+  const body = (await res.json().catch(() => null)) as { access_token?: string; expires_in?: number; error?: string; error_description?: string } | null;
+  if (res.ok && body?.access_token) return { ok: true, access_token: body.access_token, expires_in: body.expires_in ?? 3600 };
+  return { ok: false, kind: refreshFailure(res.status, body), error: body?.error_description ?? body?.error ?? `HTTP ${res.status}` };
 }
 
 export async function refreshAccessToken(refreshToken: string): Promise<{ access_token: string; expires_in: number } | null> {

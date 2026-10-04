@@ -99,8 +99,9 @@ Authorization: Bearer <CRON_SECRET>
 ```
 
 Every 5 minutes is plenty. Uploads made in the app are processed immediately
-either way; the tick only drains Gmail and WhatsApp intake and sends due
-follow-ups.
+either way; the tick checks Gmail inboxes, drains Gmail and WhatsApp intake and
+sends due follow-ups. Without it, Gmail is only checked once a day or when
+someone clicks **Check now** in Settings.
 
 ## 4. Smoke test after deploy
 

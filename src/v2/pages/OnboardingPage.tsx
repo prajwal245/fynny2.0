@@ -1,45 +1,48 @@
 import { startGmailConnect } from "@/lib/caGmail.functions";
 import { track } from "@/lib/analytics";
 /**
- * FynHelp — first run journey, value first:
- * account → firm → first client → first document (watch Extract work) →
- * how much the agents may do on their own → intake channels → you're set.
- * Connecting Gmail leaves for Google, so it comes after the value moment.
+ * FynHelp — first run journey, value first and short:
+ * account (no confirmation email) → firm → first client → first document
+ * (watch Extract work) → you're set. Agents start with sensible defaults
+ * (auto recon, chase from the 5th), changeable in Settings. Connecting Gmail
+ * leaves for Google, so it is offered at the end.
  */
 import { cloneElement, isValidElement, useEffect, useId, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Building2, Check, Mail, MessageCircle, Sparkles, UploadCloud, UserPlus, Users } from "lucide-react";
+import { ArrowRight, Building2, Check, Mail, UploadCloud, UserPlus, Users } from "lucide-react";
 import { V } from "../ui";
 import { ProcessingCard } from "../agents";
 import { supabase } from "@/integrations/supabase/client";
 import { updatePracticePipelineSettings } from "@/lib/practice/practice.functions";
+import { confirmPendingAccount, createAccount } from "@/lib/accountSignup.functions";
 import { ENTITY_TYPES, useV2 } from "../store";
 import { OnboardingPanel } from "../components/OnboardingPanel";
 
-export const STEPS = ["Account", "Firm", "First client", "First document", "Agent autonomy", "Channels", "You're set"];
+export const STEPS = ["Account", "Firm", "First client", "First document", "You're set"];
 const STEP_HINT = [
   "Sign in or create your login",
   "How clients see you",
   "Who the agents work for",
   "Watch Extract read it",
-  "What agents do on their own",
-  "Gmail and WhatsApp intake",
   "Your practice is ready",
 ];
+/** What the agents may do on their own until the partner changes it in Settings. */
+const DEFAULT_AUTONOMY = { auto_recon: true, auto_chase_day: 5 };
 
 export default function OnboardingPage() {
   const { session, saveFirm, addClient, addDoc, completeOnboarding, firm, firmIdReady, docs, runs } = useV2();
   const savePipeline = useServerFn(updatePracticePipelineSettings);
-  const [autonomy, setAutonomy] = useState<{ auto_recon: boolean; auto_chase_day: number | null }>({ auto_recon: true, auto_chase_day: 5 });
+  const createAccountFn = useServerFn(createAccount);
+  const confirmPendingFn = useServerFn(confirmPendingAccount);
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState(session ? 1 : 0);
-  // Account step modes: create an account, sign in, wait for the email link, reset a password.
-  const [mode, setMode] = useState<"signup" | "signin" | "check-email" | "forgot">(() => {
+  // Account step modes: create an account, sign in, reset a password.
+  const [mode, setMode] = useState<"signup" | "signin" | "forgot">(() => {
     if (typeof window === "undefined") return "signup";
     const m = new URLSearchParams(window.location.search).get("mode");
     if (m === "signin" || m === "forgot" || m === "signup") return m;
@@ -75,7 +78,7 @@ export default function OnboardingPage() {
   // Set while this person is creating their firm here, so we do not treat the
   // new firm as "already onboarded" and leave before the client steps.
   const settingUp = useRef(false);
-  // Arriving from the confirmation email: the session appears after mount.
+  // A session that appears after mount (another tab signed in): move on.
   useEffect(() => {
     if (!session || step !== 0) return;
     setStep(1);
@@ -105,22 +108,23 @@ export default function OnboardingPage() {
 
   const next = () => setStep((s) => Math.min(s + 1, STEPS.length - 1));
 
-  const redirectTo = () => `${window.location.origin}/v2`;
-
   /** Plain-language auth errors instead of provider codes. */
   const authError = (message: string) => {
     if (/invalid login credentials/i.test(message)) return "That email and password do not match. Try again, or reset your password.";
-    if (/email not confirmed/i.test(message)) return "Confirm your email first. We can send the link again.";
     if (/rate limit|too many/i.test(message)) return "Too many attempts. Wait a minute and try again.";
     if (/password.*(short|characters|weak)/i.test(message)) return "Use a password of at least six characters.";
     return message;
   };
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const signIn = async (email: string, password: string, quiet = false) => {
+    let { error } = await supabase.auth.signInWithPassword({ email, password });
+    // Accounts made before sign-up became instant may still wait for a link: confirm and retry once.
+    if (error && /email not confirmed/i.test(error.message)) {
+      await confirmPendingFn({ data: { email } }).catch(() => undefined);
+      ({ error } = await supabase.auth.signInWithPassword({ email, password }));
+    }
     if (error) {
-      if (/email not confirmed/i.test(error.message)) setMode("check-email");
-      toast.error(authError(error.message));
+      if (!quiet) toast.error(authError(error.message));
       return false;
     }
     // A returning partner (or an invited teammate) already has a practice:
@@ -135,9 +139,8 @@ export default function OnboardingPage() {
     const email = account.email.trim();
     try {
       if (mode === "signin") {
-        if (await signIn(email, account.password)) {
-          next();
-        }
+        // The session effect may already have moved on: go to the firm step, never past it.
+        if (await signIn(email, account.password)) setStep((s) => Math.max(s, 1));
         return;
       }
       if (mode === "forgot") {
@@ -149,44 +152,22 @@ export default function OnboardingPage() {
         setMode("signin");
         return;
       }
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password: account.password,
-        options: { data: { full_name: account.name.trim() }, emailRedirectTo: redirectTo() },
-      });
-      if (error && /already/i.test(error.message)) {
-        if (await signIn(email, account.password)) next();
-        return;
-      }
-      if (error) { toast.error(authError(error.message)); return; }
-      if (!(data.user && data.user.identities?.length === 0)) track("sign_up", { method: "email" });
-      if (!data.session) {
-        // Supabase hides whether an address is taken: an existing, confirmed
-        // account comes back with no identities.
-        if (data.user && data.user.identities?.length === 0) {
-          toast.info("An account already exists for this email. Sign in instead.");
+      const created = await createAccountFn({ data: { name: account.name.trim(), email, password: account.password } }).catch(
+        () => ({ ok: false as const, message: "We couldn't create your account just now. Check your connection and try again." }),
+      );
+      if (!created.ok) { toast.error(created.message); return; }
+      if (!(await signIn(email, account.password, created.existed))) {
+        if (created.existed) {
+          toast.info("An account already exists for this email. Sign in, or reset your password.");
           setMode("signin");
-          return;
         }
-        setMode("check-email");
         return;
       }
-      next();
+      if (!created.existed) track("sign_up", { method: "email" });
+      setStep((s) => Math.max(s, 1));
     } finally {
       setBusy(false);
     }
-  };
-
-  const resend = async () => {
-    setBusy(true);
-    const { error } = await supabase.auth.resend({
-      type: "signup",
-      email: account.email.trim(),
-      options: { emailRedirectTo: redirectTo() },
-    });
-    setBusy(false);
-    if (error) toast.error(authError(error.message));
-    else toast.success("Sent again. Check your inbox and spam folder.");
   };
 
   const submitFirm = async (e: React.FormEvent) => {
@@ -203,6 +184,8 @@ export default function OnboardingPage() {
       settingUp.current = false;
       return;
     }
+    // Agents start with the usual defaults; the partner can change them in Settings.
+    void savePipeline({ data: DEFAULT_AUTONOMY }).catch(() => undefined);
     next();
   };
 
@@ -234,18 +217,6 @@ export default function OnboardingPage() {
     const file = files[0];
     addDoc(file.name, clientId, "Manual", file);
     setUploaded(file.name);
-  };
-
-  const saveAutonomy = async () => {
-    setBusy(true);
-    try {
-      await savePipeline({ data: autonomy });
-      next();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
   };
 
   // The first document, as the Extract agent reports it (real state, not a timer).
@@ -309,18 +280,7 @@ export default function OnboardingPage() {
               </div>
             )}
 
-            {step === 0 && mode === "check-email" && (
-              <div style={{ display: "grid", gap: 18 }} data-testid="check-email">
-                <Intro icon={<Mail size={20} />} title="Confirm your email" text={`We sent a link to ${account.email || "your inbox"}. Open it on this device and you will land right back here to set up your firm.`} />
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <button className="v2-btn v2-btn-primary" type="button" data-busy={busy} disabled={busy || !account.email} onClick={resend}>Send the link again</button>
-                  <button className="v2-btn v2-btn-ghost" type="button" onClick={() => setMode("signin")}>I have confirmed, sign in</button>
-                </div>
-                <p className="onb-foot">Wrong address? <button type="button" className="v2-link" onClick={() => setMode("signup")}>Use a different email</button>. Nothing after a few minutes? Check spam.</p>
-              </div>
-            )}
-
-            {step === 0 && mode !== "check-email" && (
+            {step === 0 && (
               <form onSubmit={submitAccount} style={{ display: "grid", gap: 16 }} data-auth-mode={mode}>
                 <div>
                   <h1 className="onb-title">
@@ -376,7 +336,7 @@ export default function OnboardingPage() {
                 <Intro icon={<Building2 size={20} />} title="Set up your firm" text="Your firm's name goes on every MIS and every message the Chaser sends." />
                 <Field label="Firm name"><input className="v2-input" required autoFocus value={firmForm.name} onChange={(e) => setFirmForm({ ...firmForm, name: e.target.value })} placeholder="Mehta and Associates" /></Field>
                 <div className="onb-2col">
-                  <Field label="City"><input className="v2-input" required value={firmForm.city} onChange={(e) => setFirmForm({ ...firmForm, city: e.target.value })} placeholder="Bengaluru" /></Field>
+                  <Field label="City" optional><input className="v2-input" value={firmForm.city} onChange={(e) => setFirmForm({ ...firmForm, city: e.target.value })} placeholder="Bengaluru" /></Field>
                   <Field label="Firm registration number" optional><input className="v2-input" value={firmForm.frn} onChange={(e) => setFirmForm({ ...firmForm, frn: e.target.value })} placeholder="012345S" /></Field>
                 </div>
                 <Actions>
@@ -387,21 +347,28 @@ export default function OnboardingPage() {
 
             {step === 2 && (
               <form onSubmit={submitClient} style={{ display: "grid", gap: 16 }}>
-                <Intro icon={<UserPlus size={20} />} title="Add your first client" text="The agents work client by client. The contact details let the Chaser ask for missing documents on your behalf." />
-                <Field label="Client name"><input className="v2-input" required autoFocus value={client.name} onChange={(e) => setClient({ ...client, name: e.target.value })} placeholder="Sundar Textiles Pvt Ltd" /></Field>
+                <Intro icon={<UserPlus size={20} />} title="Add your first client" text="The agents work client by client. Statements from this email file themselves, and the Chaser writes here when one is missing." />
                 <div className="onb-2col">
-                  <Field label="Entity type">
-                    <select className="v2-input" value={client.entityType} onChange={(e) => setClient({ ...client, entityType: e.target.value })}>
-                      {ENTITY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="GSTIN" optional><input className="v2-input" value={client.gstin} onChange={(e) => setClient({ ...client, gstin: e.target.value })} placeholder="27AABCS1429B1ZP" /></Field>
+                  <Field label="Client name"><input className="v2-input" required autoFocus value={client.name} onChange={(e) => setClient({ ...client, name: e.target.value })} placeholder="Sundar Textiles Pvt Ltd" /></Field>
+                  <Field label="Client's email"><input className="v2-input" type="email" required value={client.email} onChange={(e) => setClient({ ...client, email: e.target.value })} placeholder="ramesh@client.in" /></Field>
                 </div>
-                <div className="onb-2col">
-                  <Field label="Contact person"><input className="v2-input" required value={client.contactName} onChange={(e) => setClient({ ...client, contactName: e.target.value })} placeholder="Ramesh Sundar" /></Field>
-                  <Field label="Contact email"><input className="v2-input" type="email" required value={client.email} onChange={(e) => setClient({ ...client, email: e.target.value })} placeholder="ramesh@client.in" /></Field>
-                </div>
-                <Field label="WhatsApp number" optional><input className="v2-input" value={client.phone} onChange={(e) => setClient({ ...client, phone: e.target.value })} placeholder="919820011223" /></Field>
+                <details className="onb-more">
+                  <summary>More details <span>(optional)</span></summary>
+                  <div style={{ display: "grid", gap: 14, marginTop: 14 }}>
+                    <div className="onb-2col">
+                      <Field label="Contact person" optional><input className="v2-input" value={client.contactName} onChange={(e) => setClient({ ...client, contactName: e.target.value })} placeholder="Ramesh Sundar" /></Field>
+                      <Field label="Entity type">
+                        <select className="v2-input" value={client.entityType} onChange={(e) => setClient({ ...client, entityType: e.target.value })}>
+                          {ENTITY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </Field>
+                    </div>
+                    <div className="onb-2col">
+                      <Field label="GSTIN" optional><input className="v2-input" value={client.gstin} onChange={(e) => setClient({ ...client, gstin: e.target.value })} placeholder="27AABCS1429B1ZP" /></Field>
+                      <Field label="WhatsApp number" optional><input className="v2-input" value={client.phone} onChange={(e) => setClient({ ...client, phone: e.target.value })} placeholder="919820011223" /></Field>
+                    </div>
+                  </div>
+                </details>
                 <Actions>
                   <button className="v2-btn v2-btn-primary" type="submit">Add client <ArrowRight size={15} /></button>
                 </Actions>
@@ -431,9 +398,10 @@ export default function OnboardingPage() {
                       <div className="onb-note" style={{ color: V.maroon }}>{firstDoc.error ?? "This file could not be read."} You can upload another file later from the client's Documents tab.</div>
                     )}
                     <Actions>
-                      <button className="v2-btn v2-btn-primary" onClick={next} disabled={reading} data-busy={reading}>
-                        {reading ? "Extract is reading" : "Continue"} {!reading && <ArrowRight size={15} />}
+                      <button className="v2-btn v2-btn-primary" onClick={next}>
+                        Continue <ArrowRight size={15} />
                       </button>
+                      {reading && <span className="onb-foot">Extract keeps reading in the background.</span>}
                     </Actions>
                   </div>
                 ) : (
@@ -453,59 +421,6 @@ export default function OnboardingPage() {
             )}
 
             {step === 4 && (
-              <div style={{ display: "grid", gap: 16 }}>
-                <Intro icon={<Sparkles size={20} />} title="How much should the agents do on their own?" text="You can change this any time in Settings. Matching never uses AI, and nothing reaches a partner's MIS without review." />
-                <Toggle
-                  label="Reconcile automatically"
-                  text="When a month has both the bank statement and the books, Recon matches it straight away and lists only the exceptions."
-                  on={autonomy.auto_recon}
-                  onChange={(v) => setAutonomy({ ...autonomy, auto_recon: v })}
-                />
-                <div className="onb-toggle">
-                  <div>
-                    <div className="onb-toggle-label">Chase missing bank statements</div>
-                    <div className="onb-toggle-text">If a client has not sent last month's statement by this day, the Chaser emails them (Day 0, 3 and 7) and stops the moment it arrives.</div>
-                  </div>
-                  <select className="v2-input" aria-label="Chase day" style={{ width: "auto" }} value={autonomy.auto_chase_day ?? ""} onChange={(e) => setAutonomy({ ...autonomy, auto_chase_day: e.target.value ? Number(e.target.value) : null })}>
-                    <option value="">Off</option>
-                    {[3, 5, 7, 10].map((d) => <option key={d} value={d}>By the {d}th</option>)}
-                  </select>
-                </div>
-                <div className="onb-note">
-                  <b>Always yours:</b> confirming low-confidence lines, resolving exceptions, generating the MIS and signing it off.
-                </div>
-                <Actions>
-                  <button className="v2-btn v2-btn-primary" data-busy={busy} disabled={busy} onClick={saveAutonomy}>Save and continue <ArrowRight size={15} /></button>
-                </Actions>
-              </div>
-            )}
-
-            {step === 5 && (
-              <div style={{ display: "grid", gap: 16 }}>
-                <Intro icon={<Mail size={20} />} title="Let documents come in by themselves" text="Connect the inbox your clients already email. Statements and bills from known clients go straight to the Extract agent; anything uncertain waits in the Unassigned inbox." />
-                <div className="onb-channel">
-                  <span className="onb-channel-icon"><Mail size={18} /></span>
-                  <div style={{ minWidth: 0 }}>
-                    <div className="onb-toggle-label">Gmail</div>
-                    <div className="onb-toggle-text">Read-only access to attachments. You can disconnect in Settings.</div>
-                  </div>
-                  <button className="v2-btn v2-btn-ghost" onClick={connectGmail}>Connect Gmail</button>
-                </div>
-                <div className="onb-channel">
-                  <span className="onb-channel-icon"><MessageCircle size={18} /></span>
-                  <div style={{ minWidth: 0 }}>
-                    <div className="onb-toggle-label">WhatsApp Business</div>
-                    <div className="onb-toggle-text">Link your business number in Settings once your Meta app is ready.</div>
-                  </div>
-                  <span className="onb-pill">In Settings</span>
-                </div>
-                <Actions>
-                  <button className="v2-btn v2-btn-primary" onClick={next}>Continue <ArrowRight size={15} /></button>
-                </Actions>
-              </div>
-            )}
-
-            {step === 6 && (
               <div style={{ display: "grid", gap: 16 }} data-testid="onboarding-done">
                 <Intro icon={<Check size={20} />} title={`${firm?.name || firmForm.name || "Your practice"} is ready`} text="Here is where things stand, and the one thing to do next." />
                 <ul className="onb-checklist">
@@ -516,7 +431,7 @@ export default function OnboardingPage() {
                     label={firstDoc ? `${firstDoc.name} read` : "First document"}
                     detail={firstDoc && firstDoc.status !== "Failed" ? `${firstDoc.txnCount ?? 0} transactions${firstDoc.reviewCount ? `, ${firstDoc.reviewCount} to review` : ""}` : "Upload from the client's Documents tab"}
                   />
-                  <Checked ok label="Agent autonomy set" detail={`${autonomy.auto_recon ? "Auto recon on" : "Recon on request"} · ${autonomy.auto_chase_day ? `chase by the ${autonomy.auto_chase_day}th` : "no automatic chase"}`} />
+                  <Checked ok label="Agents on duty" detail="Recon runs as soon as a month is complete; missing statements are chased from the 5th. Change it in Settings." />
                 </ul>
                 <div className="onb-note">
                   <b>Next:</b>{" "}
@@ -528,7 +443,10 @@ export default function OnboardingPage() {
                 </div>
                 <Actions>
                   <button className="v2-btn v2-btn-primary v2-btn-lg" onClick={finish}>Open the client workspace <ArrowRight size={15} /></button>
-                  <button className="v2-btn v2-btn-ghost" onClick={() => void completeOnboarding().then(() => navigate({ to: "/v2/settings" }))}>
+                  <button className="v2-btn v2-btn-ghost" onClick={connectGmail}>
+                    <Mail size={15} /> Connect Gmail
+                  </button>
+                  <button className="v2-btn v2-btn-quiet" onClick={() => void completeOnboarding().then(() => navigate({ to: "/v2/settings" }))}>
                     <Users size={15} /> Invite your team
                   </button>
                 </Actions>
@@ -548,7 +466,6 @@ export default function OnboardingPage() {
         reading={reading}
         txns={firstDoc?.txnCount ?? 0}
         review={firstDoc?.reviewCount ?? 0}
-        autonomy={autonomy}
       />
     </div>
   );
@@ -563,19 +480,6 @@ function Stat({ n, label, tone }: { n: number; label: string; tone?: "warn" }) {
   );
 }
 
-function Toggle({ label, text, on, onChange }: { label: string; text: string; on: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <div className="onb-toggle">
-      <div>
-        <div className="onb-toggle-label">{label}</div>
-        <div className="onb-toggle-text">{text}</div>
-      </div>
-      <button type="button" role="switch" aria-checked={on} aria-label={label} className="onb-switch" data-on={on} onClick={() => onChange(!on)}>
-        <span />
-      </button>
-    </div>
-  );
-}
 
 function Checked({ ok, label, detail }: { ok: boolean; label: string; detail?: string }) {
   return (
@@ -643,6 +547,8 @@ const ONB_STYLES = `
 .onb-title { font-size:clamp(24px,3vw,30px); letter-spacing:-0.03em; line-height:1.15; margin:0; }
 .onb-sub { margin:8px 0 4px; font-size:14px; color:${V.body}; line-height:1.6; }
 .onb-foot { font-size:12.5px; color:${V.muted}; margin:0; }
+.onb-more summary { cursor:pointer; font-size:13px; font-weight:600; color:${V.ink}; }
+.onb-more summary span { font-weight:400; color:${V.muted}; }
 .onb-2col { display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr)); }
 .onb-drop { display:grid; justify-items:center; gap:6px; text-align:center; border:1.5px dashed rgba(20,20,20,.18); border-radius:18px; padding:36px 20px; cursor:pointer; transition:border-color .2s ease, background .2s ease; }
 .onb-drop:hover { border-color:${V.ink}; background:rgba(20,20,20,.02); }

@@ -51,7 +51,6 @@ export function OnboardingPanel(props: {
   reading: boolean;
   txns: number;
   review: number;
-  autonomy: { auto_recon: boolean; auto_chase_day: number | null };
 }) {
   const { step } = props;
   const firm = props.firmName.trim() || "Your firm";
@@ -120,39 +119,6 @@ export function OnboardingPanel(props: {
       <div style={{ fontSize: 13.5, color: SOFT, lineHeight: 1.7 }}>
         A bank statement is the best first document: the Extract agent verifies each line against the running balance.
         Add the books (Tally or ledger) later and Recon matches the month on its own.
-      </div>
-    );
-  } else if (step === 4) {
-    title = "You stay in charge";
-    body = (
-      <div style={{ display: "grid", gap: 12 }}>
-        <Frame label="Agents do on their own">
-          <div style={{ display: "grid", gap: 6, fontSize: 13.5 }}>
-            <div>Read every document that arrives</div>
-            <div style={{ opacity: props.autonomy.auto_recon ? 1 : 0.4 }}>Match bank to books when a month is complete</div>
-            <div style={{ opacity: props.autonomy.auto_chase_day ? 1 : 0.4 }}>Chase a missing statement {props.autonomy.auto_chase_day ? `from the ${props.autonomy.auto_chase_day}th` : "(off)"}</div>
-            <div>Retry anything that failed for a temporary reason</div>
-          </div>
-        </Frame>
-        <Frame label="Always waits for a person">
-          <div style={{ display: "grid", gap: 6, fontSize: 13.5 }}>
-            <div>Unsure lines and every exception</div>
-            <div>Generating the MIS and signing it off</div>
-          </div>
-        </Frame>
-      </div>
-    );
-  } else if (step === 5) {
-    title = "Documents arrive, agents start";
-    body = (
-      <div style={{ display: "grid", gap: 10, fontSize: 13.5 }}>
-        {["Client emails a statement", "Gmail intake matches the sender", "Extract reads it", "Recon matches the month"].map((t, i) => (
-          <div key={t} style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <span style={{ width: 22, height: 22, borderRadius: 999, border: `1px solid ${LINE}`, display: "grid", placeItems: "center", fontSize: 11, color: SOFT }}>{i + 1}</span>
-            {t}
-          </div>
-        ))}
-        <div style={{ color: SOFT, fontSize: 12.5, marginTop: 6 }}>An unknown sender is never guessed: the document waits in the Unassigned inbox for one click.</div>
       </div>
     );
   } else {

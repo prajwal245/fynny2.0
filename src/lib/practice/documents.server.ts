@@ -691,7 +691,7 @@ export async function assignDocument(
 ) {
   const { data: doc } = await db
     .from("ca_document_extractions")
-    .select("id, business_id")
+    .select("id, business_id, source_type, gmail_sender_email, gmail_match_method")
     .eq("id", extractionId)
     .eq("ca_firm_id", ctx.firmId)
     .maybeSingle();
@@ -719,9 +719,47 @@ export async function assignDocument(
       extract_status: "queued",
       extract_attempts: 0,
       extract_next_attempt_at: null,
+      error_message: null,
     })
     .eq("id", extractionId);
+  if (doc.source_type === "gmail" && doc.gmail_sender_email) await learnSender(db, ctx, String(doc.gmail_sender_email), businessId, String(doc.gmail_match_method ?? ""));
   return processExtraction(db, extractionId, { trigger: "user", userId: ctx.userId });
+}
+
+/**
+ * A person filed a Gmail document under a client: the next email from that
+ * address files itself. If the same address is later filed under a
+ * different client (a shared accountant, say), it stops filing automatically
+ * and always asks.
+ */
+async function learnSender(db: Db, ctx: FirmContext, senderEmail: string, businessId: string, method: string) {
+  const email = senderEmail.toLowerCase();
+  // Forwards by the firm's own staff and addresses on several clients are never learned.
+  if (method === "internal" || method === "ambiguous" || method.endsWith("_forwarded")) return;
+  const { data: existing } = await db
+    .from("ca_email_sender_mappings")
+    .select("id, business_id, confirmed_at, match_method")
+    .eq("ca_firm_id", ctx.firmId)
+    .eq("sender_email", email)
+    .maybeSingle();
+  if (existing?.confirmed_at && existing.business_id !== businessId) {
+    await db.from("ca_email_sender_mappings").update({ confirmed_at: null, match_method: "conflict" }).eq("id", existing.id);
+    return;
+  }
+  if (existing?.match_method === "conflict") return;
+  await db.from("ca_email_sender_mappings").upsert(
+    {
+      ca_firm_id: ctx.firmId,
+      business_id: businessId,
+      sender_email: email,
+      sender_domain: email.split("@")[1] ?? null,
+      match_method: "manual",
+      confidence: 0.95,
+      confirmed_by_user_id: ctx.userId,
+      confirmed_at: new Date().toISOString(),
+    },
+    { onConflict: "ca_firm_id,sender_email" },
+  );
 }
 
 export async function documentUrl(

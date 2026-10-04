@@ -319,11 +319,26 @@
   "id",
   "is_active",
   "last_history_id",
+  "last_poll_stats",
   "last_polled_at",
   "refresh_locked_until",
   "refresh_token_enc",
   "token_expiry",
   "user_id"
+ ],
+ "ca_gmail_processed": [
+  "business_id",
+  "ca_firm_id",
+  "connection_id",
+  "created_at",
+  "extraction_id",
+  "filename",
+  "message_id",
+  "outcome",
+  "part_id",
+  "reason",
+  "sender_email",
+  "updated_at"
  ],
  "ca_notifications": [
   "business_id",

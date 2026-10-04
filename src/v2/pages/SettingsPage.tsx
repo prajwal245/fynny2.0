@@ -374,7 +374,7 @@ export default function SettingsPage() {
                       {c.is_active ? "active" : "disconnected"}
                       {c.last_polled_at
                         ? ` · last checked ${formatDate(c.last_polled_at)}`
-                        : ""}
+                        : " · first check covers the last 7 days"}
                       {c.error_message ? (
                         <span style={{ color: V.maroon }}>
                           {" "}
@@ -417,8 +417,9 @@ export default function SettingsPage() {
                               },
                             });
                             if (!r.ok) throw new Error(r.detail);
+                            // Say what was found, not just that it ran.
+                            toast.success(r.detail);
                           },
-                          "Checked the inbox. New attachments are being read.",
                         )
                       }
                     >

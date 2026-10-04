@@ -15,7 +15,7 @@ import {
   revokePracticeMember,
 } from "@/lib/practice/practice.functions";
 import { Badge, Card, PageHeader, V, formatDate } from "../ui";
-import { RowSkeleton } from "../agents";
+import { RowSkeleton, ShimmerText } from "../agents";
 import { useV2 } from "../store";
 import { AgentSettings } from "../components/AgentSettings";
 
@@ -406,6 +406,7 @@ export default function SettingsPage() {
                     <button
                       className="v2-btn v2-btn-ghost"
                       disabled={busy === "poll"}
+                      data-working={busy === "poll"}
                       onClick={() =>
                         run(
                           "poll",
@@ -423,7 +424,14 @@ export default function SettingsPage() {
                         )
                       }
                     >
-                      Check now
+                      {busy === "poll" ? (
+                        <>
+                          <span className="v2-dot" style={{ background: V.ink }} />
+                          <ShimmerText text="Checking inbox…" />
+                        </>
+                      ) : (
+                        "Check now"
+                      )}
                     </button>
                     {intg.gmail.connections
                       .filter((c) => c.is_active)

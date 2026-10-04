@@ -4,7 +4,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { BarChart3, Plus } from "lucide-react";
 import { Card, EmptyState, Modal, PageHeader, V, formatDate, formatINR } from "../ui";
-import { AgentStatusBadge, ProcessingCard } from "../agents";
+import { AgentGlyph, AgentStatusBadge, ProcessingCard, ShimmerText } from "../agents";
 import { parsePeriod } from "@/lib/practice/core";
 import { PERIODS, REPORT_TEMPLATES, ReportTemplate, useV2 } from "../store";
 
@@ -160,8 +160,8 @@ export default function ReportsPage({ clientId: scopedClient }: { clientId?: str
 
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
             <button className="v2-btn v2-btn-ghost" onClick={() => setOpen(false)}>Cancel</button>
-            <button className="v2-btn v2-btn-primary" onClick={generate} disabled={!matchedInPeriod || narrating}>
-              {narrating ? "Narrate is preparing…" : "Generate"}
+            <button className="v2-btn v2-btn-primary" onClick={generate} disabled={!matchedInPeriod || narrating} data-working={narrating}>
+              {narrating ? <><AgentGlyph agent="narrate" state="running" size={20} /><ShimmerText text="Narrate is preparing…" tone="light" /></> : "Generate"}
             </button>
           </div>
         </div>

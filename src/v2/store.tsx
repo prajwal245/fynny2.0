@@ -727,7 +727,14 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
           r.id === id ? { ...r, status: "succeeded" } : r,
         );
       };
-      return work((stage) => patch({ stage })).then(
+      // Each real step that finishes stays visible as a ticked line.
+      const advance = (stage: string) =>
+        setRuns((p) =>
+          p.map((r) =>
+            r.id === id && r.stage !== stage ? { ...r, trail: [...(r.trail ?? []), r.stage.replace(/^Uploading securely$/, "Uploaded securely")], stage } : r,
+          ),
+        );
+      return work(advance).then(
         (v) => {
           settle();
           patch({ status: "succeeded", result: opts.describe(v), finishedAt: Date.now() });

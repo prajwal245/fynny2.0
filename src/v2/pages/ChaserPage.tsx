@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import { Send, Plus, MessageCircle, Mail } from "lucide-react";
 import { Badge, Card, Drawer, EmptyState, Modal, PageHeader, Tone, V, formatDate } from "../ui";
-import { AgentStatusBadge, AgentTimeline } from "../agents";
+import { AgentGlyph, AgentStatusBadge, AgentTimeline, ShimmerText } from "../agents";
 import { Chase, useV2 } from "../store";
 
 const TONE: Record<Chase["status"], Tone> = { Open: "info", "Following Up": "warn", Escalated: "bad", Resolved: "good" };
@@ -185,9 +185,9 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
                 {active.status !== "Resolved" && (() => {
                   const sending = runs.some((r) => r.agent === "chaser" && r.target === active.id && r.status === "running");
                   return (
-                    <button className="v2-btn v2-btn-ghost" disabled={sending} onClick={() => { sendFollowUp(active.id, "Email"); }}>
-                      {sending ? <span className="v2-dot" style={{ background: "#C9962A" }} /> : <Mail size={15} />}
-                      {sending ? " Chaser is sending follow-up…" : " Send email follow up"}
+                    <button className="v2-btn v2-btn-ghost" disabled={sending} data-working={sending} onClick={() => { sendFollowUp(active.id, "Email"); }}>
+                      {sending ? <AgentGlyph agent="chaser" state="running" size={20} /> : <Mail size={15} />}
+                      {sending ? <ShimmerText text="Chaser is sending follow-up…" agent="chaser" /> : " Send email follow up"}
                     </button>
                   );
                 })()}

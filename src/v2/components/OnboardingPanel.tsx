@@ -4,8 +4,9 @@
  * message, the MIS header with the firm's name, the first document's result),
  * never invented numbers.
  */
+import type { ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { AGENTS, type AgentKey } from "../agents";
+import { AGENTS, ShimmerText, type AgentKey } from "../agents";
 
 const INK = "#141414";
 const SOFT = "rgba(255,255,255,.62)";
@@ -61,7 +62,7 @@ export function OnboardingPanel(props: {
   const contact = props.client.contact.trim().replace(/^(mr|mrs|ms|dr|shri|smt)\.?\s+/i, "").split(" ")[0] || "there";
   const month = new Date(Date.now() - 20 * 86400000).toLocaleString("en-IN", { month: "long" });
 
-  let title = "";
+  let title: ReactNode = "";
   let body: React.ReactNode = null;
   if (step === 0) {
     title = props.mode === "signin" ? "Your agents kept working" : "Four agents. One month-end close.";
@@ -99,7 +100,7 @@ export function OnboardingPanel(props: {
       </Frame>
     );
   } else if (step === 3) {
-    title = props.docName ? (props.reading ? "Extract is reading…" : "Read and structured") : "Start with one document";
+    title = props.docName ? (props.reading ? <ShimmerText text="Extract is reading…" tone="light" /> : "Read and structured") : "Start with one document";
     body = props.docName ? (
       <Frame label={props.docName}>
         {props.reading ? (

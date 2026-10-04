@@ -4,7 +4,7 @@ import { Link, useParams } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft } from "lucide-react";
 import { Badge, Card, EmptyState, PageHeader, Stat, Tabs, V, formatDate, formatINR } from "../ui";
-import { AgentStatusBadge, AgentTimeline, AnimatedCounter, ProcessingCard } from "../agents";
+import { AgentGlyph, AgentStatusBadge, AgentTimeline, AnimatedCounter, ProcessingCard, ShimmerText } from "../agents";
 import { useV2 } from "../store";
 import { CloseProgress, NextAction } from "../components/CloseProgress";
 import { AgentRunsCard } from "../components/AgentRuns";
@@ -143,11 +143,11 @@ export default function ClientWorkspacePage() {
           <Card>
             <h3 style={{ fontSize: 15 }}>Quick actions</h3>
             <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
-              <button className="v2-btn v2-btn-primary" disabled={reconRunning} onClick={() => { runRecon(client.id, (r) => toast.success(`Recon complete. Matched ${r.matched}, exceptions ${r.exceptions}.`)); }}>
-                {reconRunning ? "Recon is matching…" : "Run recon"}
+              <button className="v2-btn v2-btn-primary" disabled={reconRunning} data-working={reconRunning} onClick={() => { runRecon(client.id, (r) => toast.success(`Recon complete. Matched ${r.matched}, exceptions ${r.exceptions}.`)); }}>
+                {reconRunning ? <><AgentGlyph agent="recon" state="running" size={20} /><ShimmerText text="Recon is matching…" tone="light" /></> : "Run recon"}
               </button>
-              <button className="v2-btn v2-btn-ghost" disabled={narrateRunning} onClick={() => { generateReport(client.id, period, "Monthly MIS", () => toast.success(`${period} MIS ready`)); }}>
-                {narrateRunning ? "Narrate is preparing…" : "Generate MIS"}
+              <button className="v2-btn v2-btn-ghost" disabled={narrateRunning} data-working={narrateRunning} onClick={() => { generateReport(client.id, period, "Monthly MIS", () => toast.success(`${period} MIS ready`)); }}>
+                {narrateRunning ? <><AgentGlyph agent="narrate" state="running" size={20} /><ShimmerText text="Narrate is preparing…" agent="narrate" /></> : "Generate MIS"}
               </button>
               <Link className="v2-btn v2-btn-ghost" to="/v2/documents">Upload documents</Link>
             </div>
@@ -176,9 +176,10 @@ export default function ClientWorkspacePage() {
             <button
               className="v2-btn v2-btn-primary"
               disabled={reconRunning}
+              data-working={reconRunning}
               onClick={() => { runRecon(client.id, (r) => toast.success(`Recon complete. Matched ${r.matched}, exceptions ${r.exceptions}.`)); }}
             >
-              {reconRunning ? "Recon agent is working" : `Run recon for ${period}`}
+              {reconRunning ? <><AgentGlyph agent="recon" state="running" size={20} /><ShimmerText text="Recon agent is working" tone="light" /></> : `Run recon for ${period}`}
             </button>
             <button className="v2-btn v2-btn-ghost" onClick={() => setTab("exceptions")}>View exceptions</button>
             <AgentStatusBadge agent="recon" active={reconRunning} label={reconRunning ? "Matching transactions" : "Exact, fuzzy, then rules"} />

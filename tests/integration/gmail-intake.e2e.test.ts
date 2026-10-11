@@ -290,7 +290,7 @@ describe.runIf(RUN)("Gmail intake end to end", () => {
   it("health check runs every step and names what to fix", async () => {
     const { gmailHealth, pollGmailInboxes } = await import("@/lib/practice/gmailIntake.server");
     tokenMode = "ok";
-    await db.from("ca_gmail_connections").update({ is_active: true, error_message: null, last_auto_poll_at: null }).eq("id", connId);
+    await db.from("ca_gmail_connections").update({ is_active: true, error_message: null, last_auto_poll_at: null, last_poll_stats: null }).eq("id", connId);
     let h = await gmailHealth(FIRM, db);
     const byKey = Object.fromEntries(h.steps.map((s) => [s.key, s]));
     expect(byKey.keys.ok).toBe(true);

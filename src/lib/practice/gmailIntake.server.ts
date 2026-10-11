@@ -108,7 +108,12 @@ async function gmailGet<T>(token: string, path: string): Promise<T> {
 }
 
 async function setConnection(db: Db, id: string, patch: Record<string, unknown>) {
-  await db.from("ca_gmail_connections").update(patch).eq("id", id);
+  const { error } = await db.from("ca_gmail_connections").update(patch).eq("id", id);
+  // Before the "last_auto_poll_at" column exists, save everything else.
+  if (error && "last_auto_poll_at" in patch) {
+    const { last_auto_poll_at: _a, ...rest } = patch;
+    await db.from("ca_gmail_connections").update(rest).eq("id", id);
+  }
 }
 
 async function disconnect(db: Db, conn: Connection, message: string) {
@@ -228,12 +233,19 @@ async function claim(db: Db, conn: Connection, messageId: string, partId: string
 }
 
 async function settle(db: Db, conn: Connection, messageId: string, partId: string, patch: Record<string, unknown>) {
-  await db
-    .from("ca_gmail_processed")
-    .update({ ...patch, updated_at: new Date().toISOString() })
-    .eq("connection_id", conn.id)
-    .eq("message_id", messageId)
-    .eq("part_id", partId);
+  const write = (p: Record<string, unknown>) =>
+    db
+      .from("ca_gmail_processed")
+      .update({ ...p, updated_at: new Date().toISOString() })
+      .eq("connection_id", conn.id)
+      .eq("message_id", messageId)
+      .eq("part_id", partId);
+  const { error } = await write(patch);
+  // Before the "subject" column exists, keep the outcome and drop the extra.
+  if (error && "subject" in patch) {
+    const { subject: _s, ...rest } = patch;
+    if (Object.keys(rest).length) await write(rest);
+  }
 }
 
 interface Sender {
@@ -371,7 +383,7 @@ async function processEmail(db: Db, conn: Connection, token: string, messageId: 
   let unassigned = 0;
 
   for (const a of take) {
-    if ((await claim(db, conn, messageId, a.partId, { filename: a.filename, sender_email: sender.email, subject })) === "skip") continue;
+    if ((await claim(db, conn, messageId, a.partId, { filename: a.filename, sender_email: sender.email })) === "skip") continue;
     try {
       const bytes = await attachmentBytes(token, messageId, a);
       if (!bytes.length) {
@@ -633,7 +645,7 @@ export async function gmailHealth(firmId: string, db?: Db): Promise<{ steps: Hea
   // 2. Database
   const probes = await Promise.all([
     db.from("ca_gmail_processed").select("message_id").limit(1),
-    db.from("ca_gmail_connections").select("last_poll_stats, last_auto_poll_at, refresh_locked_until").limit(1),
+    db.from("ca_gmail_connections").select("last_poll_stats, refresh_locked_until").limit(1),
     db.rpc("claim_gmail_token_refresh", { p_connection_id: "00000000-0000-0000-0000-000000000000" }),
   ]);
   const dbErr = probes.find((p) => p.error)?.error;
@@ -643,7 +655,7 @@ export async function gmailHealth(firmId: string, db?: Db): Promise<{ steps: Hea
   // 3. Connection
   const { data: conns } = await db
     .from("ca_gmail_connections")
-    .select("id, ca_firm_id, user_id, gmail_address, access_token_enc, refresh_token_enc, token_expiry, last_polled_at, last_auto_poll_at, is_active, error_message")
+    .select("*")
     .eq("ca_firm_id", firmId)
     .order("created_at", { ascending: false });
   const active = (conns ?? []).find((c) => c.is_active) as (Connection & { last_auto_poll_at: string | null; error_message: string | null }) | undefined;
@@ -712,7 +724,10 @@ export async function gmailHealth(firmId: string, db?: Db): Promise<{ steps: Hea
   );
 
   // 7. Background checks
-  const lastAuto = active.last_auto_poll_at ? new Date(active.last_auto_poll_at) : null;
+  // Fall back to the last check's own record until the dedicated column exists.
+  const stats = (active as unknown as { last_poll_stats?: { at?: string; trigger?: string } | null }).last_poll_stats;
+  const autoAt = active.last_auto_poll_at ?? (stats?.trigger === "background" ? stats.at ?? null : null);
+  const lastAuto = autoAt ? new Date(autoAt) : null;
   const ageMin = lastAuto ? Math.round((Date.now() - lastAuto.getTime()) / 60000) : null;
   add(
     "background",

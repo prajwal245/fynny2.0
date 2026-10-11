@@ -48,9 +48,9 @@ export function ago(iso: string) {
 
 /** Everything that is waiting on a person, most urgent first. */
 export function useNeedsYou(): NeedsItem[] {
-  const { clients, docs, review, exceptions, chases, reports, period, isReadyForMis, canSignOff: mayEverSignOff, role, generateReport, isRunning, clientName } = useV2();
+  const { clients, docs, review, exceptions, chases, reports, period, isReadyForMis, partnerView, generateReport, isRunning, clientName } = useV2();
   // Sign-off tasks only for someone who can sign off and is working as a Partner.
-  const canSignOff = mayEverSignOff && role === "Partner";
+  const canSignOff = partnerView;
   const navigate = useNavigate();
   return useMemo(() => {
     const items: NeedsItem[] = [];

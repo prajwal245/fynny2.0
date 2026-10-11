@@ -70,7 +70,7 @@ const Row = ({ children }: { children: React.ReactNode }) => (
 export const GMAIL_RETURN_KEY = "fynhelp.gmail.return";
 
 export default function SettingsPage() {
-  const { firm, firmId, saveFirm, session } = useV2();
+  const { firm, firmId, saveFirm, session, partnerView } = useV2();
   const [form, setForm] = useState({ name: "", city: "", frn: "", email: "" });
   const [team, setTeam] = useState<Team | null>(null);
   const [intg, setIntg] = useState<Integrations | null>(null);
@@ -314,7 +314,7 @@ export default function SettingsPage() {
                 </div>
               </Row>
             ))}
-            {team.canManage ? (
+            {team.canManage && partnerView ? (
               <div
                 style={{
                   display: "flex",

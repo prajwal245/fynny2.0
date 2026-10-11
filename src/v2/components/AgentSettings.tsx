@@ -28,7 +28,7 @@ const row: React.CSSProperties = {
 
 /** Settings: how the agents hand work to each other, and what they have learned. */
 export function AgentSettings() {
-  const { clientName, canSignOff } = useV2();
+  const { clientName, partnerView } = useV2();
   const getMemory = useServerFn(getPracticeMemory);
   const forget = useServerFn(forgetPracticeMemory);
   const getPipeline = useServerFn(getPracticePipelineSettings);
@@ -76,7 +76,7 @@ export function AgentSettings() {
     }
   };
 
-  const partner = canSignOff;
+  const partner = partnerView;
 
   return (
     <>
@@ -131,7 +131,7 @@ export function AgentSettings() {
               </select>
             </div>
             {!partner && (
-              <div style={{ fontSize: 12.5, color: V.muted }}>Only a partner can change these.</div>
+              <div style={{ fontSize: 12.5, color: V.muted }}>Only a partner can change these. Switch to Partner under "Working as" if you are one.</div>
             )}
           </div>
         )}

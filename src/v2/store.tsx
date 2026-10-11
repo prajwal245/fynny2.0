@@ -437,6 +437,8 @@ type Store = {
   firmRole: string | null;
   /** Owners, admins and partners may sign off an MIS and change firm automation. */
   canSignOff: boolean;
+  /** Working as a Partner right now: may sign off, and sees partner tasks and controls. */
+  partnerView: boolean;
   activity: Activity[];
   activityFor: (clientId: string) => Activity[];
   /** Recorded agent runs across the firm, newest first. */
@@ -1685,6 +1687,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       setRole: chooseRole,
       firmRole,
       canSignOff,
+      partnerView: canSignOff && role === "Partner",
       activity,
       activityFor,
       agentRunsFor,

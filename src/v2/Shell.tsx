@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   LayoutGrid, Users, FileText, ListChecks, AlertTriangle, Send, BarChart3, Settings, Menu, X, LogOut,
+  BookOpen,
 } from "lucide-react";
 import { toast } from "sonner";
 import { V, V2_STYLES } from "./ui";
@@ -21,7 +22,7 @@ const NAV = [
   { to: "/v2/exceptions", label: "Exception Queue", icon: AlertTriangle },
   { to: "/v2/chaser", label: "Chaser", icon: Send },
   { to: "/v2/reports", label: "MIS and Reports", icon: BarChart3 },
-  { to: "/v2/settings", label: "Settings", icon: Settings },
+  { to: "/v2/settings", label: "Settings", icon: Settings, partnerOnly: true },
 ] as const;
 
 const TITLES: Record<string, string> = {
@@ -47,7 +48,7 @@ export default function V2Shell() {
 
 function ShellBody() {
   const [open, setOpen] = useState(false);
-  const { hydrated, session, onboarded, firm, signOut, period, setPeriod, periods, role, setRole, review, exceptions, chases, firmRole, canSignOff, runs, dismissRun } = useV2();
+  const { hydrated, session, onboarded, firm, signOut, period, setPeriod, periods, role, setRole, review, exceptions, chases, firmRole, canSignOff, runs, dismissRun, reports } = useV2();
   const navigate = useNavigate();
   // The page actually on screen (not one still loading), without a trailing slash.
   const pathname = useRouterState({ select: (s) => (s.resolvedLocation ?? s.location).pathname.replace(/(.)\/+$/, "$1") });
@@ -64,7 +65,14 @@ function ShellBody() {
   // The reset link signs the user in only to set a password: no redirects there.
   const resetting = pathname === "/v2/reset-password";
 
+  // Working as Partner: reviewer and approver, plus firm settings. Working as Junior: the preparer's tabs.
+  const partnerView = canSignOff && role === "Partner";
+  const nav = NAV.filter((n) => !("partnerOnly" in n) || partnerView);
   const COUNTS: Record<string, number> = {
+    // Partner: reports waiting for sign-off. Junior: reports sent back for correction.
+    "/v2/reports": partnerView
+      ? reports.filter((r) => !r.signedOff && !r.correction).length
+      : reports.filter((r) => r.correction && !r.signedOff).length,
     "/v2/review": review.filter((r) => r.status === "open").length,
     "/v2/exceptions": openExceptions(exceptions).length,
     "/v2/chaser": chases.filter((c) => c.status !== "Resolved").length,
@@ -145,11 +153,14 @@ function ShellBody() {
                 </button>
               ))}
             </div>
+            <div style={{ fontSize: 11, color: V.muted, marginTop: 6, lineHeight: 1.4 }} data-testid="role-hint">
+              {role === "Partner" ? "Reviews, signs off MIS and manages the firm." : "Prepares: documents, review, exceptions and MIS drafts."}
+            </div>
           </div>
           )}
 
           <nav className="v2-nav" style={{ flex: 1, overflowY: "auto" }}>
-            {NAV.map(({ to, label, icon: Icon, ...rest }) => (
+            {nav.map(({ to, label, icon: Icon, ...rest }) => (
               <Link
                 key={to}
                 to={to}
@@ -165,7 +176,10 @@ function ShellBody() {
             ))}
           </nav>
 
-          <div style={{ borderTop: `1px solid ${V.line}`, paddingTop: 14, fontSize: 11.5, color: V.muted, padding: "14px 8px 0" }}>
+          <div style={{ borderTop: `1px solid ${V.line}`, paddingTop: 14, fontSize: 11.5, color: V.muted, padding: "14px 8px 0", display: "grid", gap: 6, justifyItems: "start" }}>
+            <a className="v2-btn v2-btn-quiet" href="/guide" target="_blank" rel="noreferrer" data-testid="guide-link">
+              <BookOpen size={14} /> Resource &amp; Product Guide
+            </a>
             <button className="v2-btn v2-btn-quiet" onClick={() => { signOut(); navigate({ to: "/v2/onboarding" }); }}>
               <LogOut size={14} /> Sign out
             </button>
@@ -206,7 +220,7 @@ function ShellBody() {
               </select>
               <div style={{ textAlign: "right", lineHeight: 1.25 }} className="v2-hide-sm">
                 <div style={{ fontSize: 12.5, fontWeight: 600 }}>{session?.name || session?.email || ""}</div>
-                <div style={{ fontSize: 11, color: V.muted }} data-testid="firm-role">{firmRole ? firmRole[0].toUpperCase() + firmRole.slice(1) : role} · {firm?.name || "Your firm"}</div>
+                <div style={{ fontSize: 11, color: V.muted }} data-testid="firm-role">{firmRole ? firmRole[0].toUpperCase() + firmRole.slice(1) : role}{canSignOff && role === "Junior" ? " · viewing as Junior" : ""} · {firm?.name || "Your firm"}</div>
               </div>
               <div style={{ width: 34, height: 34, borderRadius: 999, background: V.beige, display: "grid", placeItems: "center", fontSize: 12.5, fontWeight: 700 }}>{(session?.name || "F").split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()}</div>
             </div>

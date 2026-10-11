@@ -31,7 +31,7 @@ export function useCommandMenu() {
 
 export function CommandMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
   const navigate = useNavigate();
-  const { clients, period, runRecon, generateReport, isRunning, signOut, canSignOff } = useV2();
+  const { clients, period, runRecon, generateReport, isRunning, signOut, partnerView: canSignOff } = useV2();
   const [q, setQ] = useState("");
   const [active, setActive] = useState(0);
   const input = useRef<HTMLInputElement>(null);
@@ -54,9 +54,10 @@ export function CommandMenu({ open, onClose }: { open: boolean; onClose: () => v
       { id: "nav:exceptions", group: "Go to", label: "Exception Queue", run: go("/v2/exceptions") },
       { id: "nav:chaser", group: "Go to", label: "Chaser", run: go("/v2/chaser") },
       { id: "nav:reports", group: "Go to", label: "MIS and Reports", run: go("/v2/reports") },
-      { id: "nav:settings", group: "Go to", label: "Settings", run: go("/v2/settings") },
+      ...(canSignOff ? [{ id: "nav:settings", group: "Go to", label: "Settings", run: go("/v2/settings") } as Command] : []),
+      { id: "nav:guide", group: "Go to", label: "Resource & Product Guide", hint: "How every agent and workflow works", run: () => window.open("/guide", "_blank", "noopener") },
       { id: "act:upload", group: "Actions", label: "Upload documents", agent: "extract", run: go("/v2/documents") },
-      { id: "act:invite", group: "Actions", label: "Invite a teammate", run: go("/v2/settings") },
+      ...(canSignOff ? [{ id: "act:invite", group: "Actions", label: "Invite a teammate", run: go("/v2/settings") } as Command] : []),
       { id: "act:gmail", group: "Actions", label: "Connect Gmail intake", run: go("/v2/settings") },
     ];
     for (const c of clients) {

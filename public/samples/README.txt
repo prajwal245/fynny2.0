@@ -4,7 +4,9 @@ Client: Sundara Textiles Pvt Ltd, September 2026
 
 hdfc_statement_sep2026.csv    Bank statement, 8 lines (one is in USD)
 tally_daybook_sep2026.xml     Tally day book export, 6 vouchers
-purchase_register_sep2026.csv One purchase entry
+purchase_register_sep2026.csv One purchase voucher from the books (no GST
+                              columns), read as 1 book entry. A real GST
+                              purchase register is kept as a register.
 
 Expected when uploaded in this order:
 1. Statement: 7 transactions read, 1 line (the USD Stripe payout) sent to Review.

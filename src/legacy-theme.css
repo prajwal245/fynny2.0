@@ -205,7 +205,7 @@ html.dark {
   }
   body {
     @apply bg-background text-foreground;
-    font-family: "Instrument Sans", "Inter", system-ui, -apple-system, sans-serif;
+    font-family: var(--font-geist-sans);
     font-weight: 400;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -214,33 +214,33 @@ html.dark {
   h1,
   h2,
   h3 {
-    font-family: "Instrument Sans", "Inter", sans-serif;
+    font-family: var(--font-geist-sans);
     font-weight: 600;
     letter-spacing: -0.035em;
   }
   h4,
   h5,
   h6 {
-    font-family: "Instrument Sans", "Inter", sans-serif;
+    font-family: var(--font-geist-sans);
     font-weight: 600;
     letter-spacing: -0.01em;
   }
   button {
-    font-family: "Instrument Sans", "Inter", sans-serif;
+    font-family: var(--font-geist-sans);
     font-weight: 600;
     letter-spacing: -0.01em;
   }
   label {
-    font-family: "Instrument Sans", "Inter", sans-serif;
+    font-family: var(--font-geist-sans);
     font-weight: 500;
   }
   th,
   thead {
-    font-family: "Instrument Sans", "Inter", sans-serif;
+    font-family: var(--font-geist-sans);
     font-weight: 600;
   }
   nav a {
-    font-family: "Instrument Sans", "Inter", sans-serif;
+    font-family: var(--font-geist-sans);
     font-weight: 500;
     letter-spacing: 0.02em;
   }
@@ -250,12 +250,12 @@ html.dark {
   footer span,
   footer li,
   footer div {
-    font-family: "Instrument Sans", "Inter", system-ui, sans-serif;
+    font-family: var(--font-geist-sans);
   }
   [class*="badge"],
   .fyn-badge,
   [data-badge] {
-    font-family: "Instrument Sans", "Inter", sans-serif;
+    font-family: var(--font-geist-sans);
     font-weight: 600;
   }
   .font-mono,

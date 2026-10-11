@@ -170,3 +170,9 @@ export function isDistinctiveName(name: string): boolean {
   const words = name.toLowerCase().replace(/[^a-z\s]/g, " ").split(/\s+/).filter(Boolean);
   return words.some((w) => w.length >= 4 && !GENERIC_WORDS.has(w));
 }
+
+/** The memory key for a recon decision: side, direction and the narration without dates, amounts or references. */
+export function decisionPattern(t: { side: string; direction: string; description: string | null; counterparty?: string | null }): string {
+  const p = narrationPattern(t.description) || narrationPattern(t.counterparty ?? "");
+  return p ? `${t.side}:${t.direction}:${p}` : "";
+}

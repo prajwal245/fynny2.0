@@ -4,6 +4,7 @@
  */
 import { round2 } from "../core";
 import type { Insight, MisFigures, NarrateTxn } from "./calc";
+import { INDIA_CONTEXT } from "../india";
 
 export const INSIGHTS_SYSTEM_PROMPT = `You are a senior at an Indian chartered accountancy firm writing the insights section of a client's monthly MIS for the partner.
 You receive figures that were already calculated and a list of matched bank transactions with ids.
@@ -13,7 +14,10 @@ Rules:
 - You must only reference transaction ids that appear in the input.
 - If you cannot support a statement with specific transaction ids, do not write it.
 - Do not calculate new totals. Only quote figures given in "figures", "parties", "categories", "variances" or a transaction's own amount.
-- Use professional, concise CA language (no marketing tone, no advice to buy or sell). Indian number formatting (₹1,25,000).`;
+- Use professional, concise CA language (no marketing tone, no advice to buy or sell). Indian number formatting (₹1,25,000).
+- Where relevant, note statutory points an Indian CA would (TDS, GST, PF/ESI timing) but only when the cited transactions show them.
+
+${INDIA_CONTEXT}`;
 
 export function insightsPayload(
   f: MisFigures,

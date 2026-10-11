@@ -5,11 +5,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { V, V2_STYLES } from "./ui";
-import { AGENT_STYLES, ShimmerText } from "./agents";
-import { motion } from "framer-motion";
+import { AGENT_STYLES, ProcessingCard, ShimmerText } from "./agents";
+import { AnimatePresence, motion } from "framer-motion";
 import brandMark from "@/assets/brand/fynhelp-icon-red-new.png";
 import { CommandMenu, useCommandMenu } from "./components/CommandMenu";
 import { V2StoreProvider, useV2 } from "./store";
+import { openExceptions } from "./lib/exceptions";
 
 
 const NAV = [
@@ -46,7 +47,7 @@ export default function V2Shell() {
 
 function ShellBody() {
   const [open, setOpen] = useState(false);
-  const { hydrated, session, onboarded, firm, signOut, period, setPeriod, periods, role, setRole, review, exceptions, chases, firmRole, canSignOff } = useV2();
+  const { hydrated, session, onboarded, firm, signOut, period, setPeriod, periods, role, setRole, review, exceptions, chases, firmRole, canSignOff, runs, dismissRun } = useV2();
   const navigate = useNavigate();
   // The page actually on screen (not one still loading), without a trailing slash.
   const pathname = useRouterState({ select: (s) => (s.resolvedLocation ?? s.location).pathname.replace(/(.)\/+$/, "$1") });
@@ -65,7 +66,7 @@ function ShellBody() {
 
   const COUNTS: Record<string, number> = {
     "/v2/review": review.filter((r) => r.status === "open").length,
-    "/v2/exceptions": exceptions.filter((e) => e.status === "open").length,
+    "/v2/exceptions": openExceptions(exceptions).length,
     "/v2/chaser": chases.filter((c) => c.status !== "Resolved").length,
   };
 
@@ -213,6 +214,14 @@ function ShellBody() {
 
           <main style={{ padding: 24, flex: 1, maxWidth: 1280, width: "100%" }}>
             <Outlet />
+            {/* Live agent cards dock at the bottom of the page: opening or closing one never moves what is under the cursor. */}
+            <div data-testid="run-dock" style={{ position: "sticky", bottom: 16, zIndex: 30, display: "grid", gap: 10, width: "min(520px, 100%)", marginLeft: "auto", marginTop: runs.length ? 18 : 0 }}>
+              <AnimatePresence>
+                {runs.slice(0, 3).map((r) => (
+                  <ProcessingCard key={r.id} run={r} onDismiss={() => dismissRun(r.id)} />
+                ))}
+              </AnimatePresence>
+            </div>
           </main>
           <CommandMenu open={command.open} onClose={() => command.setOpen(false)} />
         </div>

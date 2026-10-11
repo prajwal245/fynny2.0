@@ -5,9 +5,14 @@
  */
 import { parsePeriod, signedAmount } from "./core";
 import { clientMeta, type Db, type FirmContext } from "./db.server";
+import { decisionPattern } from "./memory";
 import { REASON_LABELS, type ReasonCode } from "./recon/engine";
 
 const DOC_LIMIT = 300;
+/** A server call is cut off after 60 s; anything still "running" after 90 s was cut off. */
+const STUCK_MS = 90 * 1000;
+export const STUCK_READ_MESSAGE =
+  "Reading this file took too long and was stopped. Press Retry to read it again; if it stops again, send the file as CSV or Excel.";
 const ROWS_PER_DOC = 200;
 
 type Source = "Manual" | "Gmail" | "WhatsApp";
@@ -51,7 +56,7 @@ function chaseStatus(r: {
 
 export async function loadWorkspace(db: Db, ctx: FirmContext) {
   const f = ctx.firmId;
-  const [cRes, xRes, rvRes, eRes, rRes, qRes, evRes, nRes, aRes, runRes, misRes, firmRes, gmailRes] =
+  const [cRes, xRes, rvRes, eRes, rRes, qRes, evRes, nRes, aRes, runRes, misRes, firmRes, gmailRes, memRes] =
     await Promise.all([
       db
         .from("ca_clients")
@@ -63,7 +68,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       db
         .from("ca_document_extractions")
         .select(
-          "id, business_id, original_filename, source_type, extracted, review_state, extract_status, extract_next_attempt_at, extract_attempts, side, file_kind, error_message, txn_count, review_count, duplicate_count, row_count, created_at, gmail_sender_email, gmail_subject, source_metadata",
+          "id, business_id, original_filename, source_type, extracted, review_state, extract_status, extract_started_at, extract_next_attempt_at, extract_attempts, side, file_kind, error_message, txn_count, review_count, duplicate_count, row_count, created_at, gmail_sender_email, gmail_subject, source_metadata",
         )
         .eq("ca_firm_id", f)
         .order("created_at", { ascending: false })
@@ -79,7 +84,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       db
         .from("ca_exceptions")
         .select(
-          "id, business_id, reason_code, description, detail, amount, status, candidates, txn_id, txn_side, stage_reached, created_at, ca_txns(txn_date)",
+          "id, business_id, reason_code, description, detail, amount, status, candidates, txn_id, txn_side, stage_reached, created_at, ca_txns(txn_date, direction, description, counterparty)",
         )
         .eq("ca_firm_id", f)
         .order("created_at", { ascending: false })
@@ -138,6 +143,13 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       // Firm profile and Gmail status ride along, so the app opens in one round trip.
       db.from("ca_firms").select("firm_name, ca_name, email, city, membership_number").eq("id", f).maybeSingle(),
       db.from("ca_gmail_connections").select("id").eq("ca_firm_id", f).eq("is_active", true).limit(1),
+      // Decisions the Recon agent learned from the Exception Queue, proposed again for the same lines.
+      db
+        .from("ca_agent_memory")
+        .select("business_id, pattern, lesson, times_taught, updated_at")
+        .eq("ca_firm_id", f)
+        .eq("kind", "recon_decision")
+        .limit(1000),
     ]);
 
   const clients = (cRes.data ?? []).map((r) => {
@@ -208,6 +220,33 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
           reference: t.reference,
         });
     }
+  }
+
+  // Close reads and runs that a timeout cut off, so nothing says "Running" forever.
+  const cutoff = Date.now() - STUCK_MS;
+  const stuckDocs = (xRes.data ?? []).filter(
+    (r) => r.extract_status === "processing" && r.extract_started_at && Date.parse(r.extract_started_at) < cutoff,
+  );
+  const stuckRuns = (runRes.data ?? []).filter((r) => r.status === "running" && r.started_at && Date.parse(r.started_at) < cutoff);
+  if (stuckDocs.length || stuckRuns.length) {
+    await Promise.all([
+      stuckDocs.length
+        ? db
+            .from("ca_document_extractions")
+            .update({ extract_status: "failed", error_message: STUCK_READ_MESSAGE, extract_next_attempt_at: null })
+            .in("id", stuckDocs.map((r) => r.id))
+            .eq("extract_status", "processing")
+        : null,
+      stuckRuns.length
+        ? db
+            .from("ca_agent_runs")
+            .update({ status: "failed", error: "Stopped: the server cut this run off after 60 seconds.", summary: "Timed out", finished_at: new Date().toISOString() })
+            .in("id", stuckRuns.map((r) => r.id))
+            .eq("status", "running")
+        : null,
+    ]);
+    for (const r of stuckDocs) Object.assign(r, { extract_status: "failed", error_message: STUCK_READ_MESSAGE, extract_next_attempt_at: null });
+    for (const r of stuckRuns) Object.assign(r, { status: "failed", error: "Stopped: the server cut this run off after 60 seconds.", summary: "Timed out" });
   }
 
   const docName = new Map<string, string>();
@@ -288,6 +327,9 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
     };
   });
 
+  const learned = new Map<string, { action: string; note: string; times: number; at: string; by: string | null }>();
+  for (const m of (memRes.data ?? []) as { business_id: string; pattern: string; lesson: { action: string; note: string; by?: string | null; at?: string }; times_taught: number; updated_at: string }[])
+    learned.set(`${m.business_id}|${m.pattern}`, { action: m.lesson.action, note: m.lesson.note, times: m.times_taught, at: m.lesson.at ?? m.updated_at, by: m.lesson.by ?? null });
   const exceptions = (eRes.data ?? []).map((r) => {
     const cands = Array.isArray(r.candidates)
       ? (r.candidates as {
@@ -311,7 +353,9 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
     } catch {
       /* plain text */
     }
-    const txn = (r as { ca_txns?: { txn_date?: string } | null }).ca_txns;
+    const txn = (r as { ca_txns?: { txn_date?: string; direction?: string; description?: string | null; counterparty?: string | null } | null }).ca_txns;
+    const key = txn?.direction && r.txn_side ? decisionPattern({ side: r.txn_side, direction: txn.direction, description: txn.description ?? null, counterparty: txn.counterparty }) : "";
+    const precedent = r.status === "open" && key ? learned.get(`${r.business_id}|${key}`) : undefined;
     return {
       id: r.id,
       clientId: r.business_id,
@@ -334,6 +378,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       candidateIds: cands.map((c) => c.txn_id),
       candidateAmounts: cands.map((c) => Number(c.amount)),
       txnId: r.txn_id ?? undefined,
+      precedent,
       status: (r.status === "resolved"
         ? "resolved"
         : r.status === "ignored"
@@ -363,6 +408,8 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       warnings: (c.warnings as string[]) ?? [],
       otherFlows: (c.other_flows as unknown) ?? [],
       gateway: (c.gateway as unknown) ?? null,
+      decisions: (c.decisions as unknown) ?? [],
+      statutory: (c.statutory as unknown) ?? [],
       signedOffWithOpen: (c.signedOffWithOpen as unknown) ?? null,
       signedOff: r.signed_off_at
         ? {

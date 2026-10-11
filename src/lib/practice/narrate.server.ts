@@ -23,7 +23,8 @@ import {
   type FirmContext,
 } from "./db.server";
 import { practiceLlm } from "./llm.server";
-import { BUCKET_LABELS, gatewayGrossUp, misBucket, type MisBucket, type Settlement } from "./narrate/flows";
+import { statutoryDueDates } from "./india";
+import { BUCKET_LABELS, gatewayGrossUp, misBucket, settlementsFromRegister, type MisBucket, type Settlement } from "./narrate/flows";
 import {
   computeFigures,
   ruleInsights,
@@ -107,7 +108,7 @@ export async function generateReport(
   const period = parsePeriod(periodInput);
   const prev = previousPeriod(period);
 
-  const [statement, prior, exceptions, reviewOpen] = await Promise.all([
+  const [statement, prior, exceptions, reviewOpen, decidedRes] = await Promise.all([
     bankLines(db, ctx.firmId, businessId, period),
     prev
       ? bankLines(db, ctx.firmId, businessId, prev, ["matched"])
@@ -126,6 +127,18 @@ export async function generateReport(
       .eq("ca_firm_id", ctx.firmId)
       .eq("business_id", businessId)
       .eq("status", "open"),
+    // Decided lines are listed in the Exception and Review Summary, not just counted.
+    template === "Exception and Review Summary"
+      ? db
+          .from("ca_exceptions")
+          .select("reason_code, amount, txn_id, txn_side, status, resolution_action, resolution_note, resolved_at")
+          .eq("ca_firm_id", ctx.firmId)
+          .eq("business_id", businessId)
+          .neq("status", "open")
+          .gte("period_start", period.start)
+          .lte("period_end", period.end)
+          .limit(200)
+      : Promise.resolve({ data: [] as { reason_code: string; amount: number | null; txn_id: string | null; txn_side: string | null; status: string; resolution_action: string | null; resolution_note: string | null; resolved_at: string | null }[] }),
   ]);
   const matched = statement.filter((t) => t.match_status === "matched");
   const unmatched = statement.filter(
@@ -208,6 +221,36 @@ export async function generateReport(
   }
 
   const excRows = exceptions.data ?? [];
+  const decidedRows = (decidedRes.data ?? []).filter((d) => d.txn_id && d.resolution_action !== "auto_matched");
+  const decidedTxnIds = [...new Set(decidedRows.map((d) => d.txn_id as string))];
+  const { data: decidedTxns } = decidedTxnIds.length
+    ? await db.from("ca_txns").select("id, txn_date, description, counterparty, amount, direction, side").in("id", decidedTxnIds)
+    : { data: [] as { id: string; txn_date: string; description: string | null; counterparty: string | null; amount: number; direction: string; side: string }[] };
+  const txnById = new Map((decidedTxns ?? []).map((t) => [t.id, t]));
+  const OUTCOME: Record<string, string> = {
+    ignore: "Ignored",
+    ignored: "Ignored",
+    reconciled_external: "Reconciled outside FynHelp",
+    matched_manually: "Matched by hand",
+  };
+  // A bank line and its book entry closed by one match are listed once (the bank line).
+  const bankClosed = new Set(decidedRows.filter((d) => d.txn_side === "bank" && d.resolution_action === "matched_manually").map((d) => d.resolved_at));
+  const decisions = decidedRows
+    .filter((d) => !(d.txn_side === "books" && d.resolution_action === "matched_manually" && bankClosed.has(d.resolved_at)))
+    .map((d) => {
+      const t = txnById.get(d.txn_id as string);
+      const amount = Number(t?.amount ?? d.amount ?? 0);
+      return {
+        date: t?.txn_date ?? null,
+        particulars: t?.counterparty || t?.description || "Line",
+        side: t?.side ?? d.txn_side ?? null,
+        amount: t?.direction === "out" ? -Math.abs(amount) : Math.abs(amount),
+        reason: REASON_LABELS[d.reason_code as ReasonCode] ?? d.reason_code,
+        outcome: /difference/i.test(d.resolution_note ?? "") ? "Matched with a difference" : (OUTCOME[d.resolution_action ?? d.status] ?? d.status),
+        note: d.resolution_note ?? "",
+      };
+    })
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
   const byReason: Record<string, number> = {};
   for (const e of excRows) {
     const label = REASON_LABELS[e.reason_code as ReasonCode] ?? e.reason_code;
@@ -248,12 +291,15 @@ export async function generateReport(
   // revenue is grossed up to what customers paid and the fees become an expense.
   const { data: gatewayDocs } = await db
     .from("ca_document_extractions")
-    .select("extracted")
+    .select("original_filename, extracted")
     .eq("ca_firm_id", ctx.firmId)
     .eq("business_id", businessId)
     .eq("classification", "gateway_settlement");
-  const settlements: Settlement[] = (gatewayDocs ?? []).flatMap(
-    (d) => ((d.extracted as { register?: { groups?: Settlement[] } } | null)?.register?.groups ?? []) as Settlement[],
+  const settlements: Settlement[] = (gatewayDocs ?? []).flatMap((d) =>
+    settlementsFromRegister(
+      (d.extracted as { register?: { totals?: { label: string; amount: number }[]; groups?: Settlement[] } } | null)?.register,
+      d.original_filename ?? "Settlement report",
+    ),
   );
   const gateway = settlements.length
     ? gatewayGrossUp(revenueTxns.map((t) => ({ id: t.id, amount: t.amount, txn_date: t.txn_date })), settlements)
@@ -418,6 +464,12 @@ export async function generateReport(
     total_payments: n.total_payments.value,
     sources: { revenue: inrRows(revenueTxns), expenses: inrRows(expenseTxns) },
     other_flows: otherFlows,
+    // Due dates that follow from this month's statutory payments (Indian rules, computed in code).
+    statutory: statutoryDueDates(
+      period.end,
+      statement.filter((t) => t.direction === "out").map((t) => `${t.description ?? ""} ${t.counterparty ?? ""} ${t.category ?? ""}`),
+    ),
+    decisions,
     insights: insights.map((i) => ({
       text: i.text,
       source: i.source,

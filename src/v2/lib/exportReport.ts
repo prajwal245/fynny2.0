@@ -5,7 +5,19 @@
  */
 import type { Report } from "../store";
 
-const inr = (n: number) => "Rs " + new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(n);
+// Same as the screen: ₹, paise kept when there are any (₹4,07,485.50 never becomes ₹4,07,486).
+const inr = (n: number) => {
+  const abs = Math.abs(n);
+  const paise = Math.round(abs * 100) % 100 !== 0;
+  const body = new Intl.NumberFormat("en-IN", paise ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : { maximumFractionDigits: 0 }).format(abs);
+  return (n < 0 ? "−₹" : "₹") + body;
+};
+const statusOf = (report: Report) =>
+  report.signedOff
+    ? `Signed off by ${report.signedOff.by} on ${day(report.signedOff.at)}`
+    : report.correction
+      ? `Correction requested: ${report.correction.note}`
+      : "Awaiting partner sign off";
 const day = (iso: string) => new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
 
@@ -27,7 +39,7 @@ export function buildReportHtml(report: Report, meta: ExportMeta) {
   const net = report.revenue - report.expenses;
   const all = [...report.sources.revenue, ...report.sources.expenses];
 
-  const varianceTable = `
+  const varianceTable = !report.variances.length ? "" : `
   <h3>Key variances against the prior period</h3>
   <table>
     <thead><tr><th>Line</th><th class="r">Current</th><th class="r">Prior</th><th class="r">Change</th></tr></thead>
@@ -49,17 +61,48 @@ export function buildReportHtml(report: Report, meta: ExportMeta) {
     </tbody>
   </table>`;
 
+  const flows = report.otherFlows ?? [];
+  const otherFlowsTable = !flows.length ? "" : `
+  <h3>Taxes, advances and transfers (not revenue or expense)</h3>
+  <table>
+    <thead><tr><th>Line</th><th class="r">Amount</th><th class="r">Transactions</th></tr></thead>
+    <tbody>
+      ${flows.map((f) => `<tr><td>${esc(f.label)}</td><td class="r">${inr(f.direction === "out" ? -f.amount : f.amount)}</td><td class="r">${f.count}</td></tr>`).join("")}
+    </tbody>
+  </table>`;
+  const gatewayNote = !report.gateway ? "" : `
+  <div class="insight">Payment gateway payouts grossed up: ${report.gateway.payouts} payout${report.gateway.payouts === 1 ? "" : "s"} matched the settlement report. Revenue includes ${inr(report.gateway.fees + report.gateway.gst_on_fees)} kept by the gateway, booked in expenses as fees ${inr(report.gateway.fees)} and GST on fees ${inr(report.gateway.gst_on_fees)}.</div>`;
+  const decisions = report.decisions ?? [];
+  const exceptionBody = `
+  <h3>Open exceptions and review items</h3>
+  <table>
+    <thead><tr><th>Item</th><th class="r">Count</th></tr></thead>
+    <tbody>${report.bankSummary.map((b) => `<tr><td>${esc(b.label)}</td><td class="r">${b.value}</td></tr>`).join("") || `<tr><td>Nothing open</td><td class="r">0</td></tr>`}</tbody>
+  </table>
+  <h3>Decided this period</h3>
+  ${decisions.length ? `<table>
+    <thead><tr><th>Date</th><th>Line</th><th class="r">Amount</th><th>Decision</th><th>Note</th></tr></thead>
+    <tbody>${decisions.map((d) => `<tr><td>${d.date ? day(d.date) : ""}</td><td>${esc(d.particulars)}<br/><small>${esc(d.reason)}</small></td><td class="r">${inr(d.amount)}</td><td>${esc(d.outcome)}</td><td>${esc(d.note)}</td></tr>`).join("")}</tbody>
+  </table>` : `<p class="meta">No line was ignored, matched by hand or marked reconciled elsewhere.</p>`}`;
+
   const body =
-    report.template === "Key Variances" ? varianceTable
+    report.template === "Exception and Review Summary" ? exceptionBody
+    : report.template === "Key Variances" ? varianceTable
       : report.template === "Bank Reconciliation Summary" ? bankTable + rowsTable("All bank lines considered", all)
         : report.template === "Working Paper"
           ? varianceTable + bankTable + rowsTable("Revenue transactions", report.sources.revenue) + rowsTable("Expense transactions", report.sources.expenses)
           : varianceTable + rowsTable("Revenue transactions", report.sources.revenue) + rowsTable("Expense transactions", report.sources.expenses);
+  const isException = report.template === "Exception and Review Summary";
+  const flowCount = flows.reduce((n, f) => n + f.count, 0);
+  const notes = [
+    ...(report.excluded ? [`${report.excluded} unmatched line${report.excluded === 1 ? " is" : "s are"} left out of these figures by rule.`] : []),
+    ...(report.warnings ?? []).filter((w) => !/not reconciled and/.test(w)),
+  ];
 
   return `<!doctype html>
 <html><head><meta charset="utf-8" /><title>${esc(meta.clientName)} ${esc(report.template)} ${esc(report.period)}</title>
 <style>
-  body { font-family: 'Space Grotesk', Helvetica, Arial, sans-serif; color:#141414; margin:36px; }
+  body { font-family: 'Geist', system-ui, -apple-system, Helvetica, Arial, sans-serif; font-variant-numeric: tabular-nums; color:#141414; margin:36px; }
   header { border-bottom:2px solid #141414; padding-bottom:14px; margin-bottom:22px; }
   h1 { font-size:21px; margin:0 0 4px; }
   h3 { font-size:14px; margin:26px 0 8px; }
@@ -79,16 +122,20 @@ export function buildReportHtml(report: Report, meta: ExportMeta) {
   <header>
     <h1>${esc(meta.clientName)}</h1>
     <div class="meta">${esc(report.template)} &middot; ${esc(report.period)} &middot; generated ${day(report.generated)} by ${esc(meta.firmName)}</div>
+    <div class="meta"><strong>${esc(statusOf(report))}</strong></div>
   </header>
-  <div class="cards">
+  ${isException ? "" : `<div class="cards">
     <div class="card"><span>Revenue</span><strong>${inr(report.revenue)}</strong></div>
     <div class="card"><span>Expenses</span><strong>${inr(report.expenses)}</strong></div>
     <div class="card"><span>Net</span><strong>${inr(net)}</strong></div>
-  </div>
-  <h3>Insights</h3>
-  ${report.insights.map((i) => `<div class="insight">${esc(i.text)}<br /><em>Based on ${esc(i.source)}</em></div>`).join("")}
+  </div>`}
+  ${notes.map((n) => `<p class="meta">${esc(n)}</p>`).join("")}
+  ${isException ? "" : gatewayNote + otherFlowsTable}
+  ${isException || !report.statutory?.length ? "" : `<h3>Statutory dates that follow from this month</h3><table><tbody>${report.statutory.map((s) => `<tr><td>${esc(s.label)}</td><td class="r">by ${day(s.due)}</td></tr>`).join("")}</tbody></table>`}
+  ${isException || !report.insights.length ? "" : `<h3>Insights</h3>
+  ${report.insights.map((i) => `<div class="insight">${esc(i.text)}<br /><em>Based on ${esc(i.source)}</em></div>`).join("")}`}
   ${body}
-  <footer>Prepared in FynHelp. Every figure above is derived from ${all.length} matched transactions held in the workspace.</footer>
+  <footer>Prepared in FynHelp. Every figure above is derived from ${all.length + flowCount} matched transaction${all.length + flowCount === 1 ? "" : "s"} held in the workspace.</footer>
 </body></html>`;
 }
 
@@ -111,11 +158,7 @@ export function printReport(report: Report, meta: ExportMeta) {
 /** A real .xlsx workbook: Summary, Insights, Other flows, Variances and every source transaction. */
 export async function downloadExcel(report: Report, meta: ExportMeta) {
   const XLSX = await import("xlsx");
-  const status = report.signedOff
-    ? `Signed off by ${report.signedOff.by} on ${day(report.signedOff.at)}`
-    : report.correction
-      ? `Correction requested: ${report.correction.note}`
-      : "Awaiting partner sign off";
+  const status = statusOf(report);
   const summary: (string | number)[][] = [
     [meta.clientName],
     [`${report.template} — ${report.period}`],
@@ -142,6 +185,8 @@ export async function downloadExcel(report: Report, meta: ExportMeta) {
   add("Insights", [["Insight", "Based on"], ...report.insights.map((i) => [i.text, i.source])], [90, 40]);
   if (report.variances.length)
     add("Variances", [["Line", "Current (₹)", "Prior (₹)", "Change (₹)"], ...report.variances.map((v) => [v.label, v.current, v.prior, v.current - v.prior])], [40, 16, 16, 16]);
+  if (report.decisions?.length)
+    add("Decisions", [["Date", "Line", "Reason", "Amount (₹)", "Decision", "Note"], ...report.decisions.map((d) => [d.date ?? "", d.particulars, d.reason, d.amount, d.outcome, d.note])], [12, 40, 24, 16, 26, 50]);
   if (report.bankSummary.length)
     add("Bank summary", [["Line", "Value"], ...report.bankSummary.map((b) => [b.label, b.value])], [44, 18]);
   const tx = (label: string, rows: { date: string; particulars: string; amount: number }[]) => rows.map((r) => [label, r.date, r.particulars, r.amount]);

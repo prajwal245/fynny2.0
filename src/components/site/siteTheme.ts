@@ -19,12 +19,12 @@ export const C = {
 };
 
 export const SITE_STYLES = `
-.fyn-home { background:${C.page}; color:${C.ink}; font-family:'Instrument Sans','Inter',system-ui,sans-serif; -webkit-font-smoothing:antialiased; overflow-x:hidden; }
+.fyn-home { background:${C.page}; color:${C.ink}; font-family:var(--font-geist-sans); -webkit-font-smoothing:antialiased; overflow-x:hidden; }
 .fyn-home *, .fyn-home *::before, .fyn-home *::after { box-sizing:border-box; }
-.fyn-home h1,.fyn-home h2,.fyn-home h3,.fyn-home h4 { font-family:'Instrument Sans','Inter',system-ui,sans-serif; font-weight:600; font-style:normal; letter-spacing:-0.035em; margin:0; color:inherit; line-height:1.06; }
+.fyn-home h1,.fyn-home h2,.fyn-home h3,.fyn-home h4 { font-family:var(--font-geist-sans); font-weight:600; font-style:normal; letter-spacing:-0.035em; margin:0; color:inherit; line-height:1.06; }
 .fyn-home .ital { font-family:'Fraunces',Georgia,serif; font-style:italic; font-weight:300; letter-spacing:-0.02em; color:rgba(23,18,8,.34); }
 .fh-dark .ital, .fh-maroon .ital { color:rgba(247,241,230,.42); }
-.fyn-home p,.fyn-home span,.fyn-home li,.fyn-home a,.fyn-home button,.fyn-home input,.fyn-home label { font-family:'Instrument Sans','Inter',system-ui,sans-serif; }
+.fyn-home p,.fyn-home span,.fyn-home li,.fyn-home a,.fyn-home button,.fyn-home input,.fyn-home label { font-family:var(--font-geist-sans); }
 .fyn-home .num { font-variant-numeric:tabular-nums; }
 .fh-wrap { max-width:1200px; margin:0 auto; padding:0 22px; }
 .fh-sec { padding:104px 0; position:relative; }
@@ -70,7 +70,7 @@ export const SITE_STYLES = `
   radial-gradient(90% 130% at 92% 30%, rgba(169,56,56,.55), transparent 62%),
   linear-gradient(120deg, #2A1109 0%, ${C.maroonDeep} 45%, #7A2A22 100%); }
 .fh-band::after { content:''; position:absolute; inset:0; background:radial-gradient(120% 90% at 50% 120%, rgba(0,0,0,.5), transparent 60%); }
-.fh-band-word { position:absolute; left:26px; right:26px; bottom:6px; font-family:'Instrument Sans',sans-serif; font-weight:700; letter-spacing:-0.05em; font-size:clamp(56px,13.5vw,190px); line-height:.86; color:rgba(255,248,240,.9); text-shadow:0 10px 40px rgba(0,0,0,.25); pointer-events:none; z-index:2; }
+.fh-band-word { position:absolute; left:26px; right:26px; bottom:6px; font-family:var(--font-geist-sans); font-weight:700; letter-spacing:-0.05em; font-size:clamp(56px,13.5vw,190px); line-height:.86; color:rgba(255,248,240,.9); text-shadow:0 10px 40px rgba(0,0,0,.25); pointer-events:none; z-index:2; }
 .fh-band-cards { position:relative; z-index:3; margin-left:auto; width:min(320px,100%); display:grid; gap:12px; }
 .fh-bcard { background:rgba(255,253,249,.95); backdrop-filter:blur(8px); border-radius:16px; padding:16px; }
 .fh-bcard h4 { font-size:15px; letter-spacing:-0.02em; }

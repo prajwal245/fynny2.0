@@ -11,6 +11,7 @@ import { AlertTriangle, ArrowRight, Check, CheckCircle2, FileWarning, ListChecks
 import { Card, V } from "../ui";
 import { AGENTS, type AgentKey } from "../agents";
 import { useV2, type AgentRunRecord } from "../store";
+import { openExceptions } from "../lib/exceptions";
 
 export type NeedsItem = {
   key: string;
@@ -47,7 +48,9 @@ export function ago(iso: string) {
 
 /** Everything that is waiting on a person, most urgent first. */
 export function useNeedsYou(): NeedsItem[] {
-  const { clients, docs, review, exceptions, chases, reports, period, isReadyForMis, canSignOff, generateReport, isRunning, clientName } = useV2();
+  const { clients, docs, review, exceptions, chases, reports, period, isReadyForMis, canSignOff: mayEverSignOff, role, generateReport, isRunning, clientName } = useV2();
+  // Sign-off tasks only for someone who can sign off and is working as a Partner.
+  const canSignOff = mayEverSignOff && role === "Partner";
   const navigate = useNavigate();
   return useMemo(() => {
     const items: NeedsItem[] = [];
@@ -74,7 +77,7 @@ export function useNeedsYou(): NeedsItem[] {
       });
     }
     for (const c of clients) {
-      const ex = exceptions.filter((e) => e.clientId === c.id && e.status === "open").length;
+      const ex = openExceptions(exceptions).filter((e) => e.clientId === c.id).length;
       if (ex)
         items.push({
           key: `ex:${c.id}`,

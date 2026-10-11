@@ -36,6 +36,8 @@ interface Line {
 
 const TAX = /\b(gst|cgst|sgst|igst|tds|advance tax|adv tax|income tax|self assessment tax|itns ?\d*|oltas|cbdt|tin ?nsdl|gst ?(pmt|payment|challan)|challan)\b/i;
 const STATUTORY_EXPENSE = /\b(pf|epf|epfo|esi|esic|professional tax|ptax|labour welfare)\b/i;
+// Bank and gateway charges carry GST, but the charge (with its GST) is an expense, not a tax payment.
+const CHARGES = /\b(bank charges?|charges|chrgs?|chgs?|chg|sms (charges?|chg)|service charges?|processing fees?|min(imum)? bal|amc|annual fee|card fee|gst on (chg|chgs|charges?)|commission|mdr)\b/i;
 const ADVANCE = /\b(advance|adv)\b(?!\s*tax)/i;
 const LOAN = /\b(loan|emi|od a\/?c|cc a\/?c|overdraft|capital|director'?s? (contribution|loan)|drawings?|unsecured)\b/i;
 const TRANSFER = /\b(self|own a\/?c|own account|sweep|fd (booking|closure|maturity)|fixed deposit|inter ?account|contra|transfer to (my|own)|a\/c transfer)\b/i;
@@ -51,6 +53,7 @@ export function misBucket(t: Line): MisBucket {
     if (t.category === "interest") return "other_income";
     return "revenue";
   }
+  if (CHARGES.test(text) && !/\b(challan|cpin|itns|tds|advance tax)\b/i.test(text)) return "expense";
   if (TAX.test(text) && !STATUTORY_EXPENSE.test(text)) return "tax_payment";
   if (t.category === "tax" && !STATUTORY_EXPENSE.test(text)) return "tax_payment";
   if (ADVANCE.test(text)) return "advance_paid";
@@ -64,6 +67,27 @@ export interface Settlement {
   fee?: number;
   tax?: number;
   date?: string | null;
+}
+
+/**
+ * The settlements a gateway register describes. Per-settlement groups when the
+ * report has a settlement id and fee columns; otherwise the whole file as one
+ * payout (net = "Net settled" total, or gross − fees − GST).
+ */
+export function settlementsFromRegister(
+  reg: { totals?: { label: string; amount: number }[]; groups?: Settlement[] } | null | undefined,
+  key = "settlement",
+): Settlement[] {
+  if (!reg) return [];
+  const groups = (reg.groups ?? []).filter((g) => (g.fee ?? 0) + (g.tax ?? 0) > 0);
+  if (groups.length) return groups;
+  const total = (label: string) => reg.totals?.find((t) => t.label === label)?.amount;
+  const gross = total("Gross collected");
+  const fee = total("Gateway fees") ?? 0;
+  const tax = total("GST on fees") ?? 0;
+  const net = total("Net settled to bank") ?? (gross !== undefined ? Math.round((gross - fee - tax) * 100) / 100 : undefined);
+  if (net === undefined || fee + tax <= 0) return [];
+  return [{ key, amount: net, fee, tax, date: null }];
 }
 
 /**

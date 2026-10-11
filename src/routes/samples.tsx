@@ -4,7 +4,7 @@ import { noindexHead } from "@/lib/seo";
 const FILES = [
   { file: "hdfc_statement_sep2026.csv", what: "Bank statement, 8 lines (one in USD)", expect: "7 transactions read, 1 sent to Review" },
   { file: "tally_daybook_sep2026.xml", what: "Tally day book, 6 vouchers", expect: "6 transactions read; Recon matches 5, leaves 2 exceptions" },
-  { file: "purchase_register_sep2026.csv", what: "One purchase entry", expect: "Read as a book entry" },
+  { file: "purchase_register_sep2026.csv", what: "One purchase voucher from the books (no GST columns)", expect: "Read as 1 book entry. A real GST purchase register, with GSTIN and tax columns, is kept as a register with its totals instead" },
   { file: "README.txt", what: "Expected results in full", expect: "" },
 ];
 

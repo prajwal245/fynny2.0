@@ -47,7 +47,7 @@ export function CommandMenu({ open, onClose }: { open: boolean; onClose: () => v
   const commands = useMemo<Command[]>(() => {
     const go = (to: string) => () => navigate({ to });
     const list: Command[] = [
-      { id: "nav:today", group: "Go to", label: "Today", hint: "Needs you, agent activity", run: go("/v2") },
+      { id: "nav:today", group: "Go to", label: "Portfolio", hint: "Needs you, clients, agent activity", run: go("/v2") },
       { id: "nav:clients", group: "Go to", label: "Clients", run: go("/v2/clients") },
       { id: "nav:documents", group: "Go to", label: "Documents", hint: "Uploads and unassigned inbox", run: go("/v2/documents") },
       { id: "nav:review", group: "Go to", label: "Review Queue", run: go("/v2/review") },

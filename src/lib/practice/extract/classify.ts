@@ -17,6 +17,7 @@ import {
   type Side,
   type TxnCategory,
 } from "../core";
+import { INDIA_CONTEXT } from "../india";
 
 export const CONFIDENCE_THRESHOLD = 0.75;
 
@@ -129,7 +130,9 @@ Rules:
 - counterparty is the other party's name as written in the row, or null if the row does not name one.
 - confidence is how sure you are that the category and counterparty are right AND that the row is a genuine transaction (not a total, balance or header line).
 - Set direction_doubt true only if the narration clearly contradicts the given direction (e.g. "reversal", "refund" marked the other way).
-- reason is mandatory when confidence is below 0.75. Keep it short and factual.`;
+- reason is mandatory when confidence is below 0.75. Keep it short and factual.
+
+${INDIA_CONTEXT}`;
 
 export function classifyUserPrompt(rows: ExtractedRow[], side: Side): string {
   return JSON.stringify({
@@ -158,7 +161,9 @@ Rules:
 - Skip opening/closing balance lines and totals.
 - Parse Indian dates (DD/MM/YYYY) into YYYY-MM-DD.
 - If a value is unclear (blurry, handwritten), lower confidence below 0.75 and say why in reason.
-- If there is nothing to extract return {"document_kind":"other","rows":[]}.`;
+- If there is nothing to extract return {"document_kind":"other","rows":[]}.
+
+${INDIA_CONTEXT}`;
 
 export interface AiReadRow {
   date?: string;

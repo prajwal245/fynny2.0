@@ -1,26 +1,28 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Link, useParams } from "@tanstack/react-router";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { ChevronLeft } from "lucide-react";
 import { Badge, Card, EmptyState, PageHeader, Stat, Tabs, V, formatDate, formatINR } from "../ui";
-import { AgentGlyph, AgentStatusBadge, AgentTimeline, AnimatedCounter, ProcessingCard, ShimmerText } from "../agents";
+import { AgentGlyph, AgentStatusBadge, AgentTimeline, AnimatedCounter, ShimmerText } from "../agents";
 import { useV2 } from "../store";
 import { CloseProgress, NextAction } from "../components/CloseProgress";
 import { AgentRunsCard } from "../components/AgentRuns";
 import { ReconGuide } from "../components/ReconGuide";
+import { Link2 } from "lucide-react";
 import DocumentsPage from "./DocumentsPage";
 import ReviewPage from "./ReviewPage";
 import ExceptionsPage from "./ExceptionsPage";
 import ReportsPage from "./ReportsPage";
 import ChaserPage from "./ChaserPage";
 import { parsePeriod } from "@/lib/practice/core";
+import { openExceptions } from "../lib/exceptions";
 
 const STATUS_LABEL: Record<string, string> = { matched: "Matched", exception: "Exception", unmatched: "Not run", ignored: "Ignored" };
 
 export default function ClientWorkspacePage() {
   const { clientId } = useParams({ from: "/v2/clients/$clientId" });
-  const { clients, docs, exceptions, reports, chases, review, runs, recon, runRecon, generateReport, period, closeStateFor, activityFor, agentRunsFor, isReadyForMis, dismissRun } = useV2();
+  const { clients, docs, exceptions, reports, chases, review, runs, recon, runRecon, generateReport, period, closeStateFor, activityFor, agentRunsFor, isReadyForMis } = useV2();
   const client = clients.find((c) => c.id === clientId);
   // Deep links from Today ("Resolve exceptions") open the right tab: /v2/clients/:id?tab=exceptions
   const [tab, setTab] = useState(() => {
@@ -40,7 +42,7 @@ export default function ClientWorkspacePage() {
   }
 
   const cDocs = docs.filter((d) => d.clientId === client.id);
-  const cEx = exceptions.filter((e) => e.clientId === client.id && e.status === "open");
+  const cEx = openExceptions(exceptions).filter((e) => e.clientId === client.id);
   const cReview = review.filter((r) => r.clientId === client.id && r.status === "open");
   const cReports = reports.filter((r) => r.clientId === client.id);
   const close = closeStateFor(client.id);
@@ -48,7 +50,7 @@ export default function ClientWorkspacePage() {
 
   const runNext = () => {
     if (close.next.action === "recon") {
-      runRecon(client.id, (r) => toast.success(`Recon complete. Matched ${r.matched}, exceptions ${r.exceptions}.`));
+      startRecon();
       setTab("recon");
       return;
     }
@@ -65,6 +67,22 @@ export default function ClientWorkspacePage() {
   const inPeriod = cDocs.flatMap((d) => d.rows).filter((r) => !range || (r.date >= range.start && r.date <= range.end)).sort((a, b) => (a.date < b.date ? -1 : 1));
   const bankSide = inPeriod.filter((r) => r.side !== "books");
   const bookSide = inPeriod.filter((r) => r.side === "books");
+  // Recon needs both sides: when one is missing, take the person to the guide that supplies it.
+  const startRecon = () => {
+    if (!bankSide.length || !bookSide.length) {
+      setTab("recon");
+      toast.info(`Recon needs the ${!bankSide.length && !bookSide.length ? "bank statement and the books" : !bankSide.length ? "bank statement" : "books"} for ${period}. Upload, pick a file or ask the client below.`);
+      return;
+    }
+    runRecon(client.id, (r) => toast.success(`Recon complete. Matched ${r.matched}, exceptions ${r.exceptions}.`));
+  };
+  const [matchTxn, setMatchTxn] = useState<string | null>(null);
+  const [onlyOpen, setOnlyOpen] = useState(true);
+  // One click from any unmatched line to the matching drawer.
+  const matchLine = (txnId: string) => {
+    setMatchTxn(txnId);
+    setTab("exceptions");
+  };
   const matchedBank = bankSide.filter((r) => r.matchStatus === "matched").length;
   const ignoredBank = bankSide.filter((r) => r.matchStatus === "ignored").length;
   const clientRuns = runs.filter((r) => r.target === client.id || r.clientId === client.id);
@@ -74,7 +92,9 @@ export default function ClientWorkspacePage() {
   const result = recon[client.id]?.period && recon[client.id]?.period !== period ? undefined : recon[client.id];
   const periodEx = cEx.filter((e) => !range || (e.date >= range.start && e.date <= range.end));
 
-  const status = cEx.length > 0
+  const status = cDocs.length === 0
+    ? { label: "Not started", tone: "neutral" as const }
+    : cEx.length > 0
     ? { label: "Needs attention", tone: "bad" as const }
     : cReview.length > 0 || cChases.length > 0
       ? { label: "Ready for review", tone: "warn" as const }
@@ -106,18 +126,9 @@ export default function ClientWorkspacePage() {
         ]}
       />
 
-      {/* Live agent cards sit under the tabs, so closing one never moves the tabs under the cursor. */}
-      <div style={{ display: "grid", gap: 12, marginBottom: clientRuns.length ? 18 : 0 }}>
-        <AnimatePresence>
-          {clientRuns.map((r) => (
-            <ProcessingCard key={r.id} run={r} onDismiss={() => dismissRun(r.id)} />
-          ))}
-        </AnimatePresence>
-      </div>
-
       {tab === "overview" && (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-          <ReconGuide clientId={client.id} onUpload={() => setTab("documents")} />
+          <ReconGuide clientId={client.id} onUpload={() => setTab("documents")} onTab={setTab} />
           {isReadyForMis(client.id, period) && cEx.length === 0 && cReview.length === 0 && !cReports.some((r) => r.period === period) && (
             <Card style={{ marginBottom: 18, background: "rgba(31,90,70,0.07)", borderColor: "rgba(31,90,70,0.25)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -148,7 +159,7 @@ export default function ClientWorkspacePage() {
           <Card>
             <h3 style={{ fontSize: 15 }}>Quick actions</h3>
             <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
-              <button className="v2-btn v2-btn-primary" disabled={reconRunning} data-working={reconRunning} onClick={() => { runRecon(client.id, (r) => toast.success(`Recon complete. Matched ${r.matched}, exceptions ${r.exceptions}.`)); }}>
+              <button className="v2-btn v2-btn-primary" disabled={reconRunning} data-working={reconRunning} onClick={startRecon}>
                 {reconRunning ? <><AgentGlyph agent="recon" state="running" size={20} /><ShimmerText text="Recon is matching…" tone="light" /></> : "Run recon"}
               </button>
               <button className="v2-btn v2-btn-ghost" disabled={narrateRunning} data-working={narrateRunning} onClick={() => { generateReport(client.id, period, "Monthly MIS", () => toast.success(`${period} MIS ready`)); }}>
@@ -167,11 +178,11 @@ export default function ClientWorkspacePage() {
 
       {tab === "review" && <ReviewPage clientId={client.id} />}
 
-      {tab === "exceptions" && <ExceptionsPage clientId={client.id} />}
+      {tab === "exceptions" && <ExceptionsPage clientId={client.id} focusTxnId={matchTxn ?? undefined} onFocused={() => setMatchTxn(null)} />}
 
       {tab === "recon" && (
         <>
-          <ReconGuide clientId={client.id} onUpload={() => setTab("documents")} />
+          <ReconGuide clientId={client.id} onUpload={() => setTab("documents")} onTab={setTab} />
           <div className="v2-grid-cards" style={{ marginBottom: 18 }}>
             <Stat label="Bank transactions" value={<AnimatedCounter value={bankSide.length} />} hint={`Dated in ${period}`} />
             <Stat label="Book transactions" value={<AnimatedCounter value={bookSide.length} />} hint={`Dated in ${period}`} />
@@ -183,7 +194,7 @@ export default function ClientWorkspacePage() {
               className="v2-btn v2-btn-primary"
               disabled={reconRunning}
               data-working={reconRunning}
-              onClick={() => { runRecon(client.id, (r) => toast.success(`Recon complete. Matched ${r.matched}, exceptions ${r.exceptions}.`)); }}
+              onClick={startRecon}
             >
               {reconRunning ? <><AgentGlyph agent="recon" state="running" size={20} /><ShimmerText text="Recon agent is working" tone="light" /></> : `Run recon for ${period}`}
             </button>
@@ -193,27 +204,44 @@ export default function ClientWorkspacePage() {
           {bankSide.length === 0 && bookSide.length === 0 ? (
             <EmptyState title={`Nothing dated in ${period} yet`} description="Upload the bank statement and the Tally export or ledger for this month, then run recon." action={<button className="v2-btn v2-btn-primary" onClick={() => setTab("documents")}>Upload documents</button>} />
           ) : (
+            <>
+            <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }} role="group" aria-label="Show">
+              {([[true, `Needs matching · ${inPeriod.filter((r) => r.matchStatus !== "matched" && r.matchStatus !== "ignored").length}`], [false, `All lines · ${inPeriod.length}`]] as const).map(([v, l]) => (
+                <button key={String(v)} className={`v2-btn v2-btn-sm ${onlyOpen === v ? "v2-btn-primary" : "v2-btn-ghost"}`} aria-pressed={onlyOpen === v} onClick={() => setOnlyOpen(v)}>{l}</button>
+              ))}
+              <span style={{ fontSize: 12.5, color: V.muted }}>Press Match on a line to pick its other side, add a note if amounts differ, and it counts in the MIS.</span>
+            </div>
             <div style={{ display: "grid", gap: 18, gridTemplateColumns: "repeat(auto-fit,minmax(min(420px, 100%), 1fr))" }}>
-              {([["Bank side", bankSide], ["Books side", bookSide]] as const).map(([label, rows]) => (
+              {([["Bank side", bankSide], ["Books side", bookSide]] as const).map(([label, all]) => { const rows = onlyOpen ? all.filter((r) => r.matchStatus !== "matched" && r.matchStatus !== "ignored") : all; return (
                 <Card key={label} style={{ padding: 0 }} className="v2-scroll">
                   <div style={{ padding: "14px 16px 0", fontWeight: 600 }}>{label} <span style={{ color: V.muted, fontWeight: 400 }}>· {rows.length}</span></div>
-                  <table className="v2-table">
-                    <thead><tr><th>Date</th><th>Particulars</th><th>Amount</th><th>Status</th></tr></thead>
+                  <table className="v2-table v2-table-stack">
+                    <thead><tr><th>Date</th><th>Particulars</th><th>Amount</th><th>Status</th><th className="v2-sticky-end" /></tr></thead>
                     <tbody>
-                      {rows.length === 0 && <tr><td colSpan={4} style={{ color: V.muted, textAlign: "center", padding: 22 }}>{label === "Bank side" ? "No bank statement lines yet." : "No book entries yet. Upload the Tally export or ledger."}</td></tr>}
+                      {rows.length === 0 && <tr><td colSpan={5} style={{ color: V.muted, textAlign: "center", padding: 22 }}>{all.length && onlyOpen ? "Every line here is matched or decided." : label === "Bank side" ? "No bank statement lines yet." : "No book entries yet. Upload the Tally export or ledger."}</td></tr>}
                       {rows.map((r, i) => (
                         <tr key={r.id ?? i}>
                           <td className="num">{formatDate(r.date)}</td>
                           <td>{r.particulars}</td>
                           <td className="num" style={{ color: r.amount < 0 ? V.maroon : V.green }}>{formatINR(r.amount)}</td>
                           <td><Badge tone={r.matchStatus === "matched" ? "good" : r.matchStatus === "exception" ? "bad" : r.matchStatus === "ignored" ? "neutral" : "warn"}>{STATUS_LABEL[r.matchStatus ?? "unmatched"] ?? r.matchStatus}</Badge></td>
+                          <td className="v2-sticky-end" style={{ textAlign: "right" }}>
+                            {r.id && r.matchStatus !== "matched" && r.matchStatus !== "ignored" && (
+                              r.matchStatus === "exception" || exceptions.some((e) => e.status === "open" && e.txnId === r.id) ? (
+                                <button className="v2-btn v2-btn-quiet" onClick={() => matchLine(r.id!)} aria-label={`Match ${r.particulars}`}><Link2 size={14} /> Match</button>
+                              ) : (
+                                <button className="v2-btn v2-btn-quiet" onClick={startRecon} disabled={reconRunning} title="Recon has not looked at this line yet">Run recon</button>
+                              )
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </Card>
-              ))}
+              ); })}
             </div>
+            </>
           )}
         </>
       )}

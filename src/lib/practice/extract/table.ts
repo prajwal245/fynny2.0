@@ -230,9 +230,24 @@ export function directionFromVoucherType(vch: string): "in" | "out" | null {
   return null;
 }
 
+/**
+ * A ledger exported from Tally (Date, Particulars, Vch Type, Vch No., Debit,
+ * Credit) is the books, whatever the file is called: a bank statement never
+ * carries voucher columns.
+ */
+export function isTallyLedger(rows: string[][]): boolean {
+  const map = mapColumns(rows);
+  if (!map) return false;
+  const headers = rows[map.headerRow].map((h) => norm(String(h ?? "")));
+  const vchNo = headers.some((h) => /^(vch|voucher) ?no\b|^(vch|voucher) ?number/.test(h));
+  return (map.vchType >= 0 || vchNo) && (map.debit >= 0 || map.credit >= 0);
+}
+
 export function rowsFromTable(rows: string[][], side?: "bank" | "books"): ExtractedRow[] | null {
   const map = mapColumns(rows);
   if (!map) return null;
+  // Tally's Debit/Credit are the books' view of the bank ledger: Debit = money in.
+  const booksDebitIn = side === "books" && (map.debit >= 0 || map.credit >= 0) && isTallyLedger(rows);
   const header = rows[map.headerRow];
   const cell = (r: string[], i: number) =>
     i >= 0 ? String(r[i] ?? "").trim() : "";
@@ -258,6 +273,7 @@ export function rowsFromTable(rows: string[][], side?: "bank" | "books"): Extrac
       ),
     );
 
+    if (booksDebitIn) signed = -signed;
     const vchDir = side === "books" ? directionFromVoucherType(cell(row, map.vchType)) : null;
     if (vchDir && signed !== 0) signed = vchDir === "in" ? Math.abs(signed) : -Math.abs(signed);
 

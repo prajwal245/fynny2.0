@@ -158,7 +158,7 @@ async function callProvider(
   }
 }
 
-async function viaEdgeFunction(req: LlmJsonRequest): Promise<LlmJsonResult> {
+async function viaEdgeFunction(req: LlmJsonRequest, timeoutMs = 30_000): Promise<LlmJsonResult> {
   const url = supabaseUrl();
   const key = env("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !key) throw new Error("No AI provider configured");
@@ -171,6 +171,10 @@ async function viaEdgeFunction(req: LlmJsonRequest): Promise<LlmJsonResult> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(req),
+    signal: AbortSignal.timeout(timeoutMs),
+  }).catch((e: Error) => {
+    if (e.name === "TimeoutError" || e.name === "AbortError") throw new RetryableError("practice-ai timed out");
+    throw e;
   });
   if (res.status === 429 || res.status >= 500)
     throw new RetryableError(`practice-ai ${res.status}`);
@@ -206,7 +210,7 @@ async function withRetries<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
 }
 
 export function practiceLlm(
-  opts: { timeoutMs?: number } = {},
+  opts: { timeoutMs?: number; budgetMs?: number } = {},
 ): LlmClient | null {
   const list = providers();
   const edgeAvailable =
@@ -214,22 +218,30 @@ export function practiceLlm(
     env("PRACTICE_AI_DISABLED") !== "1";
   if (!list.length && !edgeAvailable) return null;
   const timeoutMs = opts.timeoutMs ?? 45_000;
+  // The whole server call is cut off at 60 s, so every AI call made with this
+  // client (all reads, providers and retries together) gives up well before that.
+  const deadline = Date.now() + (opts.budgetMs ?? 35_000);
   return {
     async json(req) {
+      const left = () => {
+        const ms = deadline - Date.now();
+        if (ms < 3_000) throw new Error("AI took too long");
+        return Math.min(timeoutMs, ms);
+      };
       const usable = list.filter((p) => !req.attachment || p.vision);
       const errors: string[] = [];
       for (const [i, p] of usable.entries()) {
         // Move on quickly when another provider can answer instead.
         const attempts = i < usable.length - 1 || edgeAvailable ? 2 : 3;
         try {
-          return await withRetries(() => callProvider(p, req, timeoutMs), attempts);
+          return await withRetries(() => callProvider(p, req, left()), attempts);
         } catch (e) {
           errors.push(e instanceof Error ? e.message : String(e));
         }
       }
       if (edgeAvailable) {
         try {
-          return await withRetries(() => viaEdgeFunction(req), 2);
+          return await withRetries(() => viaEdgeFunction(req, left()), 2);
         } catch (e) {
           errors.push(e instanceof Error ? e.message : String(e));
         }

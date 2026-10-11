@@ -12,9 +12,19 @@ import { ReviewItem, useV2 } from "../store";
 const REGISTER_NAME = /(invoice|bill|purchase|sales|gst|gstr|tds|payroll|salary|razorpay|cashfree|payu|settlement|register)/i;
 const REGISTER_TEXT = /(gstin|taxable|cgst|sgst|igst|invoice no|hsn|deductee|section 19|net pay|settlement)/i;
 
+/** Rows from a file that looks like a register are never bulk-confirmed into bank lines. */
+export function registerLikeDocs(items: ReviewItem[]): Set<string> {
+  const byDoc = new Map<string, ReviewItem[]>();
+  for (const r of items) if (r.docId) (byDoc.get(r.docId) ?? byDoc.set(r.docId, []).get(r.docId)!).push(r);
+  const out = new Set<string>();
+  for (const [docId, list] of byDoc)
+    if (REGISTER_NAME.test(list[0].docName ?? "") || list.slice(0, 5).some((r) => REGISTER_TEXT.test(r.rawText ?? ""))) out.add(docId);
+  return out;
+}
+
 type Group = { docId: string; docName: string; clientId: string; items: ReviewItem[]; reason: string };
 
-export function guideGroups(items: ReviewItem[]): Group[] {
+export function guideGroups(items: ReviewItem[], keep: Set<string> = new Set()): Group[] {
   const byDoc = new Map<string, ReviewItem[]>();
   for (const r of items) if (r.docId) (byDoc.get(r.docId) ?? byDoc.set(r.docId, []).get(r.docId)!).push(r);
   return [...byDoc.entries()]
@@ -24,7 +34,7 @@ export function guideGroups(items: ReviewItem[]): Group[] {
       const [reason] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0] ?? [""];
       return { docId, docName: list[0].docName, clientId: list[0].clientId, items: list, reason };
     })
-    .filter((g) => g.items.length >= 3 || !g.clientId)
+    .filter((g) => g.items.length >= 3 || !g.clientId || keep.has(g.docId))
     .sort((a, b) => b.items.length - a.items.length);
 }
 
@@ -32,13 +42,16 @@ export function ReviewGuide({ items }: { items: ReviewItem[] }) {
   const { clients, reprocessDoc, assignDoc, resolveReview } = useV2();
   const [pick, setPick] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
-  const groups = guideGroups(items).slice(0, 3);
+  // Every register-like file gets its card (a 4th legacy register was hidden before); others up to 3.
+  const regs = registerLikeDocs(items);
+  const all = guideGroups(items, regs);
+  const groups = [...all.filter((g) => regs.has(g.docId)), ...all.filter((g) => !regs.has(g.docId)).slice(0, 3)];
   if (!groups.length) return null;
 
   return (
     <div style={{ display: "grid", gap: 12, marginBottom: 18 }}>
       {groups.map((g) => {
-        const looksLikeRegister = REGISTER_NAME.test(g.docName) || g.items.slice(0, 5).some((r) => REGISTER_TEXT.test(r.rawText));
+        const looksLikeRegister = regs.has(g.docId);
         const unassigned = !g.clientId;
         const n = g.items.length;
         const title = looksLikeRegister

@@ -7,6 +7,7 @@ import { AgentStatusBadge, AnimatedCounter, FadeIn, RowSkeleton } from "../agent
 import { Txn, monthOf, useV2 } from "../store";
 import { downloadExcel, printReport } from "../lib/exportReport";
 import { toast } from "sonner";
+import { openExceptions } from "../lib/exceptions";
 
 export default function ReportDetailPage() {
   const { reportId } = useParams({ from: "/v2/reports/$reportId" });
@@ -34,7 +35,7 @@ export default function ReportDetailPage() {
   const net = report.revenue - report.expenses;
   const inPeriod = (d?: string) => Boolean(d) && monthOf(d!) === report.period;
   const open = {
-    exceptions: exceptions.filter((e) => e.clientId === report.clientId && e.status === "open" && inPeriod(e.date)).length,
+    exceptions: openExceptions(exceptions).filter((e) => e.clientId === report.clientId && inPeriod(e.date)).length,
     review: review.filter((r) => r.clientId === report.clientId && r.status === "open").length,
     unmatched: docs
       .filter((d) => d.clientId === report.clientId)
@@ -58,6 +59,9 @@ export default function ReportDetailPage() {
     }
   };
   const allRows = [...report.sources.revenue, ...report.sources.expenses];
+  // Same count as the Generate dialog: every matched line in the period, including taxes and advances.
+  const flowCount = (report.otherFlows ?? []).reduce((n, f) => n + f.count, 0);
+  const matchedCount = allRows.length + flowCount;
 
   const meta = { clientName: clientName(report.clientId), firmName: firm?.name ?? "FynHelp" };
 
@@ -74,7 +78,7 @@ export default function ReportDetailPage() {
       </Link>
       <PageHeader
         title={`${clientName(report.clientId)} — ${report.period}`}
-        subtitle={`${report.template} generated ${formatDate(report.generated)} from ${allRows.length} matched transactions${report.excluded ? `. ${report.excluded} unmatched line${report.excluded > 1 ? "s" : ""} left out by rule` : ""}`}
+        subtitle={`${report.template} generated ${formatDate(report.generated)} from ${matchedCount} matched transaction${matchedCount === 1 ? "" : "s"}${flowCount ? ` (${flowCount} of them taxes, advances or transfers, shown separately)` : ""}${report.excluded ? `. ${report.excluded} unmatched line${report.excluded > 1 ? "s" : ""} left out by rule` : ""}`}
         action={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <AgentStatusBadge agent="narrate" label="Narrate" />
@@ -185,6 +189,21 @@ export default function ReportDetailPage() {
         </Card>
       )}
 
+      {!exceptionTemplate && report.statutory && report.statutory.length > 0 && (
+        <Card style={{ marginBottom: 20 }} data-testid="statutory-dates">
+          <div style={{ fontSize: 14.5, fontWeight: 600 }}>Statutory dates that follow from this month</div>
+          <div style={{ display: "grid", gap: 6, marginTop: 10 }}>
+            {report.statutory.map((s) => (
+              <div key={s.label} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13.5, flexWrap: "wrap" }}>
+                <span>{s.label}</span>
+                <b className="num">by {formatDate(s.due)}</b>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 12, color: V.muted, marginTop: 8 }}>Worked out from the TDS, PF/ESI and GST payments in this month's bank lines.</div>
+        </Card>
+      )}
+
       {!exceptionTemplate && report.otherFlows && report.otherFlows.length > 0 && (
         <Card style={{ marginBottom: 20 }} data-testid="other-flows">
           <h3 style={{ fontSize: 15.5 }}>Not counted as revenue or expenses</h3>
@@ -218,6 +237,27 @@ export default function ReportDetailPage() {
                 ))}
               </tbody>
             </table>
+          )}
+          <h3 style={{ fontSize: 15.5, margin: "22px 0 12px" }}>Decided this period</h3>
+          {!report.decisions?.length ? (
+            <p style={{ fontSize: 13.5, color: V.body, margin: 0 }}>No line was ignored, matched by hand or marked reconciled elsewhere in {report.period}.</p>
+          ) : (
+            <div className="v2-scroll">
+              <table className="v2-table" data-testid="exception-decisions">
+                <thead><tr><th>Date</th><th>Line</th><th style={{ textAlign: "right" }}>Amount</th><th>Decision</th><th>Note</th></tr></thead>
+                <tbody>
+                  {report.decisions.map((d, i) => (
+                    <tr key={i}>
+                      <td className="num">{d.date ? formatDate(d.date) : ""}</td>
+                      <td>{d.particulars}<div style={{ fontSize: 12, color: V.muted }}>{d.reason}</div></td>
+                      <td className="num" style={{ textAlign: "right", color: d.amount < 0 ? V.maroon : V.green }}>{formatINR(d.amount)}</td>
+                      <td>{d.outcome}</td>
+                      <td style={{ fontSize: 12.5, color: V.body }}>{d.note}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </Card>
       )}

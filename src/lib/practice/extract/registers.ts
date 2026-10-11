@@ -9,6 +9,7 @@
  * (date, narration, debit, credit, balance) is never mistaken for one.
  */
 import { round2 } from "../core";
+import { checkGatewayGst, checkGst, checkPayroll, checkTds, type ComplianceCheck } from "../india";
 
 export type RegisterKind =
   | "gst_sales_register"
@@ -36,6 +37,8 @@ export interface RegisterSummary {
   totals: { label: string; amount: number }[];
   /** Per settlement (gateway) or per section (TDS): small breakdown for the firm. */
   groups?: { key: string; amount: number; count: number; gross?: number; fee?: number; tax?: number; date?: string | null }[];
+  /** Checks under Indian GST, TDS and payroll rules, done in code (not by AI). */
+  checks?: ComplianceCheck[];
   note: string;
 }
 
@@ -90,14 +93,26 @@ export function summariseRegister(kind: RegisterKind, rows: string[][]): Registe
   const body = rows.slice(h.index + 1).filter((r) => r.some((x) => String(x ?? "").trim()));
   // Skip a closing "Total" row so it is not added twice.
   const data = body.filter((r) => !/^\s*(grand\s*)?total\b/i.test(String(r[0] ?? "")) && !r.some((x) => /^\s*(grand\s*)?total\s*$/i.test(String(x ?? ""))));
-  const col = (...words: (string | RegExp)[]) =>
-    h.cols.findIndex((c) => words.some((w) => (typeof w === "string" ? c === w || c.includes(w) : w.test(c))));
+  // A rate or percentage column is never an amount ("TDS Rate %" is not "TDS").
+  const isRate = (c: string) => /%|\brate\b|percent/.test(c);
+  const col = (...words: (string | RegExp)[]) => {
+    const ok = (c: string, w: string | RegExp) => (typeof w === "string" ? c === w || c.includes(w) : w.test(c));
+    // Earlier words win: "tds deducted" before a bare "tds".
+    for (const w of words) {
+      const i = h.cols.findIndex((c) => !isRate(c) && ok(c, w));
+      if (i >= 0) return i;
+    }
+    return -1;
+  };
   const sum = (i: number) => (i < 0 ? 0 : round2(data.reduce((s, r) => s + (amount(r[i]) ?? 0), 0)));
   const totals: { label: string; amount: number }[] = [];
   const push = (label: string, i: number) => {
     if (i >= 0) totals.push({ label, amount: sum(i) });
   };
   let groups: RegisterSummary["groups"];
+  let checks: ComplianceCheck[] = [];
+  const num = (r: string[], i: number) => (i >= 0 ? amount(r[i]) ?? 0 : 0);
+  const txt = (r: string[], i: number) => (i >= 0 ? String(r[i] ?? "").trim() : "");
   let note = "Kept as a register. Its entries are not bank or book transactions, so it does not change Recon or the MIS.";
 
   if (kind === "gst_sales_register" || kind === "gst_purchase_register" || kind === "invoice_register" || kind === "gstr2b") {
@@ -106,10 +121,15 @@ export function summariseRegister(kind: RegisterKind, rows: string[][]): Registe
     push("CGST", col("cgst"));
     push("SGST", col("sgst", "utgst"));
     push("Invoice total", col("invoice value", "invoice amount", "total value", "total amount", /^total$/, "grand total"));
+    const [ti, ii, ci, si] = [col("taxable value", "taxable amount", "taxable"), col("igst"), col("cgst"), col("sgst", "utgst")];
+    const gi = col("supplier gstin", "customer gstin", "party gstin", "gstin");
+    const ri = col("invoice no", "invoice number", "inv no", "bill no", "invoice");
+    if (ti >= 0)
+      checks = checkGst(data.map((r) => ({ ref: txt(r, ri), gstin: txt(r, gi), taxable: num(r, ti), igst: num(r, ii), cgst: num(r, ci), sgst: num(r, si) })));
     if (kind === "gstr2b") note = "GSTR-2B summary kept for GST reconciliation. Not used in bank reconciliation.";
   } else if (kind === "tds_register") {
-    const tdsCol = col("tds amount", "tds deducted", "tax deducted", "tds");
-    push("Amount paid / credited", col("amount paid", "amount credited", "gross amount", "amount"));
+    const tdsCol = col("tds deducted", "tds amount", "tax deducted", "tds deduction", /^tds$/, "tds");
+    push("Amount paid / credited", col("amount paid", "amount credited", "gross amount", /^amount$/, "payment amount", "bill amount", "invoice amount"));
     push("TDS", tdsCol);
     const sec = col("section");
     if (sec >= 0 && tdsCol >= 0) {
@@ -123,6 +143,10 @@ export function summariseRegister(kind: RegisterKind, rows: string[][]): Registe
       }
       groups = [...by.entries()].map(([key, g]) => ({ key, ...g }));
     }
+    const paidCol = col("amount paid", "amount credited", "gross amount", /^amount$/, "payment amount", "bill amount", "invoice amount");
+    const party = col("deductee", "party", "name", "vendor");
+    if (sec >= 0 && tdsCol >= 0 && paidCol >= 0)
+      checks = checkTds(data.map((r) => ({ party: txt(r, party), section: txt(r, sec), paid: num(r, paidCol), tds: num(r, tdsCol) })));
   } else if (kind === "payroll") {
     push("Gross salary", col("gross", "gross salary", "gross pay", "ctc"));
     push("PF", col("pf", "provident fund", "epf"));
@@ -130,11 +154,16 @@ export function summariseRegister(kind: RegisterKind, rows: string[][]): Registe
     push("Professional tax", col("professional tax", /^pt$/));
     push("TDS", col("tds", "income tax"));
     push("Net pay", col("net pay", "net salary", "net amount", "take home"));
+    const [bi, gri, pfi, esii, ni] = [col(/^basic/), col("gross", "gross salary", "gross pay"), col(/^pf$/, "pf employee", "employee pf", "provident fund", "epf", "pf"), col(/^esi$/, "esi employee", "employee esi", "esic", "esi"), col("employee name", "name", "employee")];
+    if (gri >= 0 && (pfi >= 0 || esii >= 0))
+      checks = checkPayroll(
+        data.map((r) => ({ name: txt(r, ni), basic: bi >= 0 ? num(r, bi) : undefined, gross: num(r, gri), pf: pfi >= 0 ? num(r, pfi) : undefined, esi: esii >= 0 ? num(r, esii) : undefined })),
+      );
     note = "Payroll sheet kept for reference. The salary, PF and ESI payments themselves are matched from the bank statement and the books.";
   } else if (kind === "gateway_settlement") {
-    const gross = col("amount", "gross amount", "order amount", "payment amount");
+    const gross = col(/^amount$/, "gross amount", "gross", "order amount", "payment amount", /^amount/, "amount");
     const fee = col("fee", "fees", "commission", "mdr");
-    const tax = col("tax", "gst on fee", "service tax", "gst");
+    const tax = col("gst on fee", /^tax$/, "tax on fee", "service tax", /^gst$/, "gst", "tax");
     const net = col("settled amount", "settlement amount", "net amount", "credit amount", "amount settled");
     push("Gross collected", gross);
     push("Gateway fees", fee);
@@ -166,7 +195,8 @@ export function summariseRegister(kind: RegisterKind, rows: string[][]): Registe
       }
       groups = [...by.entries()].map(([key, g]) => ({ key, ...g }));
     }
+    if (fee >= 0 && tax >= 0) checks = checkGatewayGst(sum(fee), sum(tax));
     note = "Settlement report kept as a reference: the bank already shows each payout once (net). Orders are not added to the bank side, so nothing is counted twice. Book the fees and GST on fees from the totals.";
   }
-  return { kind, label: REGISTER_LABELS[kind], entries: data.length, totals, ...(groups ? { groups } : {}), note };
+  return { kind, label: REGISTER_LABELS[kind], entries: data.length, totals, ...(groups ? { groups } : {}), ...(checks.length ? { checks } : {}), note };
 }

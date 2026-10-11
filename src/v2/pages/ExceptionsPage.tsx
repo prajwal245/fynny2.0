@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import { ShieldCheck } from "lucide-react";
@@ -14,6 +14,7 @@ import {
 } from "../ui";
 import { AgentStatusBadge } from "../agents";
 import { EXCEPTION_REASONS, Exception, monthOf, useV2 } from "../store";
+import { openExceptions } from "../lib/exceptions";
 
 /**
  * Exception Queue. Cross-client as a page; the client's Exceptions tab when
@@ -22,7 +23,9 @@ import { EXCEPTION_REASONS, Exception, monthOf, useV2 } from "../store";
  */
 export default function ExceptionsPage({
   clientId: scopedClient,
-}: { clientId?: string } = {}) {
+  focusTxnId,
+  onFocused,
+}: { clientId?: string; focusTxnId?: string; onFocused?: () => void } = {}) {
   const { exceptions, clients, clientName, setExceptionStatus, reopenException, runs, docs, period } =
     useV2();
   // The queue follows the period in the top bar; "All periods" shows everything.
@@ -33,20 +36,26 @@ export default function ExceptionsPage({
   const [openId, setOpenId] = useState<string | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
   const [note, setNote] = useState("");
+  const [actError, setActError] = useState<string | null>(null);
 
   const reconRunning = runs.some((r) => r.agent === "recon" && r.status === "running");
   const inScope = (e: (typeof exceptions)[number]) =>
     (client === "all" || e.clientId === client) && (scope === "all" || monthOf(e.date) === period);
-  const openInScope = exceptions.filter((e) => e.status === "open" && inScope(e));
-  // A bank line and its book entry often fail together: show the pair once (the bank side).
-  const openTxnIds = new Set(openInScope.map((e) => e.txnId).filter(Boolean) as string[]);
-  const twinOf = (e: (typeof exceptions)[number]) =>
-    e.side === "books" &&
-    openInScope.some((b) => b.side !== "books" && b.candidateIds?.[0] === e.txnId && e.candidateIds?.[0] === b.txnId);
-  const list = openInScope.filter((e) => (reason === "all" || e.reason === reason) && !twinOf(e));
+  // Same rule as the sidebar badge: a failed bank line and its book twin are one decision.
+  const allOpen = openExceptions(exceptions).filter((e) => client === "all" || e.clientId === client);
+  const openInScope = allOpen.filter(inScope);
+  const list = openInScope.filter((e) => reason === "all" || e.reason === reason);
   const decided = exceptions.filter((e) => e.status !== "open" && inScope(e));
-  void openTxnIds;
   const active = exceptions.find((e) => e.id === openId) ?? null;
+  // Entries already matched elsewhere are never offered again.
+  const matchedIds = useMemo(
+    () => new Set(docs.flatMap((d) => d.rows).filter((r) => r.id && r.matchStatus === "matched").map((r) => r.id as string)),
+    [docs],
+  );
+  const liveCandidates = (e: Exception) =>
+    e.candidates
+      .map((label, i) => ({ label, id: e.candidateIds?.[i], amount: e.candidateAmounts?.[i] }))
+      .filter((c) => !c.id || !matchedIds.has(c.id));
 
   // Any other unmatched entry on the opposite side, same direction, for a manual match.
   const others = useMemo(() => {
@@ -74,9 +83,22 @@ export default function ExceptionsPage({
 
   const openItem = (e: Exception) => {
     setOpenId(e.id);
-    setPicked(e.candidateIds?.slice(0, 1) ?? []);
+    setPicked(liveCandidates(e).filter((c) => c.id).slice(0, 1).map((c) => c.id as string));
     setNote("");
+    setActError(null);
   };
+  // Opened from a line elsewhere (Recon tab "Match"): open that line's drawer straight away.
+  useEffect(() => {
+    if (!focusTxnId) return;
+    const open = exceptions.filter((e) => e.status === "open");
+    const hit = open.find((e) => e.txnId === focusTxnId) ?? open.find((e) => e.candidateIds?.includes(focusTxnId));
+    if (hit) {
+      if (monthOf(hit.date) !== period) setScope("all");
+      openItem(hit);
+    }
+    onFocused?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusTxnId]);
   const toggle = (id: string) =>
     setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
   const close = () => {
@@ -101,7 +123,7 @@ export default function ExceptionsPage({
     action: "match" | "reconciled_external" | "ignore",
     ids?: string[],
   ) => {
-    if (action === "match" && !(ids?.length || e.candidateIds?.length)) {
+    if (action === "match" && !ids?.length) {
       toast.error("Pick the entry this matches");
       return;
     }
@@ -113,14 +135,24 @@ export default function ExceptionsPage({
       toast.error("Add a short note for the audit trail");
       return;
     }
-    const ok = await setExceptionStatus(
+    // Close at once so the result (and its Undo) is in view; reopen with the reason if it is refused.
+    const keepNote = note;
+    const keepPicked = picked;
+    close();
+    const error = await setExceptionStatus(
       e.id,
       action === "ignore" ? "ignored" : "resolved",
       action === "ignore"
-        ? { note }
-        : { action, counterpartIds: ids, note: note || undefined, allowDifference: action === "match" && differs },
+        ? { note: keepNote }
+        : { action, counterpartIds: ids, note: keepNote || undefined, allowDifference: action === "match" && differs },
     );
-    if (!ok) return;
+    if (error) {
+      setOpenId(e.id);
+      setNote(keepNote);
+      setPicked(keepPicked);
+      setActError(error);
+      return;
+    }
     toast.success(
       action === "match"
         ? "Matched. It now counts in the MIS."
@@ -129,12 +161,12 @@ export default function ExceptionsPage({
           : "Marked as reconciled outside FynHelp.",
       { action: { label: "Undo", onClick: () => void reopenException(e.id) }, duration: 8000 },
     );
-    setConfirmAction(null);
-    close();
   };
   // Matching from the table is only offered when the suggestion is for the same amount.
-  const safeMatch = (e: Exception) =>
-    Boolean(e.candidateIds?.length) && e.candidateAmounts?.[0] !== undefined && Math.abs(Math.abs(e.candidateAmounts[0]) - Math.abs(e.amount)) < 0.01;
+  const safeMatch = (e: Exception) => {
+    const c = liveCandidates(e)[0];
+    return Boolean(c?.id) && c.amount !== undefined && Math.abs(Math.abs(c.amount) - Math.abs(e.amount)) < 0.01;
+  };
 
   return (
     <>
@@ -179,8 +211,8 @@ export default function ExceptionsPage({
           onChange={(e) => setScope(e.target.value as "period" | "all")}
           aria-label="Period"
         >
-          <option value="period">{period}</option>
-          <option value="all">All periods</option>
+          <option value="period">{period} · {allOpen.filter((e) => monthOf(e.date) === period).length} open</option>
+          <option value="all">All periods · {allOpen.length} open</option>
         </select>
         <select
           className="v2-input"
@@ -211,7 +243,7 @@ export default function ExceptionsPage({
         />
       ) : (
         <Card style={{ padding: 0 }} className="v2-scroll">
-          <table className="v2-table">
+          <table className="v2-table v2-table-stack">
             <thead>
               <tr>
                 {!scopedClient && <th>Client</th>}
@@ -221,7 +253,7 @@ export default function ExceptionsPage({
                 <th>Amount</th>
                 <th>Date</th>
                 <th>Best candidate</th>
-                <th />
+                <th className="v2-sticky-end" />
               </tr>
             </thead>
             <tbody>
@@ -243,13 +275,13 @@ export default function ExceptionsPage({
                       </td>
                     )}
                     <td>
-                      <Badge tone="warn">{e.reason}</Badge>
+                      <Badge tone="warn">{e.reason}</Badge>{e.precedent && <span title="The Recon agent learned a decision for this line" style={{ marginLeft: 6 }}><Badge tone="info">Learned</Badge></span>}
                     </td>
                     <td style={{ color: V.body }}>
                       {e.side === "books" ? "Books" : "Bank"}
                     </td>
                     <td style={{ color: V.body }}>
-                      {e.narration}
+                      <span className="v2-mono" style={{ fontSize: 13 }}>{e.narration}</span>
                       {e.detail && (
                         <div
                           style={{ fontSize: 12, color: V.muted, marginTop: 3 }}
@@ -268,9 +300,9 @@ export default function ExceptionsPage({
                       {formatDate(e.date)}
                     </td>
                     <td style={{ color: V.body, fontSize: 12.5 }}>
-                      {e.candidates[0] ?? "No candidate found"}
+                      {liveCandidates(e)[0]?.label ?? "No candidate found"}
                     </td>
-                    <td>
+                    <td className="v2-sticky-end">
                       <div
                         style={{
                           display: "flex",
@@ -283,7 +315,7 @@ export default function ExceptionsPage({
                           <button
                             className="v2-btn v2-btn-quiet"
                             title="Match with the suggested entry (same amount)"
-                            onClick={() => void act(e, "match")}
+                            onClick={() => void act(e, "match", [liveCandidates(e)[0].id as string])}
                           >
                             Match
                           </button>
@@ -335,14 +367,13 @@ export default function ExceptionsPage({
 
             <div>
               <label className="v2-label">Suggested by the Recon agent</label>
-              {active.candidates.length === 0 ? (
+              {liveCandidates(active).length === 0 ? (
                 <div style={{ fontSize: 13, color: V.muted }}>
-                  No close candidate was found.
+                  {active.candidates.length ? "The suggested entry has since been matched to another line. Pick from the other entries below." : "No close candidate was found."}
                 </div>
               ) : (
                 <div style={{ display: "grid", gap: 8 }}>
-                  {active.candidates.map((c, i) => {
-                    const id = active.candidateIds?.[i];
+                  {liveCandidates(active).map(({ label: c, id }) => {
                     return (
                       <label
                         key={c}
@@ -450,6 +481,33 @@ export default function ExceptionsPage({
                 placeholder="e.g. part payment against invoice 1042"
               />
             </div>
+
+            {active.precedent && (
+              <div data-testid="learned-decision" style={{ background: V.cream, borderLeft: `3px solid ${V.brand}`, borderRadius: 12, padding: "10px 12px", fontSize: 13, display: "grid", gap: 8 }}>
+                <div>
+                  <b>Learned from your team:</b> this line was {active.precedent.action === "ignore" ? "ignored" : "marked reconciled elsewhere"}
+                  {active.precedent.times > 1 ? ` ${active.precedent.times} times` : ""}, last on {formatDate(active.precedent.at.slice(0, 10))}
+                  {active.precedent.note ? <> with the note "{active.precedent.note}"</> : null}. Nothing is applied until you confirm.
+                </div>
+                <div>
+                  <button
+                    className="v2-btn v2-btn-quiet"
+                    onClick={() => {
+                      setNote(active.precedent!.note || "Same as last month");
+                      setConfirmAction(active.precedent!.action === "ignore" ? "ignore" : "reconciled_external");
+                    }}
+                  >
+                    Use the same decision
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {actError && (
+              <div role="alert" data-testid="exception-error" style={{ background: V.warnBg, color: V.maroon, borderRadius: 12, padding: "10px 12px", fontSize: 13 }}>
+                Not saved: {actError}
+              </div>
+            )}
 
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               {confirmAction ? (

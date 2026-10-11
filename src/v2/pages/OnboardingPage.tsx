@@ -365,7 +365,7 @@ export default function OnboardingPage() {
                       </Field>
                     </div>
                     <div className="onb-2col">
-                      <Field label="GSTIN" optional><input className="v2-input" value={client.gstin} onChange={(e) => setClient({ ...client, gstin: e.target.value })} placeholder="27AABCS1429B1ZP" /></Field>
+                      <Field label="GSTIN" optional><input className="v2-input v2-mono" value={client.gstin} onChange={(e) => setClient({ ...client, gstin: e.target.value })} placeholder="27AABCS1429B1ZP" /></Field>
                       <Field label="WhatsApp number" optional><input className="v2-input" value={client.phone} onChange={(e) => setClient({ ...client, phone: e.target.value })} placeholder="919820011223" /></Field>
                     </div>
                   </div>

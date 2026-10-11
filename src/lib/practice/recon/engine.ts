@@ -868,11 +868,33 @@ function explain(
   }
   const ratio =
     Math.min(t.amount, best.o.amount) / Math.max(t.amount, best.o.amount);
-  if (best.explanation.counterparty_score >= 0.6 && ratio < 0.97) {
+  const sameParty = best.explanation.counterparty_score >= 0.6;
+  // A bank charge, interest or tax line is not an "amount mismatch" against an
+  // unrelated party's bill: it simply has no entry in the books yet.
+  if (!sameParty && (tag || ratio < 0.5)) {
+    return {
+      ...base,
+      candidates: tag ? [] : candidates,
+      reason_code: "no_candidate",
+      detail: tag
+        ? `Tagged as ${tag.replace(/_/g, " ")} with no matching entry in the ${t.side === "bank" ? "books" : "bank"}. Book it or mark it reconciled.`
+        : `No ${t.side === "bank" ? "book entry" : "bank line"} has a comparable amount; the nearest is ${fmt(best.o.amount)} for another party.`,
+    };
+  }
+  const bankAmount = t.side === "bank" ? t.amount : best.o.amount;
+  const bookAmount = t.side === "bank" ? best.o.amount : t.amount;
+  if (sameParty && ratio < 0.97 && bankAmount < bookAmount) {
     return {
       ...base,
       reason_code: "partial_payment_suspect",
-      detail: `Same party, but ${fmt(t.amount)} against ${fmt(best.o.amount)}. Possibly a part payment.`,
+      detail: `Same party, but ${fmt(bankAmount)} in the bank against ${fmt(bookAmount)} in the books. Possibly a part payment.`,
+    };
+  }
+  if (sameParty && bankAmount > bookAmount) {
+    return {
+      ...base,
+      reason_code: "amount_mismatch",
+      detail: `Same party, but the bank shows ${fmt(bankAmount - bookAmount)} more than the books (${fmt(bankAmount)} against ${fmt(bookAmount)}). An overpayment, or a payment covering more than one bill.`,
     };
   }
   return {

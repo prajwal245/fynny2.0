@@ -8,6 +8,7 @@ import { AgentGlyph, AgentStatusBadge, AgentTimeline, AnimatedCounter, Processin
 import { useV2 } from "../store";
 import { CloseProgress, NextAction } from "../components/CloseProgress";
 import { AgentRunsCard } from "../components/AgentRuns";
+import { ReconGuide } from "../components/ReconGuide";
 import DocumentsPage from "./DocumentsPage";
 import ReviewPage from "./ReviewPage";
 import ExceptionsPage from "./ExceptionsPage";
@@ -69,7 +70,9 @@ export default function ClientWorkspacePage() {
   const clientRuns = runs.filter((r) => r.target === client.id || r.clientId === client.id);
   const reconRunning = clientRuns.some((r) => r.agent === "recon" && r.status === "running");
   const narrateRunning = clientRuns.some((r) => r.agent === "narrate" && r.status === "running");
-  const result = recon[client.id];
+  // The last run only describes this card when it was for the month on screen.
+  const result = recon[client.id]?.period && recon[client.id]?.period !== period ? undefined : recon[client.id];
+  const periodEx = cEx.filter((e) => !range || (e.date >= range.start && e.date <= range.end));
 
   const status = cEx.length > 0
     ? { label: "Needs attention", tone: "bad" as const }
@@ -88,14 +91,6 @@ export default function ClientWorkspacePage() {
         action={<Badge tone={status.tone}>{status.label}</Badge>}
       />
 
-      <div style={{ display: "grid", gap: 12, marginBottom: clientRuns.length ? 18 : 0 }}>
-        <AnimatePresence>
-          {clientRuns.map((r) => (
-            <ProcessingCard key={r.id} run={r} onDismiss={() => dismissRun(r.id)} />
-          ))}
-        </AnimatePresence>
-      </div>
-
       <Tabs
         value={tab}
         onChange={setTab}
@@ -111,8 +106,18 @@ export default function ClientWorkspacePage() {
         ]}
       />
 
+      {/* Live agent cards sit under the tabs, so closing one never moves the tabs under the cursor. */}
+      <div style={{ display: "grid", gap: 12, marginBottom: clientRuns.length ? 18 : 0 }}>
+        <AnimatePresence>
+          {clientRuns.map((r) => (
+            <ProcessingCard key={r.id} run={r} onDismiss={() => dismissRun(r.id)} />
+          ))}
+        </AnimatePresence>
+      </div>
+
       {tab === "overview" && (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+          <ReconGuide clientId={client.id} onUpload={() => setTab("documents")} />
           {isReadyForMis(client.id, period) && cEx.length === 0 && cReview.length === 0 && !cReports.some((r) => r.period === period) && (
             <Card style={{ marginBottom: 18, background: "rgba(31,90,70,0.07)", borderColor: "rgba(31,90,70,0.25)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -166,11 +171,12 @@ export default function ClientWorkspacePage() {
 
       {tab === "recon" && (
         <>
+          <ReconGuide clientId={client.id} onUpload={() => setTab("documents")} />
           <div className="v2-grid-cards" style={{ marginBottom: 18 }}>
             <Stat label="Bank transactions" value={<AnimatedCounter value={bankSide.length} />} hint={`Dated in ${period}`} />
             <Stat label="Book transactions" value={<AnimatedCounter value={bookSide.length} />} hint={`Dated in ${period}`} />
-            <Stat label="Matched" value={<AnimatedCounter value={matchedBank} />} tone="good" hint={result ? `Last run ${formatDate(result.at)}` : "Run recon to match"} />
-            <Stat label="Unmatched" value={<AnimatedCounter value={bankSide.length - matchedBank - ignoredBank} />} tone={bankSide.length - matchedBank - ignoredBank ? "bad" : "neutral"} hint={`${cEx.length} open exception${cEx.length === 1 ? "" : "s"}`} onClick={() => setTab("exceptions")} />
+            <Stat label="Matched" value={<AnimatedCounter value={matchedBank} />} tone="good" hint={result ? `Last run ${formatDate(result.at)}` : matchedBank ? `Matched in ${period}` : "Run recon to match"} />
+            <Stat label="Unmatched" value={<AnimatedCounter value={bankSide.length - matchedBank - ignoredBank} />} tone={bankSide.length - matchedBank - ignoredBank ? "bad" : "neutral"} hint={`${periodEx.length} open exception${periodEx.length === 1 ? "" : "s"} in ${period}`} onClick={() => setTab("exceptions")} />
           </div>
           <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap", alignItems: "center" }}>
             <button

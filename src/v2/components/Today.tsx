@@ -28,7 +28,7 @@ const TONE_BG: Record<NeedsItem["tone"], string> = {
   info: "rgba(74,143,191,.12)",
   good: "rgba(31,90,70,.12)",
 };
-const TONE_FG: Record<NeedsItem["tone"], string> = { bad: V.maroon, warn: "#8A5A00", info: "#1B4763", good: V.green };
+const TONE_FG: Record<NeedsItem["tone"], string> = { bad: V.maroon, warn: V.warnFg, info: V.brandDeep, good: V.green };
 
 export function greeting(name: string) {
   const h = new Date().getHours();

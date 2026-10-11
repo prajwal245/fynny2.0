@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
-import { CheckCircle2 } from "lucide-react";
+import { Check, CheckCircle2, PencilLine, Trash2 } from "lucide-react";
+import { ReviewGuide } from "../components/ReviewGuide";
 import {
   Badge,
   Card,
@@ -149,6 +150,8 @@ export default function ReviewPage({
           </button>
         )}
       </div>
+
+      <ReviewGuide items={list} />
 
       {list.length === 0 ? (
         <EmptyState
@@ -378,13 +381,13 @@ export default function ReviewPage({
                 className="v2-btn v2-btn-primary"
                 onClick={() => confirm(false)}
               >
-                Confirm
+                <Check size={15} /> Confirm
               </button>
               <button
                 className="v2-btn v2-btn-ghost"
                 onClick={() => confirm(true)}
               >
-                Save edits and confirm
+                <PencilLine size={15} /> Save edits and confirm
               </button>
               <button
                 className="v2-btn v2-btn-ghost"
@@ -394,7 +397,7 @@ export default function ReviewPage({
                   setOpen(null);
                 }}
               >
-                Discard
+                <Trash2 size={15} /> Discard
               </button>
             </div>
           </div>

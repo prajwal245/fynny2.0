@@ -31,6 +31,7 @@ import {
   registerPracticeUpload,
   requestPracticeReportCorrection,
   resolvePracticeException,
+  reopenPracticeException,
   savePracticeFirm,
   resolvePracticeReview,
   runPracticeRecon,
@@ -88,6 +89,8 @@ export type Doc = {
   duplicateCount?: number;
   sender?: string;
   subject?: string;
+  /** GST/TDS/payroll/gateway files: summarised, not reconciled. */
+  register?: { kind: string; label: string; entries: number; totals: { label: string; amount: number }[]; groups?: { key: string; amount: number; count: number }[]; note: string };
 };
 
 export type ReviewItem = {
@@ -125,6 +128,9 @@ export type Exception = {
   stage?: string;
   candidates: string[];
   candidateIds?: string[];
+  candidateAmounts?: number[];
+  /** The bank line or book entry this exception is about. */
+  txnId?: string;
   status: "open" | "resolved" | "ignored";
 };
 
@@ -141,6 +147,9 @@ export type Report = {
   revenue: number;
   expenses: number;
   sources: { revenue: Txn[]; expenses: Txn[] };
+  /** Cash that moved but is not revenue or expense: taxes, advances, loans, transfers. */
+  otherFlows?: { key: string; label: string; direction: "in" | "out"; amount: number; count: number; rows: Txn[] }[];
+  signedOffWithOpen?: { exceptions: number; review: number; unmatched: number } | null;
   insights: {
     text: string;
     source: string;
@@ -268,6 +277,12 @@ function periodList() {
   return out;
 }
 export const PERIODS = periodList();
+const monthKey = (d: Date) => d.getFullYear() * 100 + d.getMonth();
+/** "2025-07-14" → "July 2025". */
+export function monthOf(iso: string): string | null {
+  const d = new Date(`${iso.slice(0, 10)}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? null : d.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+}
 /** The month being closed: in the first half of a month that is still last month. */
 export const DEFAULT_PERIOD = new Date().getDate() <= 15 ? PERIODS[1] : PERIODS[0];
 
@@ -288,8 +303,21 @@ const safeName = (s: string) =>
   s.replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 120) || "document";
 /** Set by the provider: called when the server rejects an expired session. */
 let onSessionEnded: (() => void) | null = null;
+/** Any thrown value as words: Error, a server error object, or a plain string. Never "[object Object]". */
+function messageOf(e: unknown): string {
+  if (e instanceof Error && typeof e.message === "string" && e.message && e.message !== "[object Object]") return e.message;
+  if (typeof e === "string") return e;
+  if (e && typeof e === "object") {
+    const o = e as { message?: unknown; error?: unknown; statusText?: unknown };
+    for (const v of [o.message, o.error, o.statusText]) {
+      if (typeof v === "string" && v) return v;
+      if (v && typeof v === "object" && typeof (v as { message?: unknown }).message === "string") return (v as { message: string }).message;
+    }
+  }
+  return "Something went wrong. Please try again.";
+}
 const errMsg = (e: unknown) => {
-  const m = e instanceof Error ? e.message : String(e);
+  const m = messageOf(e);
   if (/^Unauthorized\b/.test(m)) {
     onSessionEnded?.();
     return "Your session has ended. Please sign in again.";
@@ -362,12 +390,9 @@ type Store = {
   setExceptionStatus: (
     id: string,
     status: Exception["status"],
-    opts?: {
-      action?: "match" | "reconciled_external";
-      counterpartIds?: string[];
-      note?: string;
-    },
-  ) => void;
+    opts?: { action?: "match" | "reconciled_external"; counterpartIds?: string[]; note?: string; allowDifference?: boolean },
+  ) => Promise<boolean>;
+  reopenException: (id: string) => Promise<void>;
   runRecon: (clientId: string, onDone?: (r: ReconResult) => void) => void;
   generateReport: (
     clientId: string,
@@ -383,10 +408,12 @@ type Store = {
   clientName: (id: string) => string;
   clientTxns: (clientId: string) => Txn[];
   matchedTxns: (clientId: string) => Txn[];
-  signOffReport: (reportId: string, by: string) => void;
+  signOffReport: (reportId: string, by: string, opts?: { acknowledgeOpen?: boolean; note?: string }) => Promise<boolean>;
   requestCorrection: (reportId: string, note: string) => void;
   period: string;
   setPeriod: (p: string) => void;
+  /** The last 12 months plus every month that has transactions, newest first. */
+  periods: string[];
   role: Role;
   setRole: (r: Role) => void;
   /** The person's real role in the firm, from the server. */
@@ -456,7 +483,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
         const saved = JSON.parse(raw) as { role?: Role; period?: string; month?: string };
         if (saved.role) setRole(saved.role);
         // A period picked last month is stale: start from the month being closed.
-        if (saved.period && PERIODS.includes(saved.period) && saved.month === PERIODS[0])
+        if (saved.period && /^[A-Za-z]+ \d{4}$/.test(saved.period) && saved.month === PERIODS[0])
           setPeriod(saved.period);
       }
     } catch {
@@ -1062,44 +1089,58 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
     [refresh],
   );
 
+  /** Resolves true when the server accepted the decision. */
   const setExceptionStatus = useCallback(
-    (
+    async (
       id: string,
       status: Exception["status"],
       opts?: {
         action?: "match" | "reconciled_external";
         counterpartIds?: string[];
         note?: string;
+        allowDifference?: boolean;
       },
     ) => {
-      if (status === "open") return;
+      if (status === "open") return false;
       const ex = exceptions.find((e) => e.id === id);
-      setExceptions((p) => p.map((e) => (e.id === id ? { ...e, status } : e)));
       const action =
         status === "ignored"
           ? "ignore"
           : (opts?.action ?? "reconciled_external");
-      void resolvePracticeException({
-        data: {
-          id,
-          action,
-          counterpart_ids:
-            opts?.counterpartIds ??
-            (action === "match" ? ex?.candidateIds?.slice(0, 1) : undefined),
-          note: opts?.note,
-        },
-      })
-        .catch((e) => {
-          setExceptions((p) =>
-            p.map((x) => (x.id === id ? { ...x, status: "open" } : x)),
-          );
-          toast.error(errMsg(e));
-        })
-        .finally(() => {
-          void refresh();
+      const counterpartIds =
+        opts?.counterpartIds ??
+        (action === "match" ? ex?.candidateIds?.slice(0, 1) : undefined);
+      // The counterpart's own exception closes with it (no twin left open).
+      const closing = new Set([id, ...exceptions.filter((e) => e.txnId && counterpartIds?.includes(e.txnId)).map((e) => e.id)]);
+      setExceptions((p) => p.map((e) => (closing.has(e.id) ? { ...e, status } : e)));
+      try {
+        await resolvePracticeException({
+          data: { id, action, counterpart_ids: counterpartIds, note: opts?.note, allow_difference: opts?.allowDifference },
         });
+        return true;
+      } catch (e) {
+        setExceptions((p) => p.map((x) => (closing.has(x.id) ? { ...x, status: "open" } : x)));
+        toast.error(errMsg(e));
+        return false;
+      } finally {
+        void refresh();
+      }
     },
     [exceptions, refresh],
+  );
+
+  const reopenException = useCallback(
+    async (id: string) => {
+      try {
+        await reopenPracticeException({ data: { id } });
+        toast.success("Undone. The line is back in the queue.");
+      } catch (e) {
+        toast.error(errMsg(e));
+      } finally {
+        void refresh();
+      }
+    },
+    [refresh],
   );
 
   const clientTxns = useCallback(
@@ -1164,21 +1205,19 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
   );
 
   /** Stage 7 — the partner either accepts the MIS or sends it back. */
+  /** Resolves true when signed off; the server refuses open items unless acknowledged. */
   const signOffReport = useCallback(
-    (reportId: string, by: string) => {
-      setReports((p) =>
-        p.map((r) =>
-          r.id === reportId
-            ? { ...r, signedOff: { by, at: today() }, correction: undefined }
-            : r,
-        ),
-      );
-      void signOffPracticeReport({ data: { id: reportId, by } })
-        .then(() => toast.success("Report signed off"))
-        .catch((e) => toast.error(errMsg(e)))
-        .finally(() => {
-          void refresh();
-        });
+    async (reportId: string, by: string, opts: { acknowledgeOpen?: boolean; note?: string } = {}) => {
+      try {
+        await signOffPracticeReport({ data: { id: reportId, by, acknowledge_open: opts.acknowledgeOpen, note: opts.note } });
+        toast.success("Report signed off");
+        return true;
+      } catch (e) {
+        toast.error(errMsg(e));
+        return false;
+      } finally {
+        void refresh();
+      }
     },
     [refresh],
   );
@@ -1279,6 +1318,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
             business_id: c.clientId,
             type: c.type,
             contact: c.contact,
+            email: c.email?.trim() || undefined,
             phone: c.phone || undefined,
             due: c.due || null,
             note: c.note || undefined,
@@ -1500,6 +1540,23 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
     [docs, review, exceptions, chases, recon, reports, period],
   );
 
+  // Any month with data can be opened, however old (not just the last 12).
+  const periods = useMemo(() => {
+    const keyed = new Map<string, number>();
+    PERIODS.forEach((p, i) => {
+      const d = new Date();
+      keyed.set(p, monthKey(new Date(d.getFullYear(), d.getMonth() - i, 1)));
+    });
+    for (const doc of docs)
+      for (const r of doc.rows) {
+        if (!r.date) continue;
+        const label = monthOf(r.date);
+        if (label && !keyed.has(label)) keyed.set(label, monthKey(new Date(`${r.date.slice(0, 10)}T00:00:00`)));
+      }
+    if (!keyed.has(period)) keyed.set(period, -1);
+    return [...keyed.entries()].sort((a, b) => b[1] - a[1]).map(([p]) => p);
+  }, [docs, period]);
+
   const value = useMemo<Store>(
     () => ({
       hydrated,
@@ -1532,6 +1589,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       addDoc,
       resolveReview,
       setExceptionStatus,
+      reopenException,
       runRecon,
       generateReport,
       addChase,
@@ -1545,6 +1603,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
         clients.find((c) => c.id === id)?.name ?? "Unassigned",
       period,
       setPeriod,
+      periods,
       role,
       setRole,
       firmRole,
@@ -1568,6 +1627,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       signOffReport,
       requestCorrection,
       period,
+      periods,
       role,
       activity,
       activityFor,
@@ -1597,6 +1657,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       addDoc,
       resolveReview,
       setExceptionStatus,
+      reopenException,
       runRecon,
       generateReport,
       addChase,

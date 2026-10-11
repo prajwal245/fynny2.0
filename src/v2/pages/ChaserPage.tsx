@@ -17,7 +17,17 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
   const [creating, setCreating] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("All");
-  const [form, setForm] = useState({ clientId: scopedClient ?? clients[0]?.id ?? "", type: TYPES[0], contact: "", phone: "", due: "", note: "" });
+  const [form, setForm] = useState({ clientId: scopedClient ?? clients[0]?.id ?? "", type: TYPES[0], contact: "", email: "", phone: "", due: "", note: "" });
+  // Chases go by email: start from the client's saved contact, editable.
+  const forClient = (id: string) => {
+    const c = clients.find((x) => x.id === id);
+    const due = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10);
+    return { clientId: id, contact: c?.contactName || c?.name || "", email: c?.email ?? "", phone: c?.phone ?? "", due };
+  };
+  const openCreate = () => {
+    setForm((f) => ({ ...f, type: TYPES[0], note: "", ...forClient(f.clientId || scopedClient || clients[0]?.id || "") }));
+    setCreating(true);
+  };
 
   const active = chases.find((c) => c.id === openId) ?? null;
   const rank: Record<Chase["status"], number> = { Escalated: 0, "Following Up": 1, Open: 2, Resolved: 3 };
@@ -27,6 +37,10 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
   const create = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.clientId || !form.contact.trim()) return;
+    if (!form.email.trim() && !form.phone.trim()) {
+      toast.error("Add an email (or a WhatsApp number) so the Chaser can reach the client.");
+      return;
+    }
     addChase(form);
     setCreating(false);
     toast.success("Chase item created. Status is Open.");
@@ -41,13 +55,13 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
     <>
       {scopedClient ? (
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
-          <button className="v2-btn v2-btn-primary" onClick={() => setCreating(true)}><Plus size={15} /> Create chase item</button>
+          <button className="v2-btn v2-btn-primary" onClick={openCreate}><Plus size={15} /> Create chase item</button>
         </div>
       ) : (
         <PageHeader
         title="Chaser"
         subtitle="Polite follow ups, tracked to closure. Two unanswered nudges and it escalates."
-        action={<button className="v2-btn v2-btn-primary" onClick={() => setCreating(true)}><Plus size={15} /> Create chase item</button>}
+        action={<button className="v2-btn v2-btn-primary" onClick={openCreate}><Plus size={15} /> Create chase item</button>}
       />
       )}
 
@@ -70,7 +84,7 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
           icon={<Send size={22} />}
           title="Nothing to chase"
           description="Create a chase item when a client still owes you a statement, a bill or a confirmation."
-          action={<button className="v2-btn v2-btn-primary" onClick={() => setCreating(true)}><Plus size={15} /> Create chase item</button>}
+          action={<button className="v2-btn v2-btn-primary" onClick={openCreate}><Plus size={15} /> Create chase item</button>}
         />
       ) : (
         <div style={{ display: "grid", gap: 12 }}>
@@ -116,7 +130,7 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
         <form onSubmit={create} style={{ display: "grid", gap: 14 }}>
           <div>
             <label className="v2-label">Client</label>
-            <select className="v2-input" value={form.clientId} onChange={(e) => setForm({ ...form, clientId: e.target.value })}>
+            <select className="v2-input" value={form.clientId} onChange={(e) => setForm({ ...form, ...forClient(e.target.value) })}>
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
@@ -128,13 +142,17 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
           </div>
           <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit,minmax(min(180px, 100%), 1fr))" }}>
             <div>
-              <label className="v2-label">Contact</label>
-              <input className="v2-input" value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} required />
+              <label className="v2-label" htmlFor="chase-contact">Contact name</label>
+              <input id="chase-contact" className="v2-input" value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} required />
             </div>
             <div>
-              <label className="v2-label">Phone</label>
-              <input className="v2-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="919820011223" />
+              <label className="v2-label" htmlFor="chase-email">Email · follow-ups go here</label>
+              <input id="chase-email" className="v2-input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="The client's email" />
             </div>
+          </div>
+          <div>
+            <label className="v2-label" htmlFor="chase-phone">WhatsApp number · optional</label>
+            <input id="chase-phone" className="v2-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="With country code" inputMode="tel" />
           </div>
           <div>
             <label className="v2-label">Due date</label>

@@ -194,11 +194,54 @@ describe("recon engine", () => {
       [book("k1", "2026-09-15", 5000, "out", "Rent")],
     );
     expect(gap.exceptions[0].reason_code).toBe("date_gap");
-    const ref = reconcile(
-      [bank("b1", "2026-09-01", 5000, "out", "zzz", "AAA111", "Alpha")],
+  });
+
+  it("matches the only same-amount entry within 2 days even when references differ (QA P0-1)", () => {
+    // A cheque number never equals a Tally voucher number.
+    const out = reconcile(
+      [
+        bank("b1", "2026-08-05", 45000, "out", "CHQ 4521 RENT", "CHQ4521"),
+        bank("b2", "2026-08-07", 18240, "out", "BILLDESK MSEB ELECTRICITY", "UTR8812"),
+        bank("b3", "2026-08-28", 264180.5, "out", "NEFT STAFF SALARY AUG", "N2408"),
+      ],
+      [
+        book("k1", "2026-08-05", 45000, "out", "Office rent August", "PAY-1126", "Shree Properties"),
+        book("k2", "2026-08-08", 18240, "out", "Electricity charges", "PAY-1131", "Maharashtra State Electricity Board"),
+        book("k3", "2026-08-28", 264180.5, "out", "Salary payable", "JV-77", "Salary"),
+      ],
+    );
+    expect(out.matches.map((m) => [m.bank_txn_id, m.book_txn_ids[0]]).sort()).toEqual([["b1", "k1"], ["b2", "k2"], ["b3", "k3"]]);
+    expect(out.matches.find((m) => m.bank_txn_id === "b1")?.stage).toBe("exact");
+    expect(out.exceptions).toHaveLength(0);
+  });
+
+  it("does not pair same amounts when another line could be the match", () => {
+    const out = reconcile(
+      [bank("b1", "2026-09-01", 5000, "out", "zzz", "AAA111", "Alpha"), bank("b2", "2026-09-02", 5000, "out", "qqq", "CCC333", "Gamma")],
       [book("k1", "2026-09-01", 5000, "out", "yyy", "BBB222", "Omega")],
     );
-    expect(ref.exceptions[0].reason_code).toBe("reference_mismatch");
+    expect(out.matches).toHaveLength(0);
+  });
+
+  it("matches a book entry paid in two bank lines by the same party (QA P0-7)", () => {
+    const out = reconcile(
+      [
+        bank("b1", "2026-10-03", 100000, "in", "NEFT CR KAVERI FASHIONS", "", "Kaveri Fashions"),
+        bank("b2", "2026-10-17", 50000, "in", "NEFT CR KAVERI FASHIONS", "", "Kaveri Fashions"),
+      ],
+      [book("k1", "2026-10-02", 150000, "in", "Invoice 2231", "INV-2231", "Kaveri Fashions Pvt Ltd")],
+    );
+    expect(out.matches).toHaveLength(2);
+    expect(new Set(out.matches.map((m) => m.explanation.group)).size).toBe(1);
+    expect(out.exceptions).toHaveLength(0);
+  });
+
+  it("leaves a split unmatched when the party differs", () => {
+    const out = reconcile(
+      [bank("b1", "2026-10-03", 100000, "in", "NEFT CR RAVI TRADERS", "", "Ravi Traders"), bank("b2", "2026-10-17", 50000, "in", "NEFT CR ACME", "", "Acme")],
+      [book("k1", "2026-10-02", 150000, "in", "Invoice 2231", "INV-2231", "Kaveri Fashions Pvt Ltd")],
+    );
+    expect(out.matches).toHaveLength(0);
   });
 
   it("handles 2,000 lines quickly", () => {

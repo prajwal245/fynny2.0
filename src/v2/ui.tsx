@@ -5,64 +5,84 @@ import { createPortal } from "react-dom";
  */
 import { ReactNode, CSSProperties } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { X } from "lucide-react";
 
+/**
+ * Colours come from the FynHelp logo only: its red gradient (#E4302A → #8A1E18),
+ * its cream (#FCEEE4) and the near-black red of the app icon. Green and amber
+ * are kept, muted, for status meaning alone (matched / needs attention).
+ */
 export const V = {
-  bg: "#F8F7F4",
+  bg: "#FFF8F3",
   card: "#FFFFFF",
-  ink: "#141414",
-  body: "rgba(20,20,20,0.62)",
-  muted: "rgba(20,20,20,0.42)",
-  line: "rgba(20,20,20,0.08)",
-  blue: "#D0E4F3",
-  beige: "#F2E0B5",
-  gray: "#F3F3F3",
-  maroon: "#A93838",
-  coral: "#E2673F",
-  green: "#1F5A46",
+  ink: "#2A0F0C",
+  body: "rgba(42,15,12,0.72)",
+  muted: "rgba(42,15,12,0.50)",
+  line: "rgba(138,30,24,0.12)",
+  /** Cream-red tint: active navigation, info chips, icon wells. */
+  blue: "#FBE6DC",
+  /** Warm cream: counts and highlights. */
+  beige: "#F8DCCB",
+  gray: "#FBF1EB",
+  maroon: "#B42424",
+  coral: "#D8302A",
+  green: "#2F6B4F",
+  brand: "#D8302A",
+  brandBright: "#E4302A",
+  brandDeep: "#8A1E18",
+  cream: "#FCEEE4",
+  warnBg: "#FCEBD9",
+  warnFg: "#7A3E0C",
   radius: 18,
   font: "'Space Grotesk','Instrument Sans','Inter',system-ui,sans-serif",
 };
 
 export const V2_STYLES = `
-.v2 { background:${V.bg}; color:${V.ink}; font-family:${V.font}; -webkit-font-smoothing:antialiased; }
+.v2 { background:${V.bg}; color:${V.ink}; font-family:${V.font}; -webkit-font-smoothing:antialiased; font-size:15px; }
 .v2 *, .v2 *::before, .v2 *::after { box-sizing:border-box; }
 .v2 h1,.v2 h2,.v2 h3,.v2 h4 { font-family:${V.font}; margin:0; letter-spacing:-0.02em; font-weight:600; color:${V.ink}; }
 .v2 p,.v2 span,.v2 a,.v2 li,.v2 td,.v2 th,.v2 button,.v2 input,.v2 select,.v2 textarea,.v2 label { font-family:${V.font}; }
 .v2 .num { font-variant-numeric:tabular-nums; }
-.v2-card { background:${V.card}; border:1px solid ${V.line}; border-radius:${V.radius}px; box-shadow:0 1px 2px rgba(20,20,20,.04), 0 12px 30px -26px rgba(20,20,20,.4); }
-.v2-btn { display:inline-flex; align-items:center; gap:8px; border-radius:999px; border:1px solid transparent; font-size:13.5px; font-weight:500; padding:10px 18px; cursor:pointer; text-decoration:none; transition:transform .18s ease, background .2s ease, box-shadow .2s ease; }
+.v2-card { background:${V.card}; border:1px solid ${V.line}; border-radius:${V.radius}px; box-shadow:0 1px 2px rgba(138,30,24,.05), 0 14px 32px -26px rgba(138,30,24,.35); }
+.v2-btn { display:inline-flex; align-items:center; gap:8px; border-radius:999px; border:1px solid transparent; font-size:14px; font-weight:600; padding:10px 18px; cursor:pointer; text-decoration:none; transition:transform .18s ease, background .2s ease, box-shadow .2s ease; }
 .v2-btn:hover { transform:translateY(-1px); }
 .v2-btn:active { transform:translateY(1px) scale(.985); }
-.v2-btn-primary { background:${V.ink}; color:#FFFFFF; }
-.v2-btn-primary:hover { background:#000; }
+.v2-btn-primary { background:linear-gradient(180deg, ${V.brandBright} 0%, ${V.maroon} 100%); color:#FFFFFF; box-shadow:0 1px 0 rgba(255,255,255,.18) inset, 0 6px 16px -10px rgba(138,30,24,.8); }
+.v2-btn-primary:hover { background:linear-gradient(180deg, ${V.brand} 0%, ${V.brandDeep} 100%); }
 .v2-btn-ghost { background:${V.card}; color:${V.ink}; border-color:${V.line}; }
 .v2-btn-ghost:hover { background:${V.gray}; }
-.v2-btn-quiet { background:transparent; color:${V.body}; padding:7px 12px; font-size:12.5px; border-color:${V.line}; }
+.v2-btn-quiet { background:transparent; color:${V.body}; padding:7px 12px; font-size:13px; border-color:${V.line}; }
+.v2-btn-quiet:hover { background:${V.gray}; color:${V.ink}; }
+/* Icon-only buttons: always carry an aria-label and a title. */
+.v2-icon-btn { display:inline-grid; place-items:center; width:34px; height:34px; border-radius:999px; border:1px solid transparent; background:transparent; color:${V.body}; cursor:pointer; transition:background .15s ease, color .15s ease; }
+.v2-icon-btn:hover { background:${V.gray}; color:${V.ink}; }
+.v2-icon-btn:focus-visible { outline:2px solid ${V.brand}; outline-offset:2px; }
 .v2-btn:disabled, .v2-btn[aria-disabled="true"] { opacity:.5; cursor:not-allowed; transform:none !important; }
-.v2-btn:focus-visible, .v2-link:focus-visible, .v2-nav a:focus-visible { outline:2px solid ${V.ink}; outline-offset:2px; }
-.v2-btn-sm { padding:6px 12px; font-size:12.5px; }
-.v2-btn-lg { padding:13px 22px; font-size:14.5px; }
+.v2-btn:focus-visible, .v2-link:focus-visible, .v2-nav a:focus-visible { outline:2px solid ${V.brand}; outline-offset:2px; }
+.v2-btn-sm { padding:6px 12px; font-size:13px; }
+.v2-btn-lg { padding:13px 22px; font-size:15px; }
 .v2-btn-block { width:100%; justify-content:center; }
-.v2-btn-danger { background:transparent; color:${V.maroon}; border-color:rgba(169,56,56,.35); }
-.v2-btn-danger:hover { background:rgba(169,56,56,.06); }
+.v2-btn-danger { background:transparent; color:${V.maroon}; border-color:rgba(180,36,36,.35); }
+.v2-btn-danger:hover { background:rgba(180,36,36,.06); }
 /* Busy: keeps its width, shows a spinner, ignores clicks. */
 .v2-btn[data-busy="true"] { pointer-events:none; position:relative; }
 .v2-btn[data-busy="true"]::before { content:""; width:12px; height:12px; border-radius:999px; border:2px solid currentColor; border-right-color:transparent; animation:v2spin .7s linear infinite; }
 @keyframes v2spin { to { transform:rotate(360deg); } }
 .v2-kbd { display:inline-flex; align-items:center; gap:2px; font-size:11px; font-weight:600; color:${V.muted}; border:1px solid ${V.line}; border-bottom-width:2px; border-radius:6px; padding:1px 6px; background:${V.card}; font-family:inherit; }
-.v2-input:focus { outline:none; border-color:${V.ink}; box-shadow:0 0 0 3px rgba(20,20,20,.08); }
-.v2-input, .v2 select.v2-input, .v2 textarea.v2-input { width:100%; background:${V.card}; border:1px solid ${V.line}; border-radius:12px; padding:10px 13px; font-size:13.5px; color:${V.ink}; outline:none; transition:border-color .18s ease; }
-.v2-label { display:block; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:${V.muted}; margin-bottom:6px; font-weight:600; }
+.v2-input:focus { outline:none; border-color:${V.brand}; box-shadow:0 0 0 3px rgba(216,48,42,.14); }
+.v2-input, .v2 select.v2-input, .v2 textarea.v2-input { width:100%; background:${V.card}; border:1px solid ${V.line}; border-radius:12px; padding:10px 13px; font-size:14.5px; color:${V.ink}; outline:none; transition:border-color .18s ease; }
+.v2-label { display:block; font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; color:${V.muted}; margin-bottom:6px; font-weight:600; }
 .v2-table { width:100%; border-collapse:collapse; }
-.v2-table th { text-align:left; font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:${V.muted}; font-weight:600; padding:12px 16px; border-bottom:1px solid ${V.line}; }
-.v2-table td { padding:14px 16px; font-size:13.5px; color:${V.ink}; border-bottom:1px solid ${V.line}; vertical-align:middle; }
+.v2-table th { text-align:left; font-size:11.5px; letter-spacing:.09em; text-transform:uppercase; color:${V.muted}; font-weight:600; padding:12px 16px; border-bottom:1px solid ${V.line}; }
+.v2-table td { padding:14px 16px; font-size:14px; color:${V.ink}; border-bottom:1px solid ${V.line}; vertical-align:middle; }
 .v2-table tbody tr:last-child td { border-bottom:none; }
 .v2-table tbody tr.clickable:hover { background:${V.gray}; cursor:pointer; }
-.v2-nav a { display:flex; align-items:center; gap:11px; padding:10px 13px; border-radius:12px; font-size:13.5px; color:${V.body}; text-decoration:none; margin-bottom:2px; transition:background .18s ease, color .18s ease; }
+.v2-nav a { display:flex; align-items:center; gap:11px; padding:10px 13px; border-radius:12px; font-size:14.5px; color:${V.body}; text-decoration:none; margin-bottom:2px; transition:background .18s ease, color .18s ease; }
 .v2-nav a:hover { background:${V.gray}; color:${V.ink}; }
-.v2-nav a[data-status="active"] { background:${V.blue}; color:${V.ink}; font-weight:600; }
+.v2-nav a[data-status="active"] { background:${V.blue}; color:${V.brandDeep}; font-weight:600; box-shadow:inset 3px 0 0 ${V.brand}; }
+.v2-nav a[data-status="active"] svg { color:${V.brand}; }
 .v2-scroll { overflow-x:auto; }
-.v2-skel { background:linear-gradient(90deg, ${V.gray} 25%, #ECECEC 50%, ${V.gray} 75%); background-size:200% 100%; animation:v2shimmer 1.3s infinite linear; border-radius:10px; }
+.v2-skel { background:linear-gradient(90deg, ${V.gray} 25%, ${V.cream} 50%, ${V.gray} 75%); background-size:200% 100%; animation:v2shimmer 1.3s infinite linear; border-radius:10px; }
 @keyframes v2shimmer { from { background-position:200% 0; } to { background-position:-200% 0; } }
 .v2-grid-cards { display:grid; gap:16px; grid-template-columns:repeat(auto-fill, minmax(min(280px, 100%), 1fr)); }
 @media (max-width:900px){
@@ -89,10 +109,10 @@ export type Tone = "neutral" | "good" | "warn" | "bad" | "info";
 
 const TONES: Record<Tone, { bg: string; fg: string }> = {
   neutral: { bg: V.gray, fg: V.body },
-  good: { bg: "rgba(31,90,70,0.10)", fg: V.green },
-  warn: { bg: V.beige, fg: "#6B4E0C" },
-  bad: { bg: "rgba(169,56,56,0.10)", fg: V.maroon },
-  info: { bg: V.blue, fg: "#1B4763" },
+  good: { bg: "rgba(47,107,79,0.11)", fg: V.green },
+  warn: { bg: V.warnBg, fg: V.warnFg },
+  bad: { bg: "rgba(180,36,36,0.10)", fg: V.maroon },
+  info: { bg: V.blue, fg: V.brandDeep },
 };
 
 export function Badge({ tone = "neutral", children }: { tone?: Tone; children: ReactNode }) {
@@ -137,7 +157,7 @@ export function EmptyState({ icon, title, description, action }: { icon?: ReactN
       style={{ padding: "56px 28px", textAlign: "center" }}
     >
       {icon && (
-        <div style={{ width: 52, height: 52, borderRadius: 16, background: V.blue, display: "grid", placeItems: "center", margin: "0 auto 16px", color: "#1B4763" }}>
+        <div style={{ width: 52, height: 52, borderRadius: 16, background: V.blue, display: "grid", placeItems: "center", margin: "0 auto 16px", color: V.brandDeep }}>
           {icon}
         </div>
       )}
@@ -187,18 +207,28 @@ export function Drawer({ open, onClose, title, children }: { open: boolean; onCl
           <motion.aside
             className="v2"
             initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
-            transition={{ type: "spring", stiffness: 320, damping: 34 }}
-            style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "min(560px, 100%)", background: V.card, boxShadow: "-24px 0 60px -40px rgba(0,0,0,.6)", display: "flex", flexDirection: "column" }}
+            // No overshoot: a spring pushed the panel past the edge and clipped it for a moment.
+            transition={{ type: "tween", duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
+            style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "min(560px, 100%)", background: V.card, boxShadow: "-24px 0 60px -40px rgba(0,0,0,.6)", display: "flex", flexDirection: "column", overflowX: "hidden", willChange: "transform" }}
           >
             <div style={{ padding: "18px 22px", borderBottom: `1px solid ${V.line}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
               <h3 style={{ fontSize: 16 }}>{title}</h3>
-              <button className="v2-btn v2-btn-quiet" onClick={onClose}>Close</button>
+              <IconButton label="Close" onClick={onClose}><X size={18} /></IconButton>
             </div>
             <div style={{ padding: 22, overflowY: "auto", flex: 1 }}>{children}</div>
           </motion.aside>
         </div>
       )}
     </AnimatePresence>,
+  );
+}
+
+/** An icon-only button: the label is spoken by screen readers and shown on hover. */
+export function IconButton({ label, onClick, children, disabled, style }: { label: string; onClick?: () => void; children: ReactNode; disabled?: boolean; style?: CSSProperties }) {
+  return (
+    <button type="button" className="v2-icon-btn" aria-label={label} title={label} onClick={onClick} disabled={disabled} style={style}>
+      {children}
+    </button>
   );
 }
 
@@ -221,7 +251,10 @@ export function Modal({ open, onClose, title, children }: { open: boolean; onClo
             transition={{ duration: 0.24, ease: "easeOut" }}
             style={{ position: "relative", width: "min(520px,100%)", padding: 24, maxHeight: "88vh", overflowY: "auto" }}
           >
-            <h3 style={{ fontSize: 17, marginBottom: 16 }}>{title}</h3>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
+              <h3 style={{ fontSize: 17 }}>{title}</h3>
+              <IconButton label="Close" onClick={onClose}><X size={18} /></IconButton>
+            </div>
             {children}
           </motion.div>
         </div>
@@ -240,7 +273,7 @@ export function Tabs({ items, value, onChange }: { items: { value: string; label
             key={i.value}
             onClick={() => onChange(i.value)}
             className="v2-btn"
-            style={{ background: active ? V.ink : V.card, color: active ? "#fff" : V.body, borderColor: active ? V.ink : V.line, padding: "8px 15px", fontSize: 12.5 }}
+            style={{ background: active ? V.brandDeep : V.card, color: active ? "#fff" : V.body, borderColor: active ? V.brandDeep : V.line, padding: "8px 15px", fontSize: 13.5 }}
           >
             {i.label}
             {typeof i.count === "number" && <span style={{ opacity: 0.6 }}>{i.count}</span>}

@@ -18,7 +18,7 @@ import {
   type Db,
   type FirmContext,
 } from "./db.server";
-import { lessonFrom, narrationPattern, partyFromNarration, type Memory } from "./memory";
+import { isDistinctiveName, lessonFrom, narrationPattern, partyFromNarration, type Memory } from "./memory";
 import { autoChaseDue, periodsOf, readyForMis } from "./orchestrate";
 import type { Direction } from "./core";
 
@@ -155,12 +155,23 @@ export async function afterExtraction(
     .select("txn_date")
     .eq("extraction_id", doc.id)
     .limit(5000);
-  const periods = periodsOf((dates ?? []).map((d) => d.txn_date as string)).slice(0, 3);
+  // Every month the document covers (a bulk upload can span a whole year).
+  const periods = periodsOf((dates ?? []).map((d) => d.txn_date as string)).slice(0, 12);
   const results: { period: string; status: string }[] = [];
   for (const period of periods) {
     results.push({ period, status: await chainRecon(db, doc.ca_firm_id, doc.business_id, period) });
   }
   return results;
+}
+
+/** A person confirmed a Review line: its month may now reconcile further. */
+export async function afterReviewConfirmed(db: Db, firmId: string, txnId: string) {
+  const { data: txn } = await db.from("ca_txns").select("business_id, txn_date").eq("id", txnId).eq("ca_firm_id", firmId).maybeSingle();
+  if (!txn?.business_id || !txn.txn_date) return null;
+  const { data: firm } = await db.from("ca_firms").select("auto_recon").eq("id", firmId).maybeSingle();
+  if (firm && firm.auto_recon === false) return null;
+  const [period] = periodsOf([txn.txn_date as string]);
+  return chainRecon(db, firmId, txn.business_id as string, period);
 }
 
 async function chainRecon(db: Db, firmId: string, businessId: string, period: string) {
@@ -339,10 +350,12 @@ export async function learnAlias(
 ) {
   // Bank lines often carry only a narration: learn the name inside it.
   const alias = bank.counterparty?.trim() || partyFromNarration(bank.description);
-  const canonical = book.counterparty?.trim() || book.description?.trim();
+  // Learn only party-to-party names: a book narration ("July salary transfer")
+  // is not a party, and generic words ("against inv") would match anything.
+  const canonical = book.counterparty?.trim();
   if (!alias || !canonical) return null;
   const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-  if (norm(alias) === norm(canonical) || norm(alias).length < 3) return null;
+  if (norm(alias) === norm(canonical) || !isDistinctiveName(alias) || !isDistinctiveName(canonical)) return null;
   const { data: existing } = await db
     .from("ca_counterparty_aliases")
     .select("id, canonical")

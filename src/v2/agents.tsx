@@ -7,16 +7,17 @@
 import { ReactNode, type CSSProperties } from "react";
 import { motion, AnimatePresence, useInView, useReducedMotion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, Check, FileText, GitCompareArrows, PenLine, Send } from "lucide-react";
+import { AlertCircle, Check, FileText, GitCompareArrows, PenLine, Send, X } from "lucide-react";
 import { V } from "./ui";
 
 export type AgentKey = "extract" | "recon" | "narrate" | "chaser";
 
+/** One shade of the logo's red per agent, from bright to deep. */
 export const AGENTS: Record<AgentKey, { name: string; tint: string; ink: string; dot: string; verb: string }> = {
-  extract: { name: "Extract", tint: "#E4F0FA", ink: "#1B4763", dot: "#4A8FBF", verb: "Extracting" },
-  recon: { name: "Recon", tint: "#E1F1EA", ink: "#1F5A46", dot: "#3E8E72", verb: "Matching transactions" },
-  narrate: { name: "Narrate", tint: "#ECE7F6", ink: "#443168", dot: "#7A63B0", verb: "Generating MIS" },
-  chaser: { name: "Chaser", tint: "#FAEFD6", ink: "#6B4E0C", dot: "#C9962A", verb: "Sending follow up" },
+  extract: { name: "Extract", tint: "#FDE8E3", ink: "#9E241D", dot: "#E4302A", verb: "Extracting" },
+  recon: { name: "Recon", tint: "#F8E1DA", ink: "#6E1712", dot: "#B42424", verb: "Matching transactions" },
+  narrate: { name: "Narrate", tint: "#FCEEE4", ink: "#7A3420", dot: "#C8553D", verb: "Generating MIS" },
+  chaser: { name: "Chaser", tint: "#F4E4DF", ink: "#3A0E0A", dot: "#8A1E18", verb: "Sending follow up" },
 };
 
 export const AGENT_STYLES = `
@@ -274,8 +275,8 @@ export function ProcessingCard({ run, onDismiss }: { run: LiveRun; onDismiss?: (
         <span style={{ fontSize: 12, color: V.muted, display: "inline-flex", gap: 10, alignItems: "center" }}>
           <Elapsed from={run.startedAt} to={run.finishedAt} />
           {!run.status.startsWith("run") && onDismiss && (
-            <button className="v2-btn v2-btn-quiet" style={{ padding: "3px 10px", fontSize: 12 }} onClick={onDismiss}>
-              Dismiss
+            <button type="button" className="v2-icon-btn" aria-label="Dismiss" title="Dismiss" style={{ width: 28, height: 28 }} onClick={onDismiss}>
+              <X size={15} />
             </button>
           )}
         </span>

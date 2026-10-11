@@ -133,6 +133,7 @@ const PARTY_WORDS = [
   "supplier",
 ];
 const BALANCE_WORDS = ["balance", "closing balance", "running balance"];
+const VCH_TYPE_WORDS = ["vch type", "voucher type", "vchtype", "voucher type name", "vch typ"];
 const CURRENCY_WORDS = ["currency", "ccy"];
 
 export interface ColumnMap {
@@ -148,6 +149,8 @@ export interface ColumnMap {
   credit: number;
   amount: number;
   type: number;
+  /** Tally voucher type (Receipt, Payment, Sales, Purchase…), when the export has it. */
+  vchType: number;
 }
 
 function findBy(
@@ -200,6 +203,7 @@ export function mapColumns(rows: string[][]): ColumnMap | null {
             )
           : detected.amountIdx,
       type: detected.typeIdx,
+      vchType: findBy(headers, VCH_TYPE_WORDS),
     };
   }
   return null;
@@ -214,7 +218,19 @@ const SUMMARY_LINE =
  * Returns `null` when no header could be recognised, so the caller can fall
  * back to the AI reader instead of guessing.
  */
-export function rowsFromTable(rows: string[][]): ExtractedRow[] | null {
+/**
+ * Direction from a Tally voucher type. Tally's Debit/Credit columns are from
+ * the books' point of view (a Receipt debits the bank), the opposite of a bank
+ * statement, so the voucher type is the reliable signal when present.
+ */
+export function directionFromVoucherType(vch: string): "in" | "out" | null {
+  const v = vch.trim().toLowerCase();
+  if (/^(receipt|sales|sale|debit note)\b/.test(v)) return "in";
+  if (/^(payment|purchase|credit note)\b/.test(v)) return "out";
+  return null;
+}
+
+export function rowsFromTable(rows: string[][], side?: "bank" | "books"): ExtractedRow[] | null {
   const map = mapColumns(rows);
   if (!map) return null;
   const header = rows[map.headerRow];
@@ -233,7 +249,7 @@ export function rowsFromTable(rows: string[][]): ExtractedRow[] | null {
     const dateCell = cell(row, map.date) || cell(row, map.valueDate);
     const date = parseDate(dateCell);
     const description = cell(row, map.description);
-    const signed = round2(
+    let signed = round2(
       normaliseAmount(
         cell(row, map.amount),
         cell(row, map.type),
@@ -241,6 +257,9 @@ export function rowsFromTable(rows: string[][]): ExtractedRow[] | null {
         cell(row, map.credit),
       ),
     );
+
+    const vchDir = side === "books" ? directionFromVoucherType(cell(row, map.vchType)) : null;
+    if (vchDir && signed !== 0) signed = vchDir === "in" ? Math.abs(signed) : -Math.abs(signed);
 
     if (!date && signed === 0) {
       // Continuation of a multi-line narration: keep the text, attach it upward.

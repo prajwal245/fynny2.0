@@ -20,6 +20,7 @@ import { updatePracticePipelineSettings } from "@/lib/practice/practice.function
 import { confirmPendingAccount, createAccount } from "@/lib/accountSignup.functions";
 import { ENTITY_TYPES, useV2 } from "../store";
 import { OnboardingPanel } from "../components/OnboardingPanel";
+import { GmailIcon } from "../components/BrandIcons";
 
 export const STEPS = ["Account", "Firm", "First client", "First document", "You're set"];
 const STEP_HINT = [
@@ -194,8 +195,8 @@ export default function OnboardingPage() {
     try {
       const fid = await firmIdReady();
       if (!fid) throw new Error("Create your practice first");
-      // After Google's consent the partner lands on Today, where the setup checklist shows Gmail connected.
-      try { window.sessionStorage.setItem("fynhelp.gmail.return", "/v2"); } catch { /* private mode */ }
+      // After Google's consent the partner lands in Settings, where the first check runs and shows what it found.
+      try { window.sessionStorage.setItem("fynhelp.gmail.return", "/v2/settings"); } catch { /* private mode */ }
       const { url } = await startGmailConnect({ data: { firmId: fid, origin: window.location.origin } });
       window.location.href = url;
     } catch (e) {
@@ -295,7 +296,7 @@ export default function OnboardingPage() {
                   </p>
                 </div>
                 {expired && mode === "signin" && (
-                  <div role="status" data-testid="session-expired" style={{ fontSize: 13, padding: "10px 12px", borderRadius: 10, background: "#FFF6E5", color: "#7A4B00" }}>
+                  <div role="status" data-testid="session-expired" style={{ fontSize: 13, padding: "10px 12px", borderRadius: 10, background: V.warnBg, color: V.warnFg }}>
                     Your session ended. Sign in again to pick up where you left off.
                   </div>
                 )}
@@ -444,7 +445,7 @@ export default function OnboardingPage() {
                 <Actions>
                   <button className="v2-btn v2-btn-primary v2-btn-lg" onClick={finish}>Open the client workspace <ArrowRight size={15} /></button>
                   <button className="v2-btn v2-btn-ghost" onClick={connectGmail}>
-                    <Mail size={15} /> Connect Gmail
+                    <GmailIcon size={16} /> Connect Gmail
                   </button>
                   <button className="v2-btn v2-btn-quiet" onClick={() => void completeOnboarding().then(() => navigate({ to: "/v2/settings" }))}>
                     <Users size={15} /> Invite your team
@@ -500,7 +501,7 @@ function Actions({ children }: { children: React.ReactNode }) {
 function Intro({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "auto minmax(0,1fr)", gap: 14, alignItems: "start", marginBottom: 4 }}>
-      <span style={{ width: 40, height: 40, borderRadius: 13, background: V.blue, color: "#1B4763", display: "grid", placeItems: "center" }}>{icon}</span>
+      <span style={{ width: 40, height: 40, borderRadius: 13, background: V.blue, color: V.brandDeep, display: "grid", placeItems: "center" }}>{icon}</span>
       <div>
         <h2 style={{ fontSize: 18, letterSpacing: "-0.01em" }}>{title}</h2>
         <p style={{ margin: "5px 0 0", fontSize: 13.5, color: V.body, lineHeight: 1.6 }}>{text}</p>
@@ -552,11 +553,11 @@ const ONB_STYLES = `
 .onb-2col { display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr)); }
 .onb-drop { display:grid; justify-items:center; gap:6px; text-align:center; border:1.5px dashed rgba(20,20,20,.18); border-radius:18px; padding:36px 20px; cursor:pointer; transition:border-color .2s ease, background .2s ease; }
 .onb-drop:hover { border-color:${V.ink}; background:rgba(20,20,20,.02); }
-.onb-drop-icon { width:46px; height:46px; border-radius:14px; background:${V.blue}; color:#1B4763; display:grid; place-items:center; margin-bottom:6px; }
+.onb-drop-icon { width:46px; height:46px; border-radius:14px; background:${V.blue}; color:${V.brandDeep}; display:grid; place-items:center; margin-bottom:6px; }
 .onb-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
 .onb-stat { background:${V.gray}; border-radius:14px; padding:12px 14px; display:grid; gap:2px; font-size:12px; color:${V.body}; }
 .onb-stat .num { font-size:22px; font-weight:600; color:${V.ink}; letter-spacing:-0.02em; }
-.onb-stat[data-tone="warn"] .num { color:#8A5A00; }
+.onb-stat[data-tone="warn"] .num { color:${V.warnFg}; }
 .onb-note { background:${V.gray}; border-radius:14px; padding:12px 14px; font-size:13px; color:${V.body}; line-height:1.55; }
 .onb-result { display:flex; gap:8px; align-items:center; font-weight:600; }
 .onb-toggle, .onb-channel { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:14px; align-items:center; border:1px solid ${V.line}; border-radius:16px; padding:14px 16px; }

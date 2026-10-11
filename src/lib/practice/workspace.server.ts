@@ -185,7 +185,11 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
         list.push({
           id: t.id,
           date: t.txn_date,
-          particulars: t.description || t.counterparty || "Transaction",
+          // Books show the party first (Ravi Enterprises), then the narration.
+          particulars:
+            t.side === "books" && t.counterparty
+              ? `${t.counterparty}${t.description && t.description !== t.counterparty ? ` · ${t.description}` : ""}`
+              : t.description || t.counterparty || "Transaction",
           amount: signedAmount({
             amount: Number(t.amount),
             direction: t.direction,
@@ -203,6 +207,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
     const ex = (r.extracted ?? {}) as {
       source?: string;
       rows?: { date: string; particulars: string; amount: number }[];
+      register?: { kind: string; label: string; entries: number; totals: { label: string; amount: number }[]; groups?: { key: string; amount: number; count: number }[]; note: string };
     };
     docName.set(r.id, r.original_filename ?? "Document");
     const rows =
@@ -238,6 +243,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
         (r.source_metadata as { wa_from?: string } | null)?.wa_from ??
         undefined,
       subject: r.gmail_subject ?? undefined,
+      register: ex.register ?? undefined,
     };
   });
 
@@ -318,6 +324,8 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
           )
         : legacyCandidates,
       candidateIds: cands.map((c) => c.txn_id),
+      candidateAmounts: cands.map((c) => Number(c.amount)),
+      txnId: r.txn_id ?? undefined,
       status: (r.status === "resolved"
         ? "resolved"
         : r.status === "ignored"
@@ -345,6 +353,8 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       variances: (c.variances as unknown) ?? [],
       bankSummary: (c.bankSummary as unknown) ?? [],
       warnings: (c.warnings as string[]) ?? [],
+      otherFlows: (c.other_flows as unknown) ?? [],
+      signedOffWithOpen: (c.signedOffWithOpen as unknown) ?? null,
       signedOff: r.signed_off_at
         ? {
             by: c.signedOffBy ?? "Partner",

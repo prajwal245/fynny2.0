@@ -14,6 +14,7 @@ import { Route as BlogAdminRouteImport } from './routes/_blogAdmin'
 import { Route as CaAuthRouteImport } from './routes/_caAuth'
 import { Route as InternalAdminRouteImport } from './routes/_internalAdmin'
 import { Route as MainRouteImport } from './routes/_main'
+import { Route as SamplesRouteImport } from './routes/samples'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as V2RouteImport } from './routes/v2'
 import { Route as MainIndexRouteImport } from './routes/_main/index'
@@ -221,6 +222,11 @@ const InternalAdminRoute = InternalAdminRouteImport.update({
 } as any)
 const MainRoute = MainRouteImport.update({
   id: '/_main',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SamplesRoute = SamplesRouteImport.update({
+  id: '/samples',
+  path: '/samples',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -1258,6 +1264,7 @@ const AdminAuthAdminProtectedBlogPostIdEditRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof MainIndexRoute
+  '/samples': typeof SamplesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/v2': typeof V2RouteWithChildren
   '/about': typeof MainAboutRoute
@@ -1448,6 +1455,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof MainIndexRoute
+  '/samples': typeof SamplesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/about': typeof MainAboutRoute
   '/ca-firms': typeof MainCaFirmsRoute
@@ -1639,6 +1647,7 @@ export interface FileRoutesById {
   '/_caAuth': typeof CaAuthRouteWithChildren
   '/_internalAdmin': typeof InternalAdminRouteWithChildren
   '/_main': typeof MainRouteWithChildren
+  '/samples': typeof SamplesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/v2': typeof V2RouteWithChildren
   '/_main/about': typeof MainAboutRoute
@@ -1832,6 +1841,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/samples'
     | '/sitemap.xml'
     | '/v2'
     | '/about'
@@ -2022,6 +2032,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/samples'
     | '/sitemap.xml'
     | '/about'
     | '/ca-firms'
@@ -2212,6 +2223,7 @@ export interface FileRouteTypes {
     | '/_caAuth'
     | '/_internalAdmin'
     | '/_main'
+    | '/samples'
     | '/sitemap.xml'
     | '/v2'
     | '/_main/about'
@@ -2408,6 +2420,7 @@ export interface RootRouteChildren {
   CaAuthRoute: typeof CaAuthRouteWithChildren
   InternalAdminRoute: typeof InternalAdminRouteWithChildren
   MainRoute: typeof MainRouteWithChildren
+  SamplesRoute: typeof SamplesRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   V2Route: typeof V2RouteWithChildren
   DemoSplatRoute: typeof DemoSplatRoute
@@ -2465,6 +2478,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof MainRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/samples': {
+      id: '/samples'
+      path: '/samples'
+      fullPath: '/samples'
+      preLoaderRoute: typeof SamplesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sitemap.xml': {
@@ -4237,6 +4257,7 @@ const rootRouteChildren: RootRouteChildren = {
   CaAuthRoute: CaAuthRouteWithChildren,
   InternalAdminRoute: InternalAdminRouteWithChildren,
   MainRoute: MainRouteWithChildren,
+  SamplesRoute: SamplesRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   V2Route: V2RouteWithChildren,
   DemoSplatRoute: DemoSplatRoute,

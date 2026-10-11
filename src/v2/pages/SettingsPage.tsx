@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,11 +18,13 @@ import { Badge, Card, PageHeader, V, formatDate } from "../ui";
 import { RowSkeleton, ShimmerText } from "../agents";
 import { useV2 } from "../store";
 import { AgentSettings } from "../components/AgentSettings";
+import { GmailHealth } from "../components/GmailHealth";
+import { GmailIcon, WhatsAppIcon } from "../components/BrandIcons";
 
 type Team = Awaited<ReturnType<typeof listPracticeTeam>>;
 type Integrations = Awaited<ReturnType<typeof getPracticeIntegrations>>;
 
-const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const errMsg = (e: unknown) => (e instanceof Error && e.message && e.message !== "[object Object]" ? e.message : typeof e === "string" ? e : "Something went wrong. Please try again.");
 
 function Section({
   title,
@@ -80,6 +82,12 @@ export default function SettingsPage() {
   const [wa, setWa] = useState({ phoneNumberId: "", display: "" });
   const [profileName, setProfileName] = useState(session?.name ?? "");
   const [busy, setBusy] = useState<string | null>(null);
+  const [gmailResult, setGmailResult] = useState<string | null>(null);
+  // Back from Google: check the inbox straight away and show the health check.
+  const [justConnected] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("gmail") === "connected";
+  });
 
   const startGmail = useServerFn(startGmailConnect);
   const pollGmail = useServerFn(pollGmailNow);
@@ -148,6 +156,17 @@ export default function SettingsPage() {
       else toast.success(`Invite emailed to ${invite.email}`);
       setInvite({ ...invite, email: "" });
     });
+
+  // The first check right after connecting, so the partner sees it working.
+  const firstCheck = useRef(false);
+  useEffect(() => {
+    if (!justConnected || !firmId || firstCheck.current) return;
+    firstCheck.current = true;
+    void pollGmail({ data: { firmId, origin: window.location.origin } })
+      .then((r) => setGmailResult(r.detail))
+      .catch((e) => setGmailResult(errMsg(e)))
+      .finally(() => void load());
+  }, [justConnected, firmId, pollGmail, load]);
 
   const connectGmail = () =>
     run("gmail", async () => {
@@ -327,7 +346,7 @@ export default function SettingsPage() {
                 >
                   {team.roles.map((r) => (
                     <option key={r} value={r}>
-                      {r[0].toUpperCase() + r.slice(1)}
+                      {r === "partner" ? "Partner · can sign off reports" : r === "junior" ? "Junior · prepares, cannot sign off" : r[0].toUpperCase() + r.slice(1)}
                     </option>
                   ))}
                 </select>
@@ -358,11 +377,11 @@ export default function SettingsPage() {
           <div style={{ display: "grid", gap: 12 }}>
             <Row>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 600 }}>Gmail</div>
+                <div style={{ fontSize: 14.5, fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}><GmailIcon size={18} /> Gmail</div>
                 {intg.gmail.connections.length === 0 ? (
                   <div style={{ fontSize: 12.5, color: V.body, marginTop: 3 }}>
-                    Pull statements and bills your clients email to the firm
-                    inbox, every 15 minutes.
+                    Statements and bills your clients email to the firm inbox
+                    come in on their own, every few minutes.
                   </div>
                 ) : (
                   intg.gmail.connections.map((c) => (
@@ -417,9 +436,10 @@ export default function SettingsPage() {
                                 origin: window.location.origin,
                               },
                             });
-                            if (!r.ok) throw new Error(r.detail);
-                            // Say what was found, not just that it ran.
-                            toast.success(r.detail);
+                            // Say what was found, not just that it ran; keep it on screen.
+                            setGmailResult(r.detail);
+                            if (r.ok) toast.success(r.detail);
+                            else toast.error(r.detail);
                           },
                         )
                       }
@@ -470,10 +490,14 @@ export default function SettingsPage() {
               </div>
             </Row>
 
+            {intg.gmail.available && firmId && (
+              <GmailHealth firmId={firmId} lastResult={gmailResult} autoRun={justConnected} />
+            )}
+
             <Row>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 600 }}>
-                  WhatsApp Business
+                <div style={{ fontSize: 14.5, fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+                  <WhatsAppIcon size={18} /> WhatsApp Business
                 </div>
                 <div style={{ fontSize: 12.5, color: V.body, marginTop: 3 }}>
                   Clients send documents to your official WhatsApp Business

@@ -5,6 +5,7 @@
  * a bank line can be in only one live match, and each transaction has at most
  * one open exception which is updated in place.
  */
+import { isDistinctiveName } from "./memory";
 import {
   PracticeError,
   parsePeriod,
@@ -67,7 +68,8 @@ async function firmRules(
   ]);
   return {
     rules: [...((rules ?? []) as ReconRule[]), ...DEFAULT_RULES],
-    aliases: aliases ?? [],
+    // Older learned aliases made of generic words ("against inv") would match anything.
+    aliases: (aliases ?? []).filter((a: { alias: string }) => isDistinctiveName(a.alias)),
   };
 }
 
@@ -105,6 +107,19 @@ export interface ReconSummary {
   matched_by_stage: Record<string, number>;
   exceptions_by_reason: Record<string, number>;
   message: string;
+}
+
+/** "7 already matched; this run matched 5 more of 12 (4 same amount and date, 1 part payment). 2 need a decision." */
+function reconMessage(written: number, open: number, already: number, byStage: Record<string, number>, exceptions: number) {
+  const how = [
+    byStage.exact ? `${byStage.exact} same amount and date` : "",
+    byStage.fuzzy ? `${byStage.fuzzy} close match${byStage.fuzzy === 1 ? "" : "es"}` : "",
+    byStage.rules ? `${byStage.rules} by rules or part payments` : "",
+  ].filter(Boolean);
+  const head = already
+    ? `${already} bank line${already === 1 ? " was" : "s were"} already matched; this run matched ${written} of the ${open} still open`
+    : `${written} of ${open} bank lines matched`;
+  return `${head}${how.length ? ` (${how.join(", ")})` : ""}. ${exceptions ? `${exceptions} exception${exceptions === 1 ? "" : "s"} need a decision.` : "Nothing left to decide."}`;
 }
 
 export async function runRecon(
@@ -348,7 +363,7 @@ export async function runRecon(
     exceptions: outcome.exceptions.length,
     matched_by_stage: outcome.stats.matched_by_stage,
     exceptions_by_reason: outcome.stats.exceptions_by_reason,
-    message: `${written} of ${bank.length} bank lines matched (${outcome.stats.matched_by_stage.exact} exact, ${outcome.stats.matched_by_stage.fuzzy} fuzzy, ${outcome.stats.matched_by_stage.rules} by rules). ${outcome.exceptions.length} exception${outcome.exceptions.length === 1 ? "" : "s"} need a decision.`,
+    message: reconMessage(written, bank.length, alreadyMatched ?? 0, outcome.stats.matched_by_stage, outcome.exceptions.length),
   };
   await db
     .from("ca_recon_runs")
@@ -408,6 +423,7 @@ export async function resolveException(
   action: ExceptionAction,
   counterpartIds: string[] = [],
   note?: string,
+  opts: { allowDifference?: boolean } = {},
 ) {
   const { data: ex } = await db
     .from("ca_exceptions")
@@ -555,10 +571,10 @@ export async function resolveException(
   const all = [txn, ...parts];
   const bankSide = all.filter((t) => t.side === "bank");
   const bookSide = all.filter((t) => t.side === "books");
-  if (bankSide.length !== 1 || bookSide.length < 1)
+  if (!bankSide.length || !bookSide.length || (bankSide.length > 1 && bookSide.length > 1))
     throw new PracticeError(
       "invalid",
-      "A match needs exactly one bank line and at least one book entry.",
+      "Match one bank line with one or more book entries, or several bank lines with one book entry.",
     );
   if (all.some((t) => t.direction !== txn.direction))
     throw new PracticeError(
@@ -567,23 +583,38 @@ export async function resolveException(
     );
   const diff =
     Math.abs(
-      toPaise(bankSide[0].amount) -
+      bankSide.reduce((s, b) => s + toPaise(b.amount), 0) -
         bookSide.reduce((s, b) => s + toPaise(b.amount), 0),
     ) / 100;
+  // A difference is never accepted silently: the person confirms it with a reason.
+  if (diff > 0 && !opts.allowDifference)
+    throw new PracticeError(
+      "needs_confirmation",
+      `These entries differ by ₹${diff.toLocaleString("en-IN")}. Add the other part of the payment, or confirm the difference with a note.`,
+    );
+  if (diff > 0 && !note?.trim())
+    throw new PracticeError("invalid", "Add a note saying why the amounts differ.");
 
-  const { error } = await db.from("ca_recon_matches").insert({
-    ca_firm_id: ctx.firmId,
-    business_id: ex.business_id,
-    period_start: ex.period_start,
-    period_end: ex.period_end,
-    bank_txn_id: bankSide[0].id,
-    book_txn_ids: bookSide.map((b) => b.id),
-    match_stage: "manual",
-    match_score: 1,
-    explanation: { amount_diff: round2(diff), note: note ?? null },
-    matched_by: ctx.userId,
-    notes: note ?? null,
-  });
+  const group = bankSide.length > 1 ? `manual:${bookSide[0].id}` : undefined;
+  const { error } = await db.from("ca_recon_matches").insert(
+    bankSide.map((bk, i) => ({
+      ca_firm_id: ctx.firmId,
+      business_id: ex.business_id,
+      period_start: ex.period_start,
+      period_end: ex.period_end,
+      bank_txn_id: bk.id,
+      book_txn_ids: bookSide.map((b) => b.id),
+      match_stage: "manual",
+      match_score: 1,
+      explanation: {
+        amount_diff: round2(diff),
+        note: note ?? null,
+        ...(group ? { group, part: `${i + 1} of ${bankSide.length}` } : {}),
+      },
+      matched_by: ctx.userId,
+      notes: note ?? null,
+    })),
+  );
   if (error)
     throw new PracticeError(
       /duplicate key/i.test(error.message) ? "conflict" : "db_error",
@@ -622,8 +653,9 @@ export async function resolveException(
     `Matched manually: ${txn.description ?? ""} with ${parts.length} entr${parts.length === 1 ? "y" : "ies"}${diff ? ` (difference ₹${diff})` : ""}.`,
   );
   // Memory: a person matched two differently named parties, so the rules
-  // stage can match them by itself next time.
-  if (bookSide.length === 1) {
+  // stage can match them by itself next time. Only from clean one-to-one
+  // matches: a difference or a split says nothing reliable about names.
+  if (bookSide.length === 1 && bankSide.length === 1 && diff === 0) {
     const { learnAlias } = await import("./orchestrator.server");
     await learnAlias(db, ctx, bankSide[0], bookSide[0]).catch(() => null);
   }
@@ -644,6 +676,19 @@ export async function reverseMatch(
     .maybeSingle();
   if (!m) throw new PracticeError("not_found", "Match not found.");
   if (m.status !== "active") return { status: m.status };
+  // A part payment is several rows sharing one book entry: reverse them together.
+  const group = (m.explanation as { group?: string } | null)?.group;
+  let rows = [m];
+  if (group) {
+    const { data: siblings } = await db
+      .from("ca_recon_matches")
+      .select("*")
+      .eq("ca_firm_id", ctx.firmId)
+      .eq("business_id", m.business_id)
+      .eq("status", "active")
+      .contains("explanation", { group });
+    if (siblings?.length) rows = siblings;
+  }
   await db
     .from("ca_recon_matches")
     .update({
@@ -652,11 +697,11 @@ export async function reverseMatch(
       reversed_at: new Date().toISOString(),
       notes: note ?? m.notes,
     })
-    .eq("id", m.id);
+    .in("id", rows.map((r) => r.id));
   await db
     .from("ca_txns")
     .update({ match_status: "unmatched" })
-    .in("id", [m.bank_txn_id, ...(m.book_txn_ids ?? [])]);
+    .in("id", [...new Set(rows.flatMap((r) => [r.bank_txn_id, ...(r.book_txn_ids ?? [])]))]);
   await logActivity(
     db,
     ctx.firmId,
@@ -742,3 +787,47 @@ export async function transactionHistory(
     exceptions: exceptions.data ?? [],
   };
 }
+
+/**
+ * Undo a decision on an exception: a match made from it is reversed and the
+ * line goes back into the queue, exactly as it was before.
+ */
+export async function reopenException(db: Db, ctx: FirmContext, exceptionId: string) {
+  const { data: ex } = await db
+    .from("ca_exceptions")
+    .select("id, business_id, txn_id, status, resolution_action")
+    .eq("id", exceptionId)
+    .eq("ca_firm_id", ctx.firmId)
+    .maybeSingle();
+  if (!ex) throw new PracticeError("not_found", "Exception not found.");
+  if (ex.status === "open") return { status: "open" };
+  if (ex.txn_id) {
+    const { data: m } = await db
+      .from("ca_recon_matches")
+      .select("id")
+      .eq("ca_firm_id", ctx.firmId)
+      .eq("status", "active")
+      .or(`bank_txn_id.eq.${ex.txn_id},book_txn_ids.cs.{${ex.txn_id}}`)
+      .limit(1)
+      .maybeSingle();
+    if (m) await reverseMatch(db, ctx, m.id, "Undone from the Exception Queue");
+    await db.from("ca_txns").update({ match_status: "exception" }).eq("id", ex.txn_id).neq("match_status", "matched");
+  }
+  // Exceptions closed together with this one (its counterpart) reopen too.
+  const { data: closedTogether } = await db
+    .from("ca_exceptions")
+    .select("id, txn_id")
+    .eq("ca_firm_id", ctx.firmId)
+    .eq("business_id", ex.business_id)
+    .in("status", ["resolved", "ignored"])
+    .eq("resolution_action", ex.resolution_action ?? "")
+    .gte("resolved_at", new Date(Date.now() - 10 * 60 * 1000).toISOString());
+  const ids = [ex.id, ...((closedTogether ?? []).filter((c) => c.txn_id && c.id !== ex.id && ex.resolution_action === "matched_manually").map((c) => c.id))];
+  await db
+    .from("ca_exceptions")
+    .update({ status: "open", resolved_by: null, resolved_at: null, resolution_action: null, resolution_note: null })
+    .in("id", ids);
+  await logActivity(db, ctx.firmId, ex.business_id, "recon", "A decision in the Exception Queue was undone.");
+  return { status: "open" };
+}
+

@@ -71,7 +71,7 @@ export function NextAction({ state, onGo }: { state: CloseState; onGo: () => voi
       }}
     >
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 10.5, letterSpacing: ".14em", textTransform: "uppercase", fontWeight: 700, color: done ? V.green : "#1B4763" }}>
+        <div style={{ fontSize: 10.5, letterSpacing: ".14em", textTransform: "uppercase", fontWeight: 700, color: done ? V.green : V.brandDeep }}>
           Next best action for {period}
         </div>
         <div style={{ fontSize: 16.5, fontWeight: 600, marginTop: 6 }}>{state.next.label}</div>

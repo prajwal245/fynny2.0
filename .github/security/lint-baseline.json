@@ -1,6 +1,6 @@
 {
   "_comment": "Allowlist of Supabase database linter findings that are reviewed and accepted. CI fails on any finding NOT in this list. Each entry is matched on (name, level, metadata.schema, metadata.name) so adding a new policy/function with the same name as an allowlisted one will still be detected.",
-  "_updated": "2026-04-27",
+  "_updated": "2026-10-12",
   "allowed": [
     {
       "name": "function_search_path_mutable",
@@ -22,6 +22,62 @@
       "schema": "auth",
       "object": null,
       "reason": "HaveIBeenPwned check disabled in Lovable Cloud; tracked separately."
+    },
+    {
+      "name": "anon_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "get_shared_mis_report",
+      "reason": "Public share link for an MIS report; the token is the credential."
+    },
+    {
+      "name": "anon_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "increment_blog_views",
+      "reason": "Public blog page counts views for signed-out readers."
+    },
+    {
+      "name": "anon_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "get_ca_invitation",
+      "reason": "Invitation page shows who invited you before you sign in; needs the invitation token."
+    },
+    {
+      "name": "anon_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "check_waitlist_status",
+      "reason": "Signed-out visitors check their waitlist status by email."
+    },
+    {
+      "name": "anon_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "ca_firm_has_client_access",
+      "reason": "Referenced by RLS policies granted to the public role; returns false for anon."
+    },
+    {
+      "name": "anon_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "user_in_ca_firm",
+      "reason": "Referenced by RLS policies granted to the public role; returns false for anon."
+    },
+    {
+      "name": "extension_in_public",
+      "level": "WARN",
+      "schema": "public",
+      "object": "http",
+      "reason": "Installed by the platform in public; moving it would break existing callers. Tracked separately."
+    },
+    {
+      "name": "extension_in_public",
+      "level": "WARN",
+      "schema": "public",
+      "object": "pg_net",
+      "reason": "Installed by the platform in public; moving it would break existing callers. Tracked separately."
     }
   ]
 }

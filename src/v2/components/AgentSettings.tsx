@@ -151,18 +151,31 @@ export function AgentSettings() {
         ) : (
           <div style={{ display: "grid", gap: 10 }}>
             {memory.lessons.map((m) => {
-              const lesson = m.lesson as { direction?: string; counterparty?: string; description?: string };
+              const lesson = m.lesson as { direction?: string; counterparty?: string; description?: string; action?: string; note?: string };
+              // Recon decisions are stored as "side:direction:pattern"; extract lessons as the pattern.
+              const decision = (m as { kind?: string }).kind === "recon_decision";
+              const [side, , ...rest] = decision ? m.pattern.split(":") : [];
+              const pattern = decision ? rest.join(":") : m.pattern;
               return (
-                <div key={m.id} style={row} data-memory="lesson">
+                <div key={m.id} style={row} data-memory={decision ? "decision" : "lesson"}>
                   <div>
                     <div style={{ fontWeight: 600 }}>
-                      Lines like “{m.pattern}”
+                      {decision ? `${side === "books" ? "Book entries" : "Bank lines"} like “${pattern}”` : <>Lines like “{pattern}”</>}
                       <span style={{ fontWeight: 400, color: V.muted }}> · {clientName(m.business_id)}</span>
                     </div>
                     <div style={{ fontSize: 12.5, color: V.body, marginTop: 3 }}>
-                      {lesson.direction === "out" ? "Money out" : "Money in"}
-                      {lesson.counterparty ? `, party ${lesson.counterparty}` : ""}
-                      {lesson.description ? `, described as “${lesson.description}”` : ""}
+                      {decision ? (
+                        <>
+                          Recon proposes: {lesson.action === "ignore" ? "Ignore" : "Reconciled elsewhere"}
+                          {lesson.note ? ` · “${lesson.note}”` : ""}
+                        </>
+                      ) : (
+                        <>
+                          {lesson.direction === "out" ? "Money out" : "Money in"}
+                          {lesson.counterparty ? `, party ${lesson.counterparty}` : ""}
+                          {lesson.description ? `, described as “${lesson.description}”` : ""}
+                        </>
+                      )}
                     </div>
                     <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
                       <Badge>Taught {m.times_taught}×</Badge>

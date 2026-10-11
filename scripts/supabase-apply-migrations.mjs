@@ -46,6 +46,17 @@ const exitWith = (msg) => {
   process.exit(1);
 };
 
+// Report where the database lives, so the app's server functions can run next to it.
+if (token && process.env.GITHUB_ACTIONS) {
+  try {
+    const r = await fetch(`https://api.supabase.com/v1/projects/${ref}`, { headers: { Authorization: `Bearer ${token}` } });
+    const p = await r.json();
+    if (p?.region) console.log(`::notice title=Supabase region::${p.region}`);
+  } catch {
+    /* informational only */
+  }
+}
+
 class SqlError extends Error {
   constructor(message) {
     super(message);

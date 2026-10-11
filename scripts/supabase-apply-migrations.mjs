@@ -26,6 +26,26 @@ if (!ref || (!token && !pgUrl)) {
   process.exit(1);
 }
 
+// Any failure also becomes a GitHub annotation, readable without the raw log.
+const annotate = (msg) => {
+  if (process.env.GITHUB_ACTIONS) console.log(`::error title=Supabase migrations::${String(msg).replace(/\r?\n/g, " ").slice(0, 900)}`);
+};
+process.on("uncaughtException", (e) => {
+  annotate(e?.message ?? e);
+  console.error(e);
+  process.exit(1);
+});
+process.on("unhandledRejection", (e) => {
+  annotate(e?.message ?? e);
+  console.error(e);
+  process.exit(1);
+});
+const exitWith = (msg) => {
+  annotate(msg);
+  console.error(msg);
+  process.exit(1);
+};
+
 class SqlError extends Error {
   constructor(message) {
     super(message);
@@ -162,6 +182,7 @@ for (const file of pending) {
           skipped.push(`${err.code} ${stmt.split("\n")[0].slice(0, 90)}`);
           continue;
         }
+        annotate(`Failed at ${file}: ${err.message} :: ${stmt.slice(0, 200)}`);
         console.error(`\n\nFailed at ${file} (statement by statement):\n${stmt.slice(0, 400)}\n${err.message}`);
         console.error(`${done} applied before the failure. Fix the migration and run again; it resumes here.`);
         process.exit(1);
@@ -192,6 +213,7 @@ const extras = await query(
 if (!extras.some((r) => r.version === "bucket ca-client-documents")) missing.push("storage bucket ca-client-documents");
 if (!extras.some((r) => r.version === "function user_in_ca_firm")) missing.push("function public.user_in_ca_firm");
 if (missing.length) {
+  annotate(`Schema check failed. Missing: ${missing.join(", ")}`);
   console.error(`\nSchema check failed. Missing:\n  ${missing.join("\n  ")}`);
   process.exit(1);
 }

@@ -33,7 +33,7 @@ export function GmailHealth({ firmId, lastResult, autoRun }: { firmId: string; l
   const loadRows = useCallback(async () => {
     const { data } = await supabase
       .from("ca_gmail_processed" as never)
-      .select("message_id, part_id, subject, sender_email, outcome, reason, created_at")
+      .select("*")
       .eq("ca_firm_id", firmId)
       .order("created_at", { ascending: false })
       .limit(60);

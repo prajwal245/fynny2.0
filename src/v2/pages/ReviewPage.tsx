@@ -2,7 +2,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, CheckCircle2, PencilLine, Trash2 } from "lucide-react";
-import { ReviewGuide } from "../components/ReviewGuide";
+import { ReviewGuide, registerLikeDocs } from "../components/ReviewGuide";
 import {
   Badge,
   Card,
@@ -94,11 +94,14 @@ export default function ReviewPage({
     setOpen(null);
   };
 
-  const confident = list.filter((r) => r.confidence >= 0.7);
+  // Register rows (invoices, GST, TDS, payroll) are never bulk-confirmed into bank lines.
+  const registerDocs = registerLikeDocs(list);
+  const confident = list.filter((r) => r.confidence >= 0.7 && !(r.docId && registerDocs.has(r.docId)));
+  const heldBack = list.filter((r) => r.confidence >= 0.7 && r.docId && registerDocs.has(r.docId)).length;
   const confirmConfident = () => {
     confident.forEach((r) => resolveReview(r.id, "confirmed"));
     toast.success(
-      `${confident.length} row${confident.length > 1 ? "s" : ""} confirmed`,
+      `${confident.length} row${confident.length > 1 ? "s" : ""} confirmed${heldBack ? `. ${heldBack} from register files left for you to read again as registers.` : ""}`,
     );
   };
 
@@ -161,7 +164,7 @@ export default function ReviewPage({
         />
       ) : (
         <Card style={{ padding: 0 }} className="v2-scroll">
-          <table className="v2-table">
+          <table className="v2-table v2-table-stack">
             <thead>
               <tr>
                 {!scopedClient && <th>Client</th>}
@@ -196,6 +199,7 @@ export default function ReviewPage({
                     )}
                     <td style={{ color: V.body }}>{r.docName}</td>
                     <td
+                      className="v2-mono"
                       style={{
                         color: V.muted,
                         fontSize: 12.5,
@@ -269,7 +273,7 @@ export default function ReviewPage({
                 Original raw text ({open.docName})
               </label>
               <div
-                className="num"
+                className="num v2-mono"
                 style={{
                   background: V.gray,
                   borderRadius: 12,

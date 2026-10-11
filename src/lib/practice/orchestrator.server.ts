@@ -18,7 +18,7 @@ import {
   type Db,
   type FirmContext,
 } from "./db.server";
-import { isDistinctiveName, lessonFrom, narrationPattern, partyFromNarration, type Memory } from "./memory";
+import { decisionPattern, isDistinctiveName, lessonFrom, narrationPattern, partyFromNarration, type Memory } from "./memory";
 import { autoChaseDue, periodsOf, readyForMis } from "./orchestrate";
 import type { Direction } from "./core";
 
@@ -271,7 +271,8 @@ export async function loadMemories(db: Db, businessId: string | null): Promise<M
     .eq("business_id", businessId)
     .eq("kind", "extract_correction")
     .limit(2000);
-  return (data ?? []) as Memory[];
+  // A pattern of generic words only ("against inv", "salary sep") would fire on unrelated lines.
+  return ((data ?? []) as Memory[]).filter((m) => isDistinctiveName(m.pattern));
 }
 
 /** Records how a person settled a Review Queue line, so next month's copy goes straight through. */
@@ -287,7 +288,7 @@ export async function teachFromReview(
 ) {
   if (!item.business_id) return null;
   const pattern = narrationPattern(item.proposed.description) || narrationPattern(item.raw_text);
-  if (!pattern) return null;
+  if (!pattern || !isDistinctiveName(pattern)) return null;
   const lesson = lessonFrom(item.proposed, final);
   const { data: existing } = await db
     .from("ca_agent_memory")
@@ -373,12 +374,77 @@ export async function learnAlias(
   return data.id as string;
 }
 
+// ── Recon decisions: learned from the Exception Queue, proposed (never applied) next time ──
+
+export type DecisionLesson = {
+  action: "ignore" | "reconciled_external";
+  note: string;
+  reason_code: string;
+  side: string;
+  direction: string;
+  amount: number;
+  by: string | null;
+  at: string;
+};
+
+
+export async function rememberDecision(
+  db: Db,
+  ctx: FirmContext,
+  businessId: string,
+  t: { side: string; direction: string; description: string | null; counterparty?: string | null; amount: number },
+  lesson: Omit<DecisionLesson, "side" | "direction" | "amount" | "by" | "at">,
+) {
+  const pattern = decisionPattern(t);
+  if (!pattern) return;
+  const full: DecisionLesson = { ...lesson, side: t.side, direction: t.direction, amount: Number(t.amount), by: ctx.userId, at: new Date().toISOString() };
+  const { data: existing } = await db
+    .from("ca_agent_memory")
+    .select("id, times_taught")
+    .eq("business_id", businessId)
+    .eq("kind", "recon_decision")
+    .eq("pattern", pattern)
+    .maybeSingle();
+  // Memory must never block the decision itself (for example before the migration is applied).
+  if (existing)
+    await db
+      .from("ca_agent_memory")
+      .update({ lesson: full, times_taught: (existing.times_taught ?? 1) + 1, updated_at: full.at })
+      .eq("id", existing.id);
+  else
+    await db.from("ca_agent_memory").insert({
+      ca_firm_id: ctx.firmId,
+      business_id: businessId,
+      kind: "recon_decision",
+      pattern,
+      lesson: full,
+      example: (t.description ?? "").slice(0, 300),
+      created_by: ctx.userId,
+    });
+}
+
+/** Undo of a decision takes back what it taught. */
+export async function forgetDecision(db: Db, businessId: string, t: { side: string; direction: string; description: string | null; counterparty?: string | null }) {
+  const pattern = decisionPattern(t);
+  if (!pattern) return;
+  const { data: m } = await db
+    .from("ca_agent_memory")
+    .select("id, times_taught")
+    .eq("business_id", businessId)
+    .eq("kind", "recon_decision")
+    .eq("pattern", pattern)
+    .maybeSingle();
+  if (!m) return;
+  if ((m.times_taught ?? 1) <= 1) await db.from("ca_agent_memory").delete().eq("id", m.id);
+  else await db.from("ca_agent_memory").update({ times_taught: m.times_taught - 1 }).eq("id", m.id);
+}
+
 /** What the agents have learned in this firm, for the Settings screen. */
 export async function listMemory(db: Db, ctx: FirmContext) {
   const [{ data: lessons }, { data: aliases }] = await Promise.all([
     db
       .from("ca_agent_memory")
-      .select("id, business_id, pattern, lesson, example, times_taught, times_applied, last_applied_at, updated_at")
+      .select("id, business_id, kind, pattern, lesson, example, times_taught, times_applied, last_applied_at, updated_at")
       .eq("ca_firm_id", ctx.firmId)
       .order("updated_at", { ascending: false })
       .limit(500),
@@ -389,7 +455,17 @@ export async function listMemory(db: Db, ctx: FirmContext) {
       .order("created_at", { ascending: false })
       .limit(500),
   ]);
-  return { lessons: lessons ?? [], aliases: aliases ?? [] };
+  // Rules keyed on generic words only were learned before the guard existed: drop them.
+  const badLessons = (lessons ?? []).filter((l) => (l.kind ?? "extract_correction") === "extract_correction" && !isDistinctiveName(l.pattern)).map((l) => l.id);
+  const badAliases = (aliases ?? []).filter((a) => !isDistinctiveName(a.alias)).map((a) => a.id);
+  await Promise.all([
+    badLessons.length ? db.from("ca_agent_memory").delete().eq("ca_firm_id", ctx.firmId).in("id", badLessons) : null,
+    badAliases.length ? db.from("ca_counterparty_aliases").delete().eq("ca_firm_id", ctx.firmId).in("id", badAliases) : null,
+  ]);
+  return {
+    lessons: (lessons ?? []).filter((l) => !badLessons.includes(l.id)),
+    aliases: (aliases ?? []).filter((a) => !badAliases.includes(a.id)),
+  };
 }
 
 export async function forgetMemory(db: Db, ctx: FirmContext, kind: "lesson" | "alias", id: string) {

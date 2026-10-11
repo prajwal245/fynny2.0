@@ -2,6 +2,8 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import {
+  AlertTriangle,
+  CheckCircle2,
   ExternalLink,
   FileText,
   Inbox,
@@ -21,7 +23,7 @@ import {
   formatDate,
   formatINR,
 } from "../ui";
-import { AgentStatusBadge, ProcessingCard, RowSkeleton } from "../agents";
+import { AgentStatusBadge, RowSkeleton } from "../agents";
 import { IntakePanel } from "../components/IntakePanel";
 import { SourceIcon } from "../components/BrandIcons";
 import { Doc, useV2 } from "../store";
@@ -110,7 +112,7 @@ export default function DocumentsPage({
   const [query, setQuery] = useState("");
   const [assign, setAssign] = useState<{
     clientId: string;
-    side: "bank" | "books" | "";
+    side: "bank" | "books" | "register" | "";
   }>({ clientId: "", side: "" });
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -166,7 +168,7 @@ export default function DocumentsPage({
   const openDoc = (d: Doc) => {
     setOpen(d.id);
     // An unassigned arrival may carry a suggestion; it is only pre-selected, never filed.
-    setAssign({ clientId: d.clientId || d.suggestedClientId || "", side: d.side ?? "" });
+    setAssign({ clientId: d.clientId || d.suggestedClientId || "", side: d.register ? "register" : (d.side ?? "") });
   };
 
   const fileIt = async () => {
@@ -175,7 +177,8 @@ export default function DocumentsPage({
       return;
     }
     setBusy(true);
-    await assignDoc(active.id, assign.clientId, assign.side || undefined);
+    // A register is recognised from its columns, so it is read with detection on.
+    await assignDoc(active.id, assign.clientId, assign.side === "bank" || assign.side === "books" ? assign.side : undefined);
     setBusy(false);
   };
 
@@ -268,19 +271,7 @@ export default function DocumentsPage({
         }
       />
 
-      <div
-        style={{
-          display: "grid",
-          gap: 12,
-          marginBottom: extractRuns.length ? 18 : 0,
-        }}
-      >
-        <AnimatePresence>
-          {extractRuns.map((r) => (
-            <ProcessingCard key={r.id} run={r} onDismiss={() => dismissRun(r.id)} />
-          ))}
-        </AnimatePresence>
-      </div>
+      
 
       <Tabs
         value={tab}
@@ -393,7 +384,7 @@ export default function DocumentsPage({
         )
       ) : (
         <Card style={{ padding: 0 }} className="v2-scroll">
-          <table className="v2-table">
+          <table className="v2-table v2-table-stack">
             <thead>
               <tr>
                 <th>File</th>
@@ -483,11 +474,13 @@ export default function DocumentsPage({
                 {active.clientId ? clientName(active.clientId) : "Unassigned"}
               </Badge>
               <Badge>{active.source}</Badge>
-              {active.side && (
+              {active.register ? (
+                <Badge tone="info">{active.register.label} · reference only</Badge>
+              ) : active.side ? (
                 <Badge tone="info">
                   {active.side === "bank" ? "Bank side" : "Books side"}
                 </Badge>
-              )}
+              ) : null}
               {active.duplicateCount ? (
                 <Badge tone="warn">
                   {active.duplicateCount} duplicate
@@ -607,17 +600,19 @@ export default function DocumentsPage({
                   onChange={(e) =>
                     setAssign({
                       ...assign,
-                      side: e.target.value as "bank" | "books" | "",
+                      side: e.target.value as "bank" | "books" | "register" | "",
                     })
                   }
+                  aria-label="Document type"
                 >
-                  <option value="">Detect bank or books</option>
+                  <option value="">Detect automatically</option>
                   <option value="bank">Bank statement</option>
                   <option value="books">Books (Tally, ledger, bills)</option>
+                  <option value="register">Register or report (GST, TDS, payroll, gateway)</option>
                 </select>
               </div>
               {(assign.clientId !== (active.clientId || "") ||
-                (assign.side && assign.side !== active.side)) && (
+                (assign.side && assign.side !== (active.register ? "register" : active.side))) && (
                 <button
                   className="v2-btn v2-btn-primary"
                   style={{ marginTop: 10 }}
@@ -655,7 +650,18 @@ export default function DocumentsPage({
                 {active.register.groups?.length ? (
                   <div style={{ fontSize: 12.5, color: V.body }}>
                     {active.register.groups.slice(0, 12).map((g) => (
-                      <div key={g.key}>{g.key}: {formatINR(g.amount)} ({g.count} line{g.count === 1 ? "" : "s"})</div>
+                      <div key={g.key}><span className="v2-mono">{g.key}</span>: <span className="num">{formatINR(g.amount)}</span> ({g.count} line{g.count === 1 ? "" : "s"})</div>
+                    ))}
+                  </div>
+                ) : null}
+                {active.register.checks?.length ? (
+                  <div style={{ display: "grid", gap: 6 }} data-testid="register-checks">
+                    <div className="v2-label" style={{ marginBottom: 0 }}>Checked under Indian GST, TDS and payroll rules</div>
+                    {active.register.checks.map((c) => (
+                      <div key={c.label} style={{ display: "grid", gridTemplateColumns: "18px minmax(0,1fr)", gap: 8, fontSize: 12.5, alignItems: "start" }}>
+                        <span style={{ color: c.ok ? V.green : V.maroon, paddingTop: 1 }}>{c.ok ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}</span>
+                        <span style={{ color: c.ok ? V.body : V.ink }}><b>{c.label}.</b> {c.detail}</span>
+                      </div>
                     ))}
                   </div>
                 ) : null}

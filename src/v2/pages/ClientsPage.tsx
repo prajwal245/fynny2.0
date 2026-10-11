@@ -39,7 +39,7 @@ export default function ClientsPage() {
           </Card>
 
           <Card style={{ padding: 0 }} className="v2-scroll">
-            <table className="v2-table">
+            <table className="v2-table v2-table-stack">
               <thead>
                 <tr><th>Client</th><th>Entity type</th><th>GSTIN</th><th>Contact</th></tr>
               </thead>

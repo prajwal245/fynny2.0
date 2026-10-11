@@ -83,7 +83,7 @@ export default function AddClientModal({ open, onClose, editing }: { open: boole
               {ENTITY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           ))}
-          {field("gstin", "GSTIN · optional", <input id="client-gstin" className="v2-input" style={invalid("gstin")} value={form.gstin} onChange={set("gstin")} placeholder="15 characters" aria-invalid={Boolean(errors.gstin)} />)}
+          {field("gstin", "GSTIN · optional", <input id="client-gstin" className="v2-input v2-mono" style={invalid("gstin")} value={form.gstin} onChange={set("gstin")} placeholder="15 characters" aria-invalid={Boolean(errors.gstin)} />)}
         </div>
         <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit,minmax(min(180px, 100%), 1fr))" }}>
           {field("contactName", "Contact person · optional", <input id="client-contactName" className="v2-input" value={form.contactName} onChange={set("contactName")} placeholder="Who sends you documents" />)}

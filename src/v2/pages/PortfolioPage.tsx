@@ -3,18 +3,19 @@ import { Link } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { Users, Plus } from "lucide-react";
 import { Badge, Card, EmptyState, PageHeader, Stat, V, formatDate, Tone } from "../ui";
-import { AgentStatusBadge, AnimatedCounter, ProcessingCard } from "../agents";
+import { AgentStatusBadge, AnimatedCounter } from "../agents";
 import { useV2 } from "../store";
 import { CloseProgress } from "../components/CloseProgress";
 import { AgentActivity, NeedsYou, SetupChecklist, TODAY_STYLES, agentSummary, greeting, useNeedsYou } from "../components/Today";
 import AddClientModal from "../components/AddClientModal";
+import { openExceptions } from "../lib/exceptions";
 
 export default function PortfolioPage() {
-  const { clients, docs, review, exceptions, chases, runs, dismissRun, period, closeStateFor, session, agentRuns } = useV2();
+  const { clients, docs, review, exceptions, chases, runs, period, closeStateFor, session, agentRuns } = useV2();
   const needs = useNeedsYou();
   const [adding, setAdding] = useState(false);
 
-  const openEx = exceptions.filter((e) => e.status === "open");
+  const openEx = openExceptions(exceptions);
   const openRev = review.filter((r) => r.status === "open");
   const openChase = chases.filter((c) => c.status !== "Resolved");
 
@@ -32,14 +33,6 @@ export default function PortfolioPage() {
           const busy = runs.some((r) => r.agent === a && r.status === "running");
           return <AgentStatusBadge key={a} agent={a} active={busy} label={busy ? `${a[0].toUpperCase() + a.slice(1)} working` : `${a[0].toUpperCase() + a.slice(1)} ready`} />;
         })}
-      </div>
-
-      <div style={{ display: "grid", gap: 12, marginBottom: runs.length ? 18 : 0 }}>
-        <AnimatePresence>
-          {runs.map((r) => (
-            <ProcessingCard key={r.id} run={r} onDismiss={() => dismissRun(r.id)} />
-          ))}
-        </AnimatePresence>
       </div>
 
       {clients.length === 0 ? (

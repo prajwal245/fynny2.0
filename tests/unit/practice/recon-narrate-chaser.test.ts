@@ -439,3 +439,25 @@ describe("chaser", () => {
     );
   });
 });
+
+describe("reason codes (retest N11)", () => {
+  it("a bank charge is not an amount mismatch against another party's bill", () => {
+    const out = reconcile(
+      [bank("b1", "2026-07-20", 590, "out", "BANK CHARGES GST ON CHG")],
+      [book("k1", "2026-07-18", 4450, "out", "Office Mart stationery", null, "Office Mart")],
+    );
+    const ex = out.exceptions.find((e) => e.txn_id === "b1")!;
+    expect(ex.reason_code).toBe("no_candidate");
+    expect(ex.candidates).toEqual([]);
+  });
+
+  it("an overpayment is not labelled a part payment", () => {
+    const out = reconcile(
+      [bank("b1", "2026-07-10", 4750, "out", "NEFT OFFICE MART", null, "Office Mart")],
+      [book("k1", "2026-07-10", 4450, "out", "Office Mart stationery", null, "Office Mart")],
+    );
+    const ex = out.exceptions.find((e) => e.txn_id === "b1")!;
+    expect(ex.reason_code).toBe("amount_mismatch");
+    expect(ex.detail).toContain("more than the books");
+  });
+});

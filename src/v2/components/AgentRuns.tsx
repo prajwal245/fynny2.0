@@ -62,7 +62,7 @@ export function AgentRunsCard({ clientId }: { clientId: string }) {
       <div style={{ padding: "16px 18px 6px" }}>
         <h3 style={{ fontSize: 15 }}>Agent runs</h3>
         <div style={{ fontSize: 12.5, color: V.muted, marginTop: 4 }}>
-          Extract hands over to Recon as soon as both sides of a month are in. Failed reads are retried automatically.
+          Extract hands over to Recon as soon as both sides of a month are in. A read that fails shows Retry, and the nightly check tries it once more.
         </div>
       </div>
       <table className="v2-table">

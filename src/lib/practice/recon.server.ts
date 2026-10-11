@@ -119,7 +119,7 @@ function reconMessage(written: number, open: number, already: number, byStage: R
   const head = already
     ? `${already} bank line${already === 1 ? " was" : "s were"} already matched; this run matched ${written} of the ${open} still open`
     : `${written} of ${open} bank lines matched`;
-  return `${head}${how.length ? ` (${how.join(", ")})` : ""}. ${exceptions ? `${exceptions} exception${exceptions === 1 ? "" : "s"} need a decision.` : "Nothing left to decide."}`;
+  return `${head}${how.length ? ` (${how.join(", ")})` : ""}. ${exceptions ? `${exceptions} exception${exceptions === 1 ? " needs" : "s need"} a decision.` : "Nothing left to decide."}`;
 }
 
 export async function runRecon(
@@ -462,7 +462,7 @@ export async function resolveException(
       ctx.firmId,
       ex.business_id,
       "recon",
-      `Exception "${ex.description ?? ex.reason_code}" ${action === "ignore" ? "ignored" : "resolved"}.`,
+      `Exception "${ex.description ?? ex.reason_code}" ${action === "ignore" ? "ignored" : "resolved"}.${note?.trim() ? ` Note: ${note.trim()}` : ""}`,
     );
     return { status: action === "ignore" ? "ignored" : "resolved" };
   }
@@ -485,12 +485,15 @@ export async function resolveException(
       .update({ match_status: "ignored" })
       .eq("id", txn.id);
     await close("ignored", "ignore", note ?? "Ignored");
+    // The Recon agent remembers the decision and proposes it for the same line next month.
+    const { rememberDecision } = await import("./orchestrator.server");
+    await rememberDecision(db, ctx, ex.business_id, txn, { action: "ignore", note: note ?? "", reason_code: ex.reason_code }).catch(() => null);
     await logActivity(
       db,
       ctx.firmId,
       ex.business_id,
       "recon",
-      `Exception ignored: ${txn.description ?? ""} (${REASON_LABELS[ex.reason_code as keyof typeof REASON_LABELS] ?? ex.reason_code}).`,
+      `Exception ignored: ${txn.description ?? ""} (${REASON_LABELS[ex.reason_code as keyof typeof REASON_LABELS] ?? ex.reason_code}).${note?.trim() ? ` Note: ${note.trim()}` : ""}`,
     );
     return { status: "ignored" };
   }
@@ -521,12 +524,14 @@ export async function resolveException(
       "reconciled_external",
       note ?? "Marked as reconciled externally",
     );
+    const { rememberDecision } = await import("./orchestrator.server");
+    await rememberDecision(db, ctx, ex.business_id, txn, { action: "reconciled_external", note: note ?? "", reason_code: ex.reason_code }).catch(() => null);
     await logActivity(
       db,
       ctx.firmId,
       ex.business_id,
       "recon",
-      `Marked reconciled externally: ${txn.description ?? ""}.`,
+      `Marked reconciled externally: ${txn.description ?? ""}.${note?.trim() ? ` Note: ${note.trim()}` : ""}`,
     );
     return { status: "resolved" };
   }
@@ -636,9 +641,9 @@ export async function resolveException(
       resolved_by: ctx.userId,
       resolved_at: now,
       resolution_action: "matched_manually",
-      resolution_note:
-        note ??
-        (diff ? `Matched with a difference of ₹${diff}` : "Matched manually"),
+      resolution_note: diff
+        ? `${note?.trim() ? `${note.trim()} · ` : ""}Matched with a difference of ₹${diff.toLocaleString("en-IN")}`
+        : (note ?? "Matched manually"),
     })
     .in(
       "txn_id",
@@ -650,7 +655,7 @@ export async function resolveException(
     ctx.firmId,
     ex.business_id,
     "recon",
-    `Matched manually: ${txn.description ?? ""} with ${parts.length} entr${parts.length === 1 ? "y" : "ies"}${diff ? ` (difference ₹${diff})` : ""}.`,
+    `Matched manually: ${txn.description ?? ""} with ${parts.length} entr${parts.length === 1 ? "y" : "ies"}${diff ? ` (difference ₹${diff.toLocaleString("en-IN")})` : ""}.${note?.trim() ? ` Note: ${note.trim()}` : ""}`,
   );
   // Memory: a person matched two differently named parties, so the rules
   // stage can match them by itself next time. Only from clean one-to-one
@@ -827,6 +832,11 @@ export async function reopenException(db: Db, ctx: FirmContext, exceptionId: str
     .from("ca_exceptions")
     .update({ status: "open", resolved_by: null, resolved_at: null, resolution_action: null, resolution_note: null })
     .in("id", ids);
+  if (ex.txn_id && (ex.resolution_action === "ignore" || ex.resolution_action === "reconciled_external")) {
+    const { data: t } = await db.from("ca_txns").select("side, direction, description, counterparty").eq("id", ex.txn_id).maybeSingle();
+    const { forgetDecision } = await import("./orchestrator.server");
+    if (t) await forgetDecision(db, ex.business_id, t).catch(() => null);
+  }
   await logActivity(db, ctx.firmId, ex.business_id, "recon", "A decision in the Exception Queue was undone.");
   return { status: "open" };
 }

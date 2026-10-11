@@ -329,11 +329,11 @@ export async function processExtraction(
   }
 
   const kind = detectKind(bytes, filename, null);
-  const side: Side = doc.side ?? inferSide(filename, kind);
+  let side: Side = doc.side ?? inferSide(filename, kind);
   const { data: clientRow } = doc.business_id
     ? await db
         .from("ca_clients")
-        .select("client_name")
+        .select("client_name, gstin")
         .eq("ca_firm_id", doc.ca_firm_id)
         .eq("business_id", doc.business_id)
         .limit(1)
@@ -347,6 +347,7 @@ export async function processExtraction(
       side,
       businessId: doc.business_id,
       clientName: clientRow?.client_name ?? null,
+      clientGstin: (clientRow as { gstin?: string | null } | null)?.gstin ?? null,
     },
     {
       llm: practiceLlm(),
@@ -357,6 +358,12 @@ export async function processExtraction(
   );
   await logAiCalls(db, doc.ca_firm_id, doc.id, outcome.aiCalls);
   if (outcome.error) return failWith(outcome.error.message, outcome.error.code);
+  if (outcome.side && outcome.side !== side) {
+    // The content decides: a Tally ledger is the books even when its name says "bank".
+    side = outcome.side;
+    await db.from("ca_document_extractions").update({ side, classification: "document" }).eq("id", doc.id);
+    await logActivity(db, doc.ca_firm_id, doc.business_id, "extract", `${filename} has Tally voucher columns, so it was filed as Books.`);
+  }
   if (outcome.register) {
     // A register is summarised, not reconciled: no transactions, nothing to review.
     const reg = outcome.register;
@@ -387,7 +394,13 @@ export async function processExtraction(
         extract_finished_at: new Date().toISOString(),
       })
       .eq("id", doc.id);
-    await logActivity(db, doc.ca_firm_id, doc.business_id, "extract", `${filename} read as ${headline} ${reg.note}`);
+    const failed = (reg.checks ?? []).filter((c) => !c.ok);
+    const checksLine = reg.checks?.length
+      ? failed.length
+        ? ` Checks under GST/TDS/payroll rules: ${failed.map((c) => `${c.label}: ${c.detail}`).join(" ")}`
+        : ` Checks under GST/TDS/payroll rules passed (${reg.checks.map((c) => c.label).join(", ")}).`
+      : "";
+    await logActivity(db, doc.ca_firm_id, doc.business_id, "extract", `${filename} read as ${headline} ${reg.note}${checksLine}`.slice(0, 1900));
     await finishRun(db, runId, runStarted, { summary: `${filename}: ${headline}`, detail: { register: reg.kind, entries: reg.entries } });
     return { status: "parsed", txns: 0, review: 0, duplicates: 0, pipeline: [] as { period: string; status: string }[] };
   }

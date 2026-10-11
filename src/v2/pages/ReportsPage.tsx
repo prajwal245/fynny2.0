@@ -4,7 +4,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { BarChart3, Plus } from "lucide-react";
 import { Card, EmptyState, Modal, PageHeader, V, formatDate, formatINR } from "../ui";
-import { AgentGlyph, AgentStatusBadge, ProcessingCard, ShimmerText } from "../agents";
+import { AgentGlyph, AgentStatusBadge, ShimmerText } from "../agents";
 import { parsePeriod } from "@/lib/practice/core";
 import { REPORT_TEMPLATES, ReportTemplate, useV2 } from "../store";
 
@@ -18,7 +18,7 @@ const TEMPLATE_HINT: Record<ReportTemplate, string> = {
 
 /** MIS and Reports. All clients as a page; the client's MIS tab when given a clientId. */
 export default function ReportsPage({ clientId: scopedClient }: { clientId?: string } = {}) {
-  const { reports: allReports, clients, clientName, generateReport, runs, dismissRun, isRunning, matchedTxns, period: currentPeriod, periods } = useV2();
+  const { reports: allReports, clients, clientName, generateReport, runs, isRunning, matchedTxns, period: currentPeriod, periods } = useV2();
   const reports = scopedClient ? allReports.filter((r) => r.clientId === scopedClient) : allReports;
   const [open, setOpen] = useState(false);
   const [clientId, setClientId] = useState(scopedClient ?? clients[0]?.id ?? "");
@@ -62,14 +62,6 @@ export default function ReportsPage({ clientId: scopedClient }: { clientId?: str
       />
       )}
 
-      <div style={{ display: "grid", gap: 12, marginBottom: narrateRuns.length ? 18 : 0 }}>
-        <AnimatePresence>
-          {narrateRuns.map((r) => (
-            <ProcessingCard key={r.id} run={r} onDismiss={() => dismissRun(r.id)} />
-          ))}
-        </AnimatePresence>
-      </div>
-
       {reports.length === 0 && !runs.some((r) => r.agent === "narrate" && r.status === "running" && (!scopedClient || r.clientId === scopedClient)) ? (
         <EmptyState
           icon={<BarChart3 size={22} />}
@@ -79,7 +71,7 @@ export default function ReportsPage({ clientId: scopedClient }: { clientId?: str
         />
       ) : reports.length > 0 && (
         <Card style={{ padding: 0 }} className="v2-scroll">
-          <table className="v2-table">
+          <table className="v2-table v2-table-stack">
             <thead><tr>{!scopedClient && <th>Client</th>}<th>Period</th><th>Template</th><th>Revenue</th><th>Expenses</th><th>Generated</th></tr></thead>
             <tbody>
               <AnimatePresence initial={false}>
@@ -131,6 +123,7 @@ export default function ReportsPage({ clientId: scopedClient }: { clientId?: str
                   key={t}
                   type="button"
                   onClick={() => setTemplate(t)}
+                  aria-pressed={template === t}
                   style={{
                     textAlign: "left", padding: "11px 13px", borderRadius: 13, cursor: "pointer",
                     border: `1px solid ${template === t ? V.ink : V.line}`,

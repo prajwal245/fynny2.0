@@ -34,7 +34,8 @@ export const V = {
   warnBg: "#FCEBD9",
   warnFg: "#7A3E0C",
   radius: 18,
-  font: "'Space Grotesk','Instrument Sans','Inter',system-ui,sans-serif",
+  font: "var(--font-geist-sans)",
+  mono: "var(--font-geist-mono)",
 };
 
 export const V2_STYLES = `
@@ -42,7 +43,9 @@ export const V2_STYLES = `
 .v2 *, .v2 *::before, .v2 *::after { box-sizing:border-box; }
 .v2 h1,.v2 h2,.v2 h3,.v2 h4 { font-family:${V.font}; margin:0; letter-spacing:-0.02em; font-weight:600; color:${V.ink}; }
 .v2 p,.v2 span,.v2 a,.v2 li,.v2 td,.v2 th,.v2 button,.v2 input,.v2 select,.v2 textarea,.v2 label { font-family:${V.font}; }
-.v2 .num { font-variant-numeric:tabular-nums; }
+.v2 .num, .v2 .tabular-nums, .v2-table td, .v2-table th { font-variant-numeric:tabular-nums; }
+/* Identifiers and raw data (references, GSTIN/PAN, section codes, transaction ids). */
+.v2 .v2-mono, .v2 .font-mono { font-family:${V.mono}; font-variant-numeric:tabular-nums; letter-spacing:0; }
 .v2-card { background:${V.card}; border:1px solid ${V.line}; border-radius:${V.radius}px; box-shadow:0 1px 2px rgba(138,30,24,.05), 0 14px 32px -26px rgba(138,30,24,.35); }
 .v2-btn { display:inline-flex; align-items:center; gap:8px; border-radius:999px; border:1px solid transparent; font-size:14px; font-weight:600; padding:10px 18px; cursor:pointer; text-decoration:none; transition:transform .18s ease, background .2s ease, box-shadow .2s ease; }
 .v2-btn:hover { transform:translateY(-1px); }
@@ -85,6 +88,22 @@ export const V2_STYLES = `
 .v2-skel { background:linear-gradient(90deg, ${V.gray} 25%, ${V.cream} 50%, ${V.gray} 75%); background-size:200% 100%; animation:v2shimmer 1.3s infinite linear; border-radius:10px; }
 @keyframes v2shimmer { from { background-position:200% 0; } to { background-position:-200% 0; } }
 .v2-grid-cards { display:grid; gap:16px; grid-template-columns:repeat(auto-fill, minmax(min(280px, 100%), 1fr)); }
+/* The action column stays in view when a wide table scrolls. */
+.v2-table .v2-sticky-end { position:sticky; right:0; background:${V.card}; box-shadow:-10px 0 12px -12px rgba(42,15,12,.35); }
+.v2-table tbody tr.clickable:hover .v2-sticky-end { background:${V.gray}; }
+@media (max-width:760px){
+  /* Phones: each row becomes a compact card instead of a table that scrolls sideways. */
+  .v2-table-stack thead { display:none; }
+  .v2-table-stack, .v2-table-stack tbody { display:block; }
+  .v2-table-stack tbody tr { display:flex; flex-wrap:wrap; align-items:center; gap:4px 12px; padding:12px 14px; border-bottom:1px solid ${V.line}; }
+  .v2-table-stack tbody tr:last-child { border-bottom:none; }
+  .v2-table-stack td { padding:0 !important; border:none !important; font-size:13px; }
+  .v2-table-stack td:first-child { width:100%; font-size:14px; }
+  .v2-table-stack td.v2-sticky-end { position:static; box-shadow:none; background:transparent; width:100%; }
+  .v2-table-stack td.v2-sticky-end > div { justify-content:flex-start !important; }
+  .v2-page-header { grid-template-columns:minmax(0,1fr) !important; }
+  .v2-page-header h1 { font-size:21px !important; overflow-wrap:anywhere; }
+}
 @media (max-width:900px){
   /* The sidebar's inline sticky position must not keep it in the layout on phones. */
   .v2-sidebar { position:fixed !important; left:0; top:0; z-index:60; transform:translateX(-100%); }
@@ -136,6 +155,7 @@ export function PageHeader({ title, subtitle, action }: { title: string; subtitl
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.32, ease: "easeOut" }}
+      className="v2-page-header"
       style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 16, alignItems: "center", marginBottom: 22 }}
     >
       <div style={{ minWidth: 0 }}>

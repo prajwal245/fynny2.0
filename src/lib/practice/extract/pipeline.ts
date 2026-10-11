@@ -25,6 +25,7 @@ import {
   looksLikeSpreadsheetBinary,
   parseDelimited,
   rowsFromTable,
+  isTallyLedger,
 } from "./table";
 import { isTallyXml, rowsFromTally } from "./tally";
 import { detectRegister, summariseRegister, type RegisterSummary } from "./registers";
@@ -86,6 +87,8 @@ export interface ExtractInput {
   businessId: string | null;
   /** The client whose books these are: tells the AI which way money moves. */
   clientName?: string | null;
+  /** The client's GSTIN: its state code tells the AI whether GST should be IGST or CGST/SGST. */
+  clientGstin?: string | null;
 }
 
 export interface ExtractOutcome {
@@ -98,6 +101,8 @@ export interface ExtractOutcome {
   documentKind: string | null;
   /** Set for GST/TDS/payroll/gateway registers: summarised, never turned into transactions. */
   register?: RegisterSummary | null;
+  /** The side the content shows, when it overrides the one asked for (a Tally ledger named "bank…"). */
+  side?: Side;
   error: { code: string; message: string } | null;
 }
 
@@ -367,7 +372,8 @@ export async function runExtract(
   const client = input.clientName?.trim();
   if (client && deps.llm) {
     const base = deps.llm;
-    const who = `These are the books of the client "${client}". Direction is from the client's side: money the client receives is "in"; money the client pays, including bills and invoices addressed to the client, is "out". The counterparty is always the other party, never "${client}".\n\n`;
+    const gstin = input.clientGstin?.trim().toUpperCase();
+    const who = `These are the books of the client "${client}"${gstin ? ` (GSTIN ${gstin}, state code ${gstin.slice(0, 2)}: supplies within that state carry CGST + SGST, others IGST)` : ""}. Direction is from the client's side: money the client receives is "in"; money the client pays, including bills and invoices addressed to the client, is "out". The counterparty is always the other party, never "${client}".\n\n`;
     deps = { ...deps, llm: { json: (req) => base.json({ ...req, user: who + req.user }) } };
   }
   const kind = detectKind(input.bytes, input.filename, input.mime);
@@ -398,6 +404,7 @@ export async function runExtract(
     const table = parseDelimited(sourceText);
     const reg = asRegister(table);
     if (reg) return reg;
+    if (input.side !== "books" && isTallyLedger(table)) input = { ...input, side: "books" };
     parsed = rowsFromTable(table, input.side);
     documentKind = input.side === "bank" ? "bank_statement" : "ledger_export";
   } else if (kind === "xlsx") {
@@ -423,6 +430,7 @@ export async function runExtract(
       .join("\n");
     const reg = asRegister(rows);
     if (reg) return reg;
+    if (input.side !== "books" && isTallyLedger(rows)) input = { ...input, side: "books" };
     parsed = rowsFromTable(rows, input.side);
     documentKind = input.side === "bank" ? "bank_statement" : "ledger_export";
   } else if (kind === "tally_xml") {
@@ -636,6 +644,7 @@ export async function runExtract(
     sourceText: sourceText.slice(0, 200_000),
     aiCalls: calls,
     documentKind,
+    side: input.side,
     error: null,
   };
 }

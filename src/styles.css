@@ -11,6 +11,7 @@
 @import "@fontsource/space-grotesk/700.css";
 
 @import "tailwindcss";
+@import "./styles/fonts-geist.css";
 
 /* Full FynHelp design system, preserved verbatim from the pre-migration
    src/index.css (minus the @tailwind directives, replaced by the v4 import

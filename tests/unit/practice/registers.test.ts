@@ -58,3 +58,23 @@ describe("Tally day book exported to Excel/CSV (QA P1-2)", () => {
     expect(rows.map((r) => r.direction)).toEqual(["in", "out", "out"]);
   });
 });
+
+describe("Razorpay fees in the MIS (QA P0-4/P0-5)", () => {
+  it("grosses up each payout that matches a settlement and books the fees", async () => {
+    const { gatewayGrossUp } = await import("@/lib/practice/narrate/flows");
+    const out = gatewayGrossUp(
+      [
+        { id: "b1", amount: 14646, txn_date: "2026-09-04" },
+        { id: "b2", amount: 7811.2, txn_date: "2026-09-06" },
+        { id: "b3", amount: 50000, txn_date: "2026-09-10" },
+      ],
+      [
+        { key: "setl_A", amount: 14646, fee: 300, tax: 54, date: "2026-09-03" },
+        { key: "setl_B", amount: 7811.2, fee: 160, tax: 28.8, date: "2026-09-05" },
+      ],
+    );
+    expect(out.matches.map((m) => m.txn_id)).toEqual(["b1", "b2"]);
+    expect(out.fees).toBe(460);
+    expect(out.tax).toBe(82.8);
+  });
+});

@@ -56,3 +56,37 @@ export function misBucket(t: Line): MisBucket {
   if (ADVANCE.test(text)) return "advance_paid";
   return "expense";
 }
+
+export interface Settlement {
+  key: string;
+  /** Net amount paid into the bank. */
+  amount: number;
+  fee?: number;
+  tax?: number;
+  date?: string | null;
+}
+
+/**
+ * Payment gateways pay the bank net of their fees. When the settlement report
+ * is uploaded, each payout that matches a settlement (same net amount, within
+ * 5 days) is grossed up: revenue is what customers paid, and the fee and GST
+ * on it are an expense. Every match is listed so it can be checked.
+ */
+export function gatewayGrossUp(
+  receipts: { id: string; amount: number; txn_date: string }[],
+  settlements: Settlement[],
+): { fees: number; tax: number; matches: { txn_id: string; settlement: string; fee: number; tax: number }[] } {
+  const used = new Set<string>();
+  const matches: { txn_id: string; settlement: string; fee: number; tax: number }[] = [];
+  const days = (a: string, b: string) => Math.abs(new Date(a).getTime() - new Date(b).getTime()) / 864e5;
+  for (const r of receipts) {
+    const s = settlements.find(
+      (x) => !used.has(x.key) && Math.abs(x.amount - r.amount) <= 1 && (!x.date || days(x.date, r.txn_date) <= 5) && (x.fee ?? 0) + (x.tax ?? 0) > 0,
+    );
+    if (!s) continue;
+    used.add(s.key);
+    matches.push({ txn_id: r.id, settlement: s.key, fee: s.fee ?? 0, tax: s.tax ?? 0 });
+  }
+  const round = (n: number) => Math.round(n * 100) / 100;
+  return { fees: round(matches.reduce((t, m) => t + m.fee, 0)), tax: round(matches.reduce((t, m) => t + m.tax, 0)), matches };
+}

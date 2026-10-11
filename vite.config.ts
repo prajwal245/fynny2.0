@@ -10,7 +10,10 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 // function timeout. Other presets ignore this. (Cast, because the
 // wrapper's types list only a few nitro keys; nitro accepts all of them.)
 type NitroOption = NonNullable<Parameters<typeof defineConfig>[0]>["nitro"];
-const nitro = { vercel: { functions: { maxDuration: 60 } } } as unknown as NitroOption;
+// Server functions run in Sydney (syd1), next to the Supabase database
+// (ap-southeast-2): each database call is a few milliseconds instead of a
+// trans-Pacific round trip.
+const nitro = { vercel: { regions: ["syd1"], functions: { maxDuration: 60, regions: ["syd1"] } } } as unknown as NitroOption;
 
 export default defineConfig({
   tanstackStart: {

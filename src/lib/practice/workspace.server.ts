@@ -51,7 +51,7 @@ function chaseStatus(r: {
 
 export async function loadWorkspace(db: Db, ctx: FirmContext) {
   const f = ctx.firmId;
-  const [cRes, xRes, rvRes, eRes, rRes, qRes, evRes, nRes, aRes, runRes, misRes] =
+  const [cRes, xRes, rvRes, eRes, rRes, qRes, evRes, nRes, aRes, runRes, misRes, firmRes, gmailRes] =
     await Promise.all([
       db
         .from("ca_clients")
@@ -135,6 +135,9 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
         .eq("type", "mis_ready")
         .order("created_at", { ascending: false })
         .limit(200),
+      // Firm profile and Gmail status ride along, so the app opens in one round trip.
+      db.from("ca_firms").select("firm_name, ca_name, email, city, membership_number").eq("id", f).maybeSingle(),
+      db.from("ca_gmail_connections").select("id").eq("ca_firm_id", f).eq("is_active", true).limit(1),
     ]);
 
   const clients = (cRes.data ?? []).map((r) => {
@@ -167,8 +170,10 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       reference: string | null;
     }[]
   >();
-  for (let i = 0; i < docIds.length; i += 50) {
-    const { data } = await db
+  // All batches at once: one round trip instead of one per 50 documents.
+  const batches = await Promise.all(
+    Array.from({ length: Math.ceil(docIds.length / 50) }, (_, k) => k * 50).map((i) =>
+      db
       .from("ca_txns")
       .select(
         "id, extraction_id, txn_date, description, counterparty, reference, amount, direction, side, match_status, row_index",
@@ -176,7 +181,10 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       .in("extraction_id", docIds.slice(i, i + 50))
       .order("txn_date")
       .order("row_index")
-      .limit(ROWS_PER_DOC * 50);
+      .limit(ROWS_PER_DOC * 50),
+    ),
+  );
+  for (const { data } of batches) {
     for (const t of data ?? []) {
       const list =
         txnsByDoc.get(t.extraction_id) ??
@@ -354,6 +362,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       bankSummary: (c.bankSummary as unknown) ?? [],
       warnings: (c.warnings as string[]) ?? [],
       otherFlows: (c.other_flows as unknown) ?? [],
+      gateway: (c.gateway as unknown) ?? null,
       signedOffWithOpen: (c.signedOffWithOpen as unknown) ?? null,
       signedOff: r.signed_off_at
         ? {
@@ -490,7 +499,16 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
   }));
 
   return {
-    firm: { id: ctx.firmId, name: ctx.firmName, role: ctx.role },
+    firm: {
+      id: ctx.firmId,
+      name: firmRes.data?.firm_name ?? ctx.firmName,
+      role: ctx.role,
+      partnerName: (firmRes.data?.ca_name as string | null) ?? null,
+      email: (firmRes.data?.email as string | null) ?? null,
+      city: (firmRes.data?.city as string | null) ?? "",
+      frn: (firmRes.data?.membership_number as string | null) ?? "",
+      gmailConnected: Boolean(gmailRes.data?.length),
+    },
     clients,
     docs,
     review,

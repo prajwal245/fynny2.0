@@ -11,6 +11,7 @@ import {
   signedAmount,
   sumRupees,
   type Period,
+  round2,
 } from "./core";
 import {
   assertClient,
@@ -22,7 +23,7 @@ import {
   type FirmContext,
 } from "./db.server";
 import { practiceLlm } from "./llm.server";
-import { BUCKET_LABELS, misBucket, type MisBucket } from "./narrate/flows";
+import { BUCKET_LABELS, gatewayGrossUp, misBucket, type MisBucket, type Settlement } from "./narrate/flows";
 import {
   computeFigures,
   ruleInsights,
@@ -243,6 +244,21 @@ export async function generateReport(
       return { key: b, label: BUCKET_LABELS[b], direction: list[0]?.direction ?? "in", amount: sumRupees(list.map((t) => t.amount)), count: list.length, rows: inrRows(list) };
     })
     .filter((f) => f.count > 0);
+  // Gateway payouts arrive net of fees: with the settlement report uploaded,
+  // revenue is grossed up to what customers paid and the fees become an expense.
+  const { data: gatewayDocs } = await db
+    .from("ca_document_extractions")
+    .select("extracted")
+    .eq("ca_firm_id", ctx.firmId)
+    .eq("business_id", businessId)
+    .eq("classification", "gateway_settlement");
+  const settlements: Settlement[] = (gatewayDocs ?? []).flatMap(
+    (d) => ((d.extracted as { register?: { groups?: Settlement[] } } | null)?.register?.groups ?? []) as Settlement[],
+  );
+  const gateway = settlements.length
+    ? gatewayGrossUp(revenueTxns.map((t) => ({ id: t.id, amount: t.amount, txn_date: t.txn_date })), settlements)
+    : { fees: 0, tax: 0, matches: [] as { txn_id: string; settlement: string; fee: number; tax: number }[] };
+  const gatewayCost = round2(gateway.fees + gateway.tax);
   const high = matched.filter((t) => t.amount >= 100_000);
   const n = figures.numbers;
   const bankSummary: BankSummaryRow[] = [];
@@ -393,8 +409,11 @@ export async function generateReport(
     template,
     period: { label: period.label, start: period.start, end: period.end },
     excluded: unmatched.length,
-    revenue: sumRupees(revenueTxns.map((t) => t.amount)),
-    expenses: sumRupees(expenseTxns.map((t) => t.amount)),
+    revenue: round2(sumRupees(revenueTxns.map((t) => t.amount)) + gatewayCost),
+    expenses: round2(sumRupees(expenseTxns.map((t) => t.amount)) + gatewayCost),
+    gateway: gateway.matches.length
+      ? { payouts: gateway.matches.length, fees: gateway.fees, gst_on_fees: gateway.tax, settlements: gateway.matches.map((m) => m.settlement) }
+      : null,
     total_receipts: n.total_receipts.value,
     total_payments: n.total_payments.value,
     sources: { revenue: inrRows(revenueTxns), expenses: inrRows(expenseTxns) },

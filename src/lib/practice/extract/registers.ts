@@ -35,7 +35,7 @@ export interface RegisterSummary {
   entries: number;
   totals: { label: string; amount: number }[];
   /** Per settlement (gateway) or per section (TDS): small breakdown for the firm. */
-  groups?: { key: string; amount: number; count: number }[];
+  groups?: { key: string; amount: number; count: number; gross?: number; fee?: number; tax?: number; date?: string | null }[];
   note: string;
 }
 
@@ -141,15 +141,27 @@ export function summariseRegister(kind: RegisterKind, rows: string[][]): Registe
     push("GST on fees", tax);
     push("Net settled to bank", net);
     const sid = col("settlement id", "settlement utr", "settlement ref", "utr");
+    const when = col("settled at", "settlement date", "settled on", "settled_at", "created at", "date");
     if (sid >= 0) {
-      const by = new Map<string, { amount: number; count: number }>();
+      type G = { amount: number; count: number; gross: number; fee: number; tax: number; date: string | null };
+      const by = new Map<string, G>();
       for (const r of data) {
         const k = String(r[sid] ?? "").trim();
         if (!k) continue;
-        const g = by.get(k) ?? { amount: 0, count: 0 };
-        const n = net >= 0 ? amount(r[net]) : gross >= 0 ? round2((amount(r[gross]) ?? 0) - (fee >= 0 ? amount(r[fee]) ?? 0 : 0) - (tax >= 0 ? amount(r[tax]) ?? 0 : 0)) : null;
+        const g = by.get(k) ?? { amount: 0, count: 0, gross: 0, fee: 0, tax: 0, date: null };
+        const gr = gross >= 0 ? amount(r[gross]) ?? 0 : 0;
+        const fe = fee >= 0 ? amount(r[fee]) ?? 0 : 0;
+        const tx = tax >= 0 ? amount(r[tax]) ?? 0 : 0;
+        const n = net >= 0 ? amount(r[net]) : gross >= 0 ? round2(gr - fe - tx) : null;
         g.amount = round2(g.amount + (n ?? 0));
+        g.gross = round2(g.gross + gr);
+        g.fee = round2(g.fee + fe);
+        g.tax = round2(g.tax + tx);
         g.count++;
+        if (!g.date && when >= 0) {
+          const d = String(r[when] ?? "").trim().slice(0, 10);
+          g.date = /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null;
+        }
         by.set(k, g);
       }
       groups = [...by.entries()].map(([key, g]) => ({ key, ...g }));

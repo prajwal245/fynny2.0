@@ -150,6 +150,8 @@ export type Report = {
   /** Cash that moved but is not revenue or expense: taxes, advances, loans, transfers. */
   otherFlows?: { key: string; label: string; direction: "in" | "out"; amount: number; count: number; rows: Txn[] }[];
   signedOffWithOpen?: { exceptions: number; review: number; unmatched: number } | null;
+  /** Gateway payouts grossed up from the settlement report. */
+  gateway?: { payouts: number; fees: number; gst_on_fees: number; settlements: string[] } | null;
   insights: {
     text: string;
     source: string;
@@ -525,9 +527,20 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [apply]);
 
-  const boot = useCallback(async () => {
-    const { data: auth } = await sb.auth.getUser();
-    const user = auth?.user ?? null;
+  const booting = useRef<Promise<void> | null>(null);
+  const boot = useCallback(() => {
+    // One start-up at a time: the auth listener and the first render both ask for it.
+    if (booting.current) return booting.current;
+    booting.current = bootOnce().finally(() => {
+      booting.current = null;
+    });
+    return booting.current;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const bootOnce = async () => {
+    // The session is read locally (no network); the server checks it on every call.
+    const { data: auth } = await sb.auth.getSession();
+    const user = auth?.session?.user ?? null;
     if (!user) {
       setSession(null);
       setFirm(null);
@@ -547,41 +560,52 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       email: user.email ?? "",
     });
     let workspace: Workspace | null = null;
+    // Confirm the session is still live with the auth server, in parallel with
+    // the workspace (a token can outlive a session revoked on another device).
+    const live = sb.auth.getUser().then(
+      (r) => Boolean(r.data?.user) && !r.error,
+      () => true, // offline: let the workspace call decide
+    );
     try {
-      workspace = await getPracticeWorkspace();
-    } catch {
+      const [ok, w] = await Promise.all([live, getPracticeWorkspace()]);
+      if (!ok) throw new Error("Unauthorized: session ended");
+      workspace = w;
+    } catch (e) {
+      // The local session was revoked elsewhere (password changed, signed out
+      // on another device): sign in again instead of starting a new firm.
+      if (/^Unauthorized\b|jwt|session/i.test(messageOf(e))) {
+        try {
+          sessionStorage.setItem("fynhelp.v2.expired", "1");
+        } catch {
+          /* private mode */
+        }
+        await sb.auth.signOut({ scope: "local" }).catch(() => undefined);
+        userId.current = null;
+        setSession(null);
+        setFirm(null);
+        setHydrated(true);
+        return;
+      }
       workspace = null;
     }
     if (workspace) {
       firmId.current = workspace.firm.id;
       firmReady.current = Promise.resolve(workspace.firm.id);
-      const { data: f } = await sb
-        .from("ca_firms")
-        .select("*")
-        .eq("id", workspace.firm.id)
-        .maybeSingle();
+      const wf = workspace.firm;
       setFirm({
-        name: f?.firm_name ?? workspace.firm.name,
-        partnerName: f?.ca_name ?? meta.full_name ?? "",
-        email: f?.email ?? user.email ?? "",
-        city: f?.city ?? "",
-        frn: f?.membership_number ?? "",
-        gmailConnected: false,
+        name: wf.name,
+        partnerName: wf.partnerName ?? meta.full_name ?? "",
+        email: wf.email ?? user.email ?? "",
+        city: wf.city ?? "",
+        frn: wf.frn ?? "",
+        gmailConnected: Boolean(wf.gmailConnected),
       });
-      const { data: gmail } = await sb
-        .from("ca_gmail_connections")
-        .select("id")
-        .eq("ca_firm_id", workspace.firm.id)
-        .eq("is_active", true)
-        .limit(1);
-      if (gmail?.length)
-        setFirm((p) => (p ? { ...p, gmailConnected: true } : p));
       apply(workspace);
     } else {
       setFirm(null);
     }
     setHydrated(true);
-  }, [apply]);
+  };
 
   useEffect(() => {
     void boot();

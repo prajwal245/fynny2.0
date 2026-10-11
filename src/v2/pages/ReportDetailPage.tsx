@@ -176,6 +176,15 @@ export default function ReportDetailPage() {
       </div>
       )}
 
+      {!exceptionTemplate && report.gateway && (
+        <Card style={{ marginBottom: 20, background: V.cream }} data-testid="gateway-grossup">
+          <div style={{ fontSize: 14.5, fontWeight: 600 }}>Payment gateway payouts grossed up</div>
+          <div style={{ fontSize: 13.5, color: V.body, marginTop: 4, lineHeight: 1.55 }}>
+            {report.gateway.payouts} payout{report.gateway.payouts === 1 ? "" : "s"} matched the uploaded settlement report. Revenue includes the {formatINR(report.gateway.fees + report.gateway.gst_on_fees)} customers paid that the gateway kept, and the same amount is in expenses as gateway fees ({formatINR(report.gateway.fees)}) and GST on fees ({formatINR(report.gateway.gst_on_fees)}).
+          </div>
+        </Card>
+      )}
+
       {!exceptionTemplate && report.otherFlows && report.otherFlows.length > 0 && (
         <Card style={{ marginBottom: 20 }} data-testid="other-flows">
           <h3 style={{ fontSize: 15.5 }}>Not counted as revenue or expenses</h3>

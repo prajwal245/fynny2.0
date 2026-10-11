@@ -125,7 +125,15 @@ function formatFinding(f) {
 
   if (newFindings.length) {
     console.error("\n✘ NEW Supabase security findings detected:");
-    newFindings.forEach((f) => console.error(formatFinding(f)));
+    newFindings.forEach((f) => {
+      console.error(formatFinding(f));
+      // Also as a GitHub annotation, so the finding is readable without the raw log.
+      if (process.env.GITHUB_ACTIONS) {
+        const k = findingKey(f);
+        const detail = String(f.detail || f.description || "").replace(/\s+/g, " ").slice(0, 300);
+        console.log(`::error title=Supabase ${k.level} ${k.name}::${k.schema}.${k.object ?? "-"} ${detail}`);
+      }
+    });
     console.error(
       "\nFix the issue, or add an explicit entry to " +
         ".github/security/lint-baseline.json after review.",
@@ -136,5 +144,6 @@ function formatFinding(f) {
   console.log("\n✓ No new Supabase security findings.");
 })().catch((err) => {
   console.error("✘ Linter check failed:", err.message);
+  if (process.env.GITHUB_ACTIONS) console.log(`::error title=Supabase linter::${String(err.message).slice(0, 400)}`);
   process.exit(2);
 });

@@ -11,7 +11,7 @@ import { openExceptions } from "../lib/exceptions";
 
 export default function ReportDetailPage() {
   const { reportId } = useParams({ from: "/v2/reports/$reportId" });
-  const { reports, clientName, firm, role, session, signOffReport, requestCorrection, canSignOff, exceptions, review, docs } = useV2();
+  const { reports, clientName, firm, session, signOffReport, requestCorrection, partnerView, exceptions, review, docs } = useV2();
   const report = reports.find((r) => r.id === reportId);
   const [source, setSource] = useState<{ label: string; rows: Txn[] } | null>(null);
   const [insightsReady, setInsightsReady] = useState(false);
@@ -106,7 +106,7 @@ export default function ReportDetailPage() {
                 Signed off with {report.signedOffWithOpen.exceptions} exception(s), {report.signedOffWithOpen.review} review row(s) and {report.signedOffWithOpen.unmatched} unreconciled line(s) left out.
               </div>
             )}
-            {role === "Partner" && canSignOff && (
+            {partnerView && (
               reopening ? (
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
                   <input className="v2-input" style={{ width: 300 }} autoFocus placeholder="Why it needs reopening" value={reopenReason} onChange={(e) => setReopenReason(e.target.value)} />
@@ -122,11 +122,11 @@ export default function ReportDetailPage() {
           <div>
             <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: V.muted, fontWeight: 700 }}>Correction requested</div>
             <div style={{ fontSize: 14, marginTop: 6 }}>{report.correction.note}</div>
-            {role === "Partner" && canSignOff && !confirming && (
+            {partnerView && !confirming && (
               <button className="v2-btn v2-btn-primary" style={{ marginTop: 12 }} onClick={() => setConfirming(true)}>Sign off now</button>
             )}
           </div>
-        ) : role === "Partner" && canSignOff ? (
+        ) : partnerView ? (
           <div>
             <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: V.muted, fontWeight: 700 }}>Partner review</div>
             <div style={{ fontSize: 14, marginTop: 6, marginBottom: 12 }}>Open any number to see the transactions behind it, then accept or send it back.</div>

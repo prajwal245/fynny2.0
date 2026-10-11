@@ -5,7 +5,12 @@
 import { ReactNode, useEffect, useState } from "react";
 import { Link } from "@/lib/router-compat";
 import { ChevronLeft } from "lucide-react";
-import { FynPage, FynCard, FynSearchInput, FynSelect } from "@/components/dashboard/ui";
+import {
+  FynPage,
+  FynCard,
+  FynSearchInput,
+  FynSelect,
+} from "@/components/dashboard/ui";
 import { useMode } from "@/components/intelligence/DataSource";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +46,7 @@ export function FilterChips({
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- small hook shared by list pages
 export function useDebounced<T>(value: T, ms = 300) {
   const [v, setV] = useState(value);
   useEffect(() => {
@@ -103,7 +109,10 @@ export function ListPageShell({
   return (
     <FynPage>
       <div className="flex items-center gap-fyn-sm text-fyn-tiny text-fyn-ink-45">
-        <Link to={`${base}/cockpit`} className="hover:text-fyn-ink inline-flex items-center gap-1">
+        <Link
+          to={`${base}/cockpit`}
+          className="hover:text-fyn-ink inline-flex items-center gap-1"
+        >
           <ChevronLeft size={14} /> Cockpit
         </Link>
         <span>/</span>
@@ -114,7 +123,11 @@ export function ListPageShell({
           {title} <span className="text-fyn-ink-45 font-normal">({count})</span>
         </h1>
       </header>
-      {controls && <FynCard className="!p-fyn-md flex gap-fyn-md flex-wrap items-end">{controls}</FynCard>}
+      {controls && (
+        <FynCard className="!p-fyn-md flex gap-fyn-md flex-wrap items-end">
+          {controls}
+        </FynCard>
+      )}
       <FynCard className="!p-0 overflow-hidden">{children}</FynCard>
     </FynPage>
   );

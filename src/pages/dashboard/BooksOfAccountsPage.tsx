@@ -15,7 +15,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronDown, Download, FileText, FileSpreadsheet, ChevronRight } from "lucide-react";
+import {
+  ChevronDown,
+  Download,
+  FileText,
+  FileSpreadsheet,
+  ChevronRight,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,11 +34,36 @@ import * as XLSX from "xlsx";
 
 type TabKey = "cash" | "sales" | "purchase" | "ledger";
 
-const TAB_META: { key: TabKey; label: string; filename: string; title: string }[] = [
-  { key: "cash", label: "Cash / Bank Book", filename: "cash-bank-book", title: "Cash / Bank Book" },
-  { key: "sales", label: "Sales Journal", filename: "sales-journal", title: "Sales Journal" },
-  { key: "purchase", label: "Purchase Journal", filename: "purchase-journal", title: "Purchase Journal" },
-  { key: "ledger", label: "Ledger Summary", filename: "ledger-summary", title: "Ledger Summary" },
+const TAB_META: {
+  key: TabKey;
+  label: string;
+  filename: string;
+  title: string;
+}[] = [
+  {
+    key: "cash",
+    label: "Cash / Bank Book",
+    filename: "cash-bank-book",
+    title: "Cash / Bank Book",
+  },
+  {
+    key: "sales",
+    label: "Sales Journal",
+    filename: "sales-journal",
+    title: "Sales Journal",
+  },
+  {
+    key: "purchase",
+    label: "Purchase Journal",
+    filename: "purchase-journal",
+    title: "Purchase Journal",
+  },
+  {
+    key: "ledger",
+    label: "Ledger Summary",
+    filename: "ledger-summary",
+    title: "Ledger Summary",
+  },
 ];
 
 const currentFY = () => {
@@ -47,7 +78,13 @@ const currentFY = () => {
 };
 
 const fmtDate = (d?: string | null) =>
-  d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "-";
+  d
+    ? new Date(d).toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
+    : "-";
 
 const BooksOfAccountsPage = () => {
   const { toast } = useToast();
@@ -59,7 +96,9 @@ const BooksOfAccountsPage = () => {
 
   useEffect(() => {
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
       const { data } = await supabase
         .from("profiles")
@@ -77,7 +116,9 @@ const BooksOfAccountsPage = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("transactions")
-        .select("id, date, description, counterparty, category, direction, amount")
+        .select(
+          "id, date, description, counterparty, category, direction, amount",
+        )
         .eq("business_id", businessId!)
         .gte("date", fromDate)
         .lte("date", toDate)
@@ -93,7 +134,9 @@ const BooksOfAccountsPage = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("receivables")
-        .select("id, invoice_date, customer_name, invoice_number, amount, outstanding, status")
+        .select(
+          "id, invoice_date, customer_name, invoice_number, amount, outstanding, status",
+        )
         .eq("business_id", businessId!)
         .gte("invoice_date", fromDate)
         .lte("invoice_date", toDate)
@@ -109,7 +152,9 @@ const BooksOfAccountsPage = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("payables")
-        .select("id, due_date, vendor_name, invoice_number, amount, outstanding, status")
+        .select(
+          "id, due_date, vendor_name, invoice_number, amount, outstanding, status",
+        )
         .eq("business_id", businessId!)
         .gte("due_date", fromDate)
         .lte("due_date", toDate)
@@ -153,25 +198,45 @@ const BooksOfAccountsPage = () => {
   const cashTotals = useMemo(() => {
     const debit = cashRows.reduce((s, r) => s + r.debit, 0);
     const credit = cashRows.reduce((s, r) => s + r.credit, 0);
-    return { debit, credit, closing: cashRows.length ? cashRows[cashRows.length - 1].balance : 0 };
+    return {
+      debit,
+      credit,
+      closing: cashRows.length ? cashRows[cashRows.length - 1].balance : 0,
+    };
   }, [cashRows]);
 
   const salesTotal = useMemo(
-    () => (recvQuery.data || []).reduce((s: number, r: any) => s + Number(r.amount || 0), 0),
-    [recvQuery.data]
+    () =>
+      (recvQuery.data || []).reduce(
+        (s: number, r: any) => s + Number(r.amount || 0),
+        0,
+      ),
+    [recvQuery.data],
   );
 
   const purchaseTotal = useMemo(
-    () => (payQuery.data || []).reduce((s: number, r: any) => s + Number(r.amount || 0), 0),
-    [payQuery.data]
+    () =>
+      (payQuery.data || []).reduce(
+        (s: number, r: any) => s + Number(r.amount || 0),
+        0,
+      ),
+    [payQuery.data],
   );
 
   // Ledger groupings
   const customerLedger = useMemo(() => {
-    const map = new Map<string, { name: string; invoiced: number; outstanding: number; items: any[] }>();
+    const map = new Map<
+      string,
+      { name: string; invoiced: number; outstanding: number; items: any[] }
+    >();
     for (const r of recvQuery.data || []) {
       const key = r.customer_name || "Unknown";
-      const g = map.get(key) || { name: key, invoiced: 0, outstanding: 0, items: [] };
+      const g = map.get(key) || {
+        name: key,
+        invoiced: 0,
+        outstanding: 0,
+        items: [],
+      };
       g.invoiced += Number(r.amount || 0);
       g.outstanding += Number(r.outstanding || 0);
       g.items.push(r);
@@ -183,10 +248,18 @@ const BooksOfAccountsPage = () => {
   }, [recvQuery.data]);
 
   const vendorLedger = useMemo(() => {
-    const map = new Map<string, { name: string; billed: number; outstanding: number; items: any[] }>();
+    const map = new Map<
+      string,
+      { name: string; billed: number; outstanding: number; items: any[] }
+    >();
     for (const p of payQuery.data || []) {
       const key = p.vendor_name || "Unknown";
-      const g = map.get(key) || { name: key, billed: 0, outstanding: 0, items: [] };
+      const g = map.get(key) || {
+        name: key,
+        billed: 0,
+        outstanding: 0,
+        items: [],
+      };
       g.billed += Number(p.amount || 0);
       g.outstanding += Number(p.outstanding || 0);
       g.items.push(p);
@@ -210,9 +283,27 @@ const BooksOfAccountsPage = () => {
         columns: [
           { key: "date", label: "Date", width: 1.2 },
           { key: "particulars", label: "Particulars", width: 4 },
-          { key: "debit", label: "Debit (In)", width: 1.5, align: "right", numeric: true },
-          { key: "credit", label: "Credit (Out)", width: 1.5, align: "right", numeric: true },
-          { key: "balance", label: "Running Balance", width: 1.8, align: "right", numeric: true },
+          {
+            key: "debit",
+            label: "Debit (In)",
+            width: 1.5,
+            align: "right",
+            numeric: true,
+          },
+          {
+            key: "credit",
+            label: "Credit (Out)",
+            width: 1.5,
+            align: "right",
+            numeric: true,
+          },
+          {
+            key: "balance",
+            label: "Running Balance",
+            width: 1.8,
+            align: "right",
+            numeric: true,
+          },
         ],
         rows: cashRows.map((r) => ({
           date: fmtDate(r.date),
@@ -238,7 +329,13 @@ const BooksOfAccountsPage = () => {
           { key: "date", label: "Date", width: 1.2 },
           { key: "customer", label: "Customer", width: 3 },
           { key: "invoice", label: "Invoice #", width: 1.5 },
-          { key: "amount", label: "Amount", width: 1.5, align: "right", numeric: true },
+          {
+            key: "amount",
+            label: "Amount",
+            width: 1.5,
+            align: "right",
+            numeric: true,
+          },
           { key: "status", label: "Status", width: 1 },
         ],
         rows: rows.map((r: any) => ({
@@ -246,9 +343,18 @@ const BooksOfAccountsPage = () => {
           customer: r.customer_name,
           invoice: r.invoice_number || "-",
           amount: formatINR(Number(r.amount || 0)),
-          status: (Number(r.outstanding || 0) <= 0 || r.status === "paid") ? "Paid" : "Outstanding",
+          status:
+            Number(r.outstanding || 0) <= 0 || r.status === "paid"
+              ? "Paid"
+              : "Outstanding",
         })),
-        totals: { date: "", customer: "TOTAL", invoice: "", amount: formatINR(salesTotal), status: "" },
+        totals: {
+          date: "",
+          customer: "TOTAL",
+          invoice: "",
+          amount: formatINR(salesTotal),
+          status: "",
+        },
       };
     }
     if (tab === "purchase") {
@@ -259,7 +365,13 @@ const BooksOfAccountsPage = () => {
           { key: "date", label: "Date", width: 1.2 },
           { key: "vendor", label: "Vendor", width: 3 },
           { key: "bill", label: "Bill #", width: 1.5 },
-          { key: "amount", label: "Amount", width: 1.5, align: "right", numeric: true },
+          {
+            key: "amount",
+            label: "Amount",
+            width: 1.5,
+            align: "right",
+            numeric: true,
+          },
           { key: "status", label: "Status", width: 1 },
         ],
         rows: rows.map((r: any) => ({
@@ -267,9 +379,18 @@ const BooksOfAccountsPage = () => {
           vendor: r.vendor_name,
           bill: r.invoice_number || "-",
           amount: formatINR(Number(r.amount || 0)),
-          status: (Number(r.outstanding || 0) <= 0 || r.status === "paid") ? "Paid" : "Outstanding",
+          status:
+            Number(r.outstanding || 0) <= 0 || r.status === "paid"
+              ? "Paid"
+              : "Outstanding",
         })),
-        totals: { date: "", vendor: "TOTAL", bill: "", amount: formatINR(purchaseTotal), status: "" },
+        totals: {
+          date: "",
+          vendor: "TOTAL",
+          bill: "",
+          amount: formatINR(purchaseTotal),
+          status: "",
+        },
       };
     }
     // ledger summary
@@ -307,10 +428,34 @@ const BooksOfAccountsPage = () => {
       columns: [
         { key: "section", label: "Section", width: 1.2 },
         { key: "name", label: "Name", width: 3 },
-        { key: "debit", label: "Total Debit / Invoiced / Billed", width: 2, align: "right", numeric: true },
-        { key: "credit", label: "Total Credit / Paid", width: 1.6, align: "right", numeric: true },
-        { key: "outstanding", label: "Outstanding", width: 1.6, align: "right", numeric: true },
-        { key: "closing", label: "Closing", width: 1.6, align: "right", numeric: true },
+        {
+          key: "debit",
+          label: "Total Debit / Invoiced / Billed",
+          width: 2,
+          align: "right",
+          numeric: true,
+        },
+        {
+          key: "credit",
+          label: "Total Credit / Paid",
+          width: 1.6,
+          align: "right",
+          numeric: true,
+        },
+        {
+          key: "outstanding",
+          label: "Outstanding",
+          width: 1.6,
+          align: "right",
+          numeric: true,
+        },
+        {
+          key: "closing",
+          label: "Closing",
+          width: 1.6,
+          align: "right",
+          numeric: true,
+        },
       ],
       rows,
     };
@@ -319,7 +464,10 @@ const BooksOfAccountsPage = () => {
   const exportPdf = () => {
     const e = buildExport();
     if (!e || e.rows.length === 0) {
-      toast({ title: "Nothing to export", description: "No data in selected range." });
+      toast({
+        title: "Nothing to export",
+        description: "No data in selected range.",
+      });
       return;
     }
     const meta = TAB_META.find((t) => t.key === tab)!;
@@ -337,7 +485,10 @@ const BooksOfAccountsPage = () => {
   const exportXlsx = () => {
     const e = buildExport();
     if (!e || e.rows.length === 0) {
-      toast({ title: "Nothing to export", description: "No data in selected range." });
+      toast({
+        title: "Nothing to export",
+        description: "No data in selected range.",
+      });
       return;
     }
     const meta = TAB_META.find((t) => t.key === tab)!;
@@ -346,17 +497,23 @@ const BooksOfAccountsPage = () => {
     const aoa: any[][] = [header, ...body];
     if (e.totals) aoa.push(e.columns.map((c) => e.totals![c.key]));
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!cols"] = e.columns.map((c) => ({ wch: Math.max(12, c.label.length + 4) }));
+    ws["!cols"] = e.columns.map((c) => ({
+      wch: Math.max(12, c.label.length + 4),
+    }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, e.title.slice(0, 31));
-    XLSX.writeFile(wb, `fynhelp-${meta.filename}-${fromDate}-to-${toDate}.xlsx`);
+    XLSX.writeFile(
+      wb,
+      `fynhelp-${meta.filename}-${fromDate}-to-${toDate}.xlsx`,
+    );
   };
 
   const loadingActive =
     (tab === "cash" && txnQuery.isLoading) ||
     (tab === "sales" && recvQuery.isLoading) ||
     (tab === "purchase" && payQuery.isLoading) ||
-    (tab === "ledger" && (txnQuery.isLoading || recvQuery.isLoading || payQuery.isLoading));
+    (tab === "ledger" &&
+      (txnQuery.isLoading || recvQuery.isLoading || payQuery.isLoading));
 
   const errorActive =
     (tab === "cash" && txnQuery.error) ||
@@ -373,9 +530,11 @@ const BooksOfAccountsPage = () => {
   return (
     <DashboardLayout>
       <div className="space-y-4">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="flex items-start justify-between gap-fyn-md flex-wrap">
           <div>
-            <h1 className="font-serif text-2xl text-fyn-ink">Books of Accounts</h1>
+            <h1 className="font-serif text-2xl text-fyn-ink">
+              Books of Accounts
+            </h1>
             <p className="text-sm text-fyn-ink/60 mt-1">
               Statutory books generated from your live transaction data.
             </p>
@@ -402,17 +561,37 @@ const BooksOfAccountsPage = () => {
         </div>
 
         {/* Filters */}
-        <div className="bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg p-4 flex flex-wrap items-end gap-4">
+        <div className="bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg p-4 flex flex-wrap items-end gap-fyn-md">
           <div className="space-y-1">
-            <Label htmlFor="from" className="text-xs text-fyn-ink/60">From</Label>
-            <Input id="from" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="w-44" />
+            <Label htmlFor="from" className="text-xs text-fyn-ink/60">
+              From
+            </Label>
+            <Input
+              id="from"
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="w-44"
+            />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="to" className="text-xs text-fyn-ink/60">To</Label>
-            <Input id="to" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="w-44" />
+            <Label htmlFor="to" className="text-xs text-fyn-ink/60">
+              To
+            </Label>
+            <Input
+              id="to"
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="w-44"
+            />
           </div>
           <button
-            onClick={() => { const f = currentFY(); setFromDate(f.from); setToDate(f.to); }}
+            onClick={() => {
+              const f = currentFY();
+              setFromDate(f.from);
+              setToDate(f.to);
+            }}
             className="text-xs text-fyn-red hover:underline pb-2"
           >
             Reset to current FY
@@ -448,7 +627,10 @@ const BooksOfAccountsPage = () => {
         ) : tab === "sales" ? (
           <SalesJournalView rows={recvQuery.data || []} total={salesTotal} />
         ) : tab === "purchase" ? (
-          <PurchaseJournalView rows={payQuery.data || []} total={purchaseTotal} />
+          <PurchaseJournalView
+            rows={payQuery.data || []}
+            total={purchaseTotal}
+          />
         ) : (
           <LedgerSummaryView
             cashTotals={cashTotals}
@@ -463,7 +645,9 @@ const BooksOfAccountsPage = () => {
 
 const EmptyState = ({ label }: { label: string }) => (
   <div className="bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg p-10 text-center">
-    <h2 className="text-fyn-ink text-lg font-serif mb-2">No {label} for this period</h2>
+    <h2 className="text-fyn-ink text-lg font-serif mb-2">
+      No {label} for this period
+    </h2>
     <p className="text-fyn-ink/60 text-sm mb-4">
       Try widening the date range, or import data to get started.
     </p>
@@ -478,8 +662,12 @@ const EmptyState = ({ label }: { label: string }) => (
 
 const ErrorState = ({ onRetry }: { onRetry: () => void }) => (
   <div className="bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg p-10 text-center">
-    <h2 className="text-fyn-ink text-lg font-serif mb-2">Could not load data</h2>
-    <p className="text-fyn-ink/60 text-sm mb-4">Something went wrong while querying your books.</p>
+    <h2 className="text-fyn-ink text-lg font-serif mb-2">
+      Could not load data
+    </h2>
+    <p className="text-fyn-ink/60 text-sm mb-4">
+      Something went wrong while querying your books.
+    </p>
     <button
       onClick={onRetry}
       className="bg-fyn-red text-white px-4 py-2 rounded-md text-sm font-medium hover:opacity-90 transition"
@@ -495,7 +683,14 @@ const CashBookView = ({
   rows,
   totals,
 }: {
-  rows: { id: string; date: string; particulars: string; debit: number; credit: number; balance: number }[];
+  rows: {
+    id: string;
+    date: string;
+    particulars: string;
+    debit: number;
+    credit: number;
+    balance: number;
+  }[];
   totals: { debit: number; credit: number; closing: number };
 }) => {
   if (rows.length === 0) return <EmptyState label="cash / bank transactions" />;
@@ -513,23 +708,43 @@ const CashBookView = ({
         </TableHeader>
         <TableBody>
           <TableRow>
-            <TableCell className="text-fyn-ink/60 italic" colSpan={4}>Opening Balance</TableCell>
-            <TableCell className="text-right font-mono tabular-nums">{formatINR(0)}</TableCell>
+            <TableCell className="text-fyn-ink/60 italic" colSpan={4}>
+              Opening Balance
+            </TableCell>
+            <TableCell className="text-right font-mono tabular-nums">
+              {formatINR(0)}
+            </TableCell>
           </TableRow>
           {rows.map((r) => (
             <TableRow key={r.id}>
               <TableCell>{fmtDate(r.date)}</TableCell>
-              <TableCell className="max-w-md truncate">{r.particulars}</TableCell>
-              <TableCell className="text-right font-mono tabular-nums text-green-700">{num(r.debit)}</TableCell>
-              <TableCell className="text-right font-mono tabular-nums text-fyn-red">{num(r.credit)}</TableCell>
-              <TableCell className="text-right font-mono tabular-nums">{formatINR(r.balance)}</TableCell>
+              <TableCell className="max-w-md truncate">
+                {r.particulars}
+              </TableCell>
+              <TableCell className="text-right font-mono tabular-nums text-green-700">
+                {num(r.debit)}
+              </TableCell>
+              <TableCell className="text-right font-mono tabular-nums text-fyn-red">
+                {num(r.credit)}
+              </TableCell>
+              <TableCell className="text-right font-mono tabular-nums">
+                {formatINR(r.balance)}
+              </TableCell>
             </TableRow>
           ))}
           <TableRow className="bg-fyn-beige font-bold">
-            <TableCell colSpan={2} className="font-bold">TOTAL / Closing Balance</TableCell>
-            <TableCell className="text-right font-mono tabular-nums font-bold">{formatINR(totals.debit)}</TableCell>
-            <TableCell className="text-right font-mono tabular-nums font-bold">{formatINR(totals.credit)}</TableCell>
-            <TableCell className="text-right font-mono tabular-nums font-bold">{formatINR(totals.closing)}</TableCell>
+            <TableCell colSpan={2} className="font-bold">
+              TOTAL / Closing Balance
+            </TableCell>
+            <TableCell className="text-right font-mono tabular-nums font-bold">
+              {formatINR(totals.debit)}
+            </TableCell>
+            <TableCell className="text-right font-mono tabular-nums font-bold">
+              {formatINR(totals.credit)}
+            </TableCell>
+            <TableCell className="text-right font-mono tabular-nums font-bold">
+              {formatINR(totals.closing)}
+            </TableCell>
           </TableRow>
         </TableBody>
       </Table>
@@ -537,7 +752,10 @@ const CashBookView = ({
   );
 };
 
-const statusOf = (r: any) => (Number(r.outstanding || 0) <= 0 || r.status === "paid" ? "Paid" : "Outstanding");
+const statusOf = (r: any) =>
+  Number(r.outstanding || 0) <= 0 || r.status === "paid"
+    ? "Paid"
+    : "Outstanding";
 
 const SalesJournalView = ({ rows, total }: { rows: any[]; total: number }) => {
   if (rows.length === 0) return <EmptyState label="sales invoices" />;
@@ -560,17 +778,27 @@ const SalesJournalView = ({ rows, total }: { rows: any[]; total: number }) => {
               <TableRow key={r.id}>
                 <TableCell>{fmtDate(r.invoice_date)}</TableCell>
                 <TableCell>{r.customer_name}</TableCell>
-                <TableCell className="font-mono">{r.invoice_number || "-"}</TableCell>
-                <TableCell className="text-right font-mono tabular-nums">{formatINR(Number(r.amount || 0))}</TableCell>
+                <TableCell className="font-mono">
+                  {r.invoice_number || "-"}
+                </TableCell>
+                <TableCell className="text-right font-mono tabular-nums">
+                  {formatINR(Number(r.amount || 0))}
+                </TableCell>
                 <TableCell>
-                  <Badge variant={st === "Paid" ? "default" : "secondary"}>{st}</Badge>
+                  <Badge variant={st === "Paid" ? "default" : "secondary"}>
+                    {st}
+                  </Badge>
                 </TableCell>
               </TableRow>
             );
           })}
           <TableRow className="bg-fyn-beige font-bold">
-            <TableCell colSpan={3} className="font-bold">TOTAL</TableCell>
-            <TableCell className="text-right font-mono tabular-nums font-bold">{formatINR(total)}</TableCell>
+            <TableCell colSpan={3} className="font-bold">
+              TOTAL
+            </TableCell>
+            <TableCell className="text-right font-mono tabular-nums font-bold">
+              {formatINR(total)}
+            </TableCell>
             <TableCell />
           </TableRow>
         </TableBody>
@@ -579,7 +807,13 @@ const SalesJournalView = ({ rows, total }: { rows: any[]; total: number }) => {
   );
 };
 
-const PurchaseJournalView = ({ rows, total }: { rows: any[]; total: number }) => {
+const PurchaseJournalView = ({
+  rows,
+  total,
+}: {
+  rows: any[];
+  total: number;
+}) => {
   if (rows.length === 0) return <EmptyState label="purchase bills" />;
   return (
     <div className="bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg overflow-hidden">
@@ -600,17 +834,27 @@ const PurchaseJournalView = ({ rows, total }: { rows: any[]; total: number }) =>
               <TableRow key={r.id}>
                 <TableCell>{fmtDate(r.due_date)}</TableCell>
                 <TableCell>{r.vendor_name}</TableCell>
-                <TableCell className="font-mono">{r.invoice_number || "-"}</TableCell>
-                <TableCell className="text-right font-mono tabular-nums">{formatINR(Number(r.amount || 0))}</TableCell>
+                <TableCell className="font-mono">
+                  {r.invoice_number || "-"}
+                </TableCell>
+                <TableCell className="text-right font-mono tabular-nums">
+                  {formatINR(Number(r.amount || 0))}
+                </TableCell>
                 <TableCell>
-                  <Badge variant={st === "Paid" ? "default" : "secondary"}>{st}</Badge>
+                  <Badge variant={st === "Paid" ? "default" : "secondary"}>
+                    {st}
+                  </Badge>
                 </TableCell>
               </TableRow>
             );
           })}
           <TableRow className="bg-fyn-beige font-bold">
-            <TableCell colSpan={3} className="font-bold">TOTAL</TableCell>
-            <TableCell className="text-right font-mono tabular-nums font-bold">{formatINR(total)}</TableCell>
+            <TableCell colSpan={3} className="font-bold">
+              TOTAL
+            </TableCell>
+            <TableCell className="text-right font-mono tabular-nums font-bold">
+              {formatINR(total)}
+            </TableCell>
             <TableCell />
           </TableRow>
         </TableBody>
@@ -636,7 +880,9 @@ const LedgerGroup = ({
         className="w-full flex items-center justify-between px-4 py-3 hover:bg-fyn-ink-05 transition"
       >
         <span className="font-serif text-fyn-ink text-base">{title}</span>
-        <ChevronRight className={`w-4 h-4 transition ${open ? "rotate-90" : ""}`} />
+        <ChevronRight
+          className={`w-4 h-4 transition ${open ? "rotate-90" : ""}`}
+        />
       </button>
       {open && <div className="border-t border-fyn-ink-10">{children}</div>}
     </div>
@@ -649,32 +895,60 @@ const LedgerSummaryView = ({
   vendorLedger,
 }: {
   cashTotals: { debit: number; credit: number; closing: number };
-  customerLedger: { name: string; invoiced: number; outstanding: number; paid: number; items: any[] }[];
-  vendorLedger: { name: string; billed: number; outstanding: number; paid: number; items: any[] }[];
+  customerLedger: {
+    name: string;
+    invoiced: number;
+    outstanding: number;
+    paid: number;
+    items: any[];
+  }[];
+  vendorLedger: {
+    name: string;
+    billed: number;
+    outstanding: number;
+    paid: number;
+    items: any[];
+  }[];
 }) => {
   const net = cashTotals.debit - cashTotals.credit;
   return (
     <div className="space-y-4">
       <LedgerGroup title="Bank Ledger" defaultOpen>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4">
-          <Stat label="Total Debits (In)" value={formatINR(cashTotals.debit)} tone="pos" />
-          <Stat label="Total Credits (Out)" value={formatINR(cashTotals.credit)} tone="neg" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-fyn-md p-4">
+          <Stat
+            label="Total Debits (In)"
+            value={formatINR(cashTotals.debit)}
+            tone="pos"
+          />
+          <Stat
+            label="Total Credits (Out)"
+            value={formatINR(cashTotals.credit)}
+            tone="neg"
+          />
           <Stat label="Net Movement" value={formatINR(net)} />
           <Stat label="Closing Balance" value={formatINR(cashTotals.closing)} />
         </div>
       </LedgerGroup>
 
-      <LedgerGroup title={`Customer Ledger (Sundry Debtors) · ${customerLedger.length}`}>
+      <LedgerGroup
+        title={`Customer Ledger (Sundry Debtors) · ${customerLedger.length}`}
+      >
         {customerLedger.length === 0 ? (
-          <div className="p-6 text-sm text-fyn-ink/60">No customers in this period.</div>
+          <div className="p-6 text-sm text-fyn-ink/60">
+            No customers in this period.
+          </div>
         ) : (
           <CustomerLedgerTable data={customerLedger} />
         )}
       </LedgerGroup>
 
-      <LedgerGroup title={`Vendor Ledger (Sundry Creditors) · ${vendorLedger.length}`}>
+      <LedgerGroup
+        title={`Vendor Ledger (Sundry Creditors) · ${vendorLedger.length}`}
+      >
         {vendorLedger.length === 0 ? (
-          <div className="p-6 text-sm text-fyn-ink/60">No vendors in this period.</div>
+          <div className="p-6 text-sm text-fyn-ink/60">
+            No vendors in this period.
+          </div>
         ) : (
           <VendorLedgerTable data={vendorLedger} />
         )}
@@ -683,12 +957,26 @@ const LedgerSummaryView = ({
   );
 };
 
-const Stat = ({ label, value, tone }: { label: string; value: string; tone?: "pos" | "neg" }) => (
+const Stat = ({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: "pos" | "neg";
+}) => (
   <div>
-    <div className="text-xs uppercase tracking-wide text-fyn-ink/50 mb-1">{label}</div>
+    <div className="text-xs uppercase tracking-wide text-fyn-ink/50 mb-1">
+      {label}
+    </div>
     <div
       className={`font-mono tabular-nums text-lg ${
-        tone === "pos" ? "text-green-700" : tone === "neg" ? "text-fyn-red" : "text-fyn-ink"
+        tone === "pos"
+          ? "text-green-700"
+          : tone === "neg"
+            ? "text-fyn-red"
+            : "text-fyn-ink"
       }`}
     >
       {value}
@@ -712,23 +1000,44 @@ const CustomerLedgerTable = ({ data }: { data: any[] }) => {
       <TableBody>
         {data.map((c) => (
           <Fragment key={c.name}>
-            <TableRow key={c.name} className="cursor-pointer" onClick={() => setExpanded(expanded === c.name ? null : c.name)}>
+            <TableRow
+              key={c.name}
+              className="cursor-pointer"
+              onClick={() => setExpanded(expanded === c.name ? null : c.name)}
+            >
               <TableCell className="w-8">
-                <ChevronRight className={`w-4 h-4 transition ${expanded === c.name ? "rotate-90" : ""}`} />
+                <ChevronRight
+                  className={`w-4 h-4 transition ${expanded === c.name ? "rotate-90" : ""}`}
+                />
               </TableCell>
               <TableCell className="font-medium">{c.name}</TableCell>
-              <TableCell className="text-right font-mono tabular-nums">{formatINR(c.invoiced)}</TableCell>
-              <TableCell className="text-right font-mono tabular-nums text-green-700">{formatINR(c.paid)}</TableCell>
-              <TableCell className="text-right font-mono tabular-nums text-fyn-red">{formatINR(c.outstanding)}</TableCell>
+              <TableCell className="text-right font-mono tabular-nums">
+                {formatINR(c.invoiced)}
+              </TableCell>
+              <TableCell className="text-right font-mono tabular-nums text-green-700">
+                {formatINR(c.paid)}
+              </TableCell>
+              <TableCell className="text-right font-mono tabular-nums text-fyn-red">
+                {formatINR(c.outstanding)}
+              </TableCell>
             </TableRow>
             {expanded === c.name && (
               <TableRow key={c.name + "-x"}>
                 <TableCell colSpan={5} className="bg-fyn-beige/40">
                   <div className="space-y-1 py-2">
                     {c.items.map((it: any) => (
-                      <div key={it.id} className="flex justify-between text-xs text-fyn-ink/70 font-mono">
-                        <span>{fmtDate(it.invoice_date)} · {it.invoice_number || "-"}</span>
-                        <span>{formatINR(Number(it.amount || 0))} · outstanding {formatINR(Number(it.outstanding || 0))}</span>
+                      <div
+                        key={it.id}
+                        className="flex justify-between text-xs text-fyn-ink/70 font-mono"
+                      >
+                        <span>
+                          {fmtDate(it.invoice_date)} ·{" "}
+                          {it.invoice_number || "-"}
+                        </span>
+                        <span>
+                          {formatINR(Number(it.amount || 0))} · outstanding{" "}
+                          {formatINR(Number(it.outstanding || 0))}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -758,23 +1067,43 @@ const VendorLedgerTable = ({ data }: { data: any[] }) => {
       <TableBody>
         {data.map((v) => (
           <Fragment key={v.name}>
-            <TableRow key={v.name} className="cursor-pointer" onClick={() => setExpanded(expanded === v.name ? null : v.name)}>
+            <TableRow
+              key={v.name}
+              className="cursor-pointer"
+              onClick={() => setExpanded(expanded === v.name ? null : v.name)}
+            >
               <TableCell className="w-8">
-                <ChevronRight className={`w-4 h-4 transition ${expanded === v.name ? "rotate-90" : ""}`} />
+                <ChevronRight
+                  className={`w-4 h-4 transition ${expanded === v.name ? "rotate-90" : ""}`}
+                />
               </TableCell>
               <TableCell className="font-medium">{v.name}</TableCell>
-              <TableCell className="text-right font-mono tabular-nums">{formatINR(v.billed)}</TableCell>
-              <TableCell className="text-right font-mono tabular-nums text-green-700">{formatINR(v.paid)}</TableCell>
-              <TableCell className="text-right font-mono tabular-nums text-fyn-red">{formatINR(v.outstanding)}</TableCell>
+              <TableCell className="text-right font-mono tabular-nums">
+                {formatINR(v.billed)}
+              </TableCell>
+              <TableCell className="text-right font-mono tabular-nums text-green-700">
+                {formatINR(v.paid)}
+              </TableCell>
+              <TableCell className="text-right font-mono tabular-nums text-fyn-red">
+                {formatINR(v.outstanding)}
+              </TableCell>
             </TableRow>
             {expanded === v.name && (
               <TableRow key={v.name + "-x"}>
                 <TableCell colSpan={5} className="bg-fyn-beige/40">
                   <div className="space-y-1 py-2">
                     {v.items.map((it: any) => (
-                      <div key={it.id} className="flex justify-between text-xs text-fyn-ink/70 font-mono">
-                        <span>{fmtDate(it.due_date)} · {it.invoice_number || "-"}</span>
-                        <span>{formatINR(Number(it.amount || 0))} · outstanding {formatINR(Number(it.outstanding || 0))}</span>
+                      <div
+                        key={it.id}
+                        className="flex justify-between text-xs text-fyn-ink/70 font-mono"
+                      >
+                        <span>
+                          {fmtDate(it.due_date)} · {it.invoice_number || "-"}
+                        </span>
+                        <span>
+                          {formatINR(Number(it.amount || 0))} · outstanding{" "}
+                          {formatINR(Number(it.outstanding || 0))}
+                        </span>
                       </div>
                     ))}
                   </div>

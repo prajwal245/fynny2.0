@@ -92,8 +92,8 @@ const AuditReadinessPage = () => {
     readinessScore > 75
       ? "#16A34A"
       : readinessScore > 50
-      ? "#8B5A00"
-      : "#C41E1E";
+        ? "#8B5A00"
+        : "#C41E1E";
 
   if (isLoading) {
     return (
@@ -130,7 +130,7 @@ const AuditReadinessPage = () => {
           {checklist.map((item) => (
             <li
               key={item.label}
-              className="flex items-center gap-3 p-3 rounded-md bg-fyn-beige border border-fyn-ink-10"
+              className="flex items-center gap-fyn-sm p-3 rounded-md bg-fyn-beige border border-fyn-ink-10"
             >
               <span
                 className="flex items-center justify-center w-6 h-6 rounded-full"

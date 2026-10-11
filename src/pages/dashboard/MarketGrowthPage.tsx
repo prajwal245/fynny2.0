@@ -20,7 +20,9 @@ const MarketGrowthPage = () => {
 
   useEffect(() => {
     const fetchBusiness = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
       const { data } = await supabase
         .from("profiles")
@@ -77,16 +79,19 @@ const MarketGrowthPage = () => {
 
   const totalRevenue = receivables.reduce(
     (sum, r: any) => sum + (Number(r.amount) || 0),
-    0
+    0,
   );
 
-  const byMonth = receivables.reduce((acc: Record<string, number>, r: any) => {
-    if (!r.invoice_date) return acc;
-    const month = String(r.invoice_date).substring(0, 7);
-    if (!acc[month]) acc[month] = 0;
-    acc[month] += Number(r.amount) || 0;
-    return acc;
-  }, {} as Record<string, number>);
+  const byMonth = receivables.reduce(
+    (acc: Record<string, number>, r: any) => {
+      if (!r.invoice_date) return acc;
+      const month = String(r.invoice_date).substring(0, 7);
+      if (!acc[month]) acc[month] = 0;
+      acc[month] += Number(r.amount) || 0;
+      return acc;
+    },
+    {} as Record<string, number>,
+  );
 
   const months = Object.keys(byMonth).sort();
   const chartData = months.map((month) => ({
@@ -101,13 +106,16 @@ const MarketGrowthPage = () => {
   const prevMonth = months[months.length - 2];
   const growthRate =
     prevMonth && byMonth[prevMonth] > 0
-      ? (((byMonth[lastMonth] - byMonth[prevMonth]) / byMonth[prevMonth]) * 100).toFixed(1)
+      ? (
+          ((byMonth[lastMonth] - byMonth[prevMonth]) / byMonth[prevMonth]) *
+          100
+        ).toFixed(1)
       : "0";
   const growthPositive = parseFloat(growthRate) >= 0;
 
   return (
     <DashboardLayout>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-fyn-md mb-6">
         <Card className="bg-fyn-ink p-5 border-0">
           <p className="text-white/40 text-[13px] fyn-label">TOTAL REVENUE</p>
           <p className="text-white text-[28px] font-bold mt-1 font-sans">
@@ -115,7 +123,9 @@ const MarketGrowthPage = () => {
           </p>
         </Card>
         <Card className="bg-fyn-ink p-5 border-0">
-          <p className="text-white/40 text-[13px] fyn-label">GROWTH RATE (MoM)</p>
+          <p className="text-white/40 text-[13px] fyn-label">
+            GROWTH RATE (MoM)
+          </p>
           <p
             className="text-[28px] font-bold mt-1 font-sans"
             style={{ color: growthPositive ? "#16A34A" : "#C41E1E" }}
@@ -141,7 +151,9 @@ const MarketGrowthPage = () => {
               tickFormatter={(v: number) => `₹${(v / 1000).toFixed(0)}K`}
               fontSize={12}
             />
-            <Tooltip formatter={(v: number) => `₹${v.toLocaleString("en-IN")}`} />
+            <Tooltip
+              formatter={(v: number) => `₹${v.toLocaleString("en-IN")}`}
+            />
             <Line
               type="monotone"
               dataKey="revenue"

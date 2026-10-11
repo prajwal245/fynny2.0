@@ -39,8 +39,8 @@ const CFOReportsPage = () => {
   const { toast } = useToast();
   const [businessId, setBusinessId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const [briefDate, setBriefDate] = useState(
-    () => new Date().toISOString().slice(0, 10)
+  const [briefDate, setBriefDate] = useState(() =>
+    new Date().toISOString().slice(0, 10),
   );
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -88,7 +88,9 @@ const CFOReportsPage = () => {
 
   useEffect(() => {
     const fetchBusiness = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
       const { data } = await supabase
         .from("profiles")
@@ -151,7 +153,9 @@ const CFOReportsPage = () => {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="brief-content">What should this report cover?</Label>
+            <Label htmlFor="brief-content">
+              What should this report cover?
+            </Label>
             <Textarea
               id="brief-content"
               value={content}
@@ -206,7 +210,6 @@ const CFOReportsPage = () => {
               Generate Report
             </button>
           </div>
-
         </div>
         {newReportDialog}
       </DashboardLayout>
@@ -234,7 +237,6 @@ const CFOReportsPage = () => {
           </div>
         </div>
 
-
         <Table>
           <TableHeader>
             <TableRow>
@@ -256,11 +258,14 @@ const CFOReportsPage = () => {
                 <TableRow key={report.id}>
                   <TableCell className="font-medium">
                     {report.brief_date
-                      ? new Date(report.brief_date).toLocaleDateString("en-IN", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        })
+                      ? new Date(report.brief_date).toLocaleDateString(
+                          "en-IN",
+                          {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                          },
+                        )
                       : "-"}
                   </TableCell>
                   <TableCell className="text-fyn-ink/70 text-sm max-w-md">
@@ -274,16 +279,16 @@ const CFOReportsPage = () => {
                     })}
                   </TableCell>
                   <TableCell>
-                    <Badge
-                      variant={report.delivered ? "default" : "secondary"}
-                    >
+                    <Badge variant={report.delivered ? "default" : "secondary"}>
                       {report.delivered ? "Delivered" : "Ready"}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="inline-flex items-center gap-2 justify-end">
                       <button
-                        onClick={() => navigate(`/dashboard/reports/${report.id}`)}
+                        onClick={() =>
+                          navigate(`/dashboard/reports/${report.id}`)
+                        }
                         className="text-fyn-red text-xs font-medium hover:underline"
                       >
                         View →
@@ -297,18 +302,30 @@ const CFOReportsPage = () => {
                           </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-56">
-                          <DropdownMenuItem onClick={() => downloadReportPdf(report, "branded")}>
+                          <DropdownMenuItem
+                            onClick={() => downloadReportPdf(report, "branded")}
+                          >
                             <Sparkles className="w-3.5 h-3.5 mr-2 text-fyn-red" />
                             <div className="flex flex-col">
-                              <span className="text-xs font-medium">Branded PDF</span>
-                              <span className="text-[10px] text-fyn-ink/50">FynHelp colors & logo</span>
+                              <span className="text-xs font-medium">
+                                Branded PDF
+                              </span>
+                              <span className="text-[10px] text-fyn-ink/50">
+                                FynHelp colors & logo
+                              </span>
                             </div>
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => downloadReportPdf(report, "simple")}>
+                          <DropdownMenuItem
+                            onClick={() => downloadReportPdf(report, "simple")}
+                          >
                             <FileText className="w-3.5 h-3.5 mr-2 text-fyn-ink/60" />
                             <div className="flex flex-col">
-                              <span className="text-xs font-medium">Simple PDF</span>
-                              <span className="text-[10px] text-fyn-ink/50">Print-friendly, B&W</span>
+                              <span className="text-xs font-medium">
+                                Simple PDF
+                              </span>
+                              <span className="text-[10px] text-fyn-ink/50">
+                                Print-friendly, B&W
+                              </span>
                             </div>
                           </DropdownMenuItem>
                         </DropdownMenuContent>

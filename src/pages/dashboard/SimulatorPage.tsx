@@ -20,7 +20,9 @@ const SimulatorPage = () => {
 
   useEffect(() => {
     const fetchBusiness = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
       const { data } = await supabase
         .from("profiles")
@@ -32,31 +34,26 @@ const SimulatorPage = () => {
     fetchBusiness();
   }, []);
 
-  const {
-    data,
-    isLoading,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-  } = useInfiniteQuery({
-    queryKey: ["simulations", businessId],
-    enabled: !!businessId,
-    initialPageParam: 0,
-    queryFn: async ({ pageParam }) => {
-      if (!businessId) return [];
-      const from = (pageParam as number) * PAGE_SIZE;
-      const to = from + PAGE_SIZE - 1;
-      const { data } = await supabase
-        .from("simulations")
-        .select("*")
-        .eq("business_id", businessId)
-        .order("created_at", { ascending: false })
-        .range(from, to);
-      return data || [];
-    },
-    getNextPageParam: (lastPage, allPages) =>
-      lastPage.length === PAGE_SIZE ? allPages.length : undefined,
-  });
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useInfiniteQuery({
+      queryKey: ["simulations", businessId],
+      enabled: !!businessId,
+      initialPageParam: 0,
+      queryFn: async ({ pageParam }) => {
+        if (!businessId) return [];
+        const from = (pageParam as number) * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+        const { data } = await supabase
+          .from("simulations")
+          .select("*")
+          .eq("business_id", businessId)
+          .order("created_at", { ascending: false })
+          .range(from, to);
+        return data || [];
+      },
+      getNextPageParam: (lastPage, allPages) =>
+        lastPage.length === PAGE_SIZE ? allPages.length : undefined,
+    });
 
   const simulations = data?.pages.flat() ?? [];
 

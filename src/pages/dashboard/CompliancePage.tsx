@@ -1,14 +1,33 @@
 import { useState, useEffect, useRef, Fragment } from "react";
 import { useNavigate } from "@/lib/router-compat";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { RefreshCw, CalendarIcon, ChevronDown, ChevronRight, Download } from "lucide-react";
+import {
+  RefreshCw,
+  CalendarIcon,
+  ChevronDown,
+  ChevronRight,
+  Download,
+} from "lucide-react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import DashboardLayout from "@/components/DashboardLayout";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import {
   FynCard,
@@ -23,7 +42,11 @@ import {
   FynEmpty,
 } from "@/components/dashboard/ui";
 
-type FilingRow = { status: string; due_date: string | null; filed_date?: string | null };
+type FilingRow = {
+  status: string;
+  due_date: string | null;
+  filed_date?: string | null;
+};
 
 const CompliancePage = () => {
   const navigate = useNavigate();
@@ -32,17 +55,25 @@ const CompliancePage = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const BREAKDOWN_FILTER_KEY = "compliance:breakdownFilter";
-  type BreakdownFilter = "on-time" | "late" | "overdue" | "pending" | "unknown" | null;
+  type BreakdownFilter =
+    "on-time" | "late" | "overdue" | "pending" | "unknown" | null;
   const isValidFilter = (v: unknown): v is Exclude<BreakdownFilter, null> =>
-    v === "on-time" || v === "late" || v === "overdue" || v === "pending" || v === "unknown";
-  const [breakdownFilter, setBreakdownFilter] = useState<BreakdownFilter>(() => {
-    if (typeof window === "undefined") return null;
-    const stored = window.localStorage.getItem(BREAKDOWN_FILTER_KEY);
-    return isValidFilter(stored) ? stored : null;
-  });
+    v === "on-time" ||
+    v === "late" ||
+    v === "overdue" ||
+    v === "pending" ||
+    v === "unknown";
+  const [breakdownFilter, setBreakdownFilter] = useState<BreakdownFilter>(
+    () => {
+      if (typeof window === "undefined") return null;
+      const stored = window.localStorage.getItem(BREAKDOWN_FILTER_KEY);
+      return isValidFilter(stored) ? stored : null;
+    },
+  );
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (breakdownFilter) window.localStorage.setItem(BREAKDOWN_FILTER_KEY, breakdownFilter);
+    if (breakdownFilter)
+      window.localStorage.setItem(BREAKDOWN_FILTER_KEY, breakdownFilter);
     else window.localStorage.removeItem(BREAKDOWN_FILTER_KEY);
   }, [breakdownFilter]);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
@@ -86,8 +117,12 @@ const CompliancePage = () => {
     setIsRefreshing(true);
     try {
       await Promise.all([
-        queryClient.refetchQueries({ queryKey: ["compliance-gst", businessId, fromStr, toStr] }),
-        queryClient.refetchQueries({ queryKey: ["compliance-tds", businessId, fromStr, toStr] }),
+        queryClient.refetchQueries({
+          queryKey: ["compliance-gst", businessId, fromStr, toStr],
+        }),
+        queryClient.refetchQueries({
+          queryKey: ["compliance-tds", businessId, fromStr, toStr],
+        }),
       ]);
       setLastUpdated(new Date());
     } finally {
@@ -98,7 +133,9 @@ const CompliancePage = () => {
 
   useEffect(() => {
     const fetchBusiness = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
       const { data } = await supabase
         .from("profiles")
@@ -118,7 +155,11 @@ const CompliancePage = () => {
     fetchBusiness();
   }, []);
 
-  const { data: gstFilings, isLoading: loadingGst, isFetching: fetchingGst } = useQuery({
+  const {
+    data: gstFilings,
+    isLoading: loadingGst,
+    isFetching: fetchingGst,
+  } = useQuery({
     queryKey: ["compliance-gst", businessId, fromStr, toStr],
     queryFn: async (): Promise<FilingRow[]> => {
       if (!businessId) return [];
@@ -128,12 +169,16 @@ const CompliancePage = () => {
         .eq("business_id", businessId)
         .gte("due_date", fromStr)
         .lte("due_date", toStr);
-      return ((data as unknown) as FilingRow[]) || [];
+      return (data as unknown as FilingRow[]) || [];
     },
     enabled: !!businessId,
   });
 
-  const { data: tdsFilings, isLoading: loadingTds, isFetching: fetchingTds } = useQuery({
+  const {
+    data: tdsFilings,
+    isLoading: loadingTds,
+    isFetching: fetchingTds,
+  } = useQuery({
     queryKey: ["compliance-tds", businessId, fromStr, toStr],
     queryFn: async (): Promise<FilingRow[]> => {
       if (!businessId) return [];
@@ -143,7 +188,7 @@ const CompliancePage = () => {
         .eq("business_id", businessId)
         .gte("due_date", fromStr)
         .lte("due_date", toStr);
-      return ((data as unknown) as FilingRow[]) || [];
+      return (data as unknown as FilingRow[]) || [];
     },
     enabled: !!businessId,
   });
@@ -156,7 +201,10 @@ const CompliancePage = () => {
       setLastUpdated(new Date());
     }
   }, [isFetching, gstFilings, tdsFilings, lastUpdated]);
-  const allFilings = [...(gstFilings || []).map(f => ({ ...f, _src: "GST" as const })), ...(tdsFilings || []).map(f => ({ ...f, _src: "TDS" as const }))];
+  const allFilings = [
+    ...(gstFilings || []).map((f) => ({ ...f, _src: "GST" as const })),
+    ...(tdsFilings || []).map((f) => ({ ...f, _src: "TDS" as const })),
+  ];
   const totalFilings = allFilings.length;
 
   // Classification rules (mutually exclusive, exhaustive over rows with a known due_date):
@@ -169,9 +217,14 @@ const CompliancePage = () => {
   const isFiledStatus = (f: FilingRow) => f.status === "filed";
   const isUnknown = (f: FilingRow) => !f.due_date;
   const isOnTime = (f: FilingRow) =>
-    !isUnknown(f) && isFiledStatus(f) && !!f.filed_date && f.filed_date <= (f.due_date as string);
+    !isUnknown(f) &&
+    isFiledStatus(f) &&
+    !!f.filed_date &&
+    f.filed_date <= (f.due_date as string);
   const isLate = (f: FilingRow) =>
-    !isUnknown(f) && isFiledStatus(f) && (!f.filed_date || (f.filed_date as string) > (f.due_date as string));
+    !isUnknown(f) &&
+    isFiledStatus(f) &&
+    (!f.filed_date || (f.filed_date as string) > (f.due_date as string));
   const isOverdueNotFiled = (f: FilingRow) =>
     !isUnknown(f) && !isFiledStatus(f) && (f.due_date as string) < todayStr;
   const isPending = (f: FilingRow) =>
@@ -206,7 +259,8 @@ const CompliancePage = () => {
           label: "Filed late",
           color: "#8B5A00",
           rule: "filed AND filed_date missing",
-          detail: "Marked filed but the filed date is missing, counted as late.",
+          detail:
+            "Marked filed but the filed date is missing, counted as late.",
         };
       }
       const diff = daysBetween(f.filed_date, due);
@@ -242,7 +296,8 @@ const CompliancePage = () => {
   const unknownCount = allFilings.filter(isUnknown).length;
   // Score denominator excludes unknowns so the formula matches the visible breakdown.
   const scoredTotal = onTimeCount + lateCount + overdueCount + pendingCount;
-  const complianceScore = scoredTotal > 0 ? Math.round((onTimeCount / scoredTotal) * 100) : 0;
+  const complianceScore =
+    scoredTotal > 0 ? Math.round((onTimeCount / scoredTotal) * 100) : 0;
 
   const gstFiled = gstFilings?.filter((f) => f.status === "filed").length || 0;
   const gstTotal = gstFilings?.length || 0;
@@ -257,9 +312,15 @@ const CompliancePage = () => {
     return d.toISOString().split("T")[0];
   })();
   const countUrgency = (rows: FilingRow[] = []) => {
-    const overdue = rows.filter((r) => !!r.due_date && r.status !== "filed" && r.due_date < today).length;
+    const overdue = rows.filter(
+      (r) => !!r.due_date && r.status !== "filed" && r.due_date < today,
+    ).length;
     const dueSoon = rows.filter(
-      (r) => !!r.due_date && r.status !== "filed" && r.due_date >= today && r.due_date <= sevenDaysOut
+      (r) =>
+        !!r.due_date &&
+        r.status !== "filed" &&
+        r.due_date >= today &&
+        r.due_date <= sevenDaysOut,
     ).length;
     return { overdue, dueSoon };
   };
@@ -271,7 +332,11 @@ const CompliancePage = () => {
   const isEmpty = !isLoading && totalFilings === 0;
 
   const scoreColor =
-    complianceScore > 80 ? "#1A6B3C" : complianceScore > 50 ? "#8B5A00" : "#C41E1E";
+    complianceScore > 80
+      ? "#1A6B3C"
+      : complianceScore > 50
+        ? "#8B5A00"
+        : "#C41E1E";
 
   // Build 3-month on-time % trend per source
   const trendData = (() => {
@@ -288,7 +353,11 @@ const CompliancePage = () => {
       const inMonth = rows.filter((r) => r.due_date?.startsWith(monthKey));
       if (inMonth.length === 0) return null;
       const onTime = inMonth.filter(
-        (r) => r.status === "filed" && r.filed_date && r.due_date && r.filed_date <= r.due_date
+        (r) =>
+          r.status === "filed" &&
+          r.filed_date &&
+          r.due_date &&
+          r.filed_date <= r.due_date,
       ).length;
       return Math.round((onTime / inMonth.length) * 100);
     };
@@ -311,7 +380,10 @@ const CompliancePage = () => {
             <Button
               variant="outline"
               disabled={controlsLocked}
-              className={cn("h-9 justify-start text-left font-normal text-fyn-small", !fromDate && "text-muted-foreground")}
+              className={cn(
+                "h-9 justify-start text-left font-normal text-fyn-small",
+                !fromDate && "text-muted-foreground",
+              )}
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
               {fromDate ? format(fromDate, "dd MMM yyyy") : "From"}
@@ -334,7 +406,10 @@ const CompliancePage = () => {
             <Button
               variant="outline"
               disabled={controlsLocked}
-              className={cn("h-9 justify-start text-left font-normal text-fyn-small", !toDate && "text-muted-foreground")}
+              className={cn(
+                "h-9 justify-start text-left font-normal text-fyn-small",
+                !toDate && "text-muted-foreground",
+              )}
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
               {toDate ? format(toDate, "dd MMM yyyy") : "To"}
@@ -357,7 +432,9 @@ const CompliancePage = () => {
           disabled={controlsLocked || !businessId}
           className="bg-fyn-ink text-white border-fyn-ink hover:bg-fyn-ink/90 hover:text-white"
         >
-          <RefreshCw className={`h-4 w-4 ${controlsLocked ? "animate-spin" : ""}`} />
+          <RefreshCw
+            className={`h-4 w-4 ${controlsLocked ? "animate-spin" : ""}`}
+          />
           {controlsLocked ? "Refreshing..." : "Refresh"}
         </FynButton>
       </div>
@@ -377,7 +454,9 @@ const CompliancePage = () => {
             description="Connect your accounting system to track compliance health"
             action={
               <div className="flex items-center justify-center gap-fyn-sm">
-                <FynButton onClick={() => navigate("/dashboard/settings/integrations")}>
+                <FynButton
+                  onClick={() => navigate("/dashboard/settings/integrations")}
+                >
                   Connect Accounting →
                 </FynButton>
                 <FynButton
@@ -385,7 +464,9 @@ const CompliancePage = () => {
                   onClick={handleRefresh}
                   disabled={controlsLocked || !businessId}
                 >
-                  <RefreshCw className={`h-4 w-4 ${controlsLocked ? "animate-spin" : ""}`} />
+                  <RefreshCw
+                    className={`h-4 w-4 ${controlsLocked ? "animate-spin" : ""}`}
+                  />
                   {controlsLocked ? "Retrying..." : "Retry"}
                 </FynButton>
               </div>
@@ -415,14 +496,14 @@ const CompliancePage = () => {
                   "mb-fyn-sm flex items-center justify-between gap-fyn-sm rounded-lg border px-fyn-sm py-2 text-fyn-tiny",
                   tdsConnected
                     ? "bg-[#1A6B3C]/5 border-[#1A6B3C]/20 text-[#1A6B3C]"
-                    : "bg-[#8B5A00]/5 border-[#8B5A00]/20 text-[#8B5A00]"
+                    : "bg-[#8B5A00]/5 border-[#8B5A00]/20 text-[#8B5A00]",
                 )}
               >
                 <span className="inline-flex items-center gap-fyn-sm font-medium">
                   <span
                     className={cn(
                       "inline-block w-2 h-2 rounded-full",
-                      tdsConnected ? "bg-[#1A6B3C]" : "bg-[#8B5A00]"
+                      tdsConnected ? "bg-[#1A6B3C]" : "bg-[#8B5A00]",
                     )}
                   />
                   {tdsConnected
@@ -430,13 +511,22 @@ const CompliancePage = () => {
                     : "TDS / TRACES disconnected · no filings synced yet"}
                 </span>
                 <button
-                  onClick={tdsConnected ? handleRefresh : () => navigate("/onboarding?step=tds")}
+                  onClick={
+                    tdsConnected
+                      ? handleRefresh
+                      : () => navigate("/onboarding?step=tds")
+                  }
                   disabled={tdsConnected && controlsLocked}
                   className="inline-flex items-center gap-1 font-medium hover:underline disabled:opacity-50 disabled:no-underline"
                 >
                   {tdsConnected ? (
                     <>
-                      <RefreshCw className={cn("h-3 w-3", controlsLocked && "animate-spin")} />
+                      <RefreshCw
+                        className={cn(
+                          "h-3 w-3",
+                          controlsLocked && "animate-spin",
+                        )}
+                      />
                       {controlsLocked ? "Refreshing…" : "Refresh card"}
                     </>
                   ) : (
@@ -454,11 +544,19 @@ const CompliancePage = () => {
               </span>
             </div>
           )}
-          <div className={cn("grid grid-cols-1 lg:grid-cols-3 gap-fyn-md transition-opacity", isFetching && "opacity-70")}>
+          <div
+            className={cn(
+              "grid grid-cols-1 lg:grid-cols-3 gap-fyn-md transition-opacity",
+              isFetching && "opacity-70",
+            )}
+          >
             {/* SCORE CARD */}
             <FynCard className="lg:col-span-1">
               <FynLabel className="mb-fyn-sm">COMPLIANCE HEALTH SCORE</FynLabel>
-              <p className="text-[48px] font-bold font-sans leading-none" style={{ color: scoreColor }}>
+              <p
+                className="text-[48px] font-bold font-sans leading-none"
+                style={{ color: scoreColor }}
+              >
                 {complianceScore}%
               </p>
               <p className="text-fyn-ink/60 text-fyn-tiny mt-fyn-sm">
@@ -469,7 +567,9 @@ const CompliancePage = () => {
                   <FynBadge tone="danger">● {totalOverdue} overdue</FynBadge>
                 )}
                 {totalDueSoon > 0 && (
-                  <FynBadge tone="warning">● {totalDueSoon} due in 7 days</FynBadge>
+                  <FynBadge tone="warning">
+                    ● {totalDueSoon} due in 7 days
+                  </FynBadge>
                 )}
                 {totalOverdue === 0 && totalDueSoon === 0 && (
                   <FynBadge tone="success">● All clear</FynBadge>
@@ -481,25 +581,50 @@ const CompliancePage = () => {
             <FynCard className="relative">
               <FynLabel className="mb-fyn-sm flex items-center gap-fyn-sm">
                 GST FILINGS
-                {fetchingGst && <RefreshCw className="h-3 w-3 animate-spin text-fyn-ink/40" />}
+                {fetchingGst && (
+                  <RefreshCw className="h-3 w-3 animate-spin text-fyn-ink/40" />
+                )}
               </FynLabel>
               {gstTotal === 0 && !fetchingGst ? (
                 <div className="mt-1">
                   {gstConnected ? (
                     <>
-                      <p className="text-fyn-ink text-[28px] font-bold font-sans">0<span className="text-fyn-ink/40 text-lg font-normal">/0</span></p>
-                      <p className="text-fyn-ink/60 text-fyn-tiny mt-fyn-sm">No filings in this date range</p>
-                      <FynBadge tone="success" className="mt-fyn-sm">● GST connected</FynBadge>
+                      <p className="text-fyn-ink text-[28px] font-bold font-sans">
+                        0
+                        <span className="text-fyn-ink/40 text-lg font-normal">
+                          /0
+                        </span>
+                      </p>
+                      <p className="text-fyn-ink/60 text-fyn-tiny mt-fyn-sm">
+                        No filings in this date range
+                      </p>
+                      <FynBadge tone="success" className="mt-fyn-sm">
+                        ● GST connected
+                      </FynBadge>
                     </>
                   ) : (
                     <>
-                      <p className="text-fyn-ink/60 text-fyn-tiny mb-fyn-sm">No GST filings tracked yet.</p>
+                      <p className="text-fyn-ink/60 text-fyn-tiny mb-fyn-sm">
+                        No GST filings tracked yet.
+                      </p>
                       <FynLabel className="mb-1.5">YOU'LL NEED</FynLabel>
                       <ul className="text-fyn-ink/70 text-fyn-tiny space-y-1 mb-fyn-sm">
-                        <li className="flex items-start gap-1.5"><span className="text-fyn-ink/40 mt-0.5">•</span><span>15-character GSTIN</span></li>
-                        <li className="flex items-start gap-1.5"><span className="text-fyn-ink/40 mt-0.5">•</span><span>Filing frequency (monthly or QRMP)</span></li>
-                        <li className="flex items-start gap-1.5"><span className="text-fyn-ink/40 mt-0.5">•</span><span>GST portal username (for OTP sync)</span></li>
-                        <li className="flex items-start gap-1.5"><span className="text-fyn-ink/40 mt-0.5">•</span><span>Authorised signatory mobile / email</span></li>
+                        <li className="flex items-start gap-1.5">
+                          <span className="text-fyn-ink/40 mt-0.5">•</span>
+                          <span>15-character GSTIN</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <span className="text-fyn-ink/40 mt-0.5">•</span>
+                          <span>Filing frequency (monthly or QRMP)</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <span className="text-fyn-ink/40 mt-0.5">•</span>
+                          <span>GST portal username (for OTP sync)</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <span className="text-fyn-ink/40 mt-0.5">•</span>
+                          <span>Authorised signatory mobile / email</span>
+                        </li>
                       </ul>
                       <FynButton
                         variant="secondary"
@@ -513,24 +638,43 @@ const CompliancePage = () => {
                 </div>
               ) : (
                 <>
-                  <p className={cn("text-fyn-ink text-[28px] font-bold font-sans transition-opacity", fetchingGst && "opacity-40")}>
-                    {gstFiled}<span className="text-fyn-ink/40 text-lg font-normal">/{gstTotal}</span>
+                  <p
+                    className={cn(
+                      "text-fyn-ink text-[28px] font-bold font-sans transition-opacity",
+                      fetchingGst && "opacity-40",
+                    )}
+                  >
+                    {gstFiled}
+                    <span className="text-fyn-ink/40 text-lg font-normal">
+                      /{gstTotal}
+                    </span>
                   </p>
-                  <p className="text-fyn-ink/60 text-fyn-tiny mt-fyn-sm">filed on time</p>
+                  <p className="text-fyn-ink/60 text-fyn-tiny mt-fyn-sm">
+                    filed on time
+                  </p>
                   {(gstUrgency.overdue > 0 || gstUrgency.dueSoon > 0) && (
                     <div className="flex flex-wrap gap-1.5 mt-fyn-sm">
                       {gstUrgency.overdue > 0 && (
-                        <FynBadge tone="danger">{gstUrgency.overdue} overdue</FynBadge>
+                        <FynBadge tone="danger">
+                          {gstUrgency.overdue} overdue
+                        </FynBadge>
                       )}
                       {gstUrgency.dueSoon > 0 && (
-                        <FynBadge tone="warning">{gstUrgency.dueSoon} due soon</FynBadge>
+                        <FynBadge tone="warning">
+                          {gstUrgency.dueSoon} due soon
+                        </FynBadge>
                       )}
                     </div>
                   )}
                   <div className="w-full bg-fyn-ink/10 rounded-full h-2 mt-fyn-sm">
                     <div
                       className="bg-[#1A6B3C] h-2 rounded-full transition-all"
-                      style={{ width: gstTotal > 0 ? `${(gstFiled / gstTotal) * 100}%` : "0%" }}
+                      style={{
+                        width:
+                          gstTotal > 0
+                            ? `${(gstFiled / gstTotal) * 100}%`
+                            : "0%",
+                      }}
                     />
                   </div>
                 </>
@@ -541,18 +685,35 @@ const CompliancePage = () => {
             <FynCard className="relative">
               <FynLabel className="mb-fyn-sm flex items-center gap-fyn-sm">
                 TDS FILINGS
-                {fetchingTds && <RefreshCw className="h-3 w-3 animate-spin text-fyn-ink/40" />}
+                {fetchingTds && (
+                  <RefreshCw className="h-3 w-3 animate-spin text-fyn-ink/40" />
+                )}
               </FynLabel>
               {tdsTotal === 0 && !fetchingTds ? (
                 <div className="mt-1">
-                  <p className="text-fyn-ink/60 text-fyn-tiny mb-fyn-sm">No TDS / TRACES filings tracked yet.</p>
+                  <p className="text-fyn-ink/60 text-fyn-tiny mb-fyn-sm">
+                    No TDS / TRACES filings tracked yet.
+                  </p>
                   <FynLabel className="mb-1.5">WHAT WE'LL IMPORT</FynLabel>
                   <ul className="text-fyn-ink/70 text-fyn-tiny space-y-1 mb-fyn-sm">
-                    <li className="flex items-start gap-1.5"><span className="text-fyn-ink/40 mt-0.5">•</span><span>Form 24Q / 26Q / 27Q quarterly returns</span></li>
-                    <li className="flex items-start gap-1.5"><span className="text-fyn-ink/40 mt-0.5">•</span><span>Challan numbers, ARNs &amp; deposit dates</span></li>
-                    <li className="flex items-start gap-1.5"><span className="text-fyn-ink/40 mt-0.5">•</span><span>Default notices &amp; demand status from TRACES</span></li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-fyn-ink/40 mt-0.5">•</span>
+                      <span>Form 24Q / 26Q / 27Q quarterly returns</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-fyn-ink/40 mt-0.5">•</span>
+                      <span>Challan numbers, ARNs &amp; deposit dates</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-fyn-ink/40 mt-0.5">•</span>
+                      <span>
+                        Default notices &amp; demand status from TRACES
+                      </span>
+                    </li>
                   </ul>
-                  <p className="text-fyn-ink/50 text-[11px] mb-fyn-sm">Auto-syncs daily · manual refresh anytime</p>
+                  <p className="text-fyn-ink/50 text-[11px] mb-fyn-sm">
+                    Auto-syncs daily · manual refresh anytime
+                  </p>
                   <FynButton
                     variant="secondary"
                     onClick={() => navigate("/onboarding?step=tds")}
@@ -563,24 +724,43 @@ const CompliancePage = () => {
                 </div>
               ) : (
                 <>
-                  <p className={cn("text-fyn-ink text-[28px] font-bold font-sans transition-opacity", fetchingTds && "opacity-40")}>
-                    {tdsFiled}<span className="text-fyn-ink/40 text-lg font-normal">/{tdsTotal}</span>
+                  <p
+                    className={cn(
+                      "text-fyn-ink text-[28px] font-bold font-sans transition-opacity",
+                      fetchingTds && "opacity-40",
+                    )}
+                  >
+                    {tdsFiled}
+                    <span className="text-fyn-ink/40 text-lg font-normal">
+                      /{tdsTotal}
+                    </span>
                   </p>
-                  <p className="text-fyn-ink/60 text-fyn-tiny mt-fyn-sm">filed on time</p>
+                  <p className="text-fyn-ink/60 text-fyn-tiny mt-fyn-sm">
+                    filed on time
+                  </p>
                   {(tdsUrgency.overdue > 0 || tdsUrgency.dueSoon > 0) && (
                     <div className="flex flex-wrap gap-1.5 mt-fyn-sm">
                       {tdsUrgency.overdue > 0 && (
-                        <FynBadge tone="danger">{tdsUrgency.overdue} overdue</FynBadge>
+                        <FynBadge tone="danger">
+                          {tdsUrgency.overdue} overdue
+                        </FynBadge>
                       )}
                       {tdsUrgency.dueSoon > 0 && (
-                        <FynBadge tone="warning">{tdsUrgency.dueSoon} due soon</FynBadge>
+                        <FynBadge tone="warning">
+                          {tdsUrgency.dueSoon} due soon
+                        </FynBadge>
                       )}
                     </div>
                   )}
                   <div className="w-full bg-fyn-ink/10 rounded-full h-2 mt-fyn-sm">
                     <div
                       className="bg-[#1A6B3C] h-2 rounded-full transition-all"
-                      style={{ width: tdsTotal > 0 ? `${(tdsFiled / tdsTotal) * 100}%` : "0%" }}
+                      style={{
+                        width:
+                          tdsTotal > 0
+                            ? `${(tdsFiled / tdsTotal) * 100}%`
+                            : "0%",
+                      }}
                     />
                   </div>
                 </>
@@ -607,91 +787,121 @@ const CompliancePage = () => {
             <div>
               <FynLabel className="mb-1">HEALTH SCORE BREAKDOWN</FynLabel>
               <p className="text-fyn-ink/70 text-fyn-tiny font-mono">
-                Score = on-time ÷ scored × 100 = {onTimeCount} ÷ {scoredTotal} × 100 = <span className="font-bold" style={{ color: scoreColor }}>{complianceScore}%</span>
+                Score = on-time ÷ scored × 100 = {onTimeCount} ÷ {scoredTotal} ×
+                100 ={" "}
+                <span className="font-bold" style={{ color: scoreColor }}>
+                  {complianceScore}%
+                </span>
               </p>
               {unknownCount > 0 && (
                 <p className="text-fyn-ink/50 text-[11px] mt-1">
-                  {unknownCount} filing{unknownCount === 1 ? "" : "s"} excluded (missing due_date).
+                  {unknownCount} filing{unknownCount === 1 ? "" : "s"} excluded
+                  (missing due_date).
                 </p>
               )}
             </div>
             <div className="flex items-center gap-fyn-sm">
-              {breakdownFilter && (() => {
-                const bucketLabel: Record<string, string> = {
-                  "on-time": "on-time",
-                  late: "late",
-                  overdue: "overdue",
-                  pending: "pending",
-                  unknown: "unknown",
-                };
-                const matchesBucket = (f: typeof allFilings[number]) =>
-                  breakdownFilter === "on-time" ? isOnTime(f) :
-                  breakdownFilter === "late" ? isLate(f) :
-                  breakdownFilter === "overdue" ? isOverdueNotFiled(f) :
-                  breakdownFilter === "unknown" ? isUnknown(f) :
-                  isPending(f);
-                const rows = allFilings.filter(matchesBucket);
-                const escape = (v: string | null | undefined) => {
-                  const s = v == null ? "" : String(v);
-                  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-                };
-                const handleExport = () => {
-                  const header = ["Source", "Due date", "Filed date", "Status"];
-                  const body = rows.map((f) => [
-                    escape(f._src),
-                    escape(f.due_date),
-                    escape(f.filed_date ?? ""),
-                    escape(f.status),
-                  ].join(","));
-                  const csv = [header.join(","), ...body].join("\n");
-                  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = `compliance-${breakdownFilter}-${format(new Date(), "yyyy-MM-dd")}.csv`;
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
-                  URL.revokeObjectURL(url);
-                };
-                const handleExportReasonsCsv = () => {
-                  const header = ["Source", "Due date", "Filed date", "Status", "Classification", "Rule", "Explanation"];
-                  const body = rows.map((f) => {
-                    const exp = explainFiling(f);
-                    return [
-                      escape(f._src),
-                      escape(f.due_date),
-                      escape(f.filed_date ?? ""),
-                      escape(f.status),
-                      escape(exp.label),
-                      escape(exp.rule),
-                      escape(exp.detail),
-                    ].join(",");
-                  });
-                  const csv = [header.join(","), ...body].join("\n");
-                  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = `compliance-${breakdownFilter}-reasons-${format(new Date(), "yyyy-MM-dd")}.csv`;
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
-                  URL.revokeObjectURL(url);
-                };
-                const escapeHtml = (v: string | null | undefined) => {
-                  const s = v == null ? "" : String(v);
-                  return s
-                    .replace(/&/g, "&amp;")
-                    .replace(/</g, "&lt;")
-                    .replace(/>/g, "&gt;")
-                    .replace(/"/g, "&quot;");
-                };
-                const handleExportReasonsPdf = () => {
-                  const today = format(new Date(), "dd MMM yyyy");
-                  const rowsHtml = rows.map((f) => {
-                    const exp = explainFiling(f);
-                    return `<tr>
+              {breakdownFilter &&
+                (() => {
+                  const bucketLabel: Record<string, string> = {
+                    "on-time": "on-time",
+                    late: "late",
+                    overdue: "overdue",
+                    pending: "pending",
+                    unknown: "unknown",
+                  };
+                  const matchesBucket = (f: (typeof allFilings)[number]) =>
+                    breakdownFilter === "on-time"
+                      ? isOnTime(f)
+                      : breakdownFilter === "late"
+                        ? isLate(f)
+                        : breakdownFilter === "overdue"
+                          ? isOverdueNotFiled(f)
+                          : breakdownFilter === "unknown"
+                            ? isUnknown(f)
+                            : isPending(f);
+                  const rows = allFilings.filter(matchesBucket);
+                  const escape = (v: string | null | undefined) => {
+                    const s = v == null ? "" : String(v);
+                    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+                  };
+                  const handleExport = () => {
+                    const header = [
+                      "Source",
+                      "Due date",
+                      "Filed date",
+                      "Status",
+                    ];
+                    const body = rows.map((f) =>
+                      [
+                        escape(f._src),
+                        escape(f.due_date),
+                        escape(f.filed_date ?? ""),
+                        escape(f.status),
+                      ].join(","),
+                    );
+                    const csv = [header.join(","), ...body].join("\n");
+                    const blob = new Blob([csv], {
+                      type: "text/csv;charset=utf-8;",
+                    });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `compliance-${breakdownFilter}-${format(new Date(), "yyyy-MM-dd")}.csv`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                  };
+                  const handleExportReasonsCsv = () => {
+                    const header = [
+                      "Source",
+                      "Due date",
+                      "Filed date",
+                      "Status",
+                      "Classification",
+                      "Rule",
+                      "Explanation",
+                    ];
+                    const body = rows.map((f) => {
+                      const exp = explainFiling(f);
+                      return [
+                        escape(f._src),
+                        escape(f.due_date),
+                        escape(f.filed_date ?? ""),
+                        escape(f.status),
+                        escape(exp.label),
+                        escape(exp.rule),
+                        escape(exp.detail),
+                      ].join(",");
+                    });
+                    const csv = [header.join(","), ...body].join("\n");
+                    const blob = new Blob([csv], {
+                      type: "text/csv;charset=utf-8;",
+                    });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `compliance-${breakdownFilter}-reasons-${format(new Date(), "yyyy-MM-dd")}.csv`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                  };
+                  const escapeHtml = (v: string | null | undefined) => {
+                    const s = v == null ? "" : String(v);
+                    return s
+                      .replace(/&/g, "&amp;")
+                      .replace(/</g, "&lt;")
+                      .replace(/>/g, "&gt;")
+                      .replace(/"/g, "&quot;");
+                  };
+                  const handleExportReasonsPdf = () => {
+                    const today = format(new Date(), "dd MMM yyyy");
+                    const rowsHtml = rows
+                      .map((f) => {
+                        const exp = explainFiling(f);
+                        return `<tr>
                       <td>${escapeHtml(f._src)}</td>
                       <td>${escapeHtml(f.due_date)}</td>
                       <td>${escapeHtml(f.filed_date ?? "-")}</td>
@@ -700,8 +910,9 @@ const CompliancePage = () => {
                       <td><code>${escapeHtml(exp.rule)}</code></td>
                       <td>${escapeHtml(exp.detail)}</td>
                     </tr>`;
-                  }).join("");
-                  const html = `<!doctype html><html><head><meta charset="utf-8" />
+                      })
+                      .join("");
+                    const html = `<!doctype html><html><head><meta charset="utf-8" />
                     <title>Compliance reasons, ${escapeHtml(bucketLabel[breakdownFilter])}, ${today}</title>
                     <style>
                       body { font-family: Inter, system-ui, -apple-system, sans-serif; color: #171208; padding: 24px; }
@@ -723,64 +934,101 @@ const CompliancePage = () => {
                       </tr></thead>
                       <tbody>${rowsHtml}</tbody>
                     </table>
-                    <script>window.addEventListener('load', () => setTimeout(() => window.print(), 250));<\/script>
+                    <script>window.addEventListener('load', () => setTimeout(() => window.print(), 250));</script>
                     </body></html>`;
-                  const w = window.open("", "_blank", "noopener,noreferrer");
-                  if (!w) return;
-                  w.document.open();
-                  w.document.write(html);
-                  w.document.close();
-                };
-                return (
-                  <>
-                    <FynButton
-                      variant="secondary"
-                      onClick={handleExport}
-                      disabled={rows.length === 0}
-                      className="text-fyn-tiny px-2.5 py-1.5"
-                      title={`Export ${rows.length} ${bucketLabel[breakdownFilter]} filing${rows.length === 1 ? "" : "s"} as CSV`}
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      Export breakdown CSV ({rows.length})
-                    </FynButton>
-                    <FynButton
-                      variant="secondary"
-                      onClick={handleExportReasonsCsv}
-                      disabled={rows.length === 0}
-                      className="text-fyn-tiny px-2.5 py-1.5"
-                      title={`Export ${rows.length} explained ${bucketLabel[breakdownFilter]} filing${rows.length === 1 ? "" : "s"} as CSV`}
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      Export reasons CSV
-                    </FynButton>
-                    <FynButton
-                      variant="secondary"
-                      onClick={handleExportReasonsPdf}
-                      disabled={rows.length === 0}
-                      className="text-fyn-tiny px-2.5 py-1.5"
-                      title={`Export ${rows.length} explained ${bucketLabel[breakdownFilter]} filing${rows.length === 1 ? "" : "s"} as PDF`}
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      Export reasons PDF
-                    </FynButton>
-                  </>
-                );
-              })()}
+                    const w = window.open("", "_blank", "noopener,noreferrer");
+                    if (!w) return;
+                    w.document.open();
+                    w.document.write(html);
+                    w.document.close();
+                  };
+                  return (
+                    <>
+                      <FynButton
+                        variant="secondary"
+                        onClick={handleExport}
+                        disabled={rows.length === 0}
+                        className="text-fyn-tiny px-2.5 py-1.5"
+                        title={`Export ${rows.length} ${bucketLabel[breakdownFilter]} filing${rows.length === 1 ? "" : "s"} as CSV`}
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        Export breakdown CSV ({rows.length})
+                      </FynButton>
+                      <FynButton
+                        variant="secondary"
+                        onClick={handleExportReasonsCsv}
+                        disabled={rows.length === 0}
+                        className="text-fyn-tiny px-2.5 py-1.5"
+                        title={`Export ${rows.length} explained ${bucketLabel[breakdownFilter]} filing${rows.length === 1 ? "" : "s"} as CSV`}
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        Export reasons CSV
+                      </FynButton>
+                      <FynButton
+                        variant="secondary"
+                        onClick={handleExportReasonsPdf}
+                        disabled={rows.length === 0}
+                        className="text-fyn-tiny px-2.5 py-1.5"
+                        title={`Export ${rows.length} explained ${bucketLabel[breakdownFilter]} filing${rows.length === 1 ? "" : "s"} as PDF`}
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        Export reasons PDF
+                      </FynButton>
+                    </>
+                  );
+                })()}
               {breakdownFilter && (
-                <button onClick={() => setBreakdownFilter(null)} className="text-fyn-ink/60 text-fyn-tiny hover:text-fyn-ink">
+                <button
+                  onClick={() => setBreakdownFilter(null)}
+                  className="text-fyn-ink/60 text-fyn-tiny hover:text-fyn-ink"
+                >
                   Clear filter ✕
                 </button>
               )}
             </div>
           </div>
 
-          <div className={cn("grid grid-cols-2 gap-fyn-sm mb-fyn-md", unknownCount > 0 ? "md:grid-cols-5" : "md:grid-cols-4") }>
+          <div
+            className={cn(
+              "grid grid-cols-2 gap-fyn-sm mb-fyn-md",
+              unknownCount > 0 ? "md:grid-cols-5" : "md:grid-cols-4",
+            )}
+          >
             {[
-              { key: "on-time" as const, label: "On time", count: onTimeCount, color: "#1A6B3C" },
-              { key: "late" as const, label: "Filed late", count: lateCount, color: "#8B5A00" },
-              { key: "overdue" as const, label: "Overdue", count: overdueCount, color: "#C41E1E" },
-              { key: "pending" as const, label: "Pending", count: pendingCount, color: "#171208" },
-              ...(unknownCount > 0 ? [{ key: "unknown" as const, label: "Unknown", count: unknownCount, color: "#475569" }] : []),
+              {
+                key: "on-time" as const,
+                label: "On time",
+                count: onTimeCount,
+                color: "#1A6B3C",
+              },
+              {
+                key: "late" as const,
+                label: "Filed late",
+                count: lateCount,
+                color: "#8B5A00",
+              },
+              {
+                key: "overdue" as const,
+                label: "Overdue",
+                count: overdueCount,
+                color: "#C41E1E",
+              },
+              {
+                key: "pending" as const,
+                label: "Pending",
+                count: pendingCount,
+                color: "#171208",
+              },
+              ...(unknownCount > 0
+                ? [
+                    {
+                      key: "unknown" as const,
+                      label: "Unknown",
+                      count: unknownCount,
+                      color: "#475569",
+                    },
+                  ]
+                : []),
             ].map((b) => {
               const active = breakdownFilter === b.key;
               const denom = b.key === "unknown" ? totalFilings : scoredTotal;
@@ -790,13 +1038,26 @@ const CompliancePage = () => {
                   onClick={() => setBreakdownFilter(active ? null : b.key)}
                   className={cn(
                     "text-left border rounded-md p-fyn-sm transition-colors",
-                    active ? "border-fyn-ink bg-fyn-beige-card" : "border-fyn-ink-10 hover:border-fyn-ink/30 bg-fyn-beige-card/60"
+                    active
+                      ? "border-fyn-ink bg-fyn-beige-card"
+                      : "border-fyn-ink-10 hover:border-fyn-ink/30 bg-fyn-beige-card/60",
                   )}
                 >
-                  <p className="text-[10px] uppercase tracking-wide" style={{ color: b.color }}>{b.label}</p>
-                  <p className="text-2xl font-bold font-sans mt-1" style={{ color: b.color }}>{b.count}</p>
+                  <p
+                    className="text-[10px] uppercase tracking-wide"
+                    style={{ color: b.color }}
+                  >
+                    {b.label}
+                  </p>
+                  <p
+                    className="text-2xl font-bold font-sans mt-1"
+                    style={{ color: b.color }}
+                  >
+                    {b.count}
+                  </p>
                   <p className="text-fyn-ink/40 text-[10px] mt-1">
-                    {denom > 0 ? Math.round((b.count / denom) * 100) : 0}% {b.key === "unknown" ? "of all rows" : "of scored"}
+                    {denom > 0 ? Math.round((b.count / denom) * 100) : 0}%{" "}
+                    {b.key === "unknown" ? "of all rows" : "of scored"}
                   </p>
                 </button>
               );
@@ -807,12 +1068,19 @@ const CompliancePage = () => {
             <div className="border-t border-fyn-ink-10 pt-fyn-sm">
               <div className="flex items-center justify-between mb-fyn-sm gap-fyn-sm flex-wrap">
                 <p className="text-fyn-ink/60 text-fyn-tiny">
-                  Filings classified as <span className="font-medium text-fyn-ink">{breakdownFilter}</span>:
+                  Filings classified as{" "}
+                  <span className="font-medium text-fyn-ink">
+                    {breakdownFilter}
+                  </span>
+                  :
                 </p>
                 <div className="flex items-center gap-fyn-sm text-fyn-tiny">
                   <button
                     onClick={() => {
-                      const qs = new URLSearchParams({ from: fromStr, to: toStr });
+                      const qs = new URLSearchParams({
+                        from: fromStr,
+                        to: toStr,
+                      });
                       if (breakdownFilter) qs.set("bucket", breakdownFilter);
                       navigate(`/dashboard/gst?${qs.toString()}`);
                     }}
@@ -822,7 +1090,10 @@ const CompliancePage = () => {
                   </button>
                   <button
                     onClick={() => {
-                      const qs = new URLSearchParams({ from: fromStr, to: toStr });
+                      const qs = new URLSearchParams({
+                        from: fromStr,
+                        to: toStr,
+                      });
                       if (breakdownFilter) qs.set("bucket", breakdownFilter);
                       navigate(`/dashboard/tds-tax?${qs.toString()}`);
                     }}
@@ -846,13 +1117,19 @@ const CompliancePage = () => {
                   <tbody>
                     {allFilings
                       .filter((f) =>
-                        breakdownFilter === "on-time" ? isOnTime(f) :
-                        breakdownFilter === "late" ? isLate(f) :
-                        breakdownFilter === "overdue" ? isOverdueNotFiled(f) :
-                        breakdownFilter === "unknown" ? isUnknown(f) :
-                        isPending(f)
+                        breakdownFilter === "on-time"
+                          ? isOnTime(f)
+                          : breakdownFilter === "late"
+                            ? isLate(f)
+                            : breakdownFilter === "overdue"
+                              ? isOverdueNotFiled(f)
+                              : breakdownFilter === "unknown"
+                                ? isUnknown(f)
+                                : isPending(f),
                       )
-                      .sort((a, b) => ((a.due_date || "") < (b.due_date || "") ? 1 : -1))
+                      .sort((a, b) =>
+                        (a.due_date || "") < (b.due_date || "") ? 1 : -1,
+                      )
                       .map((f, i) => {
                         const rowKey = `${f._src}-${i}-${f.due_date}`;
                         const expanded = expandedRow === rowKey;
@@ -861,118 +1138,206 @@ const CompliancePage = () => {
                           <Fragment key={rowKey}>
                             <FynTR
                               className="cursor-pointer"
-                              onClick={() => setExpandedRow(expanded ? null : rowKey)}
+                              onClick={() =>
+                                setExpandedRow(expanded ? null : rowKey)
+                              }
                             >
                               <FynTD className="text-fyn-ink/50 w-6">
-                                {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                                {expanded ? (
+                                  <ChevronDown className="h-3.5 w-3.5" />
+                                ) : (
+                                  <ChevronRight className="h-3.5 w-3.5" />
+                                )}
                               </FynTD>
-                              <FynTD className="text-fyn-ink font-medium">{f._src}</FynTD>
+                              <FynTD className="text-fyn-ink font-medium">
+                                {f._src}
+                              </FynTD>
                               <FynTD>{f.due_date}</FynTD>
                               <FynTD>{f.filed_date || "-"}</FynTD>
                               <FynTD>{f.status}</FynTD>
                             </FynTR>
-                            {expanded && (() => {
-                              // Delta vs due date: filed_date if available, else today (for not-yet-filed rows).
-                              // Negative = before due (good), positive = after due (bad), zero = exactly on due.
-                              const ref = f.filed_date || todayStr;
-                              const hasDue = !!f.due_date;
-                              const delta = hasDue ? daysBetween(ref, f.due_date as string) : null;
-                              const refLabel = f.filed_date ? "filed" : "today";
-                              const badge = (() => {
-                                if (delta === null) {
-                                  return { sign: "?", color: "#475569", text: "no due date" };
-                                }
-                                if (delta < 0) {
+                            {expanded &&
+                              (() => {
+                                // Delta vs due date: filed_date if available, else today (for not-yet-filed rows).
+                                // Negative = before due (good), positive = after due (bad), zero = exactly on due.
+                                const ref = f.filed_date || todayStr;
+                                const hasDue = !!f.due_date;
+                                const delta = hasDue
+                                  ? daysBetween(ref, f.due_date as string)
+                                  : null;
+                                const refLabel = f.filed_date
+                                  ? "filed"
+                                  : "today";
+                                const badge = (() => {
+                                  if (delta === null) {
+                                    return {
+                                      sign: "?",
+                                      color: "#475569",
+                                      text: "no due date",
+                                    };
+                                  }
+                                  if (delta < 0) {
+                                    return {
+                                      sign: `−${Math.abs(delta)}d`,
+                                      color: "#1A6B3C",
+                                      text: `${refLabel} ${Math.abs(delta)} day${Math.abs(delta) === 1 ? "" : "s"} before due`,
+                                    };
+                                  }
+                                  if (delta > 0) {
+                                    return {
+                                      sign: `+${delta}d`,
+                                      color: "#C41E1E",
+                                      text: `${refLabel} ${delta} day${delta === 1 ? "" : "s"} after due`,
+                                    };
+                                  }
                                   return {
-                                    sign: `−${Math.abs(delta)}d`,
-                                    color: "#1A6B3C",
-                                    text: `${refLabel} ${Math.abs(delta)} day${Math.abs(delta) === 1 ? "" : "s"} before due`,
+                                    sign: "0d",
+                                    color: "#8B5A00",
+                                    text: `${refLabel} exactly on due date`,
                                   };
-                                }
-                                if (delta > 0) {
-                                  return {
-                                    sign: `+${delta}d`,
-                                    color: "#C41E1E",
-                                    text: `${refLabel} ${delta} day${delta === 1 ? "" : "s"} after due`,
-                                  };
-                                }
-                                return { sign: "0d", color: "#8B5A00", text: `${refLabel} exactly on due date` };
-                              })();
-                              return (
-                                <FynTR key={`${rowKey}-exp`} className="bg-fyn-beige-card/50 hover:bg-fyn-beige-card/50">
-                                  <FynTD></FynTD>
-                                  <td colSpan={4} className="px-fyn-md py-fyn-sm">
-                                    <div className="text-fyn-tiny space-y-1.5">
-                                      <p className="flex flex-wrap items-center gap-fyn-sm">
-                                        <span className="inline-block px-2 py-0.5 rounded text-[10px] font-medium" style={{ background: `${exp.color}1A`, color: exp.color }}>
-                                          {exp.label}
-                                        </span>
-                                        <span
-                                          className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-semibold border"
-                                          style={{ background: `${badge.color}14`, color: badge.color, borderColor: `${badge.color}40` }}
-                                          title={badge.text}
-                                          aria-label={badge.text}
-                                        >
-                                          {badge.sign}
-                                        </span>
-                                        <span className="text-fyn-ink/70">{exp.detail}</span>
-                                      </p>
-                                      <p className="font-mono text-fyn-ink/60">
-                                        Rule: <span className="text-fyn-ink">{exp.rule}</span>
-                                      </p>
-                                      <p className="font-mono text-fyn-ink/60">
-                                        due_date = <span className="text-fyn-ink">{f.due_date}</span>
-                                        {"  ·  "}
-                                        filed_date = <span className="text-fyn-ink">{f.filed_date || "null"}</span>
-                                        {"  ·  "}
-                                        status = <span className="text-fyn-ink">{f.status}</span>
-                                        {"  ·  "}
-                                        today = <span className="text-fyn-ink">{todayStr}</span>
-                                      </p>
-                                    </div>
-                                  </td>
-                                </FynTR>
-                              );
-                            })()}
+                                })();
+                                return (
+                                  <FynTR
+                                    key={`${rowKey}-exp`}
+                                    className="bg-fyn-beige-card/50 hover:bg-fyn-beige-card/50"
+                                  >
+                                    <FynTD></FynTD>
+                                    <td
+                                      colSpan={4}
+                                      className="px-fyn-md py-fyn-sm"
+                                    >
+                                      <div className="text-fyn-tiny space-y-1.5">
+                                        <p className="flex flex-wrap items-center gap-fyn-sm">
+                                          <span
+                                            className="inline-block px-2 py-0.5 rounded text-[10px] font-medium"
+                                            style={{
+                                              background: `${exp.color}1A`,
+                                              color: exp.color,
+                                            }}
+                                          >
+                                            {exp.label}
+                                          </span>
+                                          <span
+                                            className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-semibold border"
+                                            style={{
+                                              background: `${badge.color}14`,
+                                              color: badge.color,
+                                              borderColor: `${badge.color}40`,
+                                            }}
+                                            title={badge.text}
+                                            aria-label={badge.text}
+                                          >
+                                            {badge.sign}
+                                          </span>
+                                          <span className="text-fyn-ink/70">
+                                            {exp.detail}
+                                          </span>
+                                        </p>
+                                        <p className="font-mono text-fyn-ink/60">
+                                          Rule:{" "}
+                                          <span className="text-fyn-ink">
+                                            {exp.rule}
+                                          </span>
+                                        </p>
+                                        <p className="font-mono text-fyn-ink/60">
+                                          due_date ={" "}
+                                          <span className="text-fyn-ink">
+                                            {f.due_date}
+                                          </span>
+                                          {"  ·  "}
+                                          filed_date ={" "}
+                                          <span className="text-fyn-ink">
+                                            {f.filed_date || "null"}
+                                          </span>
+                                          {"  ·  "}
+                                          status ={" "}
+                                          <span className="text-fyn-ink">
+                                            {f.status}
+                                          </span>
+                                          {"  ·  "}
+                                          today ={" "}
+                                          <span className="text-fyn-ink">
+                                            {todayStr}
+                                          </span>
+                                        </p>
+                                      </div>
+                                    </td>
+                                  </FynTR>
+                                );
+                              })()}
                           </Fragment>
                         );
                       })}
                     {allFilings.filter((f) =>
-                      breakdownFilter === "on-time" ? isOnTime(f) :
-                      breakdownFilter === "late" ? isLate(f) :
-                      breakdownFilter === "overdue" ? isOverdueNotFiled(f) :
-                      breakdownFilter === "unknown" ? isUnknown(f) :
-                      isPending(f)
-                    ).length === 0 && (() => {
-                      const empty: Record<string, { title: string; body: string; emoji: string }> = {
-                        "on-time": { emoji: "🎯", title: "No on-time filings in this range", body: "Nothing was filed on or before its due date for the selected period." },
-                        late: { emoji: "✅", title: "No late filings, nice work", body: "Every filed return for this period went out on time." },
-                        overdue: { emoji: "🎉", title: "No overdue filings", body: "All past-due returns have been filed. You're caught up." },
-                        pending: { emoji: "📭", title: "No upcoming pending filings", body: "Nothing is due later in the selected window." },
-                        unknown: { emoji: "✨", title: "No rows missing a due date", body: "Every filing in this period has a valid due date on record." },
-                      };
-                      const e = empty[breakdownFilter ?? "pending"];
-                      return (
-                        <tr>
-                          <td colSpan={5} className="py-10">
-                            <div className="flex flex-col items-center text-center gap-fyn-sm">
-                              <div className="text-3xl" aria-hidden>{e.emoji}</div>
-                              <div>
-                                <p className="text-fyn-ink text-fyn-small font-medium">{e.title}</p>
-                                <p className="text-fyn-ink/60 text-fyn-tiny mt-1 max-w-sm">{e.body}</p>
+                      breakdownFilter === "on-time"
+                        ? isOnTime(f)
+                        : breakdownFilter === "late"
+                          ? isLate(f)
+                          : breakdownFilter === "overdue"
+                            ? isOverdueNotFiled(f)
+                            : breakdownFilter === "unknown"
+                              ? isUnknown(f)
+                              : isPending(f),
+                    ).length === 0 &&
+                      (() => {
+                        const empty: Record<
+                          string,
+                          { title: string; body: string; emoji: string }
+                        > = {
+                          "on-time": {
+                            emoji: "🎯",
+                            title: "No on-time filings in this range",
+                            body: "Nothing was filed on or before its due date for the selected period.",
+                          },
+                          late: {
+                            emoji: "✅",
+                            title: "No late filings, nice work",
+                            body: "Every filed return for this period went out on time.",
+                          },
+                          overdue: {
+                            emoji: "🎉",
+                            title: "No overdue filings",
+                            body: "All past-due returns have been filed. You're caught up.",
+                          },
+                          pending: {
+                            emoji: "📭",
+                            title: "No upcoming pending filings",
+                            body: "Nothing is due later in the selected window.",
+                          },
+                          unknown: {
+                            emoji: "✨",
+                            title: "No rows missing a due date",
+                            body: "Every filing in this period has a valid due date on record.",
+                          },
+                        };
+                        const e = empty[breakdownFilter ?? "pending"];
+                        return (
+                          <tr>
+                            <td colSpan={5} className="py-10">
+                              <div className="flex flex-col items-center text-center gap-fyn-sm">
+                                <div className="text-3xl" aria-hidden>
+                                  {e.emoji}
+                                </div>
+                                <div>
+                                  <p className="text-fyn-ink text-fyn-small font-medium">
+                                    {e.title}
+                                  </p>
+                                  <p className="text-fyn-ink/60 text-fyn-tiny mt-1 max-w-sm">
+                                    {e.body}
+                                  </p>
+                                </div>
+                                <FynButton
+                                  variant="secondary"
+                                  onClick={() => setBreakdownFilter(null)}
+                                  className="text-fyn-tiny px-fyn-sm py-1.5"
+                                >
+                                  Reset filter
+                                </FynButton>
                               </div>
-                              <FynButton
-                                variant="secondary"
-                                onClick={() => setBreakdownFilter(null)}
-                                className="text-fyn-tiny px-fyn-sm py-1.5"
-                              >
-                                Reset filter
-                              </FynButton>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })()}
+                            </td>
+                          </tr>
+                        );
+                      })()}
                   </tbody>
                 </FynTable>
               </div>
@@ -987,8 +1352,14 @@ const CompliancePage = () => {
             ON-TIME FILING RATE, LAST 3 MONTHS
           </FynLabel>
           <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={trendData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(23,18,8,0.08)" />
+            <LineChart
+              data={trendData}
+              margin={{ top: 8, right: 16, left: 0, bottom: 0 }}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="rgba(23,18,8,0.08)"
+              />
               <XAxis dataKey="month" stroke="#171208" fontSize={12} />
               <YAxis
                 domain={[0, 100]}
@@ -998,7 +1369,10 @@ const CompliancePage = () => {
               />
               <Tooltip
                 formatter={(v) => (v == null ? "No filings" : `${v}%`)}
-                contentStyle={{ background: "hsl(var(--background))", border: "1px solid rgba(23,18,8,0.1)" }}
+                contentStyle={{
+                  background: "hsl(var(--background))",
+                  border: "1px solid rgba(23,18,8,0.1)",
+                }}
               />
               <Legend />
               <Line
@@ -1020,7 +1394,8 @@ const CompliancePage = () => {
             </LineChart>
           </ResponsiveContainer>
           <p className="text-fyn-ink/50 text-fyn-tiny mt-fyn-sm">
-            On-time = filed on or before due date. Months with no filings appear as gaps.
+            On-time = filed on or before due date. Months with no filings appear
+            as gaps.
           </p>
         </FynCard>
       )}
@@ -1035,7 +1410,12 @@ type TroubleshootingCardProps = {
   compact?: boolean;
 };
 
-const TroubleshootingCard = ({ navigate, missingGst, missingTds, compact }: TroubleshootingCardProps) => {
+const TroubleshootingCard = ({
+  navigate,
+  missingGst,
+  missingTds,
+  compact,
+}: TroubleshootingCardProps) => {
   const items: { label: string; href: string; show: boolean }[] = [
     {
       label: "Verify your GSTIN in Business Profile",
@@ -1065,11 +1445,16 @@ const TroubleshootingCard = ({ navigate, missingGst, missingTds, compact }: Trou
   ].filter((i) => i.show);
 
   return (
-    <FynCard className={cn("mt-fyn-md text-left", compact ? "p-fyn-md" : undefined)}>
+    <FynCard
+      className={cn("mt-fyn-md text-left", compact ? "p-fyn-md" : undefined)}
+    >
       <FynLabel className="mb-fyn-sm">WHY AM I MISSING FILINGS?</FynLabel>
       <ul className="space-y-1.5">
         {items.map((i) => (
-          <li key={i.label} className="flex items-start gap-fyn-sm text-fyn-tiny text-fyn-ink/80">
+          <li
+            key={i.label}
+            className="flex items-start gap-fyn-sm text-fyn-tiny text-fyn-ink/80"
+          >
             <span className="text-fyn-ink/40 mt-0.5">•</span>
             {i.href === "#" ? (
               <span>{i.label}</span>

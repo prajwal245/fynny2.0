@@ -39,13 +39,17 @@ import {
 describe("dashboard design-system snapshots", () => {
   /* ── Layout ─────────────────────────────────────────── */
   it("FynPage wraps children with brand spacing", () => {
-    const { container } = render(<FynPage><div>content</div></FynPage>);
+    const { container } = render(
+      <FynPage>
+        <div>content</div>
+      </FynPage>,
+    );
     expect(container.firstChild).toMatchSnapshot();
   });
 
   it("FynPageTitle uses serif h1 and ink-60 sub", () => {
     const { container } = render(
-      <FynPageTitle sub="Sub copy goes here">Compliance Health</FynPageTitle>
+      <FynPageTitle sub="Sub copy goes here">Compliance Health</FynPageTitle>,
     );
     expect(container.firstChild).toMatchSnapshot();
   });
@@ -56,7 +60,7 @@ describe("dashboard design-system snapshots", () => {
       <FynCard>
         <FynCardTitle>Card title</FynCardTitle>
         <p>body</p>
-      </FynCard>
+      </FynCard>,
     );
     expect(container.firstChild).toMatchSnapshot();
   });
@@ -74,7 +78,7 @@ describe("dashboard design-system snapshots", () => {
 
   it("FynMetric renders mono metric with label and sub", () => {
     const { container } = render(
-      <FynMetric label="Cash Runway" value="142 days" sub="Healthy" />
+      <FynMetric label="Cash Runway" value="142 days" sub="Healthy" />,
     );
     expect(container.firstChild).toMatchSnapshot();
   });
@@ -86,7 +90,9 @@ describe("dashboard design-system snapshots", () => {
   });
 
   it("FynButton secondary uses beige-card + ink border", () => {
-    const { container } = render(<FynButton variant="secondary">Cancel</FynButton>);
+    const { container } = render(
+      <FynButton variant="secondary">Cancel</FynButton>,
+    );
     expect(container.firstChild).toMatchSnapshot();
   });
 
@@ -129,10 +135,12 @@ describe("dashboard design-system snapshots", () => {
         <tbody>
           <FynTR>
             <FynTD>GSTR-3B (Mar)</FynTD>
-            <FynTD align="right" mono>₹1,24,500</FynTD>
+            <FynTD align="right" mono>
+              ₹1,24,500
+            </FynTD>
           </FynTR>
         </tbody>
-      </FynTable>
+      </FynTable>,
     );
     expect(container.firstChild).toMatchSnapshot();
   });
@@ -148,7 +156,7 @@ describe("dashboard design-system snapshots", () => {
       <FynSelect defaultValue="">
         <option value="">Pick one</option>
         <option value="a">A</option>
-      </FynSelect>
+      </FynSelect>,
     );
     expect(container.firstChild).toMatchSnapshot();
   });
@@ -159,7 +167,9 @@ describe("dashboard design-system snapshots", () => {
   });
 
   it("FynSearchInput renders icon + brand chrome", () => {
-    const { container } = render(<FynSearchInput placeholder="Search filings…" />);
+    const { container } = render(
+      <FynSearchInput placeholder="Search filings…" />,
+    );
     expect(container.firstChild).toMatchSnapshot();
   });
 
@@ -167,7 +177,7 @@ describe("dashboard design-system snapshots", () => {
     const { container } = render(
       <FynField label="GSTIN" hint="15 characters">
         <FynInput defaultValue="" />
-      </FynField>
+      </FynField>,
     );
     expect(container.firstChild).toMatchSnapshot();
   });
@@ -176,7 +186,7 @@ describe("dashboard design-system snapshots", () => {
     const { container } = render(
       <FynField label="GSTIN" error="Invalid format">
         <FynInput defaultValue="" />
-      </FynField>
+      </FynField>,
     );
     expect(container.firstChild).toMatchSnapshot();
   });
@@ -193,7 +203,7 @@ describe("dashboard design-system snapshots", () => {
         title="No filings yet"
         description="Connect GST to start tracking."
         action={<FynButton>Connect GST →</FynButton>}
-      />
+      />,
     );
     expect(container.firstChild).toMatchSnapshot();
   });

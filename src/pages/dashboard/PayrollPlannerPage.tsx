@@ -4,7 +4,15 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import DashboardLayout from "@/components/DashboardLayout";
 import GlobalBackBar from "@/components/GlobalBackBar";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import { formatINR } from "@/lib/indian-format";
 
 type PayrollSnapshot = {
@@ -27,7 +35,9 @@ const PayrollPlannerPage = () => {
 
   useEffect(() => {
     const fetchBusiness = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
       const { data } = await supabase
         .from("profiles")
@@ -49,7 +59,7 @@ const PayrollPlannerPage = () => {
         .eq("business_id", businessId)
         .order("month", { ascending: false })
         .limit(12);
-      return ((data as unknown) as PayrollSnapshot[]) || [];
+      return (data as unknown as PayrollSnapshot[]) || [];
     },
     enabled: !!businessId,
   });
@@ -63,30 +73,45 @@ const PayrollPlannerPage = () => {
     .slice(0, 6)
     .reverse()
     .map((s) => ({
-      month: new Date(s.month + "-01").toLocaleDateString("en-IN", { month: "short" }),
+      month: new Date(s.month + "-01").toLocaleDateString("en-IN", {
+        month: "short",
+      }),
       payroll: Number(s.total_gross || 0),
     }));
 
-  const isEmpty = !isLoading && (!payrollSnapshots || payrollSnapshots.length === 0);
+  const isEmpty =
+    !isLoading && (!payrollSnapshots || payrollSnapshots.length === 0);
 
   return (
     <DashboardLayout>
       <GlobalBackBar />
 
       {/* TOP METRICS */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-fyn-md mb-6">
         <div className="bg-fyn-ink rounded-lg p-5">
-          <p className="text-white/40 text-[13px] fyn-label">CURRENT MONTH PAYROLL</p>
-          <p className="text-white text-[28px] font-bold mt-1 font-sans">{formatINR(totalPayroll)}</p>
-          <p className="text-white/40 text-[11px] mt-1">{currentMonth?.month || "-"}</p>
+          <p className="text-white/40 text-[13px] fyn-label">
+            CURRENT MONTH PAYROLL
+          </p>
+          <p className="text-white text-[28px] font-bold mt-1 font-sans">
+            {formatINR(totalPayroll)}
+          </p>
+          <p className="text-white/40 text-[11px] mt-1">
+            {currentMonth?.month || "-"}
+          </p>
         </div>
         <div className="bg-fyn-ink rounded-lg p-5">
           <p className="text-white/40 text-[13px] fyn-label">EMPLOYEE COUNT</p>
-          <p className="text-white text-[28px] font-bold mt-1 font-sans">{employeeCount}</p>
+          <p className="text-white text-[28px] font-bold mt-1 font-sans">
+            {employeeCount}
+          </p>
         </div>
         <div className="bg-fyn-ink rounded-lg p-5">
-          <p className="text-white/40 text-[13px] fyn-label">AVERAGE PER EMPLOYEE</p>
-          <p className="text-white text-[28px] font-bold mt-1 font-sans">{formatINR(Math.round(avgPerEmployee))}</p>
+          <p className="text-white/40 text-[13px] fyn-label">
+            AVERAGE PER EMPLOYEE
+          </p>
+          <p className="text-white text-[28px] font-bold mt-1 font-sans">
+            {formatINR(Math.round(avgPerEmployee))}
+          </p>
         </div>
       </div>
 
@@ -94,7 +119,10 @@ const PayrollPlannerPage = () => {
       {isLoading && (
         <div className="space-y-3">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-32 bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg animate-pulse" />
+            <div
+              key={i}
+              className="h-32 bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg animate-pulse"
+            />
           ))}
         </div>
       )}
@@ -102,9 +130,12 @@ const PayrollPlannerPage = () => {
       {/* EMPTY STATE */}
       {isEmpty && (
         <div className="bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg p-12 text-center">
-          <h3 className="text-fyn-ink text-xl font-serif mb-2">No Payroll Data</h3>
+          <h3 className="text-fyn-ink text-xl font-serif mb-2">
+            No Payroll Data
+          </h3>
           <p className="text-fyn-ink/60 text-sm mb-6">
-            Payroll information will appear once you run your first payroll cycle
+            Payroll information will appear once you run your first payroll
+            cycle
           </p>
           <button
             onClick={() => navigate("/dashboard/settings/integrations")}
@@ -118,18 +149,45 @@ const PayrollPlannerPage = () => {
       {/* TREND CHART */}
       {!isLoading && chartData.length > 0 && (
         <div className="bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg p-5">
-          <h3 className="text-fyn-ink font-serif text-lg mb-4">Payroll Trend (Last 6 Months)</h3>
+          <h3 className="text-fyn-ink font-serif text-lg mb-4">
+            Payroll Trend (Last 6 Months)
+          </h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(23,18,8,0.1)" />
-                <XAxis dataKey="month" stroke="rgba(23,18,8,0.5)" fontSize={12} />
-                <YAxis stroke="rgba(23,18,8,0.5)" fontSize={12} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}K`} />
+              <LineChart
+                data={chartData}
+                margin={{ top: 8, right: 16, left: 8, bottom: 8 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="rgba(23,18,8,0.1)"
+                />
+                <XAxis
+                  dataKey="month"
+                  stroke="rgba(23,18,8,0.5)"
+                  fontSize={12}
+                />
+                <YAxis
+                  stroke="rgba(23,18,8,0.5)"
+                  fontSize={12}
+                  tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}K`}
+                />
                 <Tooltip
                   formatter={(v: number) => formatINR(v)}
-                  contentStyle={{ background: "#171208", border: "none", borderRadius: 6, color: "#fff" }}
+                  contentStyle={{
+                    background: "#171208",
+                    border: "none",
+                    borderRadius: 6,
+                    color: "#fff",
+                  }}
                 />
-                <Line type="monotone" dataKey="payroll" stroke="#C41E1E" strokeWidth={2} dot={{ r: 4, fill: "#C41E1E" }} />
+                <Line
+                  type="monotone"
+                  dataKey="payroll"
+                  stroke="#C41E1E"
+                  strokeWidth={2}
+                  dot={{ r: 4, fill: "#C41E1E" }}
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>

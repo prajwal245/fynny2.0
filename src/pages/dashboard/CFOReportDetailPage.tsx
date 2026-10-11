@@ -1,7 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "@/lib/router-compat";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Check, ChevronDown, Copy, Download, FileText, Link2, Sparkles, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  ChevronDown,
+  Copy,
+  Download,
+  FileText,
+  Link2,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Badge } from "@/components/ui/badge";
@@ -34,7 +44,9 @@ const CFOReportDetailPage = () => {
   const [fallbackPreparing, setFallbackPreparing] = useState(false);
   const fallbackInputRef = useRef<HTMLInputElement>(null);
 
-  const shareUrl = id ? `${window.location.origin}/dashboard/reports/${id}` : "";
+  const shareUrl = id
+    ? `${window.location.origin}/dashboard/reports/${id}`
+    : "";
 
   const showManualFallback = () => {
     setShowFallbackInput(true);
@@ -83,12 +95,15 @@ const CFOReportDetailPage = () => {
     } catch (err: unknown) {
       const isPermissionDenied =
         err instanceof Error &&
-        (err.name === "NotAllowedError" || err.name === "PermissionDeniedError");
+        (err.name === "NotAllowedError" ||
+          err.name === "PermissionDeniedError");
 
       showManualFallback();
 
       toast({
-        title: isPermissionDenied ? "Permission blocked" : "Could not copy link",
+        title: isPermissionDenied
+          ? "Permission blocked"
+          : "Could not copy link",
         description: isPermissionDenied
           ? "Clipboard access is blocked. Use the input below to select and copy the URL manually."
           : "Unable to copy automatically. Use the input below to copy the URL manually.",
@@ -99,7 +114,9 @@ const CFOReportDetailPage = () => {
 
   useEffect(() => {
     const fetchBusiness = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
       const { data } = await supabase
         .from("profiles")
@@ -165,7 +182,7 @@ const CFOReportDetailPage = () => {
       </button>
 
       <div className="bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg p-6 mb-6">
-        <div className="flex items-start justify-between gap-4 mb-5">
+        <div className="flex items-start justify-between gap-fyn-md mb-5">
           <div>
             <h1 className="text-fyn-ink text-2xl font-sans font-semibold">
               CFO Report
@@ -175,7 +192,7 @@ const CFOReportDetailPage = () => {
               {formatDate(report.created_at)}
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-fyn-sm">
             <Badge variant={report.delivered ? "default" : "secondary"}>
               {report.delivered ? "Delivered" : "Ready"}
             </Badge>
@@ -199,18 +216,26 @@ const CFOReportDetailPage = () => {
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem onClick={() => downloadReportPdf(report, "branded")}>
+                <DropdownMenuItem
+                  onClick={() => downloadReportPdf(report, "branded")}
+                >
                   <Sparkles className="w-3.5 h-3.5 mr-2 text-fyn-red" />
                   <div className="flex flex-col">
                     <span className="text-xs font-medium">Branded PDF</span>
-                    <span className="text-[10px] text-fyn-ink/50">FynHelp colors & logo</span>
+                    <span className="text-[10px] text-fyn-ink/50">
+                      FynHelp colors & logo
+                    </span>
                   </div>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => downloadReportPdf(report, "simple")}>
+                <DropdownMenuItem
+                  onClick={() => downloadReportPdf(report, "simple")}
+                >
                   <FileText className="w-3.5 h-3.5 mr-2 text-fyn-ink/60" />
                   <div className="flex flex-col">
                     <span className="text-xs font-medium">Simple PDF</span>
-                    <span className="text-[10px] text-fyn-ink/50">Print-friendly, B&W</span>
+                    <span className="text-[10px] text-fyn-ink/50">
+                      Print-friendly, B&W
+                    </span>
                   </div>
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -225,7 +250,9 @@ const CFOReportDetailPage = () => {
                 htmlFor="share-url-fallback"
                 className="text-xs font-medium text-fyn-ink/70"
               >
-                {fallbackPreparing ? "Preparing URL…" : "Copy this URL manually"}
+                {fallbackPreparing
+                  ? "Preparing URL…"
+                  : "Copy this URL manually"}
               </label>
               <button
                 onClick={() => {
@@ -238,7 +265,7 @@ const CFOReportDetailPage = () => {
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
-{fallbackPreparing ? (
+            {fallbackPreparing ? (
               <div
                 className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2"
                 aria-busy="true"
@@ -248,36 +275,41 @@ const CFOReportDetailPage = () => {
                 <Skeleton className="h-10 w-full sm:w-24 rounded bg-fyn-ink/15 shrink-0" />
               </div>
             ) : (
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-              <input
-                ref={fallbackInputRef}
-                id="share-url-fallback"
-                type="text"
-                value={shareUrl}
-                readOnly
-                onFocus={(e) => e.currentTarget.select()}
-                onClick={(e) => e.currentTarget.select()}
-                className="flex-1 bg-card border border-fyn-ink/15 rounded px-2.5 py-2.5 min-h-10 text-xs text-fyn-ink font-mono focus:outline-hidden focus:ring-2 focus:ring-fyn-red/30"
-              />
-              <button
-                onClick={() => {
-                  fallbackInputRef.current?.select();
-                  const ok = document.execCommand("copy");
-                  if (ok) {
-                    setCopied(true);
-                    toast({ title: "Link copied", description: "Share link copied to clipboard." });
-                    setTimeout(() => setCopied(false), 2000);
-                  }
-                }}
-                className="inline-flex items-center justify-center gap-1 bg-fyn-ink text-white px-2.5 py-2.5 min-h-10 rounded text-xs font-medium hover:opacity-90 transition shrink-0"
-              >
-                <Copy className="w-3 h-3" />
-                Copy URL
-              </button>
-            </div>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <input
+                  ref={fallbackInputRef}
+                  id="share-url-fallback"
+                  type="text"
+                  value={shareUrl}
+                  readOnly
+                  onFocus={(e) => e.currentTarget.select()}
+                  onClick={(e) => e.currentTarget.select()}
+                  className="flex-1 bg-card border border-fyn-ink/15 rounded px-2.5 py-2.5 min-h-10 text-xs text-fyn-ink font-mono focus:outline-hidden focus:ring-2 focus:ring-fyn-red/30"
+                />
+                <button
+                  onClick={() => {
+                    fallbackInputRef.current?.select();
+                    const ok = document.execCommand("copy");
+                    if (ok) {
+                      setCopied(true);
+                      toast({
+                        title: "Link copied",
+                        description: "Share link copied to clipboard.",
+                      });
+                      setTimeout(() => setCopied(false), 2000);
+                    }
+                  }}
+                  className="inline-flex items-center justify-center gap-1 bg-fyn-ink text-white px-2.5 py-2.5 min-h-10 rounded text-xs font-medium hover:opacity-90 transition shrink-0"
+                >
+                  <Copy className="w-3 h-3" />
+                  Copy URL
+                </button>
+              </div>
             )}
             <p className="text-[10px] text-fyn-ink/50 mt-1.5">
-              {fallbackPreparing ? "Preparing the share URL…" : "Tip: press Ctrl/Cmd + C after the URL is selected."}
+              {fallbackPreparing
+                ? "Preparing the share URL…"
+                : "Tip: press Ctrl/Cmd + C after the URL is selected."}
             </p>
           </div>
         )}

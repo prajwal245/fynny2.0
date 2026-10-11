@@ -20,20 +20,41 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { track } from "@/lib/analytics";
-import { normaliseAmount, directionFromSigned, detectAmountPattern, logParsePattern } from "@/lib/bankAmount";
+import {
+  normaliseAmount,
+  directionFromSigned,
+  detectAmountPattern,
+  logParsePattern,
+} from "@/lib/bankAmount";
 import { recomputeIntelligence } from "@/lib/postImportCompute";
 
-import { Upload, FileText, X, Building, Receipt, Wallet, AlertTriangle, RotateCw, Sparkles, Camera } from "lucide-react";
+import {
+  Upload,
+  FileText,
+  X,
+  Building,
+  Receipt,
+  Wallet,
+  AlertTriangle,
+  RotateCw,
+  Sparkles,
+  Camera,
+} from "lucide-react";
 
 async function sha256Hex(buf: ArrayBuffer): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", buf);
-  return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 type ImportType = "bank" | "invoice" | "expense";
 
 // --- minimal CSV parser handling quoted fields ---
-function parseCSV(text: string): { headers: string[]; rows: Record<string, string>[] } {
+function parseCSV(text: string): {
+  headers: string[];
+  rows: Record<string, string>[];
+} {
   const lines = text.replace(/\r/g, "").trim().split("\n").filter(Boolean);
   if (lines.length < 2) return { headers: [], rows: [] };
   const splitLine = (line: string) => {
@@ -43,20 +64,25 @@ function parseCSV(text: string): { headers: string[]; rows: Record<string, strin
     for (let i = 0; i < line.length; i++) {
       const c = line[i];
       if (c === '"') {
-        if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
-        else inQ = !inQ;
+        if (inQ && line[i + 1] === '"') {
+          cur += '"';
+          i++;
+        } else inQ = !inQ;
       } else if (c === "," && !inQ) {
-        out.push(cur); cur = "";
+        out.push(cur);
+        cur = "";
       } else cur += c;
     }
     out.push(cur);
-    return out.map(s => s.trim());
+    return out.map((s) => s.trim());
   };
   const headers = splitLine(lines[0]);
-  const rows = lines.slice(1).map(line => {
+  const rows = lines.slice(1).map((line) => {
     const vals = splitLine(line);
     const row: Record<string, string> = {};
-    headers.forEach((h, i) => { row[h] = vals[i] ?? ""; });
+    headers.forEach((h, i) => {
+      row[h] = vals[i] ?? "";
+    });
     return row;
   });
   return { headers, rows };
@@ -71,7 +97,7 @@ const pick = (row: Record<string, string>, keys: string[]) => {
   const headers = Object.keys(row);
   // 1) exact case-insensitive match
   for (const k of keys) {
-    const found = headers.find(h => h.toLowerCase() === k.toLowerCase());
+    const found = headers.find((h) => h.toLowerCase() === k.toLowerCase());
     if (found && row[found]) return row[found];
   }
   // 2) fuzzy: header contains candidate, or candidate contains header (normalized)
@@ -79,7 +105,7 @@ const pick = (row: Record<string, string>, keys: string[]) => {
   for (const k of keys) {
     const nk = norm(k);
     if (!nk) continue;
-    const found = headers.find(h => {
+    const found = headers.find((h) => {
       const nh = norm(h);
       return nh && (nh.includes(nk) || nk.includes(nh));
     });
@@ -88,22 +114,28 @@ const pick = (row: Record<string, string>, keys: string[]) => {
   return "";
 };
 
-const TYPE_META: Record<ImportType, { title: string; description: string; icon: JSX.Element; sample: string }> = {
+const TYPE_META: Record<
+  ImportType,
+  { title: string; description: string; icon: JSX.Element; sample: string }
+> = {
   bank: {
     title: "Bank Statements",
-    description: "CSV/XLSX with columns: Date, Description, Debit, Credit (or Amount)",
+    description:
+      "CSV/XLSX with columns: Date, Description, Debit, Credit (or Amount)",
     icon: <Building className="w-6 h-6" />,
     sample: "Date, Description, Debit, Credit",
   },
   invoice: {
     title: "Invoices (Receivables)",
-    description: "CSV/XLSX with: Customer, Invoice Number, Date, Due Date, Amount",
+    description:
+      "CSV/XLSX with: Customer, Invoice Number, Date, Due Date, Amount",
     icon: <Receipt className="w-6 h-6" />,
     sample: "Customer, Invoice Number, Date, Due Date, Amount",
   },
   expense: {
     title: "Expenses (Payables)",
-    description: "CSV/XLSX with: Vendor, Invoice Number, Date, Due Date, Amount",
+    description:
+      "CSV/XLSX with: Vendor, Invoice Number, Date, Due Date, Amount",
     icon: <Wallet className="w-6 h-6" />,
     sample: "Vendor, Invoice Number, Date, Due Date, Amount",
   },
@@ -120,8 +152,11 @@ async function parseFile(file: File): Promise<Record<string, string>[]> {
     const wb = XLSX.read(buf, { type: "array" });
     const ws = wb.Sheets[wb.SheetNames[0]];
     if (!ws) return [];
-    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "", raw: false });
-    return rows.map(r => {
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
+      defval: "",
+      raw: false,
+    });
+    return rows.map((r) => {
       const out: Record<string, string> = {};
       for (const k of Object.keys(r)) out[k.trim()] = String(r[k] ?? "").trim();
       return out;
@@ -177,7 +212,9 @@ const UploadZone = ({ type, businessId, onSuccess }: UploadZoneProps) => {
 
   useEffect(() => {
     zoneOpeners[type] = () => inputRef.current?.click();
-    return () => { delete zoneOpeners[type]; };
+    return () => {
+      delete zoneOpeners[type];
+    };
   }, [type]);
   const meta = TYPE_META[type];
 
@@ -225,11 +262,15 @@ const UploadZone = ({ type, businessId, onSuccess }: UploadZoneProps) => {
     return today();
   };
 
-  const computeRange = (rows: Record<string, string>[]): { minDate: string | null; maxDate: string | null } => {
+  const computeRange = (
+    rows: Record<string, string>[],
+  ): { minDate: string | null; maxDate: string | null } => {
     const keys =
-      type === "bank" ? ["Date", "Transaction Date"] :
-      type === "invoice" ? ["Date", "Invoice Date"] :
-      ["Due Date", "Date"];
+      type === "bank"
+        ? ["Date", "Transaction Date"]
+        : type === "invoice"
+          ? ["Date", "Invoice Date"]
+          : ["Due Date", "Date"];
     let min: string | null = null;
     let max: string | null = null;
     for (const r of rows) {
@@ -246,58 +287,120 @@ const UploadZone = ({ type, businessId, onSuccess }: UploadZoneProps) => {
     if (!file || !businessId) return;
     setUploading(true);
     setProgress(10);
-    const interval = setInterval(() => setProgress(prev => Math.min(prev + 8, 85)), 200);
+    const interval = setInterval(
+      () => setProgress((prev) => Math.min(prev + 8, 85)),
+      200,
+    );
     const rows = p.rows;
 
-    track("csv_import_started", { file_type: file.type || file.name.split(".").pop() || "unknown" });
+    track("csv_import_started", {
+      file_type: file.type || file.name.split(".").pop() || "unknown",
+    });
     try {
       if (type === "bank") {
         let skipped = 0;
         const bankHeaders = Object.keys(rows[0] ?? {});
         const bankDetected = detectAmountPattern(
           bankHeaders,
-          rows.map(r => bankHeaders.map(h => r[h]))
+          rows.map((r) => bankHeaders.map((h) => r[h])),
         );
-        const records = rows.map(r => {
-          const rawDebit = pick(r, ["Debit", "Withdrawal Amt.", "Withdrawal Amt", "Withdrawal", "Withdrawal Amount", "Dr", "Out", "Paid Out", "Money Out"]);
-          const rawCredit = pick(r, ["Credit", "Deposit Amt.", "Deposit Amt", "Deposit", "Deposit Amount", "Cr", "In", "Paid In", "Money In"]);
-          const rawAmt = pick(r, ["Amount", "Transaction Amount", "Txn Amount"]);
-          const rawType = pick(r, ["Type", "Transaction Type", "Txn Type", "Dr/Cr", "Cr/Dr", "Mode"]);
-          // Signed: negative = debit / money out, positive = credit / money in
-          const amount = normaliseAmount(rawAmt, rawType, rawDebit, rawCredit);
-          if (amount === 0) return null;
-          const direction = directionFromSigned(amount);
-          return {
-            business_id: businessId,
-            date: toDate(pick(r, ["Date", "Transaction Date", "Txn Date", "Value Date"])),
-            description: pick(r, ["Description", "Narration", "Particulars", "Details"]) || "-",
-            counterparty: pick(r, ["Counterparty", "Payee", "Vendor", "Customer"]) || null,
-            amount,
-            direction,
-            category: pick(r, ["Category"]) || null,
-          };
-        }).filter((x): x is NonNullable<typeof x> => {
-
-          if (x === null) { skipped++; return false; }
-          return true;
-        });
+        const records = rows
+          .map((r) => {
+            const rawDebit = pick(r, [
+              "Debit",
+              "Withdrawal Amt.",
+              "Withdrawal Amt",
+              "Withdrawal",
+              "Withdrawal Amount",
+              "Dr",
+              "Out",
+              "Paid Out",
+              "Money Out",
+            ]);
+            const rawCredit = pick(r, [
+              "Credit",
+              "Deposit Amt.",
+              "Deposit Amt",
+              "Deposit",
+              "Deposit Amount",
+              "Cr",
+              "In",
+              "Paid In",
+              "Money In",
+            ]);
+            const rawAmt = pick(r, [
+              "Amount",
+              "Transaction Amount",
+              "Txn Amount",
+            ]);
+            const rawType = pick(r, [
+              "Type",
+              "Transaction Type",
+              "Txn Type",
+              "Dr/Cr",
+              "Cr/Dr",
+              "Mode",
+            ]);
+            // Signed: negative = debit / money out, positive = credit / money in
+            const amount = normaliseAmount(
+              rawAmt,
+              rawType,
+              rawDebit,
+              rawCredit,
+            );
+            if (amount === 0) return null;
+            const direction = directionFromSigned(amount);
+            return {
+              business_id: businessId,
+              date: toDate(
+                pick(r, ["Date", "Transaction Date", "Txn Date", "Value Date"]),
+              ),
+              description:
+                pick(r, [
+                  "Description",
+                  "Narration",
+                  "Particulars",
+                  "Details",
+                ]) || "-",
+              counterparty:
+                pick(r, ["Counterparty", "Payee", "Vendor", "Customer"]) ||
+                null,
+              amount,
+              direction,
+              category: pick(r, ["Category"]) || null,
+            };
+          })
+          .filter((x): x is NonNullable<typeof x> => {
+            if (x === null) {
+              skipped++;
+              return false;
+            }
+            return true;
+          });
         logParsePattern("bank-csv", bankDetected, records);
         if (records.length === 0) {
-          throw new Error("No parseable rows found. Please check your column headers (Date, Debit/Withdrawal, Credit/Deposit or Amount).");
+          throw new Error(
+            "No parseable rows found. Please check your column headers (Date, Debit/Withdrawal, Credit/Deposit or Amount).",
+          );
         }
 
         const { error } = await supabase.from("transactions").insert(records);
         if (error) throw error;
         if (skipped > 0) {
-          toast.warning(`${skipped} row${skipped === 1 ? "" : "s"} could not be parsed and were skipped — please verify your column headers.`);
+          toast.warning(
+            `${skipped} row${skipped === 1 ? "" : "s"} could not be parsed and were skipped — please verify your column headers.`,
+          );
         }
       } else if (type === "invoice") {
-        const records = rows.map(r => {
+        const records = rows.map((r) => {
           const amount = num(pick(r, ["Amount", "Total", "Invoice Amount"]));
           return {
             business_id: businessId,
-            customer_name: pick(r, ["Customer", "Customer Name", "Client"]) || "Unknown",
-            invoice_number: pick(r, ["Invoice Number", "Invoice", "Invoice No"]) || `INV-${Date.now()}`,
+            customer_name:
+              pick(r, ["Customer", "Customer Name", "Client"]) || "Unknown",
+            invoice_number:
+              pick(r, ["Invoice Number", "Invoice", "Invoice No"]) ||
+              `INV-${Date.now()}`,
             invoice_date: toDate(pick(r, ["Date", "Invoice Date"])),
             due_date: toDate(pick(r, ["Due Date", "Due"])),
             amount,
@@ -308,12 +411,14 @@ const UploadZone = ({ type, businessId, onSuccess }: UploadZoneProps) => {
         const { error } = await supabase.from("receivables").insert(records);
         if (error) throw error;
       } else {
-        const records = rows.map(r => {
+        const records = rows.map((r) => {
           const amount = num(pick(r, ["Amount", "Total", "Bill Amount"]));
           return {
             business_id: businessId,
-            vendor_name: pick(r, ["Vendor", "Vendor Name", "Supplier"]) || "Unknown",
-            invoice_number: pick(r, ["Invoice Number", "Bill Number", "Invoice"]) || null,
+            vendor_name:
+              pick(r, ["Vendor", "Vendor Name", "Supplier"]) || "Unknown",
+            invoice_number:
+              pick(r, ["Invoice Number", "Bill Number", "Invoice"]) || null,
             due_date: toDate(pick(r, ["Due Date", "Date"])),
             amount,
             outstanding: amount,
@@ -324,7 +429,9 @@ const UploadZone = ({ type, businessId, onSuccess }: UploadZoneProps) => {
         if (error) throw error;
       }
 
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       await supabase.from("csv_uploads").insert({
         business_id: businessId,
         uploaded_by: user?.id ?? null,
@@ -345,7 +452,7 @@ const UploadZone = ({ type, businessId, onSuccess }: UploadZoneProps) => {
       await recomputeIntelligence(businessId);
       track("csv_import_completed", { records_inserted: rows.length });
       toast.success(
-        `Import complete. ${rows.length} transaction${rows.length === 1 ? "" : "s"} imported. Dashboard metrics have been updated.`
+        `Import complete. ${rows.length} transaction${rows.length === 1 ? "" : "s"} imported. Dashboard metrics have been updated.`,
       );
 
       onSuccess();
@@ -361,7 +468,9 @@ const UploadZone = ({ type, businessId, onSuccess }: UploadZoneProps) => {
       track("csv_import_failed", { error: String(err?.message || err) });
       console.error("Upload error:", err);
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
         await supabase.from("csv_uploads").insert({
           business_id: businessId,
           uploaded_by: user?.id ?? null,
@@ -376,7 +485,9 @@ const UploadZone = ({ type, businessId, onSuccess }: UploadZoneProps) => {
           max_date: p.maxDate,
           source_type: sourceMode,
         });
-      } catch {}
+      } catch {
+        /* Recording the failed import is best-effort; the toast below is what matters. */
+      }
       toast.error(err?.message || "Upload failed");
       onSuccess();
       setUploading(false);
@@ -401,10 +512,16 @@ const UploadZone = ({ type, businessId, onSuccess }: UploadZoneProps) => {
       } else {
         const wb = XLSX.read(buf, { type: "array" });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const raw = ws ? XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "", raw: false }) : [];
-        rows = raw.map(r => {
+        const raw = ws
+          ? XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
+              defval: "",
+              raw: false,
+            })
+          : [];
+        rows = raw.map((r) => {
           const out: Record<string, string> = {};
-          for (const k of Object.keys(r)) out[k.trim()] = String(r[k] ?? "").trim();
+          for (const k of Object.keys(r))
+            out[k.trim()] = String(r[k] ?? "").trim();
           return out;
         });
       }
@@ -507,7 +624,9 @@ const UploadZone = ({ type, businessId, onSuccess }: UploadZoneProps) => {
       }
 
       // Mark prior csv_uploads rows as replaced (no DELETE permission, so we can't remove them)
-      toast.success(`Cleared previous ${meta.title.toLowerCase()} for ${minD ?? "?"} → ${maxD ?? "?"}`);
+      toast.success(
+        `Cleared previous ${meta.title.toLowerCase()} for ${minD ?? "?"} → ${maxD ?? "?"}`,
+      );
       await performInsert(p);
     } catch (err: any) {
       console.error("Replace error:", err);
@@ -533,8 +652,14 @@ const UploadZone = ({ type, businessId, onSuccess }: UploadZoneProps) => {
         return {
           Date: String(r?.date ?? ""),
           Description: String(r?.description ?? ""),
-          Debit: dir === "debit" || dir === "withdrawal" || dir === "out" ? String(amt) : "",
-          Credit: dir === "credit" || dir === "deposit" || dir === "in" ? String(amt) : "",
+          Debit:
+            dir === "debit" || dir === "withdrawal" || dir === "out"
+              ? String(amt)
+              : "",
+          Credit:
+            dir === "credit" || dir === "deposit" || dir === "in"
+              ? String(amt)
+              : "",
         };
       });
     }
@@ -559,39 +684,64 @@ const UploadZone = ({ type, businessId, onSuccess }: UploadZoneProps) => {
   const handleAiFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    if (!businessId) { toast.error("No business linked."); return; }
+    if (!businessId) {
+      toast.error("No business linked.");
+      return;
+    }
     const n = f.name.toLowerCase();
-    const ok = f.type.startsWith("image/") || n.endsWith(".pdf") || n.endsWith(".png") || n.endsWith(".jpg") || n.endsWith(".jpeg") || n.endsWith(".webp");
-    if (!ok) { toast.error("Upload a photo (PNG/JPG) or PDF"); return; }
-    if (f.size > 8 * 1024 * 1024) { toast.error("File too large (max 8MB)"); return; }
+    const ok =
+      f.type.startsWith("image/") ||
+      n.endsWith(".pdf") ||
+      n.endsWith(".png") ||
+      n.endsWith(".jpg") ||
+      n.endsWith(".jpeg") ||
+      n.endsWith(".webp");
+    if (!ok) {
+      toast.error("Upload a photo (PNG/JPG) or PDF");
+      return;
+    }
+    if (f.size > 8 * 1024 * 1024) {
+      toast.error("File too large (max 8MB)");
+      return;
+    }
 
     setFile(f);
     setSourceMode("ai_extracted");
     setAiExtracting(true);
     setUploading(true);
     setProgress(15);
-    const progInt = setInterval(() => setProgress((p) => Math.min(p + 5, 70)), 400);
+    const progInt = setInterval(
+      () => setProgress((p) => Math.min(p + 5, 70)),
+      400,
+    );
     try {
       const buf = await f.arrayBuffer();
       // base64 encode
       const bytes = new Uint8Array(buf);
       let bin = "";
-      for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
+      for (let i = 0; i < bytes.byteLength; i++)
+        bin += String.fromCharCode(bytes[i]);
       const b64 = btoa(bin);
       const hash = await sha256Hex(buf);
 
-      const { data, error } = await supabase.functions.invoke("extract-document-ai", {
-        body: {
-          doc_type: type,
-          mime_type: f.type || (n.endsWith(".pdf") ? "application/pdf" : "image/png"),
-          file_base64: b64,
+      const { data, error } = await supabase.functions.invoke(
+        "extract-document-ai",
+        {
+          body: {
+            doc_type: type,
+            mime_type:
+              f.type || (n.endsWith(".pdf") ? "application/pdf" : "image/png"),
+            file_base64: b64,
+          },
         },
-      });
+      );
       clearInterval(progInt);
       if (error) throw error;
       const aiRows = Array.isArray(data?.rows) ? data.rows : [];
       if (aiRows.length === 0) {
-        throw new Error("AI could not find any rows in this document. Try a clearer photo or a different page.");
+        throw new Error(
+          "AI could not find any rows in this document. Try a clearer photo or a different page.",
+        );
       }
       const shaped = aiRowsToCsvShape(aiRows);
       const { minDate, maxDate } = computeRange(shaped);
@@ -612,17 +762,17 @@ const UploadZone = ({ type, businessId, onSuccess }: UploadZoneProps) => {
     }
   };
 
-
   return (
-    <Card data-upload-zone={type} className="p-6 flex flex-col h-full scroll-mt-24">
+    <Card
+      data-upload-zone={type}
+      className="p-6 flex flex-col h-full scroll-mt-24"
+    >
       <div
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className={`flex-1 flex flex-col items-center justify-center text-center min-h-[260px] rounded-lg transition-colors border-2 border-dashed ${
-          isDragging
-            ? "border-fyn-red bg-fyn-red/5"
-            : "border-transparent"
+          isDragging ? "border-fyn-red bg-fyn-red/5" : "border-transparent"
         }`}
       >
         {!file && !uploading && (
@@ -630,10 +780,14 @@ const UploadZone = ({ type, businessId, onSuccess }: UploadZoneProps) => {
             <div className="w-12 h-12 rounded-full bg-fyn-beige flex items-center justify-center mb-3 text-fyn-ink">
               {meta.icon}
             </div>
-            <h3 className="font-serif text-lg text-fyn-ink mb-1">{meta.title}</h3>
+            <h3 className="font-serif text-lg text-fyn-ink mb-1">
+              {meta.title}
+            </h3>
             <p className="text-sm text-fyn-ink/60 mb-1">{meta.description}</p>
             <p className="text-xs text-fyn-ink/50 mb-4">
-              {isDragging ? "Drop your file here" : "Drag & drop a CSV or XLSX, or"}
+              {isDragging
+                ? "Drop your file here"
+                : "Drag & drop a CSV or XLSX, or"}
             </p>
             <input
               ref={inputRef}
@@ -645,12 +799,16 @@ const UploadZone = ({ type, businessId, onSuccess }: UploadZoneProps) => {
             />
             <label htmlFor={`csv-${type}`}>
               <Button asChild variant="outline" className="cursor-pointer">
-                <span><Upload className="w-4 h-4 mr-2" /> Select File</span>
+                <span>
+                  <Upload className="w-4 h-4 mr-2" /> Select File
+                </span>
               </Button>
             </label>
             <div className="flex items-center gap-2 my-3 w-full max-w-[220px]">
               <div className="flex-1 h-px bg-fyn-ink/10" />
-              <span className="text-[10px] uppercase tracking-wide text-fyn-ink/40">or</span>
+              <span className="text-[10px] uppercase tracking-wide text-fyn-ink/40">
+                or
+              </span>
               <div className="flex-1 h-px bg-fyn-ink/10" />
             </div>
             <input
@@ -662,31 +820,50 @@ const UploadZone = ({ type, businessId, onSuccess }: UploadZoneProps) => {
               id={`ai-${type}`}
             />
             <label htmlFor={`ai-${type}`}>
-              <Button asChild variant="ghost" className="cursor-pointer text-fyn-red hover:bg-fyn-red/5">
-                <span><Camera className="w-4 h-4 mr-2" /> Upload photo / PDF <Sparkles className="w-3 h-3 ml-1.5 opacity-70" /></span>
+              <Button
+                asChild
+                variant="ghost"
+                className="cursor-pointer text-fyn-red hover:bg-fyn-red/5"
+              >
+                <span>
+                  <Camera className="w-4 h-4 mr-2" /> Upload photo / PDF{" "}
+                  <Sparkles className="w-3 h-3 ml-1.5 opacity-70" />
+                </span>
               </Button>
             </label>
-            <p className="text-xs text-fyn-ink/40 mt-3">Expected: {meta.sample}</p>
-            <p className="text-[11px] text-fyn-ink/40 mt-1">Photo/PDF is read by AI — please verify the extracted rows.</p>
+            <p className="text-xs text-fyn-ink/40 mt-3">
+              Expected: {meta.sample}
+            </p>
+            <p className="text-[11px] text-fyn-ink/40 mt-1">
+              Photo/PDF is read by AI — please verify the extracted rows.
+            </p>
           </>
         )}
 
-        {file && (uploading || aiExtracting) && sourceMode === "ai_extracted" && (
-          <div className="w-full space-y-2 mt-2">
-            <p className="text-xs text-fyn-ink/60 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5" /> Reading your document with AI…
-            </p>
-          </div>
-        )}
+        {file &&
+          (uploading || aiExtracting) &&
+          sourceMode === "ai_extracted" && (
+            <div className="w-full space-y-2 mt-2">
+              <p className="text-xs text-fyn-ink/60 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" /> Reading your document with
+                AI…
+              </p>
+            </div>
+          )}
 
         {file && !uploading && (
           <div className="w-full space-y-3">
             <div className="flex items-center justify-between bg-fyn-beige/50 rounded-lg p-3">
               <div className="flex items-center gap-2 min-w-0">
                 <FileText className="w-4 h-4 text-fyn-ink flex-shrink-0" />
-                <span className="text-sm text-fyn-ink truncate">{file.name}</span>
+                <span className="text-sm text-fyn-ink truncate">
+                  {file.name}
+                </span>
               </div>
-              <button onClick={() => setFile(null)} className="text-fyn-ink/50 hover:text-fyn-red flex-shrink-0">
+              <button
+                onClick={() => setFile(null)}
+                className="text-fyn-ink/50 hover:text-fyn-red flex-shrink-0"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -698,7 +875,9 @@ const UploadZone = ({ type, businessId, onSuccess }: UploadZoneProps) => {
               Upload & Process
             </Button>
             {!businessId && (
-              <p className="text-xs text-fyn-red">No business linked. Complete onboarding first.</p>
+              <p className="text-xs text-fyn-red">
+                No business linked. Complete onboarding first.
+              </p>
             )}
           </div>
         )}
@@ -706,12 +885,19 @@ const UploadZone = ({ type, businessId, onSuccess }: UploadZoneProps) => {
         {uploading && (
           <div className="w-full space-y-3">
             <Progress value={progress} className="h-2" />
-            <p className="text-sm text-fyn-ink/70">Processing file… {progress}%</p>
+            <p className="text-sm text-fyn-ink/70">
+              Processing file… {progress}%
+            </p>
           </div>
         )}
       </div>
 
-      <AlertDialog open={!!dupMatch} onOpenChange={(o) => { if (!o) cancelDuplicate(); }}>
+      <AlertDialog
+        open={!!dupMatch}
+        onOpenChange={(o) => {
+          if (!o) cancelDuplicate();
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
@@ -729,22 +915,31 @@ const UploadZone = ({ type, businessId, onSuccess }: UploadZoneProps) => {
                 </p>
                 <div className="rounded-md border border-fyn-ink/10 divide-y divide-fyn-ink/10">
                   {dupMatch?.rows.map((h, i) => (
-                    <div key={i} className="px-3 py-2 flex items-center justify-between gap-3 text-xs">
-                      <span className="truncate" title={h.file_name}>{h.file_name}</span>
+                    <div
+                      key={i}
+                      className="px-3 py-2 flex items-center justify-between gap-fyn-sm text-xs"
+                    >
+                      <span className="truncate" title={h.file_name}>
+                        {h.file_name}
+                      </span>
                       <span className="text-fyn-ink/60 whitespace-nowrap">
-                        {h.row_count} rows · {new Date(h.created_at).toLocaleDateString("en-IN")}
+                        {h.row_count} rows ·{" "}
+                        {new Date(h.created_at).toLocaleDateString("en-IN")}
                       </span>
                     </div>
                   ))}
                 </div>
                 <p className="text-fyn-ink/60">
-                  Importing again will create duplicate records. Continue anyway?
+                  Importing again will create duplicate records. Continue
+                  anyway?
                 </p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2 sm:gap-2">
-            <AlertDialogCancel onClick={cancelDuplicate}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={cancelDuplicate}>
+              Cancel
+            </AlertDialogCancel>
             <Button
               type="button"
               variant="outline"
@@ -798,7 +993,9 @@ const UploadHistory = ({ businessId }: { businessId: string | null }) => {
       if (!businessId) return [] as UploadRow[];
       const { data, error } = await supabase
         .from("csv_uploads")
-        .select("id, upload_type, file_name, file_size, row_count, status, error_message, created_at, source_type")
+        .select(
+          "id, upload_type, file_name, file_size, row_count, status, error_message, created_at, source_type",
+        )
         .eq("business_id", businessId)
         .order("created_at", { ascending: false })
         .limit(50);
@@ -827,13 +1024,18 @@ const UploadHistory = ({ businessId }: { businessId: string | null }) => {
             {history.length === 0 && (
               <tr>
                 <td colSpan={6} className="py-8 text-center text-fyn-ink/50">
-                  {isLoading ? "Loading…" : "No uploads yet. Drop a file above to get started."}
+                  {isLoading
+                    ? "Loading…"
+                    : "No uploads yet. Drop a file above to get started."}
                 </td>
               </tr>
             )}
-            {history.map(h => (
+            {history.map((h) => (
               <tr key={h.id} className="border-b border-fyn-ink/5">
-                <td className="py-3 text-fyn-ink font-medium truncate max-w-[320px]" title={h.file_name}>
+                <td
+                  className="py-3 text-fyn-ink font-medium truncate max-w-[320px]"
+                  title={h.file_name}
+                >
                   <span className="inline-flex items-center gap-2">
                     <FileText className="w-4 h-4 text-fyn-ink/50" />
                     <span className="truncate">{h.file_name}</span>
@@ -844,8 +1046,12 @@ const UploadHistory = ({ businessId }: { businessId: string | null }) => {
                     )}
                   </span>
                 </td>
-                <td className="py-3 text-fyn-ink/70">{TYPE_LABEL[h.upload_type] ?? h.upload_type}</td>
-                <td className="py-3 text-right tabular-nums text-fyn-ink/70">{formatBytes(h.file_size)}</td>
+                <td className="py-3 text-fyn-ink/70">
+                  {TYPE_LABEL[h.upload_type] ?? h.upload_type}
+                </td>
+                <td className="py-3 text-right tabular-nums text-fyn-ink/70">
+                  {formatBytes(h.file_size)}
+                </td>
                 <td className="py-3 text-right tabular-nums">{h.row_count}</td>
                 <td className="py-3">
                   <span
@@ -860,8 +1066,10 @@ const UploadHistory = ({ businessId }: { businessId: string | null }) => {
                   </span>
                 </td>
                 <td className="py-3 text-right text-fyn-ink/60 whitespace-nowrap">
-                  <div className="inline-flex items-center gap-3 justify-end">
-                    <span>{new Date(h.created_at).toLocaleString("en-IN")}</span>
+                  <div className="inline-flex items-center gap-fyn-sm justify-end">
+                    <span>
+                      {new Date(h.created_at).toLocaleString("en-IN")}
+                    </span>
                     {h.status === "failed" && (
                       <button
                         type="button"
@@ -899,16 +1107,31 @@ const DataImportPage = () => {
   return (
     <DashboardLayout>
       <div className="mb-6">
-        <h1 className="font-serif text-3xl text-fyn-ink mb-2">Import Your Data</h1>
+        <h1 className="font-serif text-3xl text-fyn-ink mb-2">
+          Import Your Data
+        </h1>
         <p className="text-fyn-ink/60">
-          Upload bank statements, invoices, and expenses as CSV or XLSX. We'll automatically categorize and sync to your dashboard.
+          Upload bank statements, invoices, and expenses as CSV or XLSX. We'll
+          automatically categorize and sync to your dashboard.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <UploadZone type="bank" businessId={businessId} onSuccess={refreshAll} />
-        <UploadZone type="invoice" businessId={businessId} onSuccess={refreshAll} />
-        <UploadZone type="expense" businessId={businessId} onSuccess={refreshAll} />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-fyn-md mb-6">
+        <UploadZone
+          type="bank"
+          businessId={businessId}
+          onSuccess={refreshAll}
+        />
+        <UploadZone
+          type="invoice"
+          businessId={businessId}
+          onSuccess={refreshAll}
+        />
+        <UploadZone
+          type="expense"
+          businessId={businessId}
+          onSuccess={refreshAll}
+        />
       </div>
 
       <UploadHistory businessId={businessId} />

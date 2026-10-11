@@ -81,7 +81,7 @@ const ReceivablesPage = () => {
   if (isLoading) {
     return (
       <DashboardLayout>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-fyn-md mb-6">
           {[0, 1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-28 rounded-lg" />
           ))}
@@ -127,7 +127,7 @@ const ReceivablesPage = () => {
 
   return (
     <DashboardLayout>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-fyn-md mb-6">
         <Card className="p-5 bg-fyn-beige-card border-fyn-ink-10">
           <p className="text-[13px] fyn-label text-secondary-foreground">
             Total Receivables
@@ -199,10 +199,10 @@ const ReceivablesPage = () => {
                 item.status === "paid"
                   ? { variant: "default" as const, label: "Paid" }
                   : item.status === "partial"
-                  ? { variant: "secondary" as const, label: "Partial" }
-                  : isOverdue
-                  ? { variant: "destructive" as const, label: "Overdue" }
-                  : { variant: "outline" as const, label: "Pending" };
+                    ? { variant: "secondary" as const, label: "Partial" }
+                    : isOverdue
+                      ? { variant: "destructive" as const, label: "Overdue" }
+                      : { variant: "outline" as const, label: "Pending" };
 
               return (
                 <TableRow key={item.id}>

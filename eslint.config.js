@@ -4,6 +4,7 @@ import globals from "globals";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
+import fynSpacing from "./eslint-rules/fyn-spacing.js";
 
 export default tseslint.config(
   { ignores: ["dist", ".output", ".vinxi"] },
@@ -34,6 +35,16 @@ export default tseslint.config(
       ],
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
+    },
+  },
+  // Legacy v1 dashboard: enforce the fyn spacing scale. Its loosely typed
+  // Supabase rows keep `any` here; the rest of the codebase is still checked.
+  {
+    files: ["src/pages/dashboard/**/*.{ts,tsx}", "src/components/dashboard/**/*.{ts,tsx}"],
+    plugins: { "fyn-spacing": fynSpacing },
+    rules: {
+      "fyn-spacing/dashboard-gap-scale": "error",
+      "@typescript-eslint/no-explicit-any": "off",
     },
   },
   eslintPluginPrettier,

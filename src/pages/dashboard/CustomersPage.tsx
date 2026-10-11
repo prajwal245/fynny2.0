@@ -2,10 +2,23 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "@/lib/router-compat";
 import DashboardLayout from "@/components/DashboardLayout";
 import {
-  ListPageShell, FilterChips, Pagination, useDebounced,
-  FynSearchInput, FynSelect,
+  ListPageShell,
+  FilterChips,
+  Pagination,
+  useDebounced,
+  FynSearchInput,
+  FynSelect,
 } from "@/components/dashboard/ListPageShell";
-import { FynTable, FynTH, FynTR, FynTD, FynBadge, FynLoading, FynEmpty, FynButton } from "@/components/dashboard/ui";
+import {
+  FynTable,
+  FynTH,
+  FynTR,
+  FynTD,
+  FynBadge,
+  FynLoading,
+  FynEmpty,
+  FynButton,
+} from "@/components/dashboard/ui";
 import DetailDrawer, { useDrawer } from "@/components/dashboard/DetailDrawer";
 import { useCustomers, useInvoices } from "@/hooks/dashboard/useDashboardData";
 import { formatINR } from "@/lib/indian-format";
@@ -25,7 +38,13 @@ export default function CustomersPage() {
   const debounced = useDebounced(search);
 
   const overdueCustomerIds = useMemo(
-    () => new Set((invoices || []).filter((i) => i.status === "overdue").map((i) => i.customer_id).filter(Boolean) as string[]),
+    () =>
+      new Set(
+        (invoices || [])
+          .filter((i) => i.status === "overdue")
+          .map((i) => i.customer_id)
+          .filter(Boolean) as string[],
+      ),
     [invoices],
   );
 
@@ -33,7 +52,8 @@ export default function CustomersPage() {
     let list = customers || [];
     if (filter === "active") list = list.filter((c) => c.is_active);
     if (filter === "inactive") list = list.filter((c) => !c.is_active);
-    if (filter === "overdue") list = list.filter((c) => overdueCustomerIds.has(c.id));
+    if (filter === "overdue")
+      list = list.filter((c) => overdueCustomerIds.has(c.id));
     if (debounced) {
       const q = debounced.toLowerCase();
       list = list.filter((c) => c.customer_name.toLowerCase().includes(q));
@@ -54,8 +74,22 @@ export default function CustomersPage() {
 
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  if (isLoading) return <DashboardLayout><FynLoading rows={4} /></DashboardLayout>;
-  if (error) return <DashboardLayout><FynEmpty icon={<Users size={28} />} title="Couldn't load customers" description={(error as Error).message} /></DashboardLayout>;
+  if (isLoading)
+    return (
+      <DashboardLayout>
+        <FynLoading rows={4} />
+      </DashboardLayout>
+    );
+  if (error)
+    return (
+      <DashboardLayout>
+        <FynEmpty
+          icon={<Users size={28} />}
+          title="Couldn't load customers"
+          description={(error as Error).message}
+        />
+      </DashboardLayout>
+    );
 
   return (
     <DashboardLayout>
@@ -65,11 +99,21 @@ export default function CustomersPage() {
         controls={
           <>
             <div className="flex-1 min-w-[220px]">
-              <FynSearchInput value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search by name…" />
+              <FynSearchInput
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
+                placeholder="Search by name…"
+              />
             </div>
             <FilterChips
               value={filter}
-              onChange={(v) => { setFilter(v); setPage(1); }}
+              onChange={(v) => {
+                setFilter(v);
+                setPage(1);
+              }}
               options={[
                 { value: "all", label: "All" },
                 { value: "active", label: "Active" },
@@ -77,7 +121,11 @@ export default function CustomersPage() {
                 { value: "overdue", label: "Overdue" },
               ]}
             />
-            <FynSelect value={sort} onChange={(e) => setSort(e.target.value)} className="w-auto">
+            <FynSelect
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+              className="w-auto"
+            >
               <option value="name">Sort: Name</option>
               <option value="revenue">Sort: Receivable</option>
               <option value="terms">Sort: Payment Days</option>
@@ -86,7 +134,9 @@ export default function CustomersPage() {
         }
       >
         {paged.length === 0 ? (
-          <div className="p-fyn-xl text-center text-fyn-ink-45">No matching customers.</div>
+          <div className="p-fyn-xl text-center text-fyn-ink-45">
+            No matching customers.
+          </div>
         ) : (
           <FynTable>
             <thead className="bg-fyn-ink-02">
@@ -101,21 +151,41 @@ export default function CustomersPage() {
             </thead>
             <tbody>
               {paged.map((c) => (
-                <FynTR key={c.id} className="cursor-pointer" onClick={() => open("customer", c.id)}>
+                <FynTR
+                  key={c.id}
+                  className="cursor-pointer"
+                  onClick={() => open("customer", c.id)}
+                >
                   <FynTD>
-                    <div className="text-fyn-ink font-medium">{c.customer_name}</div>
-                    <div className="text-fyn-tiny text-fyn-ink-45">{c.contact_person || "—"}</div>
+                    <div className="text-fyn-ink font-medium">
+                      {c.customer_name}
+                    </div>
+                    <div className="text-fyn-tiny text-fyn-ink-45">
+                      {c.contact_person || "—"}
+                    </div>
                   </FynTD>
-                  <FynTD>{[c.city, c.state].filter(Boolean).join(", ") || "—"}</FynTD>
+                  <FynTD>
+                    {[c.city, c.state].filter(Boolean).join(", ") || "—"}
+                  </FynTD>
                   <FynTD>{c.customer_category || "—"}</FynTD>
-                  <FynTD align="right" mono>{formatINR(Number(c.total_receivable))}</FynTD>
+                  <FynTD align="right" mono>
+                    {formatINR(Number(c.total_receivable))}
+                  </FynTD>
                   <FynTD>
                     <FynBadge tone={c.is_active ? "success" : "danger"}>
                       {c.is_active ? "Active" : "Inactive"}
                     </FynBadge>
                   </FynTD>
                   <FynTD align="right">
-                    <FynButton variant="ghost" onClick={(e) => { e.stopPropagation(); open("customer", c.id); }}>View →</FynButton>
+                    <FynButton
+                      variant="ghost"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        open("customer", c.id);
+                      }}
+                    >
+                      View →
+                    </FynButton>
                   </FynTD>
                 </FynTR>
               ))}
@@ -123,7 +193,12 @@ export default function CustomersPage() {
           </FynTable>
         )}
         <div className="p-fyn-md">
-          <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPage={setPage} />
+          <Pagination
+            page={page}
+            pageSize={PAGE_SIZE}
+            total={filtered.length}
+            onPage={setPage}
+          />
         </div>
       </ListPageShell>
       <DetailDrawer />

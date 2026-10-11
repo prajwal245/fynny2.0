@@ -8,12 +8,26 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatINR } from "@/lib/indian-format";
 import { exportToCsv } from "@/utils/csvExport";
 import {
-  ResponsiveContainer, AreaChart, Area, LineChart, Line, XAxis, YAxis,
-  CartesianGrid, Tooltip as RTooltip, Legend,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RTooltip,
+  Legend,
 } from "recharts";
 import {
-  RefreshCw, Download, AlertTriangle, AlertCircle, Info, TrendingUp,
-  Sparkles, ArrowRight,
+  RefreshCw,
+  Download,
+  AlertTriangle,
+  AlertCircle,
+  Info,
+  TrendingUp,
+  Sparkles,
+  ArrowRight,
 } from "lucide-react";
 
 /* ────────────── Tax Intelligence (edge function) types ────────────── */
@@ -24,8 +38,18 @@ interface TaxIntelligenceResponse {
     tds_compliance_rate: number;
     health: { label: string; color: string };
   };
-  gst_summary: { total_filings: number; filed: number; on_time: number; overdue: number };
-  tds_summary: { total_filings: number; filed: number; on_time: number; overdue: number };
+  gst_summary: {
+    total_filings: number;
+    filed: number;
+    on_time: number;
+    overdue: number;
+  };
+  tds_summary: {
+    total_filings: number;
+    filed: number;
+    on_time: number;
+    overdue: number;
+  };
   tax_liability: {
     current_liability: number;
     output_tax: number;
@@ -33,13 +57,36 @@ interface TaxIntelligenceResponse {
     itc_utilization_percent: number;
     period: string | null;
   };
-  trend: Array<{ month: string; output_tax: number; input_tax: number; net_liability: number }>;
-  forecast: Array<{ month: string; estimated_liability: number; confidence: string }>;
-  upcoming_deadlines: Array<{
-    type: "GST" | "TDS"; filing_type: string; period: string; due_date: string; days_remaining: number;
+  trend: Array<{
+    month: string;
+    output_tax: number;
+    input_tax: number;
+    net_liability: number;
   }>;
-  alerts: Array<{ severity: "critical" | "warning" | "info"; title: string; message: string; action?: string }>;
-  suggestions: Array<{ priority: "high" | "medium" | "low"; type: string; message: string; potential_savings?: number }>;
+  forecast: Array<{
+    month: string;
+    estimated_liability: number;
+    confidence: string;
+  }>;
+  upcoming_deadlines: Array<{
+    type: "GST" | "TDS";
+    filing_type: string;
+    period: string;
+    due_date: string;
+    days_remaining: number;
+  }>;
+  alerts: Array<{
+    severity: "critical" | "warning" | "info";
+    title: string;
+    message: string;
+    action?: string;
+  }>;
+  suggestions: Array<{
+    priority: "high" | "medium" | "low";
+    type: string;
+    message: string;
+    potential_savings?: number;
+  }>;
 }
 
 /* ────────────── Types ────────────── */
@@ -79,7 +126,13 @@ type TdsFiling = {
 };
 
 type Bucket = "on-time" | "late" | "overdue" | "pending" | "unknown";
-const validBuckets = ["on-time", "late", "overdue", "pending", "unknown"] as const;
+const validBuckets = [
+  "on-time",
+  "late",
+  "overdue",
+  "pending",
+  "unknown",
+] as const;
 const bucketMeta: Record<Bucket, { label: string; color: string }> = {
   "on-time": { label: "On time", color: "#1A6B3C" },
   late: { label: "Filed late", color: "#8B5A00" },
@@ -89,7 +142,11 @@ const bucketMeta: Record<Bucket, { label: string; color: string }> = {
 };
 
 const fmtDate = (s: string) =>
-  new Date(s).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  new Date(s).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 
 /* ────────────── Page ────────────── */
 
@@ -113,7 +170,8 @@ const GSTPage = () => {
   /* shared URL filters (kept for back-compat with CompliancePage links) */
   const fromParam = searchParams.get("from");
   const toParam = searchParams.get("to");
-  const isValidDate = (s: string | null) => !!s && /^\d{4}-\d{2}-\d{2}$/.test(s);
+  const isValidDate = (s: string | null) =>
+    !!s && /^\d{4}-\d{2}-\d{2}$/.test(s);
   const fromFilter = isValidDate(fromParam) ? (fromParam as string) : null;
   const toFilter = isValidDate(toParam) ? (toParam as string) : null;
   const hasDateFilter = !!(fromFilter || toFilter);
@@ -140,7 +198,9 @@ const GSTPage = () => {
 
   useEffect(() => {
     const fetchBusiness = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
       const { data } = await supabase
         .from("profiles")
@@ -164,18 +224,27 @@ const GSTPage = () => {
         .eq("business_id", businessId)
         .order("due_date", { ascending: false })
         .limit(24);
-      return ((data as unknown) as GSTFiling[]) || [];
+      return (data as unknown as GSTFiling[]) || [];
     },
     enabled: !!businessId,
   });
 
-  const { data: taxData, isLoading: taxLoading, error: taxError, refetch: refetchTax, isFetching: taxFetching } = useQuery<TaxIntelligenceResponse>({
+  const {
+    data: taxData,
+    isLoading: taxLoading,
+    error: taxError,
+    refetch: refetchTax,
+    isFetching: taxFetching,
+  } = useQuery<TaxIntelligenceResponse>({
     queryKey: ["tax-intelligence", businessId],
     queryFn: async () => {
       if (!businessId) throw new Error("No business ID");
-      const { data, error } = await supabaseExternal.functions.invoke("tax-intelligence", {
-        body: { business_id: businessId, org_id: businessId },
-      });
+      const { data, error } = await supabaseExternal.functions.invoke(
+        "tax-intelligence",
+        {
+          body: { business_id: businessId, org_id: businessId },
+        },
+      );
       if (error) throw error;
       return data as TaxIntelligenceResponse;
     },
@@ -193,7 +262,7 @@ const GSTPage = () => {
         .eq("business_id", businessId)
         .order("due_date", { ascending: false })
         .limit(24);
-      return ((data as unknown) as TdsFiling[]) || [];
+      return (data as unknown as TdsFiling[]) || [];
     },
     enabled: !!businessId,
   });
@@ -215,16 +284,36 @@ const GSTPage = () => {
     : tdsFilings || [];
 
   /* ───── GST stats ───── */
-  const gstUpcoming = visibleGst.filter((f) => new Date(f.due_date) >= now && f.status === "pending");
-  const gstOverdue = visibleGst.filter((f) => new Date(f.due_date) < now && f.status === "pending");
-  const totalTaxPayable = visibleGst.reduce((s, f) => s + Number(f.tax_payable || 0), 0);
-  const totalInputCredit = visibleGst.reduce((s, f) => s + Number(f.input_tax_credit || 0), 0);
+  const gstUpcoming = visibleGst.filter(
+    (f) => new Date(f.due_date) >= now && f.status === "pending",
+  );
+  const gstOverdue = visibleGst.filter(
+    (f) => new Date(f.due_date) < now && f.status === "pending",
+  );
+  const totalTaxPayable = visibleGst.reduce(
+    (s, f) => s + Number(f.tax_payable || 0),
+    0,
+  );
+  const totalInputCredit = visibleGst.reduce(
+    (s, f) => s + Number(f.input_tax_credit || 0),
+    0,
+  );
 
   /* ───── TDS stats ───── */
-  const tdsUpcoming = visibleTds.filter((f) => new Date(f.due_date) >= now && f.status === "pending");
-  const tdsOverdue = visibleTds.filter((f) => new Date(f.due_date) < now && f.status === "pending");
-  const totalDeducted = visibleTds.reduce((s, f) => s + Number(f.total_tds_deducted || 0), 0);
-  const totalDeposited = visibleTds.reduce((s, f) => s + Number(f.total_tds_deposited || 0), 0);
+  const tdsUpcoming = visibleTds.filter(
+    (f) => new Date(f.due_date) >= now && f.status === "pending",
+  );
+  const tdsOverdue = visibleTds.filter(
+    (f) => new Date(f.due_date) < now && f.status === "pending",
+  );
+  const totalDeducted = visibleTds.reduce(
+    (s, f) => s + Number(f.total_tds_deducted || 0),
+    0,
+  );
+  const totalDeposited = visibleTds.reduce(
+    (s, f) => s + Number(f.total_tds_deposited || 0),
+    0,
+  );
 
   /* ───── Bucket logic (shared) ───── */
   const classifyGst = (f: GSTFiling): Bucket => {
@@ -244,8 +333,10 @@ const GSTPage = () => {
     return "pending";
   };
 
-  const matchesGstBucket = (f: GSTFiling) => !bucketFilter || classifyGst(f) === bucketFilter;
-  const matchesTdsBucket = (f: TdsFiling) => !bucketFilter || classifyTds(f) === bucketFilter;
+  const matchesGstBucket = (f: GSTFiling) =>
+    !bucketFilter || classifyGst(f) === bucketFilter;
+  const matchesTdsBucket = (f: TdsFiling) =>
+    !bucketFilter || classifyTds(f) === bucketFilter;
 
   /* ───── Overview combined stats ───── */
   const overview = useMemo(() => {
@@ -269,7 +360,9 @@ const GSTPage = () => {
     ];
     const filed = all.filter((r) => r.filed);
     const onTime = filed.filter((r) => r.bucket === "on-time").length;
-    const onTimeRate = filed.length ? Math.round((onTime / filed.length) * 100) : null;
+    const onTimeRate = filed.length
+      ? Math.round((onTime / filed.length) * 100)
+      : null;
     const overdue = all.filter((r) => r.bucket === "overdue").length;
     const upcoming = all
       .filter((r) => r.due >= todayStr && !r.filed)
@@ -285,10 +378,30 @@ const GSTPage = () => {
       tone: "Filings on track",
       color: "#1A6B3C",
     };
-    if (overdue > 0) health = { label: "At risk", tone: `${overdue} overdue filing${overdue > 1 ? "s" : ""}`, color: "#C41E1E" };
-    else if (onTimeRate !== null && onTimeRate < 80) health = { label: "Watch", tone: `${100 - onTimeRate}% filed late`, color: "#8B5A00" };
+    if (overdue > 0)
+      health = {
+        label: "At risk",
+        tone: `${overdue} overdue filing${overdue > 1 ? "s" : ""}`,
+        color: "#C41E1E",
+      };
+    else if (onTimeRate !== null && onTimeRate < 80)
+      health = {
+        label: "Watch",
+        tone: `${100 - onTimeRate}% filed late`,
+        color: "#8B5A00",
+      };
 
-    return { all, onTimeRate, overdue, upcoming, recent, next, health, filedCount: filed.length };
+    return {
+      all,
+      onTimeRate,
+      overdue,
+      upcoming,
+      recent,
+      next,
+      health,
+      filedCount: filed.length,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- classifyGst/classifyTds are pure helpers recreated every render
   }, [visibleGst, visibleTds, todayStr]);
 
   /* ───── Empty / loading flags ───── */
@@ -301,13 +414,30 @@ const GSTPage = () => {
   const bucketBanner = bucketFilter && (
     <div
       className="flex flex-wrap items-center justify-between gap-2 mb-4 px-3 py-2 border rounded-md text-xs"
-      style={{ background: `${bucketMeta[bucketFilter].color}0F`, borderColor: `${bucketMeta[bucketFilter].color}40` }}
+      style={{
+        background: `${bucketMeta[bucketFilter].color}0F`,
+        borderColor: `${bucketMeta[bucketFilter].color}40`,
+      }}
     >
       <span className="text-fyn-ink/80 inline-flex items-center gap-2">
-        <span className="inline-block w-2 h-2 rounded-full" style={{ background: bucketMeta[bucketFilter].color }} aria-hidden />
-        Highlighting <span className="font-medium" style={{ color: bucketMeta[bucketFilter].color }}>{bucketMeta[bucketFilter].label}</span> rows
+        <span
+          className="inline-block w-2 h-2 rounded-full"
+          style={{ background: bucketMeta[bucketFilter].color }}
+          aria-hidden
+        />
+        Highlighting{" "}
+        <span
+          className="font-medium"
+          style={{ color: bucketMeta[bucketFilter].color }}
+        >
+          {bucketMeta[bucketFilter].label}
+        </span>{" "}
+        rows
       </span>
-      <button onClick={clearBucketFilter} className="text-fyn-ink/70 hover:text-fyn-ink underline underline-offset-2">
+      <button
+        onClick={clearBucketFilter}
+        className="text-fyn-ink/70 hover:text-fyn-ink underline underline-offset-2"
+      >
         Clear bucket ✕
       </button>
     </div>
@@ -317,19 +447,53 @@ const GSTPage = () => {
     <div className="flex flex-wrap items-center justify-between gap-2 mb-4 px-3 py-2 bg-fyn-beige-card border border-fyn-ink-10 rounded-md text-xs">
       <span className="text-fyn-ink/70">
         Showing filings due
-        {fromFilter && <> from <span className="text-fyn-ink font-medium">{fmtDate(fromFilter)}</span></>}
-        {toFilter && <> to <span className="text-fyn-ink font-medium">{fmtDate(toFilter)}</span></>}.
+        {fromFilter && (
+          <>
+            {" "}
+            from{" "}
+            <span className="text-fyn-ink font-medium">
+              {fmtDate(fromFilter)}
+            </span>
+          </>
+        )}
+        {toFilter && (
+          <>
+            {" "}
+            to{" "}
+            <span className="text-fyn-ink font-medium">
+              {fmtDate(toFilter)}
+            </span>
+          </>
+        )}
+        .
       </span>
-      <button onClick={clearDateFilter} className="text-fyn-ink/70 hover:text-fyn-ink underline underline-offset-2">
+      <button
+        onClick={clearDateFilter}
+        className="text-fyn-ink/70 hover:text-fyn-ink underline underline-offset-2"
+      >
         Clear date filter ✕
       </button>
     </div>
   );
 
-  const Metric = ({ label, value, sub, danger }: { label: string; value: React.ReactNode; sub?: string; danger?: boolean }) => (
+  const Metric = ({
+    label,
+    value,
+    sub,
+    danger,
+  }: {
+    label: string;
+    value: React.ReactNode;
+    sub?: string;
+    danger?: boolean;
+  }) => (
     <div className="bg-fyn-ink rounded-lg p-5">
       <p className="text-white/40 text-[13px] fyn-label">{label}</p>
-      <p className={`text-[28px] font-bold mt-1 font-sans ${danger ? "text-[#C41E1E]" : "text-white"}`}>{value}</p>
+      <p
+        className={`text-[28px] font-bold mt-1 font-sans ${danger ? "text-[#C41E1E]" : "text-white"}`}
+      >
+        {value}
+      </p>
       {sub && <p className="text-white/40 text-[11px] mt-1">{sub}</p>}
     </div>
   );
@@ -340,10 +504,14 @@ const GSTPage = () => {
       status === "filed"
         ? "bg-[#1A6B3C]/10 text-[#1A6B3C]"
         : isOverdue
-        ? "bg-[#C41E1E]/10 text-[#C41E1E]"
-        : "bg-muted text-muted-foreground/70";
+          ? "bg-[#C41E1E]/10 text-[#C41E1E]"
+          : "bg-muted text-muted-foreground/70";
     const label = status === "filed" ? "Filed" : isOverdue ? "Late" : "Pending";
-    return <span className={`text-[11px] px-2 py-0.5 rounded ${className}`}>{label}</span>;
+    return (
+      <span className={`text-[11px] px-2 py-0.5 rounded ${className}`}>
+        {label}
+      </span>
+    );
   };
 
   /* ────────────── GST tab ────────────── */
@@ -351,7 +519,12 @@ const GSTPage = () => {
     if (gstLoading) {
       return (
         <div className="space-y-3">
-          {[0, 1, 2].map((i) => <div key={i} className="h-24 bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg animate-pulse" />)}
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="h-24 bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg animate-pulse"
+            />
+          ))}
         </div>
       );
     }
@@ -360,7 +533,8 @@ const GSTPage = () => {
         <div className="bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg p-12 text-center">
           <h3 className="text-fyn-ink text-xl font-serif mb-2">No GST Data</h3>
           <p className="text-fyn-ink/60 text-sm mb-6">
-            GST filings will appear here once you connect your accounting system or add them manually
+            GST filings will appear here once you connect your accounting system
+            or add them manually
           </p>
           <button
             onClick={() => navigate("/dashboard/settings/integrations")}
@@ -373,11 +547,28 @@ const GSTPage = () => {
     }
     return (
       <>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <Metric label="UPCOMING FILINGS" value={gstUpcoming.length} sub="Pending GST returns" />
-          <Metric label="OVERDUE FILINGS" value={gstOverdue.length} sub={gstOverdue.length > 0 ? "Requires attention" : "All on track"} danger={gstOverdue.length > 0} />
-          <Metric label="TAX PAYABLE (YTD)" value={formatINR(totalTaxPayable)} sub="Across all returns" />
-          <Metric label="INPUT TAX CREDIT" value={formatINR(totalInputCredit)} sub="Total ITC claimed" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-fyn-md mb-6">
+          <Metric
+            label="UPCOMING FILINGS"
+            value={gstUpcoming.length}
+            sub="Pending GST returns"
+          />
+          <Metric
+            label="OVERDUE FILINGS"
+            value={gstOverdue.length}
+            sub={gstOverdue.length > 0 ? "Requires attention" : "All on track"}
+            danger={gstOverdue.length > 0}
+          />
+          <Metric
+            label="TAX PAYABLE (YTD)"
+            value={formatINR(totalTaxPayable)}
+            sub="Across all returns"
+          />
+          <Metric
+            label="INPUT TAX CREDIT"
+            value={formatINR(totalInputCredit)}
+            sub="Total ITC claimed"
+          />
         </div>
 
         <div className="bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg p-5">
@@ -405,16 +596,42 @@ const GSTPage = () => {
                     <tr
                       key={f.id}
                       className={`border-b border-fyn-ink-10 last:border-0 ${dim ? "opacity-40" : ""} ${baseBg}`}
-                      style={bucketFilter && isMatch ? { boxShadow: `inset 3px 0 0 0 ${bucketMeta[bucketFilter].color}` } : undefined}
+                      style={
+                        bucketFilter && isMatch
+                          ? {
+                              boxShadow: `inset 3px 0 0 0 ${bucketMeta[bucketFilter].color}`,
+                            }
+                          : undefined
+                      }
                     >
-                      <td className="py-3 text-fyn-ink font-medium">{f.return_type}</td>
-                      <td className="py-3 text-fyn-ink/70">{f.filing_period}</td>
-                      <td className="py-3 text-fyn-ink/70 fyn-metric">{fmtDate(f.due_date)}</td>
-                      <td className="py-3 text-right fyn-metric">{f.taxable_sales ? formatINR(Number(f.taxable_sales)) : "-"}</td>
-                      <td className="py-3 text-right fyn-metric">{f.tax_payable ? formatINR(Number(f.tax_payable)) : "-"}</td>
-                      <td className="py-3 text-right fyn-metric">{f.input_tax_credit ? formatINR(Number(f.input_tax_credit)) : "-"}</td>
-                      <td className="py-3 text-center"><StatusBadge status={f.status} due={f.due_date} /></td>
-                      <td className="py-3 text-fyn-ink/70 fyn-metric">{f.arn_number || "-"}</td>
+                      <td className="py-3 text-fyn-ink font-medium">
+                        {f.return_type}
+                      </td>
+                      <td className="py-3 text-fyn-ink/70">
+                        {f.filing_period}
+                      </td>
+                      <td className="py-3 text-fyn-ink/70 fyn-metric">
+                        {fmtDate(f.due_date)}
+                      </td>
+                      <td className="py-3 text-right fyn-metric">
+                        {f.taxable_sales
+                          ? formatINR(Number(f.taxable_sales))
+                          : "-"}
+                      </td>
+                      <td className="py-3 text-right fyn-metric">
+                        {f.tax_payable ? formatINR(Number(f.tax_payable)) : "-"}
+                      </td>
+                      <td className="py-3 text-right fyn-metric">
+                        {f.input_tax_credit
+                          ? formatINR(Number(f.input_tax_credit))
+                          : "-"}
+                      </td>
+                      <td className="py-3 text-center">
+                        <StatusBadge status={f.status} due={f.due_date} />
+                      </td>
+                      <td className="py-3 text-fyn-ink/70 fyn-metric">
+                        {f.arn_number || "-"}
+                      </td>
                     </tr>
                   );
                 })}
@@ -431,7 +648,12 @@ const GSTPage = () => {
     if (tdsLoading) {
       return (
         <div className="space-y-3">
-          {[0, 1, 2].map((i) => <div key={i} className="h-24 bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg animate-pulse" />)}
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="h-24 bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg animate-pulse"
+            />
+          ))}
         </div>
       );
     }
@@ -440,7 +662,8 @@ const GSTPage = () => {
         <div className="bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg p-12 text-center">
           <h3 className="text-fyn-ink text-xl font-serif mb-2">No TDS Data</h3>
           <p className="text-fyn-ink/60 text-sm mb-6">
-            TDS filings will appear here once you connect your accounting system or TRACES.
+            TDS filings will appear here once you connect your accounting system
+            or TRACES.
           </p>
           <button
             onClick={() => navigate("/dashboard/settings/integrations")}
@@ -453,11 +676,28 @@ const GSTPage = () => {
     }
     return (
       <>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <Metric label="UPCOMING FILINGS" value={tdsUpcoming.length} sub="Pending TDS returns" />
-          <Metric label="OVERDUE FILINGS" value={tdsOverdue.length} sub={tdsOverdue.length > 0 ? "Requires attention" : "All on track"} danger={tdsOverdue.length > 0} />
-          <Metric label="TDS DEDUCTED" value={formatINR(totalDeducted)} sub="YTD" />
-          <Metric label="TDS DEPOSITED" value={formatINR(totalDeposited)} sub="YTD" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-fyn-md mb-6">
+          <Metric
+            label="UPCOMING FILINGS"
+            value={tdsUpcoming.length}
+            sub="Pending TDS returns"
+          />
+          <Metric
+            label="OVERDUE FILINGS"
+            value={tdsOverdue.length}
+            sub={tdsOverdue.length > 0 ? "Requires attention" : "All on track"}
+            danger={tdsOverdue.length > 0}
+          />
+          <Metric
+            label="TDS DEDUCTED"
+            value={formatINR(totalDeducted)}
+            sub="YTD"
+          />
+          <Metric
+            label="TDS DEPOSITED"
+            value={formatINR(totalDeposited)}
+            sub="YTD"
+          />
         </div>
 
         <div className="bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg p-5">
@@ -484,15 +724,33 @@ const GSTPage = () => {
                     <tr
                       key={f.id}
                       className={`border-b border-fyn-ink-10 last:border-0 ${dim ? "opacity-40" : ""} ${baseBg}`}
-                      style={bucketFilter && isMatch ? { boxShadow: `inset 3px 0 0 0 ${bucketMeta[bucketFilter].color}` } : undefined}
+                      style={
+                        bucketFilter && isMatch
+                          ? {
+                              boxShadow: `inset 3px 0 0 0 ${bucketMeta[bucketFilter].color}`,
+                            }
+                          : undefined
+                      }
                     >
-                      <td className="py-3 text-fyn-ink font-medium">{f.quarter}</td>
+                      <td className="py-3 text-fyn-ink font-medium">
+                        {f.quarter}
+                      </td>
                       <td className="py-3 text-fyn-ink/70">{f.form_type}</td>
-                      <td className="py-3 text-fyn-ink/70 fyn-metric">{fmtDate(f.due_date)}</td>
-                      <td className="py-3 text-right fyn-metric">{formatINR(Number(f.total_tds_deducted || 0))}</td>
-                      <td className="py-3 text-right fyn-metric">{formatINR(Number(f.total_tds_deposited || 0))}</td>
-                      <td className="py-3 text-center"><StatusBadge status={f.status} due={f.due_date} /></td>
-                      <td className="py-3 text-fyn-ink/70 fyn-metric">{f.acknowledgement_number || "-"}</td>
+                      <td className="py-3 text-fyn-ink/70 fyn-metric">
+                        {fmtDate(f.due_date)}
+                      </td>
+                      <td className="py-3 text-right fyn-metric">
+                        {formatINR(Number(f.total_tds_deducted || 0))}
+                      </td>
+                      <td className="py-3 text-right fyn-metric">
+                        {formatINR(Number(f.total_tds_deposited || 0))}
+                      </td>
+                      <td className="py-3 text-center">
+                        <StatusBadge status={f.status} due={f.due_date} />
+                      </td>
+                      <td className="py-3 text-fyn-ink/70 fyn-metric">
+                        {f.acknowledgement_number || "-"}
+                      </td>
                     </tr>
                   );
                 })}
@@ -508,13 +766,28 @@ const GSTPage = () => {
   const handleExportTax = () => {
     if (!taxData) return;
     const rows: any[] = [
-      { metric: "Overall Compliance %", value: taxData.compliance.overall_compliance_rate.toFixed(1) },
-      { metric: "GST Compliance %", value: taxData.compliance.gst_compliance_rate.toFixed(1) },
-      { metric: "TDS Compliance %", value: taxData.compliance.tds_compliance_rate.toFixed(1) },
-      { metric: "Current Liability", value: taxData.tax_liability.current_liability },
+      {
+        metric: "Overall Compliance %",
+        value: taxData.compliance.overall_compliance_rate.toFixed(1),
+      },
+      {
+        metric: "GST Compliance %",
+        value: taxData.compliance.gst_compliance_rate.toFixed(1),
+      },
+      {
+        metric: "TDS Compliance %",
+        value: taxData.compliance.tds_compliance_rate.toFixed(1),
+      },
+      {
+        metric: "Current Liability",
+        value: taxData.tax_liability.current_liability,
+      },
       { metric: "Output Tax", value: taxData.tax_liability.output_tax },
       { metric: "Input Tax (ITC)", value: taxData.tax_liability.input_tax },
-      { metric: "ITC Utilization %", value: taxData.tax_liability.itc_utilization_percent.toFixed(1) },
+      {
+        metric: "ITC Utilization %",
+        value: taxData.tax_liability.itc_utilization_percent.toFixed(1),
+      },
     ];
     exportToCsv(rows, "tax-intelligence");
   };
@@ -523,11 +796,16 @@ const GSTPage = () => {
     if (gstLoading || tdsLoading || (taxLoading && !taxData)) {
       return (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {[0, 1, 2, 3].map((i) => <div key={i} className="h-24 bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg animate-pulse" />)}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-fyn-md">
+            {[0, 1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="h-24 bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg animate-pulse"
+              />
+            ))}
           </div>
           <div className="h-64 bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg animate-pulse" />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-fyn-md">
             <div className="h-48 bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg animate-pulse" />
             <div className="h-48 bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg animate-pulse" />
           </div>
@@ -538,9 +816,16 @@ const GSTPage = () => {
       return (
         <div className="bg-fyn-beige-dark border border-[#C41E1E]/30 rounded-lg p-8 text-center">
           <AlertTriangle className="w-10 h-10 mx-auto text-[#C41E1E] mb-3" />
-          <h3 className="text-fyn-ink text-lg font-serif mb-2">Couldn't load tax intelligence</h3>
-          <p className="text-fyn-ink/60 text-sm mb-5">{(taxError as Error).message}</p>
-          <button onClick={() => refetchTax()} className="bg-fyn-ink text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 inline-flex items-center gap-2">
+          <h3 className="text-fyn-ink text-lg font-serif mb-2">
+            Couldn't load tax intelligence
+          </h3>
+          <p className="text-fyn-ink/60 text-sm mb-5">
+            {(taxError as Error).message}
+          </p>
+          <button
+            onClick={() => refetchTax()}
+            className="bg-fyn-ink text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 inline-flex items-center gap-2"
+          >
             <RefreshCw className="w-4 h-4" /> Retry
           </button>
         </div>
@@ -557,8 +842,13 @@ const GSTPage = () => {
       return (
         <div className="bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg p-12 text-center">
           <TrendingUp className="w-12 h-12 mx-auto text-fyn-ink/40 mb-3" />
-          <h3 className="text-fyn-ink text-xl font-serif mb-2">No tax data yet</h3>
-          <p className="text-fyn-ink/60 text-sm mb-6">Upload filings or connect your accounting system to see live compliance and forecasts.</p>
+          <h3 className="text-fyn-ink text-xl font-serif mb-2">
+            No tax data yet
+          </h3>
+          <p className="text-fyn-ink/60 text-sm mb-6">
+            Upload filings or connect your accounting system to see live
+            compliance and forecasts.
+          </p>
           <button
             onClick={() => navigate("/dashboard/data-import")}
             className="bg-[#C41E1E] text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
@@ -572,45 +862,75 @@ const GSTPage = () => {
     if (!taxData) return null;
 
     const itcPct = taxData.tax_liability.itc_utilization_percent;
-    const itcBadgeColor = itcPct > 70 ? "#1A6B3C" : itcPct >= 50 ? "#8B5A00" : "#C41E1E";
-    const itcBadgeLabel = itcPct > 70 ? "Healthy" : itcPct >= 50 ? "Watch" : "Low";
+    const itcBadgeColor =
+      itcPct > 70 ? "#1A6B3C" : itcPct >= 50 ? "#8B5A00" : "#C41E1E";
+    const itcBadgeLabel =
+      itcPct > 70 ? "Healthy" : itcPct >= 50 ? "Watch" : "Low";
 
     const sevIcon = (s: string) =>
-      s === "critical" ? <AlertTriangle className="w-4 h-4 text-[#C41E1E]" /> :
-      s === "warning" ? <AlertCircle className="w-4 h-4 text-[#8B5A00]" /> :
-      <Info className="w-4 h-4 text-fyn-ink/60" />;
+      s === "critical" ? (
+        <AlertTriangle className="w-4 h-4 text-[#C41E1E]" />
+      ) : s === "warning" ? (
+        <AlertCircle className="w-4 h-4 text-[#8B5A00]" />
+      ) : (
+        <Info className="w-4 h-4 text-fyn-ink/60" />
+      );
     const sevBg = (s: string) =>
-      s === "critical" ? "bg-[#C41E1E]/5 border-[#C41E1E]/30" :
-      s === "warning" ? "bg-[#8B5A00]/5 border-[#8B5A00]/30" :
-      "bg-fyn-ink/5 border-fyn-ink-10";
+      s === "critical"
+        ? "bg-[#C41E1E]/5 border-[#C41E1E]/30"
+        : s === "warning"
+          ? "bg-[#8B5A00]/5 border-[#8B5A00]/30"
+          : "bg-fyn-ink/5 border-fyn-ink-10";
 
     const priorityBadge = (p: string) => {
-      const c = p === "high" ? "#C41E1E" : p === "medium" ? "#8B5A00" : "#1A6B3C";
-      return <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-medium" style={{ background: `${c}15`, color: c }}>{p}</span>;
+      const c =
+        p === "high" ? "#C41E1E" : p === "medium" ? "#8B5A00" : "#1A6B3C";
+      return (
+        <span
+          className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-medium"
+          style={{ background: `${c}15`, color: c }}
+        >
+          {p}
+        </span>
+      );
     };
 
     return (
       <>
         {/* Action bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+        <div className="flex flex-wrap items-center justify-between gap-fyn-sm mb-5">
           <p className="text-fyn-ink/60 text-xs">
-            Live compliance · refreshed every minute{taxFetching ? " · updating…" : ""}
+            Live compliance · refreshed every minute
+            {taxFetching ? " · updating…" : ""}
           </p>
           <div className="flex items-center gap-2 print:hidden">
-            <button onClick={() => refetchTax()} disabled={taxFetching} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-fyn-ink-10 text-fyn-ink hover:bg-fyn-beige-card disabled:opacity-50">
-              <RefreshCw className={`w-3.5 h-3.5 ${taxFetching ? "animate-spin" : ""}`} /> Refresh
+            <button
+              onClick={() => refetchTax()}
+              disabled={taxFetching}
+              className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-fyn-ink-10 text-fyn-ink hover:bg-fyn-beige-card disabled:opacity-50"
+            >
+              <RefreshCw
+                className={`w-3.5 h-3.5 ${taxFetching ? "animate-spin" : ""}`}
+              />{" "}
+              Refresh
             </button>
-            <button onClick={handleExportTax} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-fyn-ink-10 text-fyn-ink hover:bg-fyn-beige-card">
+            <button
+              onClick={handleExportTax}
+              className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-fyn-ink-10 text-fyn-ink hover:bg-fyn-beige-card"
+            >
               <Download className="w-3.5 h-3.5" /> Export
             </button>
-            <button onClick={() => window.print()} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-fyn-ink-10 text-fyn-ink hover:bg-fyn-beige-card">
+            <button
+              onClick={() => window.print()}
+              className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-fyn-ink-10 text-fyn-ink hover:bg-fyn-beige-card"
+            >
               Print
             </button>
           </div>
         </div>
 
         {/* Combined health metrics (existing) */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-fyn-md mb-6">
           <Metric
             label="ON-TIME FILING %"
             value={`${taxData.compliance.overall_compliance_rate.toFixed(0)}%`}
@@ -619,60 +939,155 @@ const GSTPage = () => {
           <Metric
             label="OVERDUE (TOTAL)"
             value={taxData.gst_summary.overdue + taxData.tds_summary.overdue}
-            sub={taxData.gst_summary.overdue + taxData.tds_summary.overdue > 0 ? "Requires attention" : "All on track"}
-            danger={taxData.gst_summary.overdue + taxData.tds_summary.overdue > 0}
+            sub={
+              taxData.gst_summary.overdue + taxData.tds_summary.overdue > 0
+                ? "Requires attention"
+                : "All on track"
+            }
+            danger={
+              taxData.gst_summary.overdue + taxData.tds_summary.overdue > 0
+            }
           />
           <Metric
             label="NEXT DEADLINE"
-            value={taxData.upcoming_deadlines[0] ? fmtDate(taxData.upcoming_deadlines[0].due_date) : "-"}
-            sub={taxData.upcoming_deadlines[0] ? `${taxData.upcoming_deadlines[0].type} · ${taxData.upcoming_deadlines[0].filing_type}` : "No upcoming filings"}
+            value={
+              taxData.upcoming_deadlines[0]
+                ? fmtDate(taxData.upcoming_deadlines[0].due_date)
+                : "-"
+            }
+            sub={
+              taxData.upcoming_deadlines[0]
+                ? `${taxData.upcoming_deadlines[0].type} · ${taxData.upcoming_deadlines[0].filing_type}`
+                : "No upcoming filings"
+            }
           />
           <Metric
             label="TAX HEALTH"
-            value={<span style={{ color: taxData.compliance.health.color }}>{taxData.compliance.health.label}</span>}
+            value={
+              <span style={{ color: taxData.compliance.health.color }}>
+                {taxData.compliance.health.label}
+              </span>
+            }
           />
         </div>
 
         {/* Tax Liability section */}
-        <h3 className="text-fyn-ink font-serif text-lg mb-3">Tax Liability {taxData.tax_liability.period && <span className="text-fyn-ink/50 text-sm">· {taxData.tax_liability.period}</span>}</h3>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <Metric label="CURRENT LIABILITY" value={formatINR(taxData.tax_liability.current_liability)} sub="Net payable" />
-          <Metric label="OUTPUT TAX" value={formatINR(taxData.tax_liability.output_tax)} sub="GST on sales" />
-          <Metric label="INPUT TAX (ITC)" value={formatINR(taxData.tax_liability.input_tax)} sub="Credit available" />
+        <h3 className="text-fyn-ink font-serif text-lg mb-3">
+          Tax Liability{" "}
+          {taxData.tax_liability.period && (
+            <span className="text-fyn-ink/50 text-sm">
+              · {taxData.tax_liability.period}
+            </span>
+          )}
+        </h3>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-fyn-md mb-6">
+          <Metric
+            label="CURRENT LIABILITY"
+            value={formatINR(taxData.tax_liability.current_liability)}
+            sub="Net payable"
+          />
+          <Metric
+            label="OUTPUT TAX"
+            value={formatINR(taxData.tax_liability.output_tax)}
+            sub="GST on sales"
+          />
+          <Metric
+            label="INPUT TAX (ITC)"
+            value={formatINR(taxData.tax_liability.input_tax)}
+            sub="Credit available"
+          />
           <div className="bg-fyn-ink rounded-lg p-5">
-            <p className="text-white/40 text-[13px] fyn-label">ITC UTILIZATION</p>
-            <p className="text-[28px] font-bold mt-1 font-sans text-white">{itcPct.toFixed(0)}%</p>
-            <span className="inline-block text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-medium mt-1" style={{ background: `${itcBadgeColor}30`, color: itcBadgeColor }}>{itcBadgeLabel}</span>
+            <p className="text-white/40 text-[13px] fyn-label">
+              ITC UTILIZATION
+            </p>
+            <p className="text-[28px] font-bold mt-1 font-sans text-white">
+              {itcPct.toFixed(0)}%
+            </p>
+            <span
+              className="inline-block text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-medium mt-1"
+              style={{ background: `${itcBadgeColor}30`, color: itcBadgeColor }}
+            >
+              {itcBadgeLabel}
+            </span>
           </div>
         </div>
 
         {/* Trend chart */}
         <div className="bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg p-5 mb-6">
-          <h3 className="text-fyn-ink font-serif text-lg mb-4">12-Month Tax Trend</h3>
+          <h3 className="text-fyn-ink font-serif text-lg mb-4">
+            12-Month Tax Trend
+          </h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={taxData.trend} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+              <AreaChart
+                data={taxData.trend}
+                margin={{ top: 5, right: 10, left: 0, bottom: 0 }}
+              >
                 <defs>
                   <linearGradient id="outputGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#C41E1E" stopOpacity={0.5} />
-                    <stop offset="100%" stopColor="#C41E1E" stopOpacity={0.05} />
+                    <stop
+                      offset="100%"
+                      stopColor="#C41E1E"
+                      stopOpacity={0.05}
+                    />
                   </linearGradient>
                   <linearGradient id="inputGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#1A6B3C" stopOpacity={0.5} />
-                    <stop offset="100%" stopColor="#1A6B3C" stopOpacity={0.05} />
+                    <stop
+                      offset="100%"
+                      stopColor="#1A6B3C"
+                      stopOpacity={0.05}
+                    />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#17120815" />
-                <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#171208" }} />
-                <YAxis tick={{ fontSize: 11, fill: "#171208" }} tickFormatter={(v) => formatINR(v)} />
+                <XAxis
+                  dataKey="month"
+                  tick={{ fontSize: 11, fill: "#171208" }}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: "#171208" }}
+                  tickFormatter={(v) => formatINR(v)}
+                />
                 <RTooltip
-                  contentStyle={{ background: "#171208", border: "none", borderRadius: 8, color: "#fff", fontSize: 12 }}
-                  formatter={(v: any, name: string) => [formatINR(Number(v)), name]}
+                  contentStyle={{
+                    background: "#171208",
+                    border: "none",
+                    borderRadius: 8,
+                    color: "#fff",
+                    fontSize: 12,
+                  }}
+                  formatter={(v: any, name: string) => [
+                    formatINR(Number(v)),
+                    name,
+                  ]}
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Area type="monotone" dataKey="output_tax" stackId="1" stroke="#C41E1E" fill="url(#outputGrad)" name="Output Tax" />
-                <Area type="monotone" dataKey="input_tax" stackId="2" stroke="#1A6B3C" fill="url(#inputGrad)" name="Input Tax (ITC)" />
-                <Line type="monotone" dataKey="net_liability" stroke="#171208" strokeWidth={2} dot={{ r: 3 }} name="Net Liability" />
+                <Area
+                  type="monotone"
+                  dataKey="output_tax"
+                  stackId="1"
+                  stroke="#C41E1E"
+                  fill="url(#outputGrad)"
+                  name="Output Tax"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="input_tax"
+                  stackId="2"
+                  stroke="#1A6B3C"
+                  fill="url(#inputGrad)"
+                  name="Input Tax (ITC)"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="net_liability"
+                  stroke="#171208"
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                  name="Net Liability"
+                />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -680,35 +1095,81 @@ const GSTPage = () => {
 
         {/* Forecast */}
         <div className="bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg p-5 mb-6">
-          <h3 className="text-fyn-ink font-serif text-lg mb-4">3-Month Liability Forecast</h3>
+          <h3 className="text-fyn-ink font-serif text-lg mb-4">
+            3-Month Liability Forecast
+          </h3>
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={taxData.forecast} margin={{ top: 5, right: 20, left: 0, bottom: 0 }}>
+              <LineChart
+                data={taxData.forecast}
+                margin={{ top: 5, right: 20, left: 0, bottom: 0 }}
+              >
                 <CartesianGrid strokeDasharray="3 3" stroke="#17120815" />
-                <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#171208" }} />
-                <YAxis tick={{ fontSize: 11, fill: "#171208" }} tickFormatter={(v) => formatINR(v)} />
-                <RTooltip
-                  contentStyle={{ background: "#171208", border: "none", borderRadius: 8, color: "#fff", fontSize: 12 }}
-                  formatter={(v: any, _n, p: any) => [`${formatINR(Number(v))} (${p?.payload?.confidence})`, "Estimate"]}
+                <XAxis
+                  dataKey="month"
+                  tick={{ fontSize: 11, fill: "#171208" }}
                 />
-                <Line type="monotone" dataKey="estimated_liability" stroke="#8B6914" strokeWidth={2} strokeDasharray="6 4" dot={{ r: 5, fill: "#8B6914" }} />
+                <YAxis
+                  tick={{ fontSize: 11, fill: "#171208" }}
+                  tickFormatter={(v) => formatINR(v)}
+                />
+                <RTooltip
+                  contentStyle={{
+                    background: "#171208",
+                    border: "none",
+                    borderRadius: 8,
+                    color: "#fff",
+                    fontSize: 12,
+                  }}
+                  formatter={(v: any, _n, p: any) => [
+                    `${formatINR(Number(v))} (${p?.payload?.confidence})`,
+                    "Estimate",
+                  ]}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="estimated_liability"
+                  stroke="#8B6914"
+                  strokeWidth={2}
+                  strokeDasharray="6 4"
+                  dot={{ r: 5, fill: "#8B6914" }}
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
           <div className="flex flex-wrap gap-2 mt-3">
             {taxData.forecast.map((f) => (
-              <span key={f.month} className="text-[11px] px-2 py-0.5 rounded bg-fyn-ink/5 text-fyn-ink/70">
-                {f.month}: <span className="fyn-metric text-fyn-ink">{formatINR(f.estimated_liability)}</span> · {f.confidence}
+              <span
+                key={f.month}
+                className="text-[11px] px-2 py-0.5 rounded bg-fyn-ink/5 text-fyn-ink/70"
+              >
+                {f.month}:{" "}
+                <span className="fyn-metric text-fyn-ink">
+                  {formatINR(f.estimated_liability)}
+                </span>{" "}
+                · {f.confidence}
               </span>
             ))}
           </div>
         </div>
 
         {/* Compliance breakdown */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-fyn-md mb-6">
           {[
-            { label: "GST Compliance", rate: taxData.compliance.gst_compliance_rate, on: taxData.gst_summary.on_time, total: taxData.gst_summary.filed, tab: "gst" },
-            { label: "TDS Compliance", rate: taxData.compliance.tds_compliance_rate, on: taxData.tds_summary.on_time, total: taxData.tds_summary.filed, tab: "tds" },
+            {
+              label: "GST Compliance",
+              rate: taxData.compliance.gst_compliance_rate,
+              on: taxData.gst_summary.on_time,
+              total: taxData.gst_summary.filed,
+              tab: "gst",
+            },
+            {
+              label: "TDS Compliance",
+              rate: taxData.compliance.tds_compliance_rate,
+              on: taxData.tds_summary.on_time,
+              total: taxData.tds_summary.filed,
+              tab: "tds",
+            },
           ].map((c) => {
             const r = Math.round(c.rate);
             const color = r >= 80 ? "#1A6B3C" : r >= 50 ? "#8B5A00" : "#C41E1E";
@@ -717,18 +1178,45 @@ const GSTPage = () => {
               <button
                 key={c.label}
                 onClick={() => handleTabChange(c.tab)}
-                className="bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg p-5 text-left hover:border-fyn-ink/30 transition-colors flex items-center gap-5"
+                className="bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg p-5 text-left hover:border-fyn-ink/30 transition-colors flex items-center gap-fyn-md"
               >
                 <svg width="92" height="92" viewBox="0 0 92 92">
-                  <circle cx="46" cy="46" r="36" stroke="#17120815" strokeWidth="8" fill="none" />
-                  <circle cx="46" cy="46" r="36" stroke={color} strokeWidth="8" fill="none"
-                    strokeDasharray={`${(circ * r) / 100} ${circ}`} strokeLinecap="round"
-                    transform="rotate(-90 46 46)" />
-                  <text x="46" y="51" textAnchor="middle" fontSize="18" fontWeight="700" fill="#171208" fontFamily="JetBrains Mono, monospace">{r}%</text>
+                  <circle
+                    cx="46"
+                    cy="46"
+                    r="36"
+                    stroke="#17120815"
+                    strokeWidth="8"
+                    fill="none"
+                  />
+                  <circle
+                    cx="46"
+                    cy="46"
+                    r="36"
+                    stroke={color}
+                    strokeWidth="8"
+                    fill="none"
+                    strokeDasharray={`${(circ * r) / 100} ${circ}`}
+                    strokeLinecap="round"
+                    transform="rotate(-90 46 46)"
+                  />
+                  <text
+                    x="46"
+                    y="51"
+                    textAnchor="middle"
+                    fontSize="18"
+                    fontWeight="700"
+                    fill="#171208"
+                    fontFamily="JetBrains Mono, monospace"
+                  >
+                    {r}%
+                  </text>
                 </svg>
                 <div>
                   <p className="text-fyn-ink font-serif text-lg">{c.label}</p>
-                  <p className="text-fyn-ink/60 text-sm fyn-metric">{c.on}/{c.total} on time</p>
+                  <p className="text-fyn-ink/60 text-sm fyn-metric">
+                    {c.on}/{c.total} on time
+                  </p>
                 </div>
               </button>
             );
@@ -736,11 +1224,15 @@ const GSTPage = () => {
         </div>
 
         {/* Upcoming deadlines table + Alerts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-fyn-md mb-6">
           <div className="bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg p-5">
-            <h3 className="text-fyn-ink font-serif text-lg mb-3">Upcoming Deadlines</h3>
+            <h3 className="text-fyn-ink font-serif text-lg mb-3">
+              Upcoming Deadlines
+            </h3>
             {taxData.upcoming_deadlines.length === 0 ? (
-              <p className="text-fyn-ink/60 text-sm">Nothing pending. You're caught up.</p>
+              <p className="text-fyn-ink/60 text-sm">
+                Nothing pending. You're caught up.
+              </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -756,18 +1248,38 @@ const GSTPage = () => {
                   <tbody>
                     {taxData.upcoming_deadlines.slice(0, 8).map((d, i) => {
                       const days = d.days_remaining;
-                      const tone = days <= 7 ? "#C41E1E" : days <= 15 ? "#8B5A00" : "#1A6B3C";
+                      const tone =
+                        days <= 7
+                          ? "#C41E1E"
+                          : days <= 15
+                            ? "#8B5A00"
+                            : "#1A6B3C";
                       return (
-                        <tr key={i} onClick={() => handleTabChange(d.type === "GST" ? "gst" : "tds")}
+                        <tr
+                          key={i}
+                          onClick={() =>
+                            handleTabChange(d.type === "GST" ? "gst" : "tds")
+                          }
                           className="border-b border-fyn-ink-10 last:border-0 cursor-pointer hover:bg-fyn-beige-card"
                           style={{ boxShadow: `inset 3px 0 0 0 ${tone}` }}
                         >
-                          <td className="py-2 text-fyn-ink font-medium text-xs">{d.type}</td>
-                          <td className="py-2 text-fyn-ink/80 text-xs">{d.filing_type}</td>
-                          <td className="py-2 text-fyn-ink/70 text-xs">{d.period}</td>
-                          <td className="py-2 text-fyn-ink/70 fyn-metric text-xs">{fmtDate(d.due_date)}</td>
+                          <td className="py-2 text-fyn-ink font-medium text-xs">
+                            {d.type}
+                          </td>
+                          <td className="py-2 text-fyn-ink/80 text-xs">
+                            {d.filing_type}
+                          </td>
+                          <td className="py-2 text-fyn-ink/70 text-xs">
+                            {d.period}
+                          </td>
+                          <td className="py-2 text-fyn-ink/70 fyn-metric text-xs">
+                            {fmtDate(d.due_date)}
+                          </td>
                           <td className="py-2 text-right">
-                            <span className="text-[11px] px-2 py-0.5 rounded fyn-metric" style={{ background: `${tone}15`, color: tone }}>
+                            <span
+                              className="text-[11px] px-2 py-0.5 rounded fyn-metric"
+                              style={{ background: `${tone}15`, color: tone }}
+                            >
                               {days <= 0 ? "Today" : `${days}d`}
                             </span>
                           </td>
@@ -783,17 +1295,30 @@ const GSTPage = () => {
           <div className="bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg p-5">
             <h3 className="text-fyn-ink font-serif text-lg mb-3">Alerts</h3>
             {taxData.alerts.length === 0 ? (
-              <p className="text-fyn-ink/60 text-sm">No active alerts. Everything looks good.</p>
+              <p className="text-fyn-ink/60 text-sm">
+                No active alerts. Everything looks good.
+              </p>
             ) : (
               <ul className="space-y-2">
                 {taxData.alerts.map((a, i) => (
-                  <li key={i} className={`border rounded-md p-3 ${sevBg(a.severity)}`}>
+                  <li
+                    key={i}
+                    className={`border rounded-md p-3 ${sevBg(a.severity)}`}
+                  >
                     <div className="flex items-start gap-2">
                       {sevIcon(a.severity)}
                       <div className="min-w-0 flex-1">
-                        <p className="text-fyn-ink text-sm font-medium">{a.title}</p>
-                        <p className="text-fyn-ink/70 text-xs mt-0.5">{a.message}</p>
-                        {a.action && <p className="text-fyn-ink/60 text-[11px] mt-1 italic">→ {a.action}</p>}
+                        <p className="text-fyn-ink text-sm font-medium">
+                          {a.title}
+                        </p>
+                        <p className="text-fyn-ink/70 text-xs mt-0.5">
+                          {a.message}
+                        </p>
+                        {a.action && (
+                          <p className="text-fyn-ink/60 text-[11px] mt-1 italic">
+                            → {a.action}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </li>
@@ -808,18 +1333,27 @@ const GSTPage = () => {
           <div className="bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg p-5">
             <div className="flex items-center gap-2 mb-4">
               <Sparkles className="w-4 h-4 text-fyn-gold" />
-              <h3 className="text-fyn-ink font-serif text-lg">Tax Optimization Suggestions</h3>
+              <h3 className="text-fyn-ink font-serif text-lg">
+                Tax Optimization Suggestions
+              </h3>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-fyn-sm">
               {taxData.suggestions.map((s, i) => (
-                <div key={i} className="border border-fyn-ink-10 rounded-md p-4 bg-card flex flex-col">
+                <div
+                  key={i}
+                  className="border border-fyn-ink-10 rounded-md p-4 bg-card flex flex-col"
+                >
                   <div className="flex items-center justify-between mb-2">
                     {priorityBadge(s.priority)}
-                    <span className="text-[10px] uppercase tracking-wider text-fyn-ink/50">{s.type.replace(/_/g, " ")}</span>
+                    <span className="text-[10px] uppercase tracking-wider text-fyn-ink/50">
+                      {s.type.replace(/_/g, " ")}
+                    </span>
                   </div>
                   <p className="text-fyn-ink text-sm flex-1">{s.message}</p>
                   {s.potential_savings && s.potential_savings > 0 && (
-                    <p className="text-fyn-success text-xs fyn-metric mt-2">Est. savings: {formatINR(s.potential_savings)}</p>
+                    <p className="text-fyn-success text-xs fyn-metric mt-2">
+                      Est. savings: {formatINR(s.potential_savings)}
+                    </p>
                   )}
                   <button className="mt-3 inline-flex items-center gap-1 text-xs text-fyn-ink hover:underline self-start">
                     Review <ArrowRight className="w-3 h-3" />
@@ -840,12 +1374,19 @@ const GSTPage = () => {
       {/* Breadcrumb + title */}
       <div className="mb-5">
         <p className="text-fyn-ink/50 text-xs mb-1">
-          <button onClick={() => navigate("/dashboard/cockpit")} className="hover:text-fyn-ink underline-offset-2 hover:underline">Dashboard</button>
+          <button
+            onClick={() => navigate("/dashboard/cockpit")}
+            className="hover:text-fyn-ink underline-offset-2 hover:underline"
+          >
+            Dashboard
+          </button>
           <span className="mx-2">→</span>
           <span className="text-fyn-ink/70">Tax Intelligence</span>
         </p>
         <h1 className="font-serif text-fyn-ink text-3xl">Tax Intelligence</h1>
-        <p className="text-fyn-ink/60 text-sm mt-1">Unified GST &amp; TDS compliance, deadlines and audit readiness.</p>
+        <p className="text-fyn-ink/60 text-sm mt-1">
+          Unified GST &amp; TDS compliance, deadlines and audit readiness.
+        </p>
       </div>
 
       {dateBanner}
@@ -853,9 +1394,24 @@ const GSTPage = () => {
 
       <Tabs value={tab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="mb-5 bg-fyn-beige-card border border-fyn-ink-10">
-          <TabsTrigger value="overview" className="data-[state=active]:bg-fyn-ink data-[state=active]:text-white">Tax Overview</TabsTrigger>
-          <TabsTrigger value="gst" className="data-[state=active]:bg-fyn-ink data-[state=active]:text-white">GST Filings</TabsTrigger>
-          <TabsTrigger value="tds" className="data-[state=active]:bg-fyn-ink data-[state=active]:text-white">TDS Filings</TabsTrigger>
+          <TabsTrigger
+            value="overview"
+            className="data-[state=active]:bg-fyn-ink data-[state=active]:text-white"
+          >
+            Tax Overview
+          </TabsTrigger>
+          <TabsTrigger
+            value="gst"
+            className="data-[state=active]:bg-fyn-ink data-[state=active]:text-white"
+          >
+            GST Filings
+          </TabsTrigger>
+          <TabsTrigger
+            value="tds"
+            className="data-[state=active]:bg-fyn-ink data-[state=active]:text-white"
+          >
+            TDS Filings
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="overview">{renderOverviewTab()}</TabsContent>
         <TabsContent value="gst">{renderGstTab()}</TabsContent>

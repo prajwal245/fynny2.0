@@ -30,7 +30,9 @@ export default function TestSecureImportPage() {
   const [amount, setAmount] = useState("1000");
   const [description, setDescription] = useState("Test import");
   const [category, setCategory] = useState("office");
-  const [overrideBusinessId, setOverrideBusinessId] = useState<string | null>(null);
+  const [overrideBusinessId, setOverrideBusinessId] = useState<string | null>(
+    null,
+  );
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<TestResult | null>(null);
 
@@ -41,86 +43,136 @@ export default function TestSecureImportPage() {
   }) => {
     setLoading(true);
     setResult(null);
-    const bId = overrides?.businessId !== undefined ? overrides.businessId : (overrideBusinessId ?? businessId);
+    const bId =
+      overrides?.businessId !== undefined
+        ? overrides.businessId
+        : (overrideBusinessId ?? businessId);
     console.log("[TestSecureImport] businessId from useAuth:", businessId);
     console.log("[TestSecureImport] business_id sent in body:", bId);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session?.access_token) {
-        setResult({ status: "error", payload: null, error: "Not signed in, please log in first." });
+        setResult({
+          status: "error",
+          payload: null,
+          error: "Not signed in, please log in first.",
+        });
         setLoading(false);
         return;
       }
-      const { data, error } = await supabase.functions.invoke("secure-data-import", {
-        body: {
-          data_type: dataType,
-          business_id: bId,
-          records: [
-            {
-              transaction_date: overrides?.date ?? date,
-              amount: Number(overrides?.amount ?? amount),
-              description,
-              category,
-            },
-          ],
+      const { data, error } = await supabase.functions.invoke(
+        "secure-data-import",
+        {
+          body: {
+            data_type: dataType,
+            business_id: bId,
+            records: [
+              {
+                transaction_date: overrides?.date ?? date,
+                amount: Number(overrides?.amount ?? amount),
+                description,
+                category,
+              },
+            ],
+          },
         },
-      });
+      );
       if (error) {
-        setResult({ status: "error", payload: data ?? null, error: error.message });
+        setResult({
+          status: "error",
+          payload: data ?? null,
+          error: error.message,
+        });
       } else {
         setResult({ status: "success", payload: data });
       }
     } catch (e) {
-      setResult({ status: "error", payload: null, error: e instanceof Error ? e.message : String(e) });
+      setResult({
+        status: "error",
+        payload: null,
+        error: e instanceof Error ? e.message : String(e),
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const futureDate = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+  const futureDate = new Date(Date.now() + 30 * 86400000)
+    .toISOString()
+    .slice(0, 10);
 
   return (
     <DashboardLayout>
       <div className="max-w-3xl mx-auto p-6 space-y-6">
         <div>
-          <h1 className="text-2xl font-serif font-bold text-fyn-ink">Test: secure-data-import</h1>
+          <h1 className="text-2xl font-serif font-bold text-fyn-ink">
+            Test: secure-data-import
+          </h1>
           <p className="text-sm text-fyn-ink/70 mt-1">
-            Business ID: <code className="font-mono">{businessId ?? "(none)"}</code>
+            Business ID:{" "}
+            <code className="font-mono">{businessId ?? "(none)"}</code>
           </p>
         </div>
 
         <div className="bg-fyn-beige/40 border border-fyn-ink/10 rounded-lg p-6 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-fyn-md">
             <div>
               <Label>Data type</Label>
-              <Select value={dataType} onValueChange={(v) => setDataType(v as DataType)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select
+                value={dataType}
+                onValueChange={(v) => setDataType(v as DataType)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="transactions">transactions</SelectItem>
                   <SelectItem value="invoices">invoices</SelectItem>
-                  <SelectItem value="vendor_payments">vendor_payments</SelectItem>
+                  <SelectItem value="vendor_payments">
+                    vendor_payments
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label>Transaction date</Label>
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <Input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
             </div>
             <div>
               <Label>Amount</Label>
-              <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
+              <Input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
             </div>
             <div>
               <Label>Category</Label>
-              <Input value={category} onChange={(e) => setCategory(e.target.value)} />
+              <Input
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              />
             </div>
             <div className="md:col-span-2">
               <Label>Description</Label>
-              <Input value={description} onChange={(e) => setDescription(e.target.value)} />
+              <Input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
             </div>
           </div>
 
-          <Button onClick={() => callFn()} disabled={loading} className="w-full">
+          <Button
+            onClick={() => callFn()}
+            disabled={loading}
+            className="w-full"
+          >
             {loading ? "Calling..." : "Test Secure Import"}
           </Button>
         </div>
@@ -130,16 +182,32 @@ export default function TestSecureImportPage() {
             Quick test cases
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            <Button variant="outline" onClick={() => callFn({ amount: "1500", date: today })} disabled={loading}>
+            <Button
+              variant="outline"
+              onClick={() => callFn({ amount: "1500", date: today })}
+              disabled={loading}
+            >
               ✓ Valid data
             </Button>
-            <Button variant="outline" onClick={() => callFn({ amount: "0" })} disabled={loading}>
+            <Button
+              variant="outline"
+              onClick={() => callFn({ amount: "0" })}
+              disabled={loading}
+            >
               ✗ Zero amount
             </Button>
-            <Button variant="outline" onClick={() => callFn({ date: futureDate })} disabled={loading}>
+            <Button
+              variant="outline"
+              onClick={() => callFn({ date: futureDate })}
+              disabled={loading}
+            >
               ✗ Future date
             </Button>
-            <Button variant="outline" onClick={() => callFn({ businessId: "" })} disabled={loading}>
+            <Button
+              variant="outline"
+              onClick={() => callFn({ businessId: "" })}
+              disabled={loading}
+            >
               ✗ Empty business_id
             </Button>
           </div>
@@ -157,10 +225,15 @@ export default function TestSecureImportPage() {
               <span className="font-semibold">
                 {result.status === "success" ? "✓ Success" : "✗ Error"}
               </span>
-              {result.error && <span className="text-sm text-red-700">{result.error}</span>}
+              {result.error && (
+                <span className="text-sm text-red-700">{result.error}</span>
+              )}
             </div>
             {(() => {
-              const p = result.payload as { inserted_count?: number; errors?: unknown } | null;
+              const p = result.payload as {
+                inserted_count?: number;
+                errors?: unknown;
+              } | null;
               return (
                 <>
                   {p?.inserted_count !== undefined && (
@@ -180,7 +253,9 @@ export default function TestSecureImportPage() {
               );
             })()}
             <details>
-              <summary className="text-xs cursor-pointer text-fyn-ink/70">Full response</summary>
+              <summary className="text-xs cursor-pointer text-fyn-ink/70">
+                Full response
+              </summary>
               <pre className="text-xs bg-white/60 p-2 rounded mt-1 overflow-auto">
                 {JSON.stringify(result.payload, null, 2)}
               </pre>

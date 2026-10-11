@@ -32,9 +32,13 @@ const fromMock = vi.fn();
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user: { id: "test-user" } } }),
+      getUser: vi
+        .fn()
+        .mockResolvedValue({ data: { user: { id: "test-user" } } }),
       getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
-      onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
+      onAuthStateChange: vi.fn(() => ({
+        data: { subscription: { unsubscribe: vi.fn() } },
+      })),
     },
     from: (...args: unknown[]) => fromMock(...args),
   },
@@ -53,7 +57,7 @@ vi.mock("@/contexts/AuthContext", () => ({
 // Helper: returns a chainable Supabase query stub that resolves to `data`.
 const makeQuery = (data: unknown) => {
   const result = { data, error: null };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   const chain: any = {};
   const passthrough = () => chain;
   ["select", "eq", "order", "limit", "gte", "lte", "in", "neq"].forEach((m) => {
@@ -69,7 +73,9 @@ const makeQuery = (data: unknown) => {
 
 const renderPage = (ui: ReactNode) => {
   const qc = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: Infinity } },
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0, staleTime: Infinity },
+    },
   });
   return render(
     <QueryClientProvider client={qc}>
@@ -88,7 +94,8 @@ beforeEach(() => {
 
 describe("Dashboard page snapshots, shared-primitive layout regression", () => {
   it("AuditReadinessPage: scorecard, area bars, accordion, vault use brand tokens", async () => {
-    const { default: AuditReadinessPage } = await import("../AuditReadinessPage");
+    const { default: AuditReadinessPage } =
+      await import("../AuditReadinessPage");
     const { container } = renderPage(<AuditReadinessPage />);
     expect(container.firstChild).toMatchSnapshot();
   });

@@ -2,17 +2,44 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@/lib/router-compat";
 import {
-  Wallet, Clock, TrendingDown, Scale, RefreshCw, Download,
-  AlertTriangle, AlertCircle, Info, Database, ArrowUpRight, ArrowDownRight,
+  Wallet,
+  Clock,
+  TrendingDown,
+  Scale,
+  RefreshCw,
+  Download,
+  AlertTriangle,
+  AlertCircle,
+  Info,
+  Database,
+  ArrowUpRight,
+  ArrowDownRight,
 } from "lucide-react";
 import {
-  AreaChart, Area, LineChart, Line, BarChart, Bar,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  AreaChart,
+  Area,
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
 } from "recharts";
 import DashboardLayout from "@/components/DashboardLayout";
 import {
-  FynPage, FynPageTitle, FynCard, FynCardTitle, FynSectionTitle,
-  FynLabel, FynBadge, FynButton, FynLoading, FynEmpty,
+  FynPage,
+  FynPageTitle,
+  FynCard,
+  FynCardTitle,
+  FynSectionTitle,
+  FynLabel,
+  FynBadge,
+  FynButton,
+  FynLoading,
+  FynEmpty,
 } from "@/components/dashboard/ui";
 import { supabaseExternal } from "@/integrations/supabase/external";
 import { useAuth } from "@/contexts/AuthContext";
@@ -36,9 +63,19 @@ interface LiquidityResponse {
     total_outflows?: number;
     net_cash_flow?: number;
   };
-  trend?: Array<{ period: string; inflow?: number; outflow?: number; net?: number; balance?: number }>;
+  trend?: Array<{
+    period: string;
+    inflow?: number;
+    outflow?: number;
+    net?: number;
+    balance?: number;
+  }>;
   forecast?: Array<{ month: string; ending_balance: number }>;
-  alerts?: Array<{ severity: "critical" | "warning" | "info"; message: string; title?: string }>;
+  alerts?: Array<{
+    severity: "critical" | "warning" | "info";
+    message: string;
+    title?: string;
+  }>;
   expense_categories?: Array<{ category: string; amount: number }>;
   revenue_categories?: Array<{ category: string; amount: number }>;
 }
@@ -48,20 +85,21 @@ const num = (v: unknown) => (typeof v === "number" && isFinite(v) ? v : 0);
 export default function LiquidityIntelligencePage() {
   const { businessId } = useAuth();
 
-  const { data, isLoading, error, refetch, isFetching } = useQuery<LiquidityResponse>({
-    queryKey: ["liquidity-intelligence", businessId],
-    queryFn: async () => {
-      if (!businessId) throw new Error("No business ID");
-      const { data, error } = await supabaseExternal.functions.invoke(
-        "liquidity-intelligence",
-        { body: { business_id: businessId, org_id: businessId } },
-      );
-      if (error) throw error;
-      return data as LiquidityResponse;
-    },
-    enabled: !!businessId,
-    refetchInterval: 60_000,
-  });
+  const { data, isLoading, error, refetch, isFetching } =
+    useQuery<LiquidityResponse>({
+      queryKey: ["liquidity-intelligence", businessId],
+      queryFn: async () => {
+        if (!businessId) throw new Error("No business ID");
+        const { data, error } = await supabaseExternal.functions.invoke(
+          "liquidity-intelligence",
+          { body: { business_id: businessId, org_id: businessId } },
+        );
+        if (error) throw error;
+        return data as LiquidityResponse;
+      },
+      enabled: !!businessId,
+      refetchInterval: 60_000,
+    });
 
   const isEmpty = useMemo(() => {
     if (!data) return false;
@@ -106,11 +144,23 @@ export default function LiquidityIntelligencePage() {
             Liquidity Intelligence
           </FynPageTitle>
           <div className="flex items-center gap-fyn-sm">
-            <FynButton variant="secondary" onClick={handleRefresh} disabled={isFetching} aria-label="Refresh data">
-              <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+            <FynButton
+              variant="secondary"
+              onClick={handleRefresh}
+              disabled={isFetching}
+              aria-label="Refresh data"
+            >
+              <RefreshCw
+                className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`}
+              />
               Refresh
             </FynButton>
-            <FynButton variant="secondary" onClick={handleExport} disabled={!data || isEmpty} aria-label="Export to CSV">
+            <FynButton
+              variant="secondary"
+              onClick={handleExport}
+              disabled={!data || isEmpty}
+              aria-label="Export to CSV"
+            >
               <Download className="h-4 w-4" />
               Export
             </FynButton>
@@ -124,9 +174,12 @@ export default function LiquidityIntelligencePage() {
             <div className="flex items-start gap-fyn-md">
               <AlertCircle className="h-5 w-5 text-fyn-red shrink-0 mt-0.5" />
               <div className="flex-1">
-                <h3 className="font-serif text-fyn-h3 text-fyn-ink mb-fyn-xs">Couldn't load liquidity data</h3>
+                <h3 className="font-serif text-fyn-h3 text-fyn-ink mb-fyn-xs">
+                  Couldn't load liquidity data
+                </h3>
                 <p className="text-fyn-body text-fyn-ink-60 mb-fyn-md">
-                  {(error as Error).message || "The liquidity engine is unreachable right now."}
+                  {(error as Error).message ||
+                    "The liquidity engine is unreachable right now."}
                 </p>
                 <FynButton onClick={handleRefresh}>Try again</FynButton>
               </div>
@@ -161,13 +214,21 @@ function LiquidityContent({ data }: { data: LiquidityResponse }) {
   const runwayDays = num(data.runway?.days);
   const runwayMonths = runwayDays / 30;
   // Tier badge: Safe (>6mo) / Watch (3-6mo) / Critical (<3mo), ported from RunwayPage
-  const runwayTone = runwayMonths > 6 ? "success" : runwayMonths >= 3 ? "warning" : "danger";
-  const runwayLabel = runwayMonths > 6 ? "Safe" : runwayMonths >= 3 ? "Watch" : "Critical";
-  const crisisDate = runwayDays > 0 && runwayDays < 3650
-    ? new Date(Date.now() + runwayDays * 86400000).toLocaleDateString("en-IN", {
-        day: "numeric", month: "short", year: "numeric",
-      })
-    : null;
+  const runwayTone =
+    runwayMonths > 6 ? "success" : runwayMonths >= 3 ? "warning" : "danger";
+  const runwayLabel =
+    runwayMonths > 6 ? "Safe" : runwayMonths >= 3 ? "Watch" : "Critical";
+  const crisisDate =
+    runwayDays > 0 && runwayDays < 3650
+      ? new Date(Date.now() + runwayDays * 86400000).toLocaleDateString(
+          "en-IN",
+          {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          },
+        )
+      : null;
 
   const trend = (data.trend || []).map((t) => ({
     period: t.period,
@@ -223,10 +284,30 @@ function LiquidityContent({ data }: { data: LiquidityResponse }) {
       <div>
         <FynSectionTitle>Liquidity Position</FynSectionTitle>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-fyn-md">
-          <FynCard><MiniMetric label="Current Assets" value={formatINR(num(lp.current_assets))} /></FynCard>
-          <FynCard><MiniMetric label="Current Liabilities" value={formatINR(num(lp.current_liabilities))} /></FynCard>
-          <FynCard><MiniMetric label="Current Ratio" value={num(lp.current_ratio).toFixed(2)} /></FynCard>
-          <FynCard><MiniMetric label="Quick Ratio" value={num(lp.quick_ratio).toFixed(2)} /></FynCard>
+          <FynCard>
+            <MiniMetric
+              label="Current Assets"
+              value={formatINR(num(lp.current_assets))}
+            />
+          </FynCard>
+          <FynCard>
+            <MiniMetric
+              label="Current Liabilities"
+              value={formatINR(num(lp.current_liabilities))}
+            />
+          </FynCard>
+          <FynCard>
+            <MiniMetric
+              label="Current Ratio"
+              value={num(lp.current_ratio).toFixed(2)}
+            />
+          </FynCard>
+          <FynCard>
+            <MiniMetric
+              label="Quick Ratio"
+              value={num(lp.quick_ratio).toFixed(2)}
+            />
+          </FynCard>
         </div>
       </div>
 
@@ -240,13 +321,26 @@ function LiquidityContent({ data }: { data: LiquidityResponse }) {
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-fyn-md mb-fyn-md">
           <FynCard>
-            <MiniMetric label="Total Inflows" value={formatINR(num(cf.total_inflows))} positive />
+            <MiniMetric
+              label="Total Inflows"
+              value={formatINR(num(cf.total_inflows))}
+              positive
+            />
           </FynCard>
           <FynCard>
-            <MiniMetric label="Total Outflows" value={formatINR(num(cf.total_outflows))} negative />
+            <MiniMetric
+              label="Total Outflows"
+              value={formatINR(num(cf.total_outflows))}
+              negative
+            />
           </FynCard>
           <FynCard>
-            <MiniMetric label="Net Cash Flow" value={formatINR(num(cf.net_cash_flow))} positive={num(cf.net_cash_flow) >= 0} negative={num(cf.net_cash_flow) < 0} />
+            <MiniMetric
+              label="Net Cash Flow"
+              value={formatINR(num(cf.net_cash_flow))}
+              positive={num(cf.net_cash_flow) >= 0}
+              negative={num(cf.net_cash_flow) < 0}
+            />
           </FynCard>
         </div>
 
@@ -255,26 +349,66 @@ function LiquidityContent({ data }: { data: LiquidityResponse }) {
             <FynCardTitle>Cash Flow Trend</FynCardTitle>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={trend} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                <AreaChart
+                  data={trend}
+                  margin={{ top: 8, right: 16, left: 0, bottom: 0 }}
+                >
                   <defs>
                     <linearGradient id="inflowFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#16A34A" stopOpacity={0.35} />
+                      <stop
+                        offset="0%"
+                        stopColor="#16A34A"
+                        stopOpacity={0.35}
+                      />
                       <stop offset="100%" stopColor="#16A34A" stopOpacity={0} />
                     </linearGradient>
-                    <linearGradient id="outflowFill" x1="0" y1="0" x2="0" y2="1">
+                    <linearGradient
+                      id="outflowFill"
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
                       <stop offset="0%" stopColor="#C41E1E" stopOpacity={0.3} />
                       <stop offset="100%" stopColor="#C41E1E" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(23,18,8,0.08)" />
-                  <XAxis dataKey="period" tick={{ fill: "#171208", fontSize: 12 }} />
-                  <YAxis tick={{ fill: "#171208", fontSize: 12 }} tickFormatter={(v) => formatINR(v)} />
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="rgba(23,18,8,0.08)"
+                  />
+                  <XAxis
+                    dataKey="period"
+                    tick={{ fill: "#171208", fontSize: 12 }}
+                  />
+                  <YAxis
+                    tick={{ fill: "#171208", fontSize: 12 }}
+                    tickFormatter={(v) => formatINR(v)}
+                  />
                   <Tooltip
-                    contentStyle={{ background: "#FBF7EC", border: "1px solid rgba(23,18,8,0.12)", borderRadius: 8 }}
+                    contentStyle={{
+                      background: "#FBF7EC",
+                      border: "1px solid rgba(23,18,8,0.12)",
+                      borderRadius: 8,
+                    }}
                     formatter={(v: number) => formatINR(v)}
                   />
-                  <Area type="monotone" dataKey="inflow" stroke="#16A34A" fill="url(#inflowFill)" strokeWidth={2} name="Inflow" />
-                  <Area type="monotone" dataKey="outflow" stroke="#C41E1E" fill="url(#outflowFill)" strokeWidth={2} name="Outflow" />
+                  <Area
+                    type="monotone"
+                    dataKey="inflow"
+                    stroke="#16A34A"
+                    fill="url(#inflowFill)"
+                    strokeWidth={2}
+                    name="Inflow"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="outflow"
+                    stroke="#C41E1E"
+                    fill="url(#outflowFill)"
+                    strokeWidth={2}
+                    name="Outflow"
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -289,15 +423,38 @@ function LiquidityContent({ data }: { data: LiquidityResponse }) {
           <FynCard>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={forecast} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(23,18,8,0.08)" />
-                  <XAxis dataKey="month" tick={{ fill: "#171208", fontSize: 12 }} />
-                  <YAxis tick={{ fill: "#171208", fontSize: 12 }} tickFormatter={(v) => formatINR(v)} />
+                <LineChart
+                  data={forecast}
+                  margin={{ top: 8, right: 16, left: 0, bottom: 0 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="rgba(23,18,8,0.08)"
+                  />
+                  <XAxis
+                    dataKey="month"
+                    tick={{ fill: "#171208", fontSize: 12 }}
+                  />
+                  <YAxis
+                    tick={{ fill: "#171208", fontSize: 12 }}
+                    tickFormatter={(v) => formatINR(v)}
+                  />
                   <Tooltip
-                    contentStyle={{ background: "#FBF7EC", border: "1px solid rgba(23,18,8,0.12)", borderRadius: 8 }}
+                    contentStyle={{
+                      background: "#FBF7EC",
+                      border: "1px solid rgba(23,18,8,0.12)",
+                      borderRadius: 8,
+                    }}
                     formatter={(v: number) => formatINR(v)}
                   />
-                  <Line type="monotone" dataKey="balance" stroke="#C41E1E" strokeWidth={2.5} dot={{ r: 4, fill: "#C41E1E" }} name="Ending Balance" />
+                  <Line
+                    type="monotone"
+                    dataKey="balance"
+                    stroke="#C41E1E"
+                    strokeWidth={2.5}
+                    dot={{ r: 4, fill: "#C41E1E" }}
+                    name="Ending Balance"
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -310,7 +467,9 @@ function LiquidityContent({ data }: { data: LiquidityResponse }) {
         <div>
           <FynSectionTitle>Alerts</FynSectionTitle>
           <div className="space-y-fyn-sm">
-            {data.alerts.map((a, i) => <AlertRow key={i} alert={a} />)}
+            {data.alerts.map((a, i) => (
+              <AlertRow key={i} alert={a} />
+            ))}
           </div>
         </div>
       )}
@@ -339,7 +498,19 @@ function LiquidityContent({ data }: { data: LiquidityResponse }) {
   );
 }
 
-function Kpi({ icon, label, value, badge, footer }: { icon: React.ReactNode; label: string; value: string; badge?: React.ReactNode; footer?: string }) {
+function Kpi({
+  icon,
+  label,
+  value,
+  badge,
+  footer,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  badge?: React.ReactNode;
+  footer?: string;
+}) {
   return (
     <FynCard>
       <div className="flex items-start justify-between mb-fyn-sm">
@@ -347,19 +518,37 @@ function Kpi({ icon, label, value, badge, footer }: { icon: React.ReactNode; lab
         {badge}
       </div>
       <FynLabel>{label}</FynLabel>
-      <p className="font-mono text-fyn-metric text-fyn-ink mt-fyn-xs">{value}</p>
-      {footer && <p className="text-fyn-small text-fyn-ink-60 mt-fyn-xs">{footer}</p>}
+      <p className="font-mono text-fyn-metric text-fyn-ink mt-fyn-xs">
+        {value}
+      </p>
+      {footer && (
+        <p className="text-fyn-small text-fyn-ink-60 mt-fyn-xs">{footer}</p>
+      )}
     </FynCard>
   );
 }
 
-function MiniMetric({ label, value, positive, negative }: { label: string; value: string; positive?: boolean; negative?: boolean }) {
+function MiniMetric({
+  label,
+  value,
+  positive,
+  negative,
+}: {
+  label: string;
+  value: string;
+  positive?: boolean;
+  negative?: boolean;
+}) {
   return (
     <div>
       <FynLabel>{label}</FynLabel>
       <p
         className={`font-mono text-[22px] font-semibold mt-fyn-xs ${
-          positive ? "text-[#16A34A]" : negative ? "text-fyn-red" : "text-fyn-ink"
+          positive
+            ? "text-[#16A34A]"
+            : negative
+              ? "text-fyn-red"
+              : "text-fyn-ink"
         }`}
       >
         {positive && <ArrowUpRight className="inline h-4 w-4 mr-1" />}
@@ -370,19 +559,38 @@ function MiniMetric({ label, value, positive, negative }: { label: string; value
   );
 }
 
-function AlertRow({ alert }: { alert: { severity: string; message: string; title?: string } }) {
-  const tone = alert.severity === "critical" ? "danger" : alert.severity === "warning" ? "warning" : "neutral";
-  const Icon = alert.severity === "critical" ? AlertCircle : alert.severity === "warning" ? AlertTriangle : Info;
+function AlertRow({
+  alert,
+}: {
+  alert: { severity: string; message: string; title?: string };
+}) {
+  const tone =
+    alert.severity === "critical"
+      ? "danger"
+      : alert.severity === "warning"
+        ? "warning"
+        : "neutral";
+  const Icon =
+    alert.severity === "critical"
+      ? AlertCircle
+      : alert.severity === "warning"
+        ? AlertTriangle
+        : Info;
   const iconColor =
-    alert.severity === "critical" ? "text-fyn-red" :
-    alert.severity === "warning" ? "text-[#8B5A00]" : "text-[#475569]";
+    alert.severity === "critical"
+      ? "text-fyn-red"
+      : alert.severity === "warning"
+        ? "text-[#8B5A00]"
+        : "text-[#475569]";
   return (
     <FynCard className="py-fyn-md">
       <div className="flex items-start gap-fyn-md">
         <Icon className={`h-5 w-5 shrink-0 mt-0.5 ${iconColor}`} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-fyn-sm mb-fyn-xs">
-            {alert.title && <span className="font-medium text-fyn-ink">{alert.title}</span>}
+            {alert.title && (
+              <span className="font-medium text-fyn-ink">{alert.title}</span>
+            )}
             <FynBadge tone={tone as any}>{alert.severity}</FynBadge>
           </div>
           <p className="text-fyn-body text-fyn-ink-60">{alert.message}</p>
@@ -392,16 +600,43 @@ function AlertRow({ alert }: { alert: { severity: string; message: string; title
   );
 }
 
-function CategoryChart({ data, color }: { data: Array<{ category: string; amount: number }>; color: string }) {
+function CategoryChart({
+  data,
+  color,
+}: {
+  data: Array<{ category: string; amount: number }>;
+  color: string;
+}) {
   return (
     <div className="h-64">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} layout="vertical" margin={{ top: 4, right: 16, left: 8, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(23,18,8,0.08)" horizontal={false} />
-          <XAxis type="number" tick={{ fill: "#171208", fontSize: 12 }} tickFormatter={(v) => formatINR(v)} />
-          <YAxis dataKey="category" type="category" tick={{ fill: "#171208", fontSize: 12 }} width={110} />
+        <BarChart
+          data={data}
+          layout="vertical"
+          margin={{ top: 4, right: 16, left: 8, bottom: 0 }}
+        >
+          <CartesianGrid
+            strokeDasharray="3 3"
+            stroke="rgba(23,18,8,0.08)"
+            horizontal={false}
+          />
+          <XAxis
+            type="number"
+            tick={{ fill: "#171208", fontSize: 12 }}
+            tickFormatter={(v) => formatINR(v)}
+          />
+          <YAxis
+            dataKey="category"
+            type="category"
+            tick={{ fill: "#171208", fontSize: 12 }}
+            width={110}
+          />
           <Tooltip
-            contentStyle={{ background: "#FBF7EC", border: "1px solid rgba(23,18,8,0.12)", borderRadius: 8 }}
+            contentStyle={{
+              background: "#FBF7EC",
+              border: "1px solid rgba(23,18,8,0.12)",
+              borderRadius: 8,
+            }}
             formatter={(v: number) => formatINR(v)}
           />
           <Bar dataKey="amount" fill={color} radius={[0, 4, 4, 0]} />

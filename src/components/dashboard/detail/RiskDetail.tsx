@@ -2,9 +2,20 @@ import { X } from "lucide-react";
 import { useRiskDetail } from "@/hooks/dashboard/useDashboardData";
 import { formatINR } from "@/lib/indian-format";
 import { FynLoading } from "@/components/dashboard/ui";
-import { DrawerHeader, DrawerSection, DrawerMetricRow, StatusBadgeFor } from "./parts";
+import {
+  DrawerHeader,
+  DrawerSection,
+  DrawerMetricRow,
+  StatusBadgeFor,
+} from "./parts";
 
-function RiskHeatmap({ likelihood, impact }: { likelihood: number; impact: number }) {
+function RiskHeatmap({
+  likelihood,
+  impact,
+}: {
+  likelihood: number;
+  impact: number;
+}) {
   // 5x5 grid; impact rows (top=5), likelihood cols (left=1)
   return (
     <div className="inline-grid grid-cols-5 gap-[3px] p-fyn-sm bg-fyn-beige-card border border-fyn-ink-10 rounded-md">
@@ -13,7 +24,14 @@ function RiskHeatmap({ likelihood, impact }: { likelihood: number; impact: numbe
         const row = 5 - Math.floor(idx / 5); // impact
         const sev = col * row; // 1..25
         const here = col === likelihood && row === impact;
-        const bg = sev >= 15 ? "#A93838" : sev >= 9 ? "#D97706" : sev >= 4 ? "#8B6914" : "#1F5A46";
+        const bg =
+          sev >= 15
+            ? "#A93838"
+            : sev >= 9
+              ? "#D97706"
+              : sev >= 4
+                ? "#8B6914"
+                : "#1F5A46";
         return (
           <div
             key={idx}
@@ -31,16 +49,38 @@ function RiskHeatmap({ likelihood, impact }: { likelihood: number; impact: numbe
   );
 }
 
-export default function RiskDetail({ id, onClose }: { id: string; onClose: () => void }) {
+export default function RiskDetail({
+  id,
+  onClose,
+}: {
+  id: string;
+  onClose: () => void;
+}) {
   const { data, isLoading } = useRiskDetail(id);
-  if (isLoading || !data) return <div className="p-fyn-lg"><FynLoading rows={4} /></div>;
+  if (isLoading || !data)
+    return (
+      <div className="p-fyn-lg">
+        <FynLoading rows={4} />
+      </div>
+    );
   const r = data as any;
   const score = Number(r.risk_score);
-  const severity = score >= 15 ? "Critical" : score >= 9 ? "High" : score >= 4 ? "Medium" : "Low";
+  const severity =
+    score >= 15
+      ? "Critical"
+      : score >= 9
+        ? "High"
+        : score >= 4
+          ? "Medium"
+          : "Low";
 
   return (
     <div className="relative">
-      <button onClick={onClose} aria-label="Close" className="absolute right-fyn-md top-fyn-md text-fyn-ink-60 hover:text-fyn-ink z-10">
+      <button
+        onClick={onClose}
+        aria-label="Close"
+        className="absolute right-fyn-md top-fyn-md text-fyn-ink-60 hover:text-fyn-ink z-10"
+      >
         <X size={20} />
       </button>
 
@@ -69,20 +109,28 @@ export default function RiskDetail({ id, onClose }: { id: string; onClose: () =>
 
       <DrawerSection title="Heatmap position">
         <div className="flex items-start gap-fyn-md">
-          <RiskHeatmap likelihood={Number(r.likelihood)} impact={Number(r.impact)} />
+          <RiskHeatmap
+            likelihood={Number(r.likelihood)}
+            impact={Number(r.impact)}
+          />
           <div className="text-fyn-tiny text-fyn-ink-45 space-y-1">
             <p>← Likelihood (1–5)</p>
             <p>↑ Impact (1–5)</p>
-            <p className="pt-2 text-fyn-ink-60">Position: L{r.likelihood} × I{r.impact}</p>
+            <p className="pt-2 text-fyn-ink-60">
+              Position: L{r.likelihood} × I{r.impact}
+            </p>
           </div>
         </div>
       </DrawerSection>
 
       {Number(r.current_exposure) > 0 && (
         <DrawerSection title="Current Exposure">
-          <p className="font-mono text-fyn-h1 text-fyn-ink">{formatINR(Number(r.current_exposure))}</p>
+          <p className="font-mono text-fyn-h1 text-fyn-ink">
+            {formatINR(Number(r.current_exposure))}
+          </p>
           <p className="text-fyn-small text-fyn-ink-60 mt-fyn-xs">
-            Estimated financial exposure if this risk materialises before mitigation.
+            Estimated financial exposure if this risk materialises before
+            mitigation.
           </p>
         </DrawerSection>
       )}

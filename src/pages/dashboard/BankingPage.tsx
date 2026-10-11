@@ -19,7 +19,9 @@ const BankingPage = () => {
 
   useEffect(() => {
     const fetchBusiness = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
       const { data } = await supabase
         .from("profiles")
@@ -90,13 +92,13 @@ const BankingPage = () => {
 
   const totalBalance = bankAccounts.reduce(
     (sum, acc: any) => sum + (Number(acc.balance) || 0),
-    0
+    0,
   );
   const accountCount = bankAccounts.length;
 
   return (
     <DashboardLayout>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-fyn-md mb-6">
         <Card className="bg-fyn-ink p-5 border-0">
           <p className="text-white/40 text-[13px] fyn-label">TOTAL BALANCE</p>
           <p className="text-white text-[28px] font-bold mt-1 font-sans">
@@ -155,7 +157,9 @@ const BankingPage = () => {
           Recent Transactions
         </h3>
         {!transactions || transactions.length === 0 ? (
-          <p className="text-fyn-ink/60 text-sm">No transactions recorded yet.</p>
+          <p className="text-fyn-ink/60 text-sm">
+            No transactions recorded yet.
+          </p>
         ) : (
           <Table>
             <TableHeader>
@@ -178,7 +182,9 @@ const BankingPage = () => {
                         })
                       : "-"}
                   </TableCell>
-                  <TableCell>{txn.description || txn.counterparty || "-"}</TableCell>
+                  <TableCell>
+                    {txn.description || txn.counterparty || "-"}
+                  </TableCell>
                   <TableCell className="capitalize">
                     {txn.direction || "-"}
                   </TableCell>

@@ -23,7 +23,9 @@ export function DrawerHeader({
           {meta.map((m) => (
             <div key={m.label} className="flex gap-2 text-fyn-small">
               <dt className="text-fyn-ink-45 min-w-[80px]">{m.label}</dt>
-              <dd className="text-fyn-ink-60 font-medium break-all">{m.value}</dd>
+              <dd className="text-fyn-ink-60 font-medium break-all">
+                {m.value}
+              </dd>
             </div>
           ))}
         </dl>
@@ -42,8 +44,15 @@ export function DrawerSection({
   className?: string;
 }) {
   return (
-    <section className={cn("p-fyn-lg border-b border-fyn-ink-10 space-y-fyn-sm", className)}>
-      {title && <h3 className="font-serif text-fyn-h3 text-fyn-ink">{title}</h3>}
+    <section
+      className={cn(
+        "p-fyn-lg border-b border-fyn-ink-10 space-y-fyn-sm",
+        className,
+      )}
+    >
+      {title && (
+        <h3 className="font-serif text-fyn-h3 text-fyn-ink">{title}</h3>
+      )}
       {children}
     </section>
   );
@@ -63,7 +72,9 @@ export function DrawerMetricRow({
         >
           <FynLabel>{m.label}</FynLabel>
           <p className="font-mono text-fyn-h3 text-fyn-ink mt-1">{m.value}</p>
-          {m.sub && <p className="text-fyn-tiny text-fyn-ink-40 mt-1">{m.sub}</p>}
+          {m.sub && (
+            <p className="text-fyn-tiny text-fyn-ink-40 mt-1">{m.sub}</p>
+          )}
         </div>
       ))}
     </div>
@@ -74,12 +85,23 @@ export function StatusBadgeFor({
   kind,
   value,
 }: {
-  kind: "invoice" | "expense" | "filing" | "mitigation" | "policy" | "deal" | "employee" | "txn";
+  kind:
+    | "invoice"
+    | "expense"
+    | "filing"
+    | "mitigation"
+    | "policy"
+    | "deal"
+    | "employee"
+    | "txn";
   value: string;
 }) {
   const v = String(value || "").toLowerCase();
   if (kind === "invoice") {
-    const map: Record<string, { tone: "success" | "danger" | "warning" | "neutral"; label: string }> = {
+    const map: Record<
+      string,
+      { tone: "success" | "danger" | "warning" | "neutral"; label: string }
+    > = {
       paid: { tone: "success", label: "Paid" },
       overdue: { tone: "danger", label: "Overdue" },
       sent: { tone: "warning", label: "Sent" },
@@ -91,7 +113,9 @@ export function StatusBadgeFor({
     return <FynBadge tone={m.tone}>{m.label}</FynBadge>;
   }
   if (kind === "expense") {
-    return <FynBadge tone={v === "paid" ? "success" : "warning"}>{value}</FynBadge>;
+    return (
+      <FynBadge tone={v === "paid" ? "success" : "warning"}>{value}</FynBadge>
+    );
   }
   if (kind === "filing") {
     if (/filed/i.test(v)) return <FynBadge tone="success">Filed</FynBadge>;
@@ -101,30 +125,41 @@ export function StatusBadgeFor({
   }
   if (kind === "mitigation") {
     if (v === "mitigated") return <FynBadge tone="success">Mitigated</FynBadge>;
-    if (v === "in_progress") return <FynBadge tone="warning">In progress</FynBadge>;
-    return <FynBadge tone="neutral">{(value || "").replace(/_/g, " ")}</FynBadge>;
+    if (v === "in_progress")
+      return <FynBadge tone="warning">In progress</FynBadge>;
+    return (
+      <FynBadge tone="neutral">{(value || "").replace(/_/g, " ")}</FynBadge>
+    );
   }
   if (kind === "policy") {
     if (v === "active") return <FynBadge tone="success">Active</FynBadge>;
-    if (v === "expired" || v === "lapsed") return <FynBadge tone="danger">{value}</FynBadge>;
+    if (v === "expired" || v === "lapsed")
+      return <FynBadge tone="danger">{value}</FynBadge>;
     return <FynBadge tone="neutral">{value}</FynBadge>;
   }
   if (kind === "deal") {
-    if (/closed.?won/i.test(value)) return <FynBadge tone="success">Closed Won</FynBadge>;
-    if (/closed.?lost/i.test(value)) return <FynBadge tone="neutral">Closed Lost</FynBadge>;
-    if (/negotiation/i.test(value)) return <FynBadge tone="warning">{value}</FynBadge>;
-    if (/proposal|qualified/i.test(value)) return <FynBadge tone="warning">{value}</FynBadge>;
+    if (/closed.?won/i.test(value))
+      return <FynBadge tone="success">Closed Won</FynBadge>;
+    if (/closed.?lost/i.test(value))
+      return <FynBadge tone="neutral">Closed Lost</FynBadge>;
+    if (/negotiation/i.test(value))
+      return <FynBadge tone="warning">{value}</FynBadge>;
+    if (/proposal|qualified/i.test(value))
+      return <FynBadge tone="warning">{value}</FynBadge>;
     return <FynBadge tone="neutral">{value}</FynBadge>;
   }
   if (kind === "employee") {
     if (v === "active") return <FynBadge tone="success">Active</FynBadge>;
-    if (v === "exited" || v === "terminated") return <FynBadge tone="neutral">{value}</FynBadge>;
+    if (v === "exited" || v === "terminated")
+      return <FynBadge tone="neutral">{value}</FynBadge>;
     return <FynBadge tone="neutral">{value}</FynBadge>;
   }
   if (kind === "txn") {
-    return v === "credit"
-      ? <FynBadge tone="success">Credit</FynBadge>
-      : <FynBadge tone="danger">Debit</FynBadge>;
+    return v === "credit" ? (
+      <FynBadge tone="success">Credit</FynBadge>
+    ) : (
+      <FynBadge tone="danger">Debit</FynBadge>
+    );
   }
   return <FynBadge tone="neutral">{value}</FynBadge>;
 }

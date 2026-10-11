@@ -25,7 +25,9 @@ const FilingCalendarPage = () => {
 
   useEffect(() => {
     const fetchBusiness = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
       const { data } = await supabase
         .from("profiles")
@@ -61,16 +63,21 @@ const FilingCalendarPage = () => {
   const filteredEvents = useMemo(() => {
     if (!events) return [];
     if (filter === "All") return events;
-    return events.filter((e) => e.filing_type?.toLowerCase() === filter.toLowerCase());
+    return events.filter(
+      (e) => e.filing_type?.toLowerCase() === filter.toLowerCase(),
+    );
   }, [events, filter]);
 
   const eventsByMonth = useMemo(() => {
-    return filteredEvents.reduce((acc, ev) => {
-      const month = ev.due_date.substring(0, 7);
-      if (!acc[month]) acc[month] = [];
-      acc[month].push(ev);
-      return acc;
-    }, {} as Record<string, ComplianceEvent[]>);
+    return filteredEvents.reduce(
+      (acc, ev) => {
+        const month = ev.due_date.substring(0, 7);
+        if (!acc[month]) acc[month] = [];
+        acc[month].push(ev);
+        return acc;
+      },
+      {} as Record<string, ComplianceEvent[]>,
+    );
   }, [filteredEvents]);
 
   const isEmpty = !isLoading && filteredEvents.length === 0;
@@ -98,7 +105,10 @@ const FilingCalendarPage = () => {
       {isLoading && (
         <div className="space-y-3">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-32 bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg animate-pulse" />
+            <div
+              key={i}
+              className="h-32 bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg animate-pulse"
+            />
           ))}
         </div>
       )}
@@ -106,9 +116,12 @@ const FilingCalendarPage = () => {
       {/* EMPTY STATE */}
       {isEmpty && (
         <div className="bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg p-12 text-center">
-          <h3 className="text-fyn-ink text-xl font-serif mb-2">No Upcoming Compliance Events</h3>
+          <h3 className="text-fyn-ink text-xl font-serif mb-2">
+            No Upcoming Compliance Events
+          </h3>
           <p className="text-fyn-ink/60 text-sm mb-6">
-            Your filing calendar will appear here once you add compliance deadlines
+            Your filing calendar will appear here once you add compliance
+            deadlines
           </p>
           <button
             onClick={() => navigate("/dashboard/settings/integrations")}
@@ -123,14 +136,21 @@ const FilingCalendarPage = () => {
       {!isLoading && filteredEvents.length > 0 && (
         <div className="space-y-5">
           {Object.entries(eventsByMonth).map(([month, monthEvents]) => (
-            <div key={month} className="bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg p-5">
+            <div
+              key={month}
+              className="bg-fyn-beige-dark border border-fyn-ink-10 rounded-lg p-5"
+            >
               <h3 className="text-fyn-ink font-serif text-lg mb-4">
-                {new Date(month + "-01").toLocaleDateString("en-IN", { month: "long", year: "numeric" })}
+                {new Date(month + "-01").toLocaleDateString("en-IN", {
+                  month: "long",
+                  year: "numeric",
+                })}
               </h3>
               <div className="space-y-2">
                 {monthEvents.map((ev) => {
                   const daysUntil = Math.ceil(
-                    (new Date(ev.due_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+                    (new Date(ev.due_date).getTime() - new Date().getTime()) /
+                      (1000 * 60 * 60 * 24),
                   );
                   const isUrgent = daysUntil <= 7;
                   const isCritical = ev.urgency === "critical";
@@ -138,25 +158,31 @@ const FilingCalendarPage = () => {
                   return (
                     <div
                       key={ev.id}
-                      className={`flex items-center gap-4 bg-card rounded-lg p-4 border-l-4 ${
-                        isUrgent || isCritical ? "border-[#C41E1E]" : "border-fyn-ink/20"
+                      className={`flex items-centergap-fyn-md4 bg-card rounded-lg p-4 border-l-4 ${
+                        isUrgent || isCritical
+                          ? "border-[#C41E1E]"
+                          : "border-fyn-ink/20"
                       }`}
                     >
                       <div className="text-center min-w-[60px]">
                         <div className="text-fyn-ink/40 text-xs fyn-label">
-                          {new Date(ev.due_date).toLocaleDateString("en-IN", { month: "short" })}
+                          {new Date(ev.due_date).toLocaleDateString("en-IN", {
+                            month: "short",
+                          })}
                         </div>
                         <div className="text-fyn-ink text-2xl font-bold font-sans">
                           {new Date(ev.due_date).getDate()}
                         </div>
                       </div>
                       <div className="flex-1">
-                        <div className="text-fyn-ink font-medium">{ev.filing_name}</div>
+                        <div className="text-fyn-ink font-medium">
+                          {ev.filing_name}
+                        </div>
                         <div className="text-fyn-ink/50 text-xs mt-0.5 fyn-label">
                           {ev.filing_type?.toUpperCase()}
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-fyn-sm">
                         <span
                           className={`text-[11px] px-2 py-0.5 rounded ${
                             isCritical

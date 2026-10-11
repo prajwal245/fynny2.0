@@ -3,17 +3,40 @@ import { X } from "lucide-react";
 import { useVendorDetail } from "@/hooks/dashboard/useDashboardData";
 import { useMode } from "@/components/intelligence/DataSource";
 import { formatINR } from "@/lib/indian-format";
-import { FynButton, FynLoading, FynTable, FynTH, FynTR, FynTD } from "@/components/dashboard/ui";
-import { DrawerHeader, DrawerSection, DrawerMetricRow, StatusBadgeFor } from "./parts";
+import {
+  FynButton,
+  FynLoading,
+  FynTable,
+  FynTH,
+  FynTR,
+  FynTD,
+} from "@/components/dashboard/ui";
+import {
+  DrawerHeader,
+  DrawerSection,
+  DrawerMetricRow,
+  StatusBadgeFor,
+} from "./parts";
 import { useDrawer } from "../DetailDrawer";
 
-export default function VendorDetail({ id, onClose }: { id: string; onClose: () => void }) {
+export default function VendorDetail({
+  id,
+  onClose,
+}: {
+  id: string;
+  onClose: () => void;
+}) {
   const { data, isLoading } = useVendorDetail(id);
   const { open } = useDrawer();
   const navigate = useNavigate();
   const base = useMode() === "demo" ? "/demo" : "/dashboard";
 
-  if (isLoading || !data?.vendor) return <div className="p-fyn-lg"><FynLoading rows={4} /></div>;
+  if (isLoading || !data?.vendor)
+    return (
+      <div className="p-fyn-lg">
+        <FynLoading rows={4} />
+      </div>
+    );
   const v = data.vendor;
   const expenses = data.expenses;
   const totalSpend = expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
@@ -22,7 +45,11 @@ export default function VendorDetail({ id, onClose }: { id: string; onClose: () 
 
   return (
     <div className="relative">
-      <button onClick={onClose} aria-label="Close" className="absolute right-fyn-md top-fyn-md text-fyn-ink-60 hover:text-fyn-ink z-10">
+      <button
+        onClick={onClose}
+        aria-label="Close"
+        className="absolute right-fyn-md top-fyn-md text-fyn-ink-60 hover:text-fyn-ink z-10"
+      >
         <X size={20} />
       </button>
 
@@ -42,7 +69,10 @@ export default function VendorDetail({ id, onClose }: { id: string; onClose: () 
         <DrawerMetricRow
           items={[
             { label: "Total Spend", value: formatINR(totalSpend) },
-            { label: "Outstanding", value: formatINR(Number(v.total_outstanding || 0)) },
+            {
+              label: "Outstanding",
+              value: formatINR(Number(v.total_outstanding || 0)),
+            },
             { label: "Avg Monthly", value: formatINR(avgMonthly) },
           ]}
         />
@@ -50,7 +80,9 @@ export default function VendorDetail({ id, onClose }: { id: string; onClose: () 
 
       <DrawerSection title="Expense History">
         {expenses.length === 0 ? (
-          <p className="text-fyn-small text-fyn-ink-45">No expenses recorded.</p>
+          <p className="text-fyn-small text-fyn-ink-45">
+            No expenses recorded.
+          </p>
         ) : (
           <FynTable>
             <thead>
@@ -63,11 +95,24 @@ export default function VendorDetail({ id, onClose }: { id: string; onClose: () 
             </thead>
             <tbody>
               {expenses.map((e) => (
-                <FynTR key={e.id} className="cursor-pointer" onClick={() => open("expense", e.id)}>
+                <FynTR
+                  key={e.id}
+                  className="cursor-pointer"
+                  onClick={() => open("expense", e.id)}
+                >
                   <FynTD>{e.description || e.category}</FynTD>
-                  <FynTD>{new Date(e.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}</FynTD>
-                  <FynTD align="right" mono>{formatINR(Number(e.amount))}</FynTD>
-                  <FynTD><StatusBadgeFor kind="expense" value={e.payment_status} /></FynTD>
+                  <FynTD>
+                    {new Date(e.date).toLocaleDateString("en-IN", {
+                      day: "2-digit",
+                      month: "short",
+                    })}
+                  </FynTD>
+                  <FynTD align="right" mono>
+                    {formatINR(Number(e.amount))}
+                  </FynTD>
+                  <FynTD>
+                    <StatusBadgeFor kind="expense" value={e.payment_status} />
+                  </FynTD>
                 </FynTR>
               ))}
             </tbody>
@@ -77,9 +122,21 @@ export default function VendorDetail({ id, onClose }: { id: string; onClose: () 
 
       <div className="p-fyn-lg flex gap-fyn-sm flex-wrap">
         {Number(v.total_outstanding || 0) > 0 && (
-          <FynButton variant="primary" onClick={() => alert("Payment scheduled (demo)")}>Pay Outstanding</FynButton>
+          <FynButton
+            variant="primary"
+            onClick={() => alert("Payment scheduled (demo)")}
+          >
+            Pay Outstanding
+          </FynButton>
         )}
-        <FynButton variant="secondary" onClick={() => navigate(`${base}/expenses?vendor=${encodeURIComponent(v.vendor_name)}`)}>
+        <FynButton
+          variant="secondary"
+          onClick={() =>
+            navigate(
+              `${base}/expenses?vendor=${encodeURIComponent(v.vendor_name)}`,
+            )
+          }
+        >
           View All Expenses →
         </FynButton>
       </div>

@@ -1,13 +1,19 @@
 // ─── src/pages/dashboard/ImportPage.tsx ────────────────────────────────────
 import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "@/lib/router-compat";
-import { Upload, FileText, CheckCircle2, AlertTriangle, Loader2, Info } from "lucide-react";
+import {
+  Upload,
+  FileText,
+  CheckCircle2,
+  AlertTriangle,
+  Loader2,
+  Info,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { track } from "@/lib/analytics";
 import { toast } from "sonner";
 import { recomputeIntelligence } from "@/lib/postImportCompute";
-
 
 import {
   normaliseAmount,
@@ -23,10 +29,10 @@ import {
   type DetectedColumns,
 } from "@/lib/bankAmount";
 
-
 // ── TYPES ───────────────────────────────────────────────────────────────────
 
-type BankId = "hdfc" | "icici" | "sbi" | "axis" | "kotak" | "generic" | "tally" | "busy";
+type BankId =
+  "hdfc" | "icici" | "sbi" | "axis" | "kotak" | "generic" | "tally" | "busy";
 
 interface BankMapping {
   id: BankId;
@@ -130,7 +136,14 @@ const BANKS: BankMapping[] = [
     credit: [],
     amount: ["amount", "Amount"],
     direction: ["type", "direction", "Type", "Direction"],
-    description: ["description", "narration", "remarks", "Description", "Narration", "Remarks"],
+    description: [
+      "description",
+      "narration",
+      "remarks",
+      "Description",
+      "Narration",
+      "Remarks",
+    ],
     balance: ["balance", "Balance", "closing_balance"],
   },
   {
@@ -138,33 +151,78 @@ const BANKS: BankMapping[] = [
     name: "Tally (ERP 9 / Prime)",
     note: "Export Day Book or Cash or Bank Ledger as CSV or XML",
     date: [
-      "Date", "DATE", "Voucher Date", "VoucherDate", "Txn Date", "Transaction Date",
-      "Vch Date", "VchDate", "Entry Date",
+      "Date",
+      "DATE",
+      "Voucher Date",
+      "VoucherDate",
+      "Txn Date",
+      "Transaction Date",
+      "Vch Date",
+      "VchDate",
+      "Entry Date",
     ],
     debit: [
-      "Debit", "DEBIT", "Dr", "DR", "Withdrawal", "Outflow",
-      "Debit Amount", "Dr Amount", "Withdrawal Amt",
+      "Debit",
+      "DEBIT",
+      "Dr",
+      "DR",
+      "Withdrawal",
+      "Outflow",
+      "Debit Amount",
+      "Dr Amount",
+      "Withdrawal Amt",
     ],
     credit: [
-      "Credit", "CREDIT", "Cr", "CR", "Deposit", "Inflow",
-      "Credit Amount", "Cr Amount", "Deposit Amt",
+      "Credit",
+      "CREDIT",
+      "Cr",
+      "CR",
+      "Deposit",
+      "Inflow",
+      "Credit Amount",
+      "Cr Amount",
+      "Deposit Amt",
     ],
     amount: [
-      "Amount", "AMOUNT", "Voucher Amount", "VoucherAmount",
-      "Transaction Amount", "Net Amount", "Value",
+      "Amount",
+      "AMOUNT",
+      "Voucher Amount",
+      "VoucherAmount",
+      "Transaction Amount",
+      "Net Amount",
+      "Value",
     ],
     direction: [
-      "Type", "VoucherType", "Voucher Type", "Direction",
-      "Vch Type", "VchType", "Transaction Type",
+      "Type",
+      "VoucherType",
+      "Voucher Type",
+      "Direction",
+      "Vch Type",
+      "VchType",
+      "Transaction Type",
     ],
     description: [
-      "Particulars", "PARTICULARS", "Narration", "NARRATION",
-      "Ledger Name", "LedgerName", "Remarks", "REMARKS",
-      "Description", "Details", "Party Name", "PartyName",
+      "Particulars",
+      "PARTICULARS",
+      "Narration",
+      "NARRATION",
+      "Ledger Name",
+      "LedgerName",
+      "Remarks",
+      "REMARKS",
+      "Description",
+      "Details",
+      "Party Name",
+      "PartyName",
     ],
     balance: [
-      "Closing Balance", "ClosingBalance", "Balance", "BALANCE",
-      "Running Balance", "RunningBalance", "Ledger Balance",
+      "Closing Balance",
+      "ClosingBalance",
+      "Balance",
+      "BALANCE",
+      "Running Balance",
+      "RunningBalance",
+      "Ledger Balance",
     ],
   },
   {
@@ -176,7 +234,13 @@ const BANKS: BankMapping[] = [
     credit: ["Credit", "CREDIT", "Cr", "CR", "Credit Amount"],
     amount: ["Amount", "AMOUNT", "Voucher Amount"],
     direction: ["Voucher Type", "VoucherType", "Type"],
-    description: ["Particulars", "PARTICULARS", "Narration", "NARRATION", "Description"],
+    description: [
+      "Particulars",
+      "PARTICULARS",
+      "Narration",
+      "NARRATION",
+      "Description",
+    ],
     balance: ["Balance", "BALANCE", "Closing Balance"],
   },
 ];
@@ -188,11 +252,13 @@ const BANKS: BankMapping[] = [
 // Ambiguous types (Journal, Sales, Purchase) need ledger-side analysis.
 
 const TALLY_INFLOW_TYPES = new Set([
-  "receipt", "bank receipt", "cash receipt",
-  "contra",           // used for cash-to-bank or bank-to-bank transfers
-  "sales",            // sales invoice increases receivables or cash
-  "credit note",      // reversal of a sales invoice
-  "debit note",       // issued to vendor — increases payable credit
+  "receipt",
+  "bank receipt",
+  "cash receipt",
+  "contra", // used for cash-to-bank or bank-to-bank transfers
+  "sales", // sales invoice increases receivables or cash
+  "credit note", // reversal of a sales invoice
+  "debit note", // issued to vendor — increases payable credit
   "forex receipt",
   "pos",
   "receipt voucher",
@@ -202,10 +268,12 @@ const TALLY_INFLOW_TYPES = new Set([
 ]);
 
 const TALLY_OUTFLOW_TYPES = new Set([
-  "payment", "bank payment", "cash payment",
-  "purchase",         // purchase invoice increases payables or reduces cash
+  "payment",
+  "bank payment",
+  "cash payment",
+  "purchase", // purchase invoice increases payables or reduces cash
   "expense",
-  "debit note",       // received from vendor — reduces payable
+  "debit note", // received from vendor — reduces payable
   "payroll",
   "salary",
   "wages",
@@ -240,19 +308,23 @@ function parseCSV(text: string): string[][] {
   if (!lines.length) return [];
   const delimiter = lines[0].includes("\t") ? "\t" : ",";
   return lines.map((row) =>
-    row.split(delimiter).map((cell) => cell.trim().replace(/^"|"$/g, ""))
+    row.split(delimiter).map((cell) => cell.trim().replace(/^"|"$/g, "")),
   );
 }
 
 function pick(headers: string[], candidates: string[]): number {
   for (const c of candidates) {
-    const idx = headers.findIndex((h) => h.toLowerCase().trim() === c.toLowerCase().trim());
+    const idx = headers.findIndex(
+      (h) => h.toLowerCase().trim() === c.toLowerCase().trim(),
+    );
     if (idx !== -1) return idx;
   }
   // Fuzzy fallback: partial match if exact fails
   for (const c of candidates) {
-    const idx = headers.findIndex((h) =>
-      h.toLowerCase().includes(c.toLowerCase()) || c.toLowerCase().includes(h.toLowerCase())
+    const idx = headers.findIndex(
+      (h) =>
+        h.toLowerCase().includes(c.toLowerCase()) ||
+        c.toLowerCase().includes(h.toLowerCase()),
     );
     if (idx !== -1) return idx;
   }
@@ -264,9 +336,10 @@ function toISODate(raw: string): string | null {
   const s = raw.trim().replace(/\s+/g, " ");
 
   // DD-MM-YYYY, DD/MM/YYYY, DD.MM.YYYY
-  const dmy = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+  const dmy = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/);
   if (dmy) {
-    let [, d, mo, y] = dmy;
+    const [, d, mo] = dmy;
+    let y = dmy[3];
     if (y.length === 2) y = (Number(y) > 50 ? "19" : "20") + y;
     const dt = new Date(Number(y), Number(mo) - 1, Number(d));
     if (!isNaN(dt.getTime())) return dt.toISOString().slice(0, 10);
@@ -311,9 +384,15 @@ function mapRows(
   rows: string[][],
   bank: BankMapping,
   businessId: string,
-  manualMap?: TallyColumnMap | null
+  manualMap?: TallyColumnMap | null,
 ): RowParseResult {
-  if (rows.length < 2) return { txns: [], skipped: 0, skipReasons: [], error: "File has no data rows" };
+  if (rows.length < 2)
+    return {
+      txns: [],
+      skipped: 0,
+      skipReasons: [],
+      error: "File has no data rows",
+    };
 
   const headers = rows[0].map((h) => h.trim());
 
@@ -328,12 +407,16 @@ function mapRows(
   if (manualMap && bank.id === "tally") {
     // Use manually selected column positions
     dateIdx = manualMap.dateCol ? headers.indexOf(manualMap.dateCol) : -1;
-    descIdx = manualMap.descriptionCol ? headers.indexOf(manualMap.descriptionCol) : -1;
+    descIdx = manualMap.descriptionCol
+      ? headers.indexOf(manualMap.descriptionCol)
+      : -1;
     balIdx = manualMap.balanceCol ? headers.indexOf(manualMap.balanceCol) : -1;
     debitIdx = manualMap.debitCol ? headers.indexOf(manualMap.debitCol) : -1;
     creditIdx = manualMap.creditCol ? headers.indexOf(manualMap.creditCol) : -1;
     amountIdx = manualMap.amountCol ? headers.indexOf(manualMap.amountCol) : -1;
-    dirIdx = manualMap.directionCol ? headers.indexOf(manualMap.directionCol) : -1;
+    dirIdx = manualMap.directionCol
+      ? headers.indexOf(manualMap.directionCol)
+      : -1;
   } else {
     dateIdx = pick(headers, bank.date);
     descIdx = pick(headers, bank.description);
@@ -352,14 +435,16 @@ function mapRows(
   if (amountIdx === -1) amountIdx = detected.amountIdx;
   if (dirIdx === -1) dirIdx = detected.typeIdx;
   // Never let one physical column serve two roles.
-  if (amountIdx !== -1 && (amountIdx === debitIdx || amountIdx === creditIdx)) amountIdx = -1;
-
+  if (amountIdx !== -1 && (amountIdx === debitIdx || amountIdx === creditIdx))
+    amountIdx = -1;
 
   if (dateIdx === -1) {
     return {
       txns: [],
       skipped: rows.length - 1,
-      skipReasons: [`Date column not found. Detected columns: ${headers.join(", ")}`],
+      skipReasons: [
+        `Date column not found. Detected columns: ${headers.join(", ")}`,
+      ],
       error: `Could not find a date column. Please use the column mapping below to identify which column contains the date.`,
     };
   }
@@ -368,7 +453,9 @@ function mapRows(
     return {
       txns: [],
       skipped: rows.length - 1,
-      skipReasons: [`Amount column not found. Detected columns: ${headers.join(", ")}`],
+      skipReasons: [
+        `Amount column not found. Detected columns: ${headers.join(", ")}`,
+      ],
       error: `Could not find an amount column. Please use the column mapping below to identify which column contains the transaction amount.`,
     };
   }
@@ -391,9 +478,9 @@ function mapRows(
       continue;
     }
 
-    const rawDebit = debitIdx !== -1 ? r[debitIdx] ?? "" : "";
-    const rawCredit = creditIdx !== -1 ? r[creditIdx] ?? "" : "";
-    const rawAmt = amountIdx !== -1 ? r[amountIdx] ?? "" : "";
+    const rawDebit = debitIdx !== -1 ? (r[debitIdx] ?? "") : "";
+    const rawCredit = creditIdx !== -1 ? (r[creditIdx] ?? "") : "";
+    const rawAmt = amountIdx !== -1 ? (r[amountIdx] ?? "") : "";
     const rawDir = dirIdx !== -1 ? (r[dirIdx] || "").trim() : "";
 
     // Universal signed normalisation: negative = debit, positive = credit
@@ -402,21 +489,30 @@ function mapRows(
     // Tally/Busy voucher types are richer than plain debit/credit words —
     // when a voucher type is present and the generic normaliser could not
     // resolve a direction from it, fall back to voucher classification.
-    if (signed !== 0 && rawDir && signFromType(rawDir) === 0 && debitIdx === -1 && creditIdx === -1) {
+    if (
+      signed !== 0 &&
+      rawDir &&
+      signFromType(rawDir) === 0 &&
+      debitIdx === -1 &&
+      creditIdx === -1
+    ) {
       const vdir = classifyTallyVoucherType(rawDir, String(rawAmt));
       signed = vdir === "out" ? -Math.abs(signed) : Math.abs(signed);
     }
 
     if (signed === 0) {
       skipped++;
-      if (skipReasons.length < 5) skipReasons.push(`Row ${i + 1}: amount is zero or unreadable`);
+      if (skipReasons.length < 5)
+        skipReasons.push(`Row ${i + 1}: amount is zero or unreadable`);
       continue;
     }
 
     const dir: "in" | "out" = directionFromSigned(signed);
 
     const bal = balIdx !== -1 ? toNumber(r[balIdx] || "") : NaN;
-    const desc = (descIdx !== -1 ? r[descIdx] : "").trim().slice(0, 500) || "No description";
+    const desc =
+      (descIdx !== -1 ? r[descIdx] : "").trim().slice(0, 500) ||
+      "No description";
 
     out.push({
       business_id: businessId,
@@ -432,9 +528,8 @@ function mapRows(
   logParsePattern(
     `${bank.id}-csv`,
     { ...detected, debitIdx, creditIdx, amountIdx, typeIdx: dirIdx },
-    out
+    out,
   );
-
 
   if (!out.length) {
     return {
@@ -465,7 +560,8 @@ function parseTallyXML(xmlText: string, businessId: string): RowParseResult {
         txns: [],
         skipped: 0,
         skipReasons: [],
-        error: "This XML file could not be read. Please export from Tally as CSV instead (Alt+E then Excel format).",
+        error:
+          "This XML file could not be read. Please export from Tally as CSV instead (Alt+E then Excel format).",
       };
     }
 
@@ -490,7 +586,10 @@ function parseTallyXML(xmlText: string, businessId: string): RowParseResult {
     let vouchers: NodeListOf<Element> | null = null;
     for (const sel of voucherSelectors) {
       const found = doc.querySelectorAll(sel);
-      if (found.length > 0) { vouchers = found; break; }
+      if (found.length > 0) {
+        vouchers = found;
+        break;
+      }
     }
 
     if (!vouchers || vouchers.length === 0) {
@@ -507,19 +606,28 @@ function parseTallyXML(xmlText: string, businessId: string): RowParseResult {
           txns: [],
           skipped: 0,
           skipReasons: [],
-          error: "No voucher data found in this XML. This file may not be a Tally export. Try exporting as CSV from Tally (Alt+E).",
+          error:
+            "No voucher data found in this XML. This file may not be a Tally export. Try exporting as CSV from Tally (Alt+E).",
         };
       }
       voucherElements.forEach((v) => {
         const result = extractTallyVoucher(v, businessId);
         if (result) txns.push(result);
-        else { skipped++; if (skipReasons.length < 5) skipReasons.push(`Voucher missing date or amount`); }
+        else {
+          skipped++;
+          if (skipReasons.length < 5)
+            skipReasons.push(`Voucher missing date or amount`);
+        }
       });
     } else {
       vouchers.forEach((v) => {
         const result = extractTallyVoucher(v, businessId);
         if (result) txns.push(result);
-        else { skipped++; if (skipReasons.length < 5) skipReasons.push(`Voucher missing date or amount`); }
+        else {
+          skipped++;
+          if (skipReasons.length < 5)
+            skipReasons.push(`Voucher missing date or amount`);
+        }
       });
     }
 
@@ -551,7 +659,8 @@ function extractTallyVoucher(v: Element, businessId: string): ParsedTxn | null {
       if (el?.textContent?.trim()) return el.textContent.trim();
       // Try case-insensitive via getElementsByTagName
       const els = v.getElementsByTagName(tag);
-      if (els.length > 0 && els[0].textContent?.trim()) return els[0].textContent.trim();
+      if (els.length > 0 && els[0].textContent?.trim())
+        return els[0].textContent.trim();
     }
     return "";
   };
@@ -561,15 +670,21 @@ function extractTallyVoucher(v: Element, businessId: string): ParsedTxn | null {
       const found = el.querySelector(tag);
       if (found?.textContent?.trim()) return found.textContent.trim();
       const els = el.getElementsByTagName(tag);
-      if (els.length > 0 && els[0].textContent?.trim()) return els[0].textContent.trim();
+      if (els.length > 0 && els[0].textContent?.trim())
+        return els[0].textContent.trim();
     }
     return "";
   };
 
   // Date: try multiple tag name variants across all Tally versions
   const rawDate = getText([
-    "DATE", "Date", "VOUCHERDATE", "VoucherDate", "date",
-    "EFFECTIVEDATE", "EffectiveDate",
+    "DATE",
+    "Date",
+    "VOUCHERDATE",
+    "VoucherDate",
+    "date",
+    "EFFECTIVEDATE",
+    "EffectiveDate",
   ]);
   if (!rawDate) return null;
 
@@ -578,8 +693,13 @@ function extractTallyVoucher(v: Element, businessId: string): ParsedTxn | null {
 
   // Voucher type: determines inflow vs outflow for unambiguous types
   const vtype = getText([
-    "VOUCHERTYPENAME", "VoucherTypeName", "VOUCHERTYPE", "VoucherType",
-    "TYPE", "Type", "type",
+    "VOUCHERTYPENAME",
+    "VoucherTypeName",
+    "VOUCHERTYPE",
+    "VoucherType",
+    "TYPE",
+    "Type",
+    "type",
   ]);
 
   // Amount: Tally XML can store the amount in multiple places
@@ -591,22 +711,38 @@ function extractTallyVoucher(v: Element, businessId: string): ParsedTxn | null {
 
   // Try to find the bank/cash ledger entry for accurate direction
   // Bank ledger entries: look for ALLLEDGERENTRIES or LEDGERENTRIES with ISPARTYLEDGER = No
-  const ledgerEntries = v.querySelectorAll("ALLLEDGERENTRIES\\.LIST, ALLLEDGERENTRIESLIST, LEDGERENTRIES\\.LIST");
+  const ledgerEntries = v.querySelectorAll(
+    "ALLLEDGERENTRIES\\.LIST, ALLLEDGERENTRIESLIST, LEDGERENTRIES\\.LIST",
+  );
   if (ledgerEntries.length > 0) {
     // Find the entry that is NOT a party ledger (i.e., the bank/cash side)
     for (let i = 0; i < ledgerEntries.length; i++) {
       const entry = ledgerEntries[i];
       const isParty = getTextFromEl(entry, ["ISPARTYLEDGER"]).toLowerCase();
       if (isParty === "no" || isParty === "false") {
-        const entryAmt = entry.querySelector("AMOUNT")?.textContent?.trim() || "";
-        if (entryAmt) { rawAmt = entryAmt; break; }
+        const entryAmt =
+          entry.querySelector("AMOUNT")?.textContent?.trim() || "";
+        if (entryAmt) {
+          rawAmt = entryAmt;
+          break;
+        }
       }
     }
   }
 
   // If ledger entry approach failed, use the voucher-level amount
   if (!rawAmt) {
-    rawAmt = getText(["AMOUNT", "Amount", "amount", "DR", "CR", "DEBIT", "CREDIT", "NET", "Net"]);
+    rawAmt = getText([
+      "AMOUNT",
+      "Amount",
+      "amount",
+      "DR",
+      "CR",
+      "DEBIT",
+      "CREDIT",
+      "NET",
+      "Net",
+    ]);
   }
 
   if (!rawAmt) return null;
@@ -617,19 +753,29 @@ function extractTallyVoucher(v: Element, businessId: string): ParsedTxn | null {
   dir = classifyTallyVoucherType(vtype, rawAmt);
 
   // Narration / description
-  const narration = getText([
-    "NARRATION", "Narration", "narration",
-    "PARTICULARS", "Particulars",
-    "LEDGERNAME", "LedgerName",
-    "PARTYLEDGERNAME", "PartyLedgerName",
-    "REMARKS", "Remarks",
-  ]) || `Tally ${vtype || "voucher"}`;
+  const narration =
+    getText([
+      "NARRATION",
+      "Narration",
+      "narration",
+      "PARTICULARS",
+      "Particulars",
+      "LEDGERNAME",
+      "LedgerName",
+      "PARTYLEDGERNAME",
+      "PartyLedgerName",
+      "REMARKS",
+      "Remarks",
+    ]) || `Tally ${vtype || "voucher"}`;
 
   // Closing balance
   const balText = getText([
-    "CLOSINGBALANCE", "ClosingBalance",
-    "BALANCE", "Balance",
-    "RUNNINGBALANCE", "RunningBalance",
+    "CLOSINGBALANCE",
+    "ClosingBalance",
+    "BALANCE",
+    "Balance",
+    "RUNNINGBALANCE",
+    "RunningBalance",
   ]);
   const bal = balText ? toNumber(balText) : null;
 
@@ -649,27 +795,38 @@ function extractTallyVoucher(v: Element, businessId: string): ParsedTxn | null {
 async function insertAndCompute(
   txns: ParsedTxn[],
   businessId: string,
-  setProgress: (p: { done: number; total: number }) => void
-): Promise<{ cash_position: number; burn_rate_current: number; runway_months: number } | { error: string }> {
+  setProgress: (p: { done: number; total: number }) => void,
+): Promise<
+  | { cash_position: number; burn_rate_current: number; runway_months: number }
+  | { error: string }
+> {
   const BATCH = 100;
   setProgress({ done: 0, total: txns.length });
 
   for (let i = 0; i < txns.length; i += BATCH) {
     const chunk = txns.slice(i, i + BATCH);
     const { error: insErr } = await supabase.from("transactions").insert(chunk);
-    if (insErr) return { error: `Database insert failed at row ${i + 1}: ${insErr.message}` };
+    if (insErr)
+      return {
+        error: `Database insert failed at row ${i + 1}: ${insErr.message}`,
+      };
     setProgress({ done: Math.min(i + BATCH, txns.length), total: txns.length });
   }
 
-  const { data: compData, error: compErr } = await supabase.functions.invoke("compute-liquidity", {
-    body: { business_id: businessId },
-  });
+  const { data: compData, error: compErr } = await supabase.functions.invoke(
+    "compute-liquidity",
+    {
+      body: { business_id: businessId },
+    },
+  );
 
   // Refresh the pre-computed liquidity + cost metrics the dashboards read from.
   await recomputeIntelligence(businessId);
 
-  if (compErr) return { error: `Imported ${txns.length} rows but intelligence computation failed: ${compErr.message}` };
-
+  if (compErr)
+    return {
+      error: `Imported ${txns.length} rows but intelligence computation failed: ${compErr.message}`,
+    };
 
   return {
     cash_position: compData?.cash_position ?? 0,
@@ -692,9 +849,15 @@ export default function ImportPage() {
   const [isXMLFile, setIsXMLFile] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [progress, setProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [skippedInfo, setSkippedInfo] = useState<{ count: number; reasons: string[] } | null>(null);
+  const [skippedInfo, setSkippedInfo] = useState<{
+    count: number;
+    reasons: string[];
+  } | null>(null);
   const [result, setResult] = useState<null | {
     rows: number;
     cash_position: number;
@@ -713,9 +876,15 @@ export default function ImportPage() {
   const [columnMapperNeeded, setColumnMapperNeeded] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const bank = useMemo(() => BANKS.find((b) => b.id === bankId) ?? null, [bankId]);
+  const bank = useMemo(
+    () => BANKS.find((b) => b.id === bankId) ?? null,
+    [bankId],
+  );
 
-  function detectIfMapperNeeded(headers: string[], bankMapping: BankMapping): boolean {
+  function detectIfMapperNeeded(
+    headers: string[],
+    bankMapping: BankMapping,
+  ): boolean {
     const dateFound = pick(headers, bankMapping.date) !== -1;
     const amountFound =
       pick(headers, bankMapping.debit) !== -1 ||
@@ -729,19 +898,36 @@ export default function ImportPage() {
     setResult(null);
     setSkippedInfo(null);
     setColumnMapperNeeded(false);
-    setTallyColumnMap({ dateCol: "", amountCol: "", descriptionCol: "", directionCol: "", debitCol: "", creditCol: "", balanceCol: "" });
+    setTallyColumnMap({
+      dateCol: "",
+      amountCol: "",
+      descriptionCol: "",
+      directionCol: "",
+      debitCol: "",
+      creditCol: "",
+      balanceCol: "",
+    });
 
-    if (!f) { setFile(null); setRawRows([]); setIsXMLFile(false); return; }
+    if (!f) {
+      setFile(null);
+      setRawRows([]);
+      setIsXMLFile(false);
+      return;
+    }
 
     const isCSV = f.name.toLowerCase().endsWith(".csv");
     const isXML = f.name.toLowerCase().endsWith(".xml");
 
     if (!isCSV && !isXML) {
-      setError("Only CSV and XML files are supported. For Tally, export as Excel CSV (Alt+E) or XML. For other banks, export the statement as CSV.");
+      setError(
+        "Only CSV and XML files are supported. For Tally, export as Excel CSV (Alt+E) or XML. For other banks, export the statement as CSV.",
+      );
       return;
     }
     if (f.size > MAX_SIZE) {
-      setError("File exceeds 10MB. For large exports, split by date range and import in multiple batches.");
+      setError(
+        "File exceeds 10MB. For large exports, split by date range and import in multiple batches.",
+      );
       return;
     }
 
@@ -751,7 +937,14 @@ export default function ImportPage() {
       setFile(f);
       setIsXMLFile(true);
       // Show a preview message for XML — we cannot render XML rows in a table
-      setRawRows([["XML file ready", f.name, `${(f.size / 1024).toFixed(1)} KB`, "Click Import to process"]]);
+      setRawRows([
+        [
+          "XML file ready",
+          f.name,
+          `${(f.size / 1024).toFixed(1)} KB`,
+          "Click Import to process",
+        ],
+      ]);
       return;
     }
 
@@ -787,7 +980,8 @@ export default function ImportPage() {
         parseResult = parseTallyXML(text, businessId);
       } else {
         const rows = parseCSV(text);
-        const useManualMap = columnMapperNeeded && bankId === "tally" ? tallyColumnMap : null;
+        const useManualMap =
+          columnMapperNeeded && bankId === "tally" ? tallyColumnMap : null;
         parseResult = mapRows(rows, bank, businessId, useManualMap);
       }
 
@@ -805,23 +999,33 @@ export default function ImportPage() {
         setSkippedInfo({ count: skipped, reasons: skipReasons });
       }
 
-      const compResult = await insertAndCompute(txns, businessId, (p) => setProgress(p));
+      const compResult = await insertAndCompute(txns, businessId, (p) =>
+        setProgress(p),
+      );
       if ("error" in compResult) {
         setError(compResult.error);
-        track("csv_import_failed", { error: compResult.error, bank: bank.id, inserted: txns.length });
+        track("csv_import_failed", {
+          error: compResult.error,
+          bank: bank.id,
+          inserted: txns.length,
+        });
         setBusy(false);
         return;
       }
 
       setResult({ rows: txns.length, ...compResult });
       toast.success(
-        `Import complete. ${txns.length} transaction${txns.length === 1 ? "" : "s"} imported. Dashboard metrics have been updated.`
+        `Import complete. ${txns.length} transaction${txns.length === 1 ? "" : "s"} imported. Dashboard metrics have been updated.`,
       );
 
-      track("csv_import_completed", { records: txns.length, skipped, bank: bank.id });
-
+      track("csv_import_completed", {
+        records: txns.length,
+        skipped,
+        bank: bank.id,
+      });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Unexpected error during import";
+      const msg =
+        e instanceof Error ? e.message : "Unexpected error during import";
       setError(msg);
       track("csv_import_failed", { error: msg, bank: bank?.id });
     } finally {
@@ -829,15 +1033,30 @@ export default function ImportPage() {
     }
   }
 
-  const isTallyMapperReady = !columnMapperNeeded || (tallyColumnMap.dateCol !== "" && (tallyColumnMap.amountCol !== "" || tallyColumnMap.debitCol !== ""));
-  const disabled = !bank || !file || busy || !businessId || (bankId === "tally" && columnMapperNeeded && !isTallyMapperReady && !isXMLFile);
+  const isTallyMapperReady =
+    !columnMapperNeeded ||
+    (tallyColumnMap.dateCol !== "" &&
+      (tallyColumnMap.amountCol !== "" || tallyColumnMap.debitCol !== ""));
+  const disabled =
+    !bank ||
+    !file ||
+    busy ||
+    !businessId ||
+    (bankId === "tally" &&
+      columnMapperNeeded &&
+      !isTallyMapperReady &&
+      !isXMLFile);
 
-  const headers = rawRows.length > 0 ? rawRows[0] : [];
+  const headers = useMemo(
+    () => (rawRows.length > 0 ? rawRows[0] : []),
+    [rawRows],
+  );
 
   // Live "Parsed amount" preview for the column mapper: shows the raw cell and
   // the signed value that will actually be stored (red = debit, green = credit).
   const mapperPreview = useMemo(() => {
-    if (isXMLFile || rawRows.length < 2) return [] as Array<{ raw: string; parsed: number }>;
+    if (isXMLFile || rawRows.length < 2)
+      return [] as Array<{ raw: string; parsed: number }>;
     const idx = (name: string) => (name ? headers.indexOf(name) : -1);
     const dIdx = idx(tallyColumnMap.debitCol);
     const cIdx = idx(tallyColumnMap.creditCol);
@@ -845,43 +1064,85 @@ export default function ImportPage() {
     const tIdx = idx(tallyColumnMap.directionCol);
     if (dIdx === -1 && cIdx === -1 && aIdx === -1) return [];
     return rawRows.slice(1, 6).map((r) => {
-      const rawDebit = dIdx !== -1 ? r[dIdx] ?? "" : "";
-      const rawCredit = cIdx !== -1 ? r[cIdx] ?? "" : "";
-      const rawAmt = aIdx !== -1 ? r[aIdx] ?? "" : "";
-      const rawDir = tIdx !== -1 ? r[tIdx] ?? "" : "";
+      const rawDebit = dIdx !== -1 ? (r[dIdx] ?? "") : "";
+      const rawCredit = cIdx !== -1 ? (r[cIdx] ?? "") : "";
+      const rawAmt = aIdx !== -1 ? (r[aIdx] ?? "") : "";
+      const rawDir = tIdx !== -1 ? (r[tIdx] ?? "") : "";
       let parsed = normaliseAmount(rawAmt, rawDir, rawDebit, rawCredit);
-      if (parsed !== 0 && rawDir && signFromType(rawDir) === 0 && dIdx === -1 && cIdx === -1) {
-        parsed = classifyTallyVoucherType(rawDir, String(rawAmt)) === "out" ? -Math.abs(parsed) : Math.abs(parsed);
+      if (
+        parsed !== 0 &&
+        rawDir &&
+        signFromType(rawDir) === 0 &&
+        dIdx === -1 &&
+        cIdx === -1
+      ) {
+        parsed =
+          classifyTallyVoucherType(rawDir, String(rawAmt)) === "out"
+            ? -Math.abs(parsed)
+            : Math.abs(parsed);
       }
-      const raw = [rawDebit && `Dr ${rawDebit}`, rawCredit && `Cr ${rawCredit}`, rawAmt, rawDir]
-        .filter(Boolean).join("  ·  ");
+      const raw = [
+        rawDebit && `Dr ${rawDebit}`,
+        rawCredit && `Cr ${rawCredit}`,
+        rawAmt,
+        rawDir,
+      ]
+        .filter(Boolean)
+        .join("  ·  ");
       return { raw, parsed };
     });
   }, [rawRows, headers, tallyColumnMap, isXMLFile]);
 
-
   return (
     <div className="min-h-screen bg-fyn-beige px-6 py-8">
       <div className="max-w-5xl mx-auto">
-
         <div className="mb-8">
-          <h1 className="text-3xl text-fyn-ink mb-2" style={{ fontFamily: "Georgia, serif" }}>Import financial data</h1>
-          <p className="text-fyn-ink/60" style={{ fontFamily: "Inter, sans-serif" }}>
-            Connect your bank statement or Tally export to populate your intelligence dashboard with real numbers.
+          <h1
+            className="text-3xl text-fyn-ink mb-2"
+            style={{ fontFamily: "Georgia, serif" }}
+          >
+            Import financial data
+          </h1>
+          <p
+            className="text-fyn-ink/60"
+            style={{ fontFamily: "Inter, sans-serif" }}
+          >
+            Connect your bank statement or Tally export to populate your
+            intelligence dashboard with real numbers.
           </p>
         </div>
 
         {!businessId && (
-          <div className="mb-6 bg-white p-4 flex gap-3" style={{ borderRadius: 12, border: "1px solid rgba(196,30,30,0.2)", borderLeft: "4px solid #C41E1E" }}>
+          <div
+            className="mb-6 bg-white p-4 flex gap-fyn-sm"
+            style={{
+              borderRadius: 12,
+              border: "1px solid rgba(196,30,30,0.2)",
+              borderLeft: "4px solid #C41E1E",
+            }}
+          >
             <AlertTriangle className="w-5 h-5 text-fyn-red shrink-0 mt-0.5" />
-            <div className="text-sm text-fyn-ink" style={{ fontFamily: "Inter, sans-serif" }}>Complete business onboarding before importing data.</div>
+            <div
+              className="text-sm text-fyn-ink"
+              style={{ fontFamily: "Inter, sans-serif" }}
+            >
+              Complete business onboarding before importing data.
+            </div>
           </div>
         )}
 
         {/* STEP 1 — SOURCE SELECTOR */}
         <section className="mb-8">
-          <div className="text-[11px] tracking-widest mb-3" style={{ color: "#8B6914", fontFamily: "'JetBrains Mono', monospace" }}>STEP 1 · SELECT SOURCE</div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div
+            className="text-[11px] tracking-widest mb-3"
+            style={{
+              color: "#8B6914",
+              fontFamily: "'JetBrains Mono', monospace",
+            }}
+          >
+            STEP 1 · SELECT SOURCE
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-fyn-sm">
             {BANKS.map((b) => {
               const selected = bankId === b.id;
               return (
@@ -901,12 +1162,24 @@ export default function ImportPage() {
                   className="bg-white text-left p-4 transition-all"
                   style={{
                     borderRadius: 12,
-                    border: selected ? "2px solid #C41E1E" : "1px solid rgba(23,18,8,0.08)",
+                    border: selected
+                      ? "2px solid #C41E1E"
+                      : "1px solid rgba(23,18,8,0.08)",
                     outline: "none",
                   }}
                 >
-                  <div className="text-fyn-ink font-semibold text-sm mb-1" style={{ fontFamily: "Georgia, serif" }}>{b.name}</div>
-                  <div className="text-xs text-fyn-ink/55 mb-3" style={{ fontFamily: "Inter, sans-serif", lineHeight: 1.4 }}>{b.note}</div>
+                  <div
+                    className="text-fyn-ink font-semibold text-sm mb-1"
+                    style={{ fontFamily: "Georgia, serif" }}
+                  >
+                    {b.name}
+                  </div>
+                  <div
+                    className="text-xs text-fyn-ink/55 mb-3"
+                    style={{ fontFamily: "Inter, sans-serif", lineHeight: 1.4 }}
+                  >
+                    {b.note}
+                  </div>
                   <div
                     className="inline-block text-xs px-3 py-1 rounded"
                     style={{
@@ -926,13 +1199,46 @@ export default function ImportPage() {
 
         {/* TALLY EXPORT INSTRUCTIONS */}
         {bankId === "tally" && (
-          <div style={{ background: "#FDFAF3", border: "1px solid rgba(139,105,20,0.2)", borderRadius: 12, padding: "20px 24px", marginBottom: 24 }}>
-            <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 11, color: "#8B6914", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>
+          <div
+            style={{
+              background: "#FDFAF3",
+              border: "1px solid rgba(139,105,20,0.2)",
+              borderRadius: 12,
+              padding: "20px 24px",
+              marginBottom: 24,
+            }}
+          >
+            <div
+              style={{
+                fontFamily: "JetBrains Mono, monospace",
+                fontSize: 11,
+                color: "#8B6914",
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                marginBottom: 12,
+              }}
+            >
               How to export from Tally
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 20,
+              }}
+            >
               <div>
-                <div style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: "#171208", marginBottom: 8 }}>Tally Prime</div>
+                <div
+                  style={{
+                    fontFamily: "Inter, sans-serif",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "#171208",
+                    marginBottom: 8,
+                  }}
+                >
+                  Tally Prime
+                </div>
                 {[
                   "Gateway of Tally",
                   "Display More Reports",
@@ -943,14 +1249,52 @@ export default function ImportPage() {
                   "Choose Excel (CSV) or XML format",
                   "Save the file and upload below",
                 ].map((step, i) => (
-                  <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 5 }}>
-                    <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 11, color: "#C41E1E", fontWeight: 600, minWidth: 22, flexShrink: 0 }}>{i + 1}.</span>
-                    <span style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: "rgba(23,18,8,0.75)", lineHeight: 1.4 }}>{step}</span>
+                  <div
+                    key={i}
+                    style={{
+                      display: "flex",
+                      gap: 8,
+                      alignItems: "flex-start",
+                      marginBottom: 5,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontFamily: "JetBrains Mono, monospace",
+                        fontSize: 11,
+                        color: "#C41E1E",
+                        fontWeight: 600,
+                        minWidth: 22,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {i + 1}.
+                    </span>
+                    <span
+                      style={{
+                        fontFamily: "Inter, sans-serif",
+                        fontSize: 13,
+                        color: "rgba(23,18,8,0.75)",
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      {step}
+                    </span>
                   </div>
                 ))}
               </div>
               <div>
-                <div style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: "#171208", marginBottom: 8 }}>Tally ERP 9</div>
+                <div
+                  style={{
+                    fontFamily: "Inter, sans-serif",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "#171208",
+                    marginBottom: 8,
+                  }}
+                >
+                  Tally ERP 9
+                </div>
                 {[
                   "Gateway of Tally",
                   "Display",
@@ -961,17 +1305,68 @@ export default function ImportPage() {
                   "Select Excel format",
                   "Save the file and upload below",
                 ].map((step, i) => (
-                  <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 5 }}>
-                    <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 11, color: "#C41E1E", fontWeight: 600, minWidth: 22, flexShrink: 0 }}>{i + 1}.</span>
-                    <span style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: "rgba(23,18,8,0.75)", lineHeight: 1.4 }}>{step}</span>
+                  <div
+                    key={i}
+                    style={{
+                      display: "flex",
+                      gap: 8,
+                      alignItems: "flex-start",
+                      marginBottom: 5,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontFamily: "JetBrains Mono, monospace",
+                        fontSize: 11,
+                        color: "#C41E1E",
+                        fontWeight: 600,
+                        minWidth: 22,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {i + 1}.
+                    </span>
+                    <span
+                      style={{
+                        fontFamily: "Inter, sans-serif",
+                        fontSize: 13,
+                        color: "rgba(23,18,8,0.75)",
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      {step}
+                    </span>
                   </div>
                 ))}
               </div>
             </div>
-            <div style={{ marginTop: 16, padding: "10px 14px", background: "rgba(139,105,20,0.06)", borderRadius: 8, display: "flex", gap: 8, alignItems: "flex-start" }}>
-              <Info size={14} style={{ color: "#8B6914", flexShrink: 0, marginTop: 1 }} />
-              <span style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: "#8B6914", lineHeight: 1.5 }}>
-                Export the Cash or Bank Book — not the Day Book or Ledger Summary. If your columns are not recognised automatically, FYNHelp shows a mapping screen. XML exports from Tally Prime are also supported and recommended for the most accurate data.
+            <div
+              style={{
+                marginTop: 16,
+                padding: "10px 14px",
+                background: "rgba(139,105,20,0.06)",
+                borderRadius: 8,
+                display: "flex",
+                gap: 8,
+                alignItems: "flex-start",
+              }}
+            >
+              <Info
+                size={14}
+                style={{ color: "#8B6914", flexShrink: 0, marginTop: 1 }}
+              />
+              <span
+                style={{
+                  fontFamily: "Inter, sans-serif",
+                  fontSize: 12,
+                  color: "#8B6914",
+                  lineHeight: 1.5,
+                }}
+              >
+                Export the Cash or Bank Book — not the Day Book or Ledger
+                Summary. If your columns are not recognised automatically,
+                FYNHelp shows a mapping screen. XML exports from Tally Prime are
+                also supported and recommended for the most accurate data.
               </span>
             </div>
           </div>
@@ -979,8 +1374,25 @@ export default function ImportPage() {
 
         {/* BUSY EXPORT INSTRUCTIONS */}
         {bankId === "busy" && (
-          <div style={{ background: "#FDFAF3", border: "1px solid rgba(139,105,20,0.2)", borderRadius: 12, padding: "20px 24px", marginBottom: 24 }}>
-            <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 11, color: "#8B6914", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>
+          <div
+            style={{
+              background: "#FDFAF3",
+              border: "1px solid rgba(139,105,20,0.2)",
+              borderRadius: 12,
+              padding: "20px 24px",
+              marginBottom: 24,
+            }}
+          >
+            <div
+              style={{
+                fontFamily: "JetBrains Mono, monospace",
+                fontSize: 11,
+                color: "#8B6914",
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                marginBottom: 12,
+              }}
+            >
               How to export from Busy Accounting
             </div>
             {[
@@ -991,9 +1403,37 @@ export default function ImportPage() {
               "Choose CSV format",
               "Save the file and upload below",
             ].map((step, i) => (
-              <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 5 }}>
-                <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 11, color: "#C41E1E", fontWeight: 600, minWidth: 22, flexShrink: 0 }}>{i + 1}.</span>
-                <span style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: "rgba(23,18,8,0.75)", lineHeight: 1.4 }}>{step}</span>
+              <div
+                key={i}
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "flex-start",
+                  marginBottom: 5,
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: "JetBrains Mono, monospace",
+                    fontSize: 11,
+                    color: "#C41E1E",
+                    fontWeight: 600,
+                    minWidth: 22,
+                    flexShrink: 0,
+                  }}
+                >
+                  {i + 1}.
+                </span>
+                <span
+                  style={{
+                    fontFamily: "Inter, sans-serif",
+                    fontSize: 13,
+                    color: "rgba(23,18,8,0.75)",
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {step}
+                </span>
               </div>
             ))}
           </div>
@@ -1001,11 +1441,20 @@ export default function ImportPage() {
 
         {/* STEP 2 — FILE UPLOAD */}
         <section className="mb-6">
-          <div className="text-[11px] tracking-widest mb-3" style={{ color: "#8B6914", fontFamily: "'JetBrains Mono', monospace" }}>
+          <div
+            className="text-[11px] tracking-widest mb-3"
+            style={{
+              color: "#8B6914",
+              fontFamily: "'JetBrains Mono', monospace",
+            }}
+          >
             STEP 2 · UPLOAD {bankId === "tally" ? "CSV OR XML" : "CSV"}
           </div>
           <div
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
             onDragLeave={() => setDragOver(false)}
             onDrop={(e) => {
               e.preventDefault();
@@ -1020,28 +1469,55 @@ export default function ImportPage() {
             }}
           >
             <Upload className="w-8 h-8 mb-3" style={{ color: "#8B6914" }} />
-            <div className="text-fyn-ink font-medium mb-1" style={{ fontFamily: "Inter, sans-serif" }}>
+            <div
+              className="text-fyn-ink font-medium mb-1"
+              style={{ fontFamily: "Inter, sans-serif" }}
+            >
               Drop your file here or click to browse
             </div>
-            <div className="text-xs text-fyn-ink/50" style={{ fontFamily: "Inter, sans-serif" }}>
-              {bankId === "tally" ? ".csv and .xml supported — up to 10MB" : ".csv only — up to 10MB"}
+            <div
+              className="text-xs text-fyn-ink/50"
+              style={{ fontFamily: "Inter, sans-serif" }}
+            >
+              {bankId === "tally"
+                ? ".csv and .xml supported — up to 10MB"
+                : ".csv only — up to 10MB"}
             </div>
             <input
               ref={inputRef}
               type="file"
-              accept={bankId === "tally" ? ".csv,.xml,text/csv,text/xml,application/xml" : ".csv,text/csv"}
+              accept={
+                bankId === "tally"
+                  ? ".csv,.xml,text/csv,text/xml,application/xml"
+                  : ".csv,text/csv"
+              }
               className="hidden"
               onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
             />
           </div>
 
           {file && (
-            <div className="mt-3 bg-white p-4 flex items-center gap-3" style={{ borderRadius: 12, border: "1px solid rgba(23,18,8,0.08)" }}>
+            <div
+              className="mt-3 bg-white p-4 flex items-center gap-fyn-sm"
+              style={{
+                borderRadius: 12,
+                border: "1px solid rgba(23,18,8,0.08)",
+              }}
+            >
               <FileText className="w-5 h-5 text-fyn-ink/60" />
               <div className="flex-1 min-w-0">
-                <div className="text-sm text-fyn-ink font-medium truncate" style={{ fontFamily: "Inter, sans-serif" }}>{file.name}</div>
-                <div className="text-xs text-fyn-ink/50" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                  {(file.size / 1024).toFixed(1)} KB · {isXMLFile ? "Tally XML" : "CSV"}
+                <div
+                  className="text-sm text-fyn-ink font-medium truncate"
+                  style={{ fontFamily: "Inter, sans-serif" }}
+                >
+                  {file.name}
+                </div>
+                <div
+                  className="text-xs text-fyn-ink/50"
+                  style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                >
+                  {(file.size / 1024).toFixed(1)} KB ·{" "}
+                  {isXMLFile ? "Tally XML" : "CSV"}
                 </div>
               </div>
               <button
@@ -1064,16 +1540,40 @@ export default function ImportPage() {
           )}
 
           {rawRows.length > 0 && !isXMLFile && (
-            <div className="mt-3 bg-white overflow-hidden" style={{ borderRadius: 12, border: "1px solid rgba(23,18,8,0.08)" }}>
-              <div className="px-4 py-2 text-[11px] tracking-widest" style={{ color: "#8B6914", fontFamily: "'JetBrains Mono', monospace", borderBottom: "1px solid rgba(23,18,8,0.06)" }}>
+            <div
+              className="mt-3 bg-white overflow-hidden"
+              style={{
+                borderRadius: 12,
+                border: "1px solid rgba(23,18,8,0.08)",
+              }}
+            >
+              <div
+                className="px-4 py-2 text-[11px] tracking-widest"
+                style={{
+                  color: "#8B6914",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  borderBottom: "1px solid rgba(23,18,8,0.06)",
+                }}
+              >
                 PREVIEW — FIRST {Math.max(0, rawRows.length - 1)} ROWS
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                <table
+                  className="w-full text-xs"
+                  style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                >
                   <thead>
                     <tr>
                       {rawRows[0].map((h, i) => (
-                        <th key={i} className="text-left px-3 py-2 text-fyn-ink/70 font-semibold whitespace-nowrap" style={{ borderBottom: "1px solid rgba(23,18,8,0.06)" }}>{h}</th>
+                        <th
+                          key={i}
+                          className="text-left px-3 py-2 text-fyn-ink/70 font-semibold whitespace-nowrap"
+                          style={{
+                            borderBottom: "1px solid rgba(23,18,8,0.06)",
+                          }}
+                        >
+                          {h}
+                        </th>
                       ))}
                     </tr>
                   </thead>
@@ -1081,7 +1581,15 @@ export default function ImportPage() {
                     {rawRows.slice(1).map((r, ri) => (
                       <tr key={ri}>
                         {r.map((c, ci) => (
-                          <td key={ci} className="px-3 py-2 text-fyn-ink/80 whitespace-nowrap" style={{ borderBottom: "1px solid rgba(23,18,8,0.04)" }}>{c}</td>
+                          <td
+                            key={ci}
+                            className="px-3 py-2 text-fyn-ink/80 whitespace-nowrap"
+                            style={{
+                              borderBottom: "1px solid rgba(23,18,8,0.04)",
+                            }}
+                          >
+                            {c}
+                          </td>
                         ))}
                       </tr>
                     ))}
@@ -1093,97 +1601,281 @@ export default function ImportPage() {
         </section>
 
         {/* TALLY COLUMN MAPPER — shown only when auto-detection fails */}
-        {bankId === "tally" && columnMapperNeeded && !isXMLFile && headers.length > 0 && (
-          <div style={{ background: "#FFF7ED", border: "1px solid rgba(146,64,14,0.35)", borderRadius: 12, padding: "18px 20px", marginBottom: 20 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-              <AlertTriangle size={16} style={{ color: "#92400e", flexShrink: 0 }} />
-              <div style={{ fontFamily: "Inter, sans-serif", fontSize: 13, fontWeight: 600, color: "#92400e" }}>
-                Column names not recognised automatically — map them below
+        {bankId === "tally" &&
+          columnMapperNeeded &&
+          !isXMLFile &&
+          headers.length > 0 && (
+            <div
+              style={{
+                background: "#FFF7ED",
+                border: "1px solid rgba(146,64,14,0.35)",
+                borderRadius: 12,
+                padding: "18px 20px",
+                marginBottom: 20,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 12,
+                }}
+              >
+                <AlertTriangle
+                  size={16}
+                  style={{ color: "#92400e", flexShrink: 0 }}
+                />
+                <div
+                  style={{
+                    fontFamily: "Inter, sans-serif",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "#92400e",
+                  }}
+                >
+                  Column names not recognised automatically — map them below
+                </div>
               </div>
-            </div>
-            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: "#92400e", marginBottom: 14, lineHeight: 1.5 }}>
-              Your Tally export uses custom column names. Select which column in your file corresponds to each field. Date and at least one amount column are required. The import button becomes active once these are mapped.
-            </p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-              {[
-                { label: "Date column (required)", key: "dateCol" as keyof TallyColumnMap, required: true },
-                { label: "Amount column (if single column)", key: "amountCol" as keyof TallyColumnMap, required: false },
-                { label: "Description or Narration", key: "descriptionCol" as keyof TallyColumnMap, required: false },
-                { label: "Voucher Type or Direction", key: "directionCol" as keyof TallyColumnMap, required: false },
-                { label: "Debit column (if separate)", key: "debitCol" as keyof TallyColumnMap, required: false },
-                { label: "Credit column (if separate)", key: "creditCol" as keyof TallyColumnMap, required: false },
-              ].map(({ label, key, required }) => (
-                <div key={key}>
-                  <label style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 600, color: required ? "#92400e" : "rgba(146,64,14,0.7)", display: "block", marginBottom: 5 }}>
-                    {label}{required && " *"}
-                  </label>
-                  <select
-                    value={tallyColumnMap[key]}
-                    onChange={(e) => setTallyColumnMap((prev) => ({ ...prev, [key]: e.target.value }))}
+              <p
+                style={{
+                  fontFamily: "Inter, sans-serif",
+                  fontSize: 12,
+                  color: "#92400e",
+                  marginBottom: 14,
+                  lineHeight: 1.5,
+                }}
+              >
+                Your Tally export uses custom column names. Select which column
+                in your file corresponds to each field. Date and at least one
+                amount column are required. The import button becomes active
+                once these are mapped.
+              </p>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr 1fr",
+                  gap: 12,
+                }}
+              >
+                {[
+                  {
+                    label: "Date column (required)",
+                    key: "dateCol" as keyof TallyColumnMap,
+                    required: true,
+                  },
+                  {
+                    label: "Amount column (if single column)",
+                    key: "amountCol" as keyof TallyColumnMap,
+                    required: false,
+                  },
+                  {
+                    label: "Description or Narration",
+                    key: "descriptionCol" as keyof TallyColumnMap,
+                    required: false,
+                  },
+                  {
+                    label: "Voucher Type or Direction",
+                    key: "directionCol" as keyof TallyColumnMap,
+                    required: false,
+                  },
+                  {
+                    label: "Debit column (if separate)",
+                    key: "debitCol" as keyof TallyColumnMap,
+                    required: false,
+                  },
+                  {
+                    label: "Credit column (if separate)",
+                    key: "creditCol" as keyof TallyColumnMap,
+                    required: false,
+                  },
+                ].map(({ label, key, required }) => (
+                  <div key={key}>
+                    <label
+                      style={{
+                        fontFamily: "Inter, sans-serif",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: required ? "#92400e" : "rgba(146,64,14,0.7)",
+                        display: "block",
+                        marginBottom: 5,
+                      }}
+                    >
+                      {label}
+                      {required && " *"}
+                    </label>
+                    <select
+                      value={tallyColumnMap[key]}
+                      onChange={(e) =>
+                        setTallyColumnMap((prev) => ({
+                          ...prev,
+                          [key]: e.target.value,
+                        }))
+                      }
+                      style={{
+                        width: "100%",
+                        height: 36,
+                        padding: "0 10px",
+                        border: `1px solid ${required && !tallyColumnMap[key] ? "rgba(196,30,30,0.4)" : "rgba(146,64,14,0.3)"}`,
+                        borderRadius: 8,
+                        fontFamily: "Inter, sans-serif",
+                        fontSize: 13,
+                        color: "#171208",
+                        background: "white",
+                        outline: "none",
+                      }}
+                    >
+                      <option value="">Not mapped</option>
+                      {headers.map((h, i) => (
+                        <option key={i} value={h}>
+                          {h}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+              {mapperPreview.length > 0 && (
+                <div style={{ marginTop: 16 }}>
+                  <div
                     style={{
-                      width: "100%", height: 36, padding: "0 10px",
-                      border: `1px solid ${required && !tallyColumnMap[key] ? "rgba(196,30,30,0.4)" : "rgba(146,64,14,0.3)"}`,
-                      borderRadius: 8, fontFamily: "Inter, sans-serif", fontSize: 13,
-                      color: "#171208", background: "white", outline: "none",
+                      fontFamily: "Inter, sans-serif",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: "#92400e",
+                      marginBottom: 6,
                     }}
                   >
-                    <option value="">Not mapped</option>
-                    {headers.map((h, i) => <option key={i} value={h}>{h}</option>)}
-                  </select>
-                </div>
-              ))}
-            </div>
-            {mapperPreview.length > 0 && (
-              <div style={{ marginTop: 16 }}>
-                <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11, fontWeight: 600, color: "#92400e", marginBottom: 6 }}>
-                  Preview — confirm debits are negative before importing
-                </div>
-                <div style={{ overflowX: "auto", background: "white", border: "1px solid rgba(146,64,14,0.25)", borderRadius: 8 }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "Inter, sans-serif", fontSize: 12 }}>
-                    <thead>
-                      <tr style={{ background: "#FFF7ED", color: "#92400e" }}>
-                        <th style={{ textAlign: "left", padding: "7px 10px", fontWeight: 600 }}>Raw value</th>
-                        <th style={{ textAlign: "right", padding: "7px 10px", fontWeight: 600 }}>Parsed amount</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {mapperPreview.map((p, i) => (
-                        <tr key={i} style={{ borderTop: "1px solid rgba(146,64,14,0.12)" }}>
-                          <td style={{ padding: "7px 10px", color: "#171208", whiteSpace: "nowrap" }}>{p.raw || "—"}</td>
-                          <td style={{
-                            padding: "7px 10px", textAlign: "right",
-                            fontFamily: "'JetBrains Mono', monospace",
-                            color: p.parsed < 0 ? "#C41E1E" : "#1F5A46",
-                          }}>
-                            {p.parsed < 0 ? "−" : "+"}{Math.abs(p.parsed).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </td>
+                    Preview — confirm debits are negative before importing
+                  </div>
+                  <div
+                    style={{
+                      overflowX: "auto",
+                      background: "white",
+                      border: "1px solid rgba(146,64,14,0.25)",
+                      borderRadius: 8,
+                    }}
+                  >
+                    <table
+                      style={{
+                        width: "100%",
+                        borderCollapse: "collapse",
+                        fontFamily: "Inter, sans-serif",
+                        fontSize: 12,
+                      }}
+                    >
+                      <thead>
+                        <tr style={{ background: "#FFF7ED", color: "#92400e" }}>
+                          <th
+                            style={{
+                              textAlign: "left",
+                              padding: "7px 10px",
+                              fontWeight: 600,
+                            }}
+                          >
+                            Raw value
+                          </th>
+                          <th
+                            style={{
+                              textAlign: "right",
+                              padding: "7px 10px",
+                              fontWeight: 600,
+                            }}
+                          >
+                            Parsed amount
+                          </th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {mapperPreview.map((p, i) => (
+                          <tr
+                            key={i}
+                            style={{
+                              borderTop: "1px solid rgba(146,64,14,0.12)",
+                            }}
+                          >
+                            <td
+                              style={{
+                                padding: "7px 10px",
+                                color: "#171208",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {p.raw || "—"}
+                            </td>
+                            <td
+                              style={{
+                                padding: "7px 10px",
+                                textAlign: "right",
+                                fontFamily: "'JetBrains Mono', monospace",
+                                color: p.parsed < 0 ? "#C41E1E" : "#1F5A46",
+                              }}
+                            >
+                              {p.parsed < 0 ? "−" : "+"}
+                              {Math.abs(p.parsed).toLocaleString("en-IN", {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {!isTallyMapperReady && (
-              <div style={{ marginTop: 12, fontFamily: "Inter, sans-serif", fontSize: 12, color: "#92400e" }}>
-                Map the Date column and at least one Amount or Debit column to enable the import button.
-              </div>
-            )}
-
-          </div>
-        )}
+              {!isTallyMapperReady && (
+                <div
+                  style={{
+                    marginTop: 12,
+                    fontFamily: "Inter, sans-serif",
+                    fontSize: 12,
+                    color: "#92400e",
+                  }}
+                >
+                  Map the Date column and at least one Amount or Debit column to
+                  enable the import button.
+                </div>
+              )}
+            </div>
+          )}
 
         {/* STEP 3 — IMPORT */}
         <section className="mb-8">
-          <div className="text-[11px] tracking-widest mb-3" style={{ color: "#8B6914", fontFamily: "'JetBrains Mono', monospace" }}>STEP 3 · IMPORT</div>
+          <div
+            className="text-[11px] tracking-widest mb-3"
+            style={{
+              color: "#8B6914",
+              fontFamily: "'JetBrains Mono', monospace",
+            }}
+          >
+            STEP 3 · IMPORT
+          </div>
 
           {error && (
-            <div className="mb-4 bg-white p-4 flex gap-3" style={{ borderRadius: 12, border: "1px solid rgba(196,30,30,0.25)", borderLeft: "4px solid #C41E1E" }}>
+            <div
+              className="mb-4 bg-white p-4 flex gap-fyn-sm"
+              style={{
+                borderRadius: 12,
+                border: "1px solid rgba(196,30,30,0.25)",
+                borderLeft: "4px solid #C41E1E",
+              }}
+            >
               <AlertTriangle className="w-5 h-5 text-fyn-red shrink-0 mt-0.5" />
               <div>
-                <div className="text-sm text-fyn-ink font-medium mb-1" style={{ fontFamily: "Inter, sans-serif" }}>Import failed</div>
-                <div className="text-sm text-fyn-ink/80" style={{ fontFamily: "Inter, sans-serif", lineHeight: 1.5 }}>{error}</div>
+                <div
+                  className="text-sm text-fyn-ink font-medium mb-1"
+                  style={{ fontFamily: "Inter, sans-serif" }}
+                >
+                  Import failed
+                </div>
+                <div
+                  className="text-sm text-fyn-ink/80"
+                  style={{ fontFamily: "Inter, sans-serif", lineHeight: 1.5 }}
+                >
+                  {error}
+                </div>
               </div>
             </div>
           )}
@@ -1201,19 +1893,34 @@ export default function ImportPage() {
               fontSize: 15,
             }}
           >
-            {busy
-              ? <><Loader2 className="w-5 h-5 animate-spin" /> Importing...</>
-              : `Import ${bankId === "tally" ? "Tally" : ""} transactions`
-            }
+            {busy ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" /> Importing...
+              </>
+            ) : (
+              `Import ${bankId === "tally" ? "Tally" : ""} transactions`
+            )}
           </button>
 
           {busy && progress && (
             <div className="mt-4">
-              <div className="flex justify-between text-xs text-fyn-ink/60 mb-1" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+              <div
+                className="flex justify-between text-xs text-fyn-ink/60 mb-1"
+                style={{ fontFamily: "'JetBrains Mono', monospace" }}
+              >
                 <span>Inserting rows</span>
-                <span>{progress.done} / {progress.total}</span>
+                <span>
+                  {progress.done} / {progress.total}
+                </span>
               </div>
-              <div style={{ height: 4, background: "rgba(23,18,8,0.08)", borderRadius: 2, overflow: "hidden" }}>
+              <div
+                style={{
+                  height: 4,
+                  background: "rgba(23,18,8,0.08)",
+                  borderRadius: 2,
+                  overflow: "hidden",
+                }}
+              >
                 <div
                   style={{
                     height: "100%",
@@ -1228,43 +1935,106 @@ export default function ImportPage() {
           )}
 
           {skippedInfo && skippedInfo.count > 0 && (
-            <div className="mt-4 bg-white p-4" style={{ borderRadius: 12, border: "1px solid rgba(146,64,14,0.25)", borderLeft: "4px solid #8B6914" }}>
+            <div
+              className="mt-4 bg-white p-4"
+              style={{
+                borderRadius: 12,
+                border: "1px solid rgba(146,64,14,0.25)",
+                borderLeft: "4px solid #8B6914",
+              }}
+            >
               <div className="flex items-center gap-2 mb-2">
                 <Info size={15} style={{ color: "#8B6914" }} />
-                <span className="text-sm font-medium text-fyn-ink" style={{ fontFamily: "Inter, sans-serif" }}>
-                  {skippedInfo.count} row{skippedInfo.count !== 1 ? "s" : ""} skipped
+                <span
+                  className="text-sm font-medium text-fyn-ink"
+                  style={{ fontFamily: "Inter, sans-serif" }}
+                >
+                  {skippedInfo.count} row{skippedInfo.count !== 1 ? "s" : ""}{" "}
+                  skipped
                 </span>
               </div>
               {skippedInfo.reasons.length > 0 && (
-                <ul style={{ fontFamily: "Inter, sans-serif", fontSize: 12, color: "rgba(23,18,8,0.65)", lineHeight: 1.5, paddingLeft: 16 }}>
-                  {skippedInfo.reasons.map((r, i) => <li key={i}>{r}</li>)}
+                <ul
+                  style={{
+                    fontFamily: "Inter, sans-serif",
+                    fontSize: 12,
+                    color: "rgba(23,18,8,0.65)",
+                    lineHeight: 1.5,
+                    paddingLeft: 16,
+                  }}
+                >
+                  {skippedInfo.reasons.map((r, i) => (
+                    <li key={i}>{r}</li>
+                  ))}
                   {skippedInfo.count > skippedInfo.reasons.length && (
-                    <li>...and {skippedInfo.count - skippedInfo.reasons.length} more</li>
+                    <li>
+                      ...and {skippedInfo.count - skippedInfo.reasons.length}{" "}
+                      more
+                    </li>
                   )}
                 </ul>
               )}
-              <div style={{ fontFamily: "Inter, sans-serif", fontSize: 11, color: "rgba(23,18,8,0.45)", marginTop: 6 }}>
-                Skipped rows had unrecognised dates, zero amounts, or empty content. All valid rows were imported successfully.
+              <div
+                style={{
+                  fontFamily: "Inter, sans-serif",
+                  fontSize: 11,
+                  color: "rgba(23,18,8,0.45)",
+                  marginTop: 6,
+                }}
+              >
+                Skipped rows had unrecognised dates, zero amounts, or empty
+                content. All valid rows were imported successfully.
               </div>
             </div>
           )}
 
           {result && (
-            <div className="mt-6 bg-white p-6" style={{ borderRadius: 12, border: "1px solid rgba(16,185,129,0.3)", borderLeft: "4px solid #1F5A46" }}>
+            <div
+              className="mt-6 bg-white p-6"
+              style={{
+                borderRadius: 12,
+                border: "1px solid rgba(16,185,129,0.3)",
+                borderLeft: "4px solid #1F5A46",
+              }}
+            >
               <div className="flex items-center gap-2 mb-5">
-                <CheckCircle2 className="w-6 h-6" style={{ color: "#1F5A46" }} />
-                <h2 className="text-xl text-fyn-ink" style={{ fontFamily: "Georgia, serif" }}>Import complete</h2>
+                <CheckCircle2
+                  className="w-6 h-6"
+                  style={{ color: "#1F5A46" }}
+                />
+                <h2
+                  className="text-xl text-fyn-ink"
+                  style={{ fontFamily: "Georgia, serif" }}
+                >
+                  Import complete
+                </h2>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <Stat label="Rows imported" value={result.rows.toLocaleString("en-IN")} />
-                <Stat label="Cash position" value={`Rs ${result.cash_position.toLocaleString("en-IN")}`} />
-                <Stat label="Monthly burn" value={`Rs ${result.burn_rate_current.toLocaleString("en-IN")}`} />
-                <Stat label="Runway (months)" value={String(result.runway_months)} />
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-fyn-md mb-6">
+                <Stat
+                  label="Rows imported"
+                  value={result.rows.toLocaleString("en-IN")}
+                />
+                <Stat
+                  label="Cash position"
+                  value={`Rs ${result.cash_position.toLocaleString("en-IN")}`}
+                />
+                <Stat
+                  label="Monthly burn"
+                  value={`Rs ${result.burn_rate_current.toLocaleString("en-IN")}`}
+                />
+                <Stat
+                  label="Runway (months)"
+                  value={String(result.runway_months)}
+                />
               </div>
               <button
                 onClick={() => navigate("/dashboard/liquidity")}
                 className="px-5 py-2.5 text-white text-sm font-semibold"
-                style={{ background: "#C41E1E", borderRadius: 10, fontFamily: "Inter, sans-serif" }}
+                style={{
+                  background: "#C41E1E",
+                  borderRadius: 10,
+                  fontFamily: "Inter, sans-serif",
+                }}
               >
                 View Liquidity Dashboard
               </button>
@@ -1279,8 +2049,21 @@ export default function ImportPage() {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-[10px] tracking-widest mb-1" style={{ color: "#8B6914", fontFamily: "'JetBrains Mono', monospace" }}>{label.toUpperCase()}</div>
-      <div className="text-fyn-ink text-lg font-semibold" style={{ fontFamily: "'JetBrains Mono', monospace", fontVariantNumeric: "tabular-nums" }}>{value}</div>
+      <div
+        className="text-[10px] tracking-widest mb-1"
+        style={{ color: "#8B6914", fontFamily: "'JetBrains Mono', monospace" }}
+      >
+        {label.toUpperCase()}
+      </div>
+      <div
+        className="text-fyn-ink text-lg font-semibold"
+        style={{
+          fontFamily: "'JetBrains Mono', monospace",
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {value}
+      </div>
     </div>
   );
 }

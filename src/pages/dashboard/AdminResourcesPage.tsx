@@ -136,8 +136,12 @@ export default function AdminResourcesPage() {
   };
 
   const removeRow = async (row: ResourceRow) => {
-    if (!confirm(`Delete "${row.title}"? Stored files will remain in storage.`)) return;
-    const { error } = await supabase.from("resources").delete().eq("id", row.id);
+    if (!confirm(`Delete "${row.title}"? Stored files will remain in storage.`))
+      return;
+    const { error } = await supabase
+      .from("resources")
+      .delete()
+      .eq("id", row.id);
     if (error) return toast.error(error.message);
     toast.success("Deleted");
     load();
@@ -154,15 +158,23 @@ export default function AdminResourcesPage() {
       const path = `${kind === "icon" ? "icons" : "files"}/${row.id}-${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage
         .from("resources")
-        .upload(path, file, { upsert: true, contentType: file.type || undefined });
+        .upload(path, file, {
+          upsert: true,
+          contentType: file.type || undefined,
+        });
       if (upErr) throw upErr;
-      const { data: pub } = supabase.storage.from("resources").getPublicUrl(path);
+      const { data: pub } = supabase.storage
+        .from("resources")
+        .getPublicUrl(path);
       const url = pub.publicUrl;
 
       // Best-effort: remove the previous asset if it lived in our bucket
       const oldPath = kind === "icon" ? row.icon_path : row.file_path;
       if (oldPath && oldPath !== path) {
-        await supabase.storage.from("resources").remove([oldPath]).catch(() => {});
+        await supabase.storage
+          .from("resources")
+          .remove([oldPath])
+          .catch(() => {});
       }
 
       const patch =
@@ -198,12 +210,16 @@ export default function AdminResourcesPage() {
     return (
       <DashboardLayout>
         <FynPage>
-          <FynPageTitle sub="Admin role required.">Admin · Resources</FynPageTitle>
+          <FynPageTitle sub="Admin role required.">
+            Admin · Resources
+          </FynPageTitle>
           <FynCard>
             <p className="text-fyn-body text-fyn-ink-60 mb-fyn-md">
               You don’t have access to this page. Sign in with an admin account.
             </p>
-            <FynButton onClick={() => navigate("/dashboard/cockpit")}>Back to dashboard</FynButton>
+            <FynButton onClick={() => navigate("/dashboard/cockpit")}>
+              Back to dashboard
+            </FynButton>
           </FynCard>
         </FynPage>
       </DashboardLayout>
@@ -222,9 +238,14 @@ export default function AdminResourcesPage() {
 
         {editingId && (
           <FynCard>
-            <FynCardTitle>{editingId === "__new" ? "New resource" : "Edit resource"}</FynCardTitle>
+            <FynCardTitle>
+              {editingId === "__new" ? "New resource" : "Edit resource"}
+            </FynCardTitle>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-fyn-md mt-fyn-md">
-              <FynField label="ID (slug)" hint="Stable identifier used in download URLs. Lowercase, hyphenated.">
+              <FynField
+                label="ID (slug)"
+                hint="Stable identifier used in download URLs. Lowercase, hyphenated."
+              >
                 <FynInput
                   value={draft.id ?? ""}
                   onChange={(e) => setDraft({ ...draft, id: e.target.value })}
@@ -235,16 +256,22 @@ export default function AdminResourcesPage() {
               <FynField label="Title">
                 <FynInput
                   value={draft.title ?? ""}
-                  onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+                  onChange={(e) =>
+                    setDraft({ ...draft, title: e.target.value })
+                  }
                 />
               </FynField>
               <FynField label="Format">
                 <FynSelect
                   value={draft.format ?? "Excel"}
-                  onChange={(e) => setDraft({ ...draft, format: e.target.value })}
+                  onChange={(e) =>
+                    setDraft({ ...draft, format: e.target.value })
+                  }
                 >
                   {FORMATS.map((f) => (
-                    <option key={f} value={f}>{f}</option>
+                    <option key={f} value={f}>
+                      {f}
+                    </option>
                   ))}
                 </FynSelect>
               </FynField>
@@ -252,7 +279,9 @@ export default function AdminResourcesPage() {
                 <FynInput
                   type="number"
                   value={draft.sort_order ?? 0}
-                  onChange={(e) => setDraft({ ...draft, sort_order: Number(e.target.value) })}
+                  onChange={(e) =>
+                    setDraft({ ...draft, sort_order: Number(e.target.value) })
+                  }
                 />
               </FynField>
               <div className="md:col-span-2">
@@ -260,7 +289,9 @@ export default function AdminResourcesPage() {
                   <FynTextarea
                     rows={3}
                     value={draft.description ?? ""}
-                    onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+                    onChange={(e) =>
+                      setDraft({ ...draft, description: e.target.value })
+                    }
                   />
                 </FynField>
               </div>
@@ -268,14 +299,18 @@ export default function AdminResourcesPage() {
                 <input
                   type="checkbox"
                   checked={draft.is_published ?? true}
-                  onChange={(e) => setDraft({ ...draft, is_published: e.target.checked })}
+                  onChange={(e) =>
+                    setDraft({ ...draft, is_published: e.target.checked })
+                  }
                 />
                 Published (visible on public page)
               </label>
             </div>
             <div className="flex gap-fyn-sm mt-fyn-lg">
               <FynButton onClick={saveDraft}>Save</FynButton>
-              <FynButton variant="secondary" onClick={cancelEdit}>Cancel</FynButton>
+              <FynButton variant="secondary" onClick={cancelEdit}>
+                Cancel
+              </FynButton>
             </div>
           </FynCard>
         )}
@@ -283,7 +318,10 @@ export default function AdminResourcesPage() {
         {loading ? (
           <FynLoading rows={4} />
         ) : rows.length === 0 ? (
-          <FynEmpty title="No resources yet" description="Create your first downloadable template." />
+          <FynEmpty
+            title="No resources yet"
+            description="Create your first downloadable template."
+          />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-fyn-md">
             {rows.map((row) => (
@@ -293,19 +331,27 @@ export default function AdminResourcesPage() {
                     {row.icon_url ? (
                       <img src={row.icon_url} alt="" className="w-12 h-12" />
                     ) : (
-                      <span className="text-fyn-ink-40 text-fyn-tiny">no icon</span>
+                      <span className="text-fyn-ink-40 text-fyn-tiny">
+                        no icon
+                      </span>
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-serif text-fyn-h3 text-fyn-ink truncate">{row.title}</h3>
+                      <h3 className="font-serif text-fyn-h3 text-fyn-ink truncate">
+                        {row.title}
+                      </h3>
                       <FynBadge tone={row.is_published ? "success" : "neutral"}>
                         {row.is_published ? "Published" : "Draft"}
                       </FynBadge>
                       <FynBadge tone="neutral">{row.format}</FynBadge>
                     </div>
-                    <p className="text-fyn-small text-fyn-ink-60 mt-1">id: {row.id} · order {row.sort_order}</p>
-                    <p className="text-fyn-small text-fyn-ink-60 mt-2 line-clamp-2">{row.description}</p>
+                    <p className="text-fyn-small text-fyn-ink-60 mt-1">
+                      id: {row.id} · order {row.sort_order}
+                    </p>
+                    <p className="text-fyn-small text-fyn-ink-60 mt-2 line-clamp-2">
+                      {row.description}
+                    </p>
                   </div>
                 </div>
 
@@ -325,7 +371,9 @@ export default function AdminResourcesPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-fyn-sm mt-fyn-md">
-                  <FynButton variant="secondary" onClick={() => startEdit(row)}>Edit</FynButton>
+                  <FynButton variant="secondary" onClick={() => startEdit(row)}>
+                    Edit
+                  </FynButton>
                   {row.file_url && (
                     <a
                       href={row.file_url}

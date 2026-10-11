@@ -22,6 +22,8 @@ import {
   formatINR,
 } from "../ui";
 import { AgentStatusBadge, ProcessingCard, RowSkeleton } from "../agents";
+import { IntakePanel } from "../components/IntakePanel";
+import { SourceIcon } from "../components/BrandIcons";
 import { Doc, useV2 } from "../store";
 
 const TONE: Record<Doc["status"], Tone> = {
@@ -59,6 +61,21 @@ function DocStatus({ d }: { d: Doc }) {
         </div>
       </span>
     );
+  if (d.register)
+    return (
+      <span title={d.register.note}>
+        <Badge tone="good">Register</Badge>
+        <div style={{ fontSize: 11.5, color: V.muted, marginTop: 3 }}>{d.register.label}</div>
+      </span>
+    );
+  // Every row was already in the books from an earlier file: say so, not "0".
+  if (d.status === "Parsed" && !d.txnCount && d.duplicateCount)
+    return (
+      <span>
+        <Badge tone="neutral">Already received</Badge>
+        <div style={{ fontSize: 11.5, color: V.muted, marginTop: 3 }}>{d.duplicateCount} duplicate{d.duplicateCount === 1 ? "" : "s"} skipped</div>
+      </span>
+    );
   return <Badge tone={TONE[d.status]}>{d.status}</Badge>;
 }
 const SOURCES = ["All sources", "Manual", "Gmail", "WhatsApp"] as const;
@@ -88,7 +105,6 @@ export default function DocumentsPage({
     scopedClient ?? clients[0]?.id ?? "",
   );
   const [drag, setDrag] = useState(false);
-  const [source, setSource] = useState<Doc["source"]>("Manual");
   const [sourceFilter, setSourceFilter] =
     useState<(typeof SOURCES)[number]>("All sources");
   const [query, setQuery] = useState("");
@@ -114,7 +130,7 @@ export default function DocumentsPage({
       toast.error("Add a client before uploading");
       return;
     }
-    Array.from(files).forEach((f) => addDoc(f.name, targetClient, source, f));
+    Array.from(files).forEach((f) => addDoc(f.name, targetClient, "Manual", f));
     toast.success(
       `Extract agent is reading ${files.length > 1 ? `${files.length} files` : files[0].name}`,
     );
@@ -179,107 +195,78 @@ export default function DocumentsPage({
         />
       )}
 
-      <Card
-        style={{
-          padding: 0,
-          marginBottom: 20,
-          borderStyle: "dashed",
-          borderColor: drag ? V.ink : V.line,
-          background: drag ? V.gray : V.card,
-        }}
-        onClick={() => fileRef.current?.click()}
-      >
-        <div
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDrag(true);
-          }}
-          onDragLeave={() => setDrag(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDrag(false);
-            upload(e.dataTransfer.files);
-          }}
-          style={{
-            padding: scopedClient ? "26px 22px" : "40px 22px",
-            textAlign: "center",
-            cursor: "pointer",
-          }}
-        >
-          <div
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: 15,
-              background: V.blue,
-              display: "grid",
-              placeItems: "center",
-              margin: "0 auto 14px",
-              color: "#1B4763",
-            }}
-          >
-            <UploadCloud size={22} />
+      <IntakePanel
+        unassignedEmail={unassigned.filter((d) => d.source === "Gmail").length}
+        unassignedWhatsApp={unassigned.filter((d) => d.source === "WhatsApp").length}
+        onShowUnassigned={(t) => setTab(t)}
+        upload={
+          <div style={{ padding: scopedClient ? 16 : 20, display: "grid", gap: 14 }}>
+            {!scopedClient && clients.length > 0 && (
+              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                <label htmlFor="upload-client" style={{ fontSize: 13, color: V.body, fontWeight: 600 }}>Client</label>
+                <select
+                  id="upload-client"
+                  className="v2-input"
+                  style={{ width: "auto", minWidth: 240 }}
+                  value={uploadClient}
+                  onChange={(e) => setUploadClient(e.target.value)}
+                >
+                  {clients.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div
+              role="button"
+              tabIndex={0}
+              aria-label="Upload documents"
+              onClick={() => fileRef.current?.click()}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileRef.current?.click(); }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDrag(true);
+              }}
+              onDragLeave={() => setDrag(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDrag(false);
+                upload(e.dataTransfer.files);
+              }}
+              style={{
+                padding: scopedClient ? "22px 18px" : "32px 18px",
+                textAlign: "center",
+                cursor: "pointer",
+                border: `1.5px dashed ${drag ? V.ink : "rgba(20,20,20,.2)"}`,
+                borderRadius: 14,
+                background: drag ? V.gray : "transparent",
+                transition: "background .15s ease, border-color .15s ease",
+              }}
+            >
+              <div style={{ width: 46, height: 46, borderRadius: 14, background: V.blue, display: "grid", placeItems: "center", margin: "0 auto 12px", color: V.brandDeep }}>
+                <UploadCloud size={22} />
+              </div>
+              <h3 style={{ fontSize: 16 }}>Drop files here or click to choose</h3>
+              <p style={{ fontSize: 13, color: V.body, marginTop: 6 }}>
+                Bank statements, Tally exports, bills, GST/TDS registers, payroll and gateway reports. CSV, Excel, Tally XML, PDF and photos, up to 25 MB.
+              </p>
+              <p style={{ fontSize: 12, color: V.muted, marginTop: 4 }}>
+                FynHelp works out what each file is. Registers are summarised and never mixed into bank reconciliation.
+              </p>
+              <input
+                ref={fileRef}
+                type="file"
+                multiple
+                accept={ACCEPT}
+                hidden
+                onChange={(e) => upload(e.target.files)}
+              />
+            </div>
           </div>
-          <h3 style={{ fontSize: 16 }}>Drop files here or click to upload</h3>
-          <p style={{ fontSize: 13, color: V.body, marginTop: 6 }}>
-            Bank statements, Tally exports and bills. CSV, Excel, Tally XML, PDF
-            and photos.
-          </p>
-          <input
-            ref={fileRef}
-            type="file"
-            multiple
-            accept={ACCEPT}
-            hidden
-            onChange={(e) => upload(e.target.files)}
-          />
-        </div>
-      </Card>
-
-      {clients.length > 0 && (
-        <div
-          style={{
-            display: "flex",
-            gap: 10,
-            alignItems: "center",
-            marginBottom: 18,
-            flexWrap: "wrap",
-          }}
-        >
-          {!scopedClient && (
-            <>
-              <span style={{ fontSize: 12.5, color: V.muted }}>Upload for</span>
-              <select
-                className="v2-input"
-                style={{ width: "auto", minWidth: 220 }}
-                value={uploadClient}
-                onChange={(e) => setUploadClient(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-              >
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </>
-          )}
-          <span style={{ fontSize: 12.5, color: V.muted }}>
-            arrived through
-          </span>
-          <div style={{ display: "flex", gap: 6 }}>
-            {(["Manual", "Gmail", "WhatsApp"] as const).map((s) => (
-              <button
-                key={s}
-                className={`v2-btn ${source === s ? "v2-btn-primary" : "v2-btn-ghost"}`}
-                onClick={() => setSource(s)}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+        }
+      />
 
       <div
         style={{
@@ -385,12 +372,22 @@ export default function DocumentsPage({
             title={
               q || sourceFilter !== "All sources"
                 ? "No documents match"
-                : "No documents here yet"
+                : tab !== "All"
+                  ? `Nothing in ${tab}`
+                  : "No documents here yet"
             }
             description={
               q || sourceFilter !== "All sources"
                 ? "Clear the search or source filter to see everything."
-                : "Upload a bank statement or a Tally export above and the Extract agent will read every row."
+                : tab === "Failed"
+                  ? "Every file was read. Files that cannot be read show here with the reason and a way to fix it."
+                  : tab === "Needs review"
+                    ? "No file has rows waiting for a person."
+                    : tab === "Processing" || tab === "Queued"
+                      ? "Nothing is being read right now."
+                      : tab !== "All"
+                        ? "Switch to All to see every document."
+                        : "Upload a bank statement or a Tally export above and the Extract agent will read every row."
             }
           />
         )
@@ -444,12 +441,17 @@ export default function DocumentsPage({
                           : (d.sender ?? "Unknown sender")}
                       </td>
                     )}
-                    <td style={{ color: V.body }}>{d.source}</td>
+                    <td style={{ color: V.body }}>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+                        <SourceIcon source={d.source} />
+                        {d.source === "Manual" ? "Upload" : d.source}
+                      </span>
+                    </td>
                     <td>
                       <DocStatus d={d} />
                     </td>
                     <td className="num" style={{ color: V.body }}>
-                      {d.txnCount ?? d.rows.length}
+                      {d.register ? `${d.register.entries} entries` : !d.txnCount && d.duplicateCount ? `0 new, ${d.duplicateCount} dup.` : (d.txnCount ?? d.rows.length)}
                       {d.reviewCount ? (
                         <span style={{ color: V.muted }}>
                           {" "}
@@ -637,11 +639,35 @@ export default function DocumentsPage({
 
             {active.status === "Processing" || active.status === "Uploading" ? (
               <RowSkeleton rows={4} />
+            ) : active.register ? (
+              <div style={{ display: "grid", gap: 10 }} data-testid="register-summary">
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{active.register.label} · {active.register.entries} entries</div>
+                <table className="v2-table">
+                  <tbody>
+                    {active.register.totals.map((t) => (
+                      <tr key={t.label}>
+                        <td>{t.label}</td>
+                        <td className="num" style={{ textAlign: "right" }}>{formatINR(t.amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {active.register.groups?.length ? (
+                  <div style={{ fontSize: 12.5, color: V.body }}>
+                    {active.register.groups.slice(0, 12).map((g) => (
+                      <div key={g.key}>{g.key}: {formatINR(g.amount)} ({g.count} line{g.count === 1 ? "" : "s"})</div>
+                    ))}
+                  </div>
+                ) : null}
+                <p style={{ fontSize: 12.5, color: V.muted, margin: 0 }}>{active.register.note}</p>
+              </div>
             ) : active.rows.length === 0 ? (
               <p style={{ fontSize: 13.5, color: V.body, margin: 0 }}>
                 {active.reviewCount
                   ? `All ${active.reviewCount} rows from this file are waiting in the Review Queue.`
-                  : "No transactions were extracted from this file."}
+                  : active.duplicateCount
+                    ? `Every row in this file was already received from an earlier file: ${active.duplicateCount} duplicate${active.duplicateCount === 1 ? "" : "s"} skipped, nothing added twice.`
+                    : "No transactions were extracted from this file."}
               </p>
             ) : (
               <motion.table

@@ -14,7 +14,7 @@ import { useV2 } from "../store";
 type MemoryData = Awaited<ReturnType<typeof getPracticeMemory>>;
 type Pipeline = Awaited<ReturnType<typeof getPracticePipelineSettings>>;
 
-const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const errMsg = (e: unknown) => (e instanceof Error && e.message && e.message !== "[object Object]" ? e.message : typeof e === "string" ? e : "Something went wrong. Please try again.");
 
 const row: React.CSSProperties = {
   display: "grid",
@@ -125,7 +125,7 @@ export function AgentSettings() {
                 <option value="">Off</option>
                 {[3, 5, 7, 10, 15].map((d) => (
                   <option key={d} value={d}>
-                    By the {d}th
+                    By the {d}{d % 10 === 1 && d !== 11 ? "st" : d % 10 === 2 && d !== 12 ? "nd" : d % 10 === 3 && d !== 13 ? "rd" : "th"}
                   </option>
                 ))}
               </select>

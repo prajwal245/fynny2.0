@@ -22,6 +22,7 @@ import {
   type FirmContext,
 } from "./db.server";
 import { practiceLlm } from "./llm.server";
+import { BUCKET_LABELS, misBucket, type MisBucket } from "./narrate/flows";
 import {
   computeFigures,
   ruleInsights,
@@ -152,18 +153,23 @@ export async function generateReport(
     error: string | null;
   } = { provider: null, model: null, rejected: [], error: null };
   let aiCall: Record<string, unknown> | null = null;
-  const llm = matched.length >= 3 ? practiceLlm({ timeoutMs: 30_000 }) : null;
+  // Insights are a bonus on top of figures computed in code: never let the AI
+  // hold the report up. One short attempt, then the rule-based insights stand.
+  const llm = matched.length >= 3 ? practiceLlm({ timeoutMs: 9_000 }) : null;
   if (llm) {
     const user = JSON.stringify(
       insightsPayload(figures, matched, client.client_name, period.label),
     );
     const started = Date.now();
     try {
-      const res = await llm.json({
-        purpose: "narrate_insights",
-        system: INSIGHTS_SYSTEM_PROMPT,
-        user,
-      });
+      const res = await Promise.race([
+        llm.json({
+          purpose: "narrate_insights",
+          system: INSIGHTS_SYSTEM_PROMPT,
+          user,
+        }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("AI insights took too long; rule-based insights used")), 10_000)),
+      ]);
       const check = validateInsights(res.data, figures, matched);
       aiMeta.provider = res.provider;
       aiMeta.model = res.model;
@@ -226,6 +232,17 @@ export async function generateReport(
 
   const ins = matched.filter((t) => t.direction === "in");
   const outs = matched.filter((t) => t.direction === "out");
+  // Operating revenue and expenses only; other cash flows are listed separately.
+  const bucketOf = new Map(matched.map((t) => [t.id, misBucket(t)]));
+  const revenueTxns = matched.filter((t) => bucketOf.get(t.id) === "revenue");
+  const expenseTxns = matched.filter((t) => bucketOf.get(t.id) === "expense");
+  const otherFlows = (Object.keys(BUCKET_LABELS) as MisBucket[])
+    .filter((b) => b !== "revenue" && b !== "expense")
+    .map((b) => {
+      const list = matched.filter((t) => bucketOf.get(t.id) === b);
+      return { key: b, label: BUCKET_LABELS[b], direction: list[0]?.direction ?? "in", amount: sumRupees(list.map((t) => t.amount)), count: list.length, rows: inrRows(list) };
+    })
+    .filter((f) => f.count > 0);
   const high = matched.filter((t) => t.amount >= 100_000);
   const n = figures.numbers;
   const bankSummary: BankSummaryRow[] = [];
@@ -376,9 +393,12 @@ export async function generateReport(
     template,
     period: { label: period.label, start: period.start, end: period.end },
     excluded: unmatched.length,
-    revenue: n.total_receipts.value,
-    expenses: n.total_payments.value,
-    sources: { revenue: inrRows(ins), expenses: inrRows(outs) },
+    revenue: sumRupees(revenueTxns.map((t) => t.amount)),
+    expenses: sumRupees(expenseTxns.map((t) => t.amount)),
+    total_receipts: n.total_receipts.value,
+    total_payments: n.total_payments.value,
+    sources: { revenue: inrRows(revenueTxns), expenses: inrRows(expenseTxns) },
+    other_flows: otherFlows,
     insights: insights.map((i) => ({
       text: i.text,
       source: i.source,
@@ -565,6 +585,7 @@ export async function signOffReport(
   reportId: string,
   by: string,
   note?: string,
+  opts: { acknowledgeOpen?: boolean } = {},
 ) {
   if (!canSignOff(ctx))
     throw new PracticeError(
@@ -578,10 +599,32 @@ export async function signOffReport(
     .eq("ca_firm_id", ctx.firmId)
     .maybeSingle();
   if (!data) throw new PracticeError("not_found", "Report not found.");
+  // Open work in the period is never signed off silently.
+  const p = (data.content as { period?: { start?: string; end?: string } } | null)?.period;
+  let open = { exceptions: 0, review: 0, unmatched: 0 };
+  if (p?.start && p?.end && data.business_id) {
+    const [ex, rv, um] = await Promise.all([
+      db.from("ca_exceptions").select("id", { count: "exact", head: true }).eq("ca_firm_id", ctx.firmId).eq("business_id", data.business_id).eq("status", "open").gte("period_start", p.start).lte("period_end", p.end),
+      db.from("ca_review_items").select("id", { count: "exact", head: true }).eq("ca_firm_id", ctx.firmId).eq("business_id", data.business_id).eq("status", "open"),
+      db.from("ca_txns").select("id", { count: "exact", head: true }).eq("ca_firm_id", ctx.firmId).eq("business_id", data.business_id).eq("side", "bank").in("match_status", ["unmatched", "exception"]).gte("txn_date", p.start).lte("txn_date", p.end),
+    ]);
+    open = { exceptions: ex.count ?? 0, review: rv.count ?? 0, unmatched: um.count ?? 0 };
+  }
+  const openTotal = open.exceptions + open.review + open.unmatched;
+  if (openTotal > 0 && !opts.acknowledgeOpen)
+    throw new PracticeError(
+      "needs_confirmation",
+      `Not signed off: ${[
+        open.exceptions && `${open.exceptions} open exception${open.exceptions === 1 ? "" : "s"}`,
+        open.review && `${open.review} row${open.review === 1 ? "" : "s"} in the Review Queue`,
+        open.unmatched && `${open.unmatched} unreconciled bank line${open.unmatched === 1 ? "" : "s"}`,
+      ].filter(Boolean).join(", ")}. Clear them, or confirm that you are signing off with them left out.`,
+    );
   const content = {
     ...((data.content ?? {}) as Record<string, unknown>),
     signedOffBy: by,
     signOffNote: note ?? null,
+    signedOffWithOpen: openTotal > 0 ? open : null,
     correction: null,
   };
   await db

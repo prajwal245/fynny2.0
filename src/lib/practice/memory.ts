@@ -155,3 +155,18 @@ export function partyFromNarration(text: string | null | undefined): string {
   const name = best.join(" ");
   return name.length >= 4 ? name : "";
 }
+
+const GENERIC_WORDS = new Set([
+  "against", "inv", "invoice", "bill", "payment", "pmt", "paid", "transfer", "trf", "salary", "salaries", "staff",
+  "neft", "rtgs", "imps", "upi", "chq", "cheque", "cash", "deposit", "withdrawal", "misc", "miscellaneous", "bank",
+  "charges", "charge", "fees", "fee", "refund", "advance", "receipt", "received", "credit", "debit", "cr", "dr",
+  "to", "from", "by", "for", "the", "and", "of", "on", "a", "ac", "acct", "account", "ref", "no", "being", "towards",
+  "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december",
+  "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec", "month", "monthly",
+  "tax", "gst", "tds", "pf", "esi", "rent", "interest",
+]);
+/** A real party name: at least one word of 4+ letters that is not a generic banking or month word. */
+export function isDistinctiveName(name: string): boolean {
+  const words = name.toLowerCase().replace(/[^a-z\s]/g, " ").split(/\s+/).filter(Boolean);
+  return words.some((w) => w.length >= 4 && !GENERIC_WORDS.has(w));
+}

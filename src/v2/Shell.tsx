@@ -3,13 +3,14 @@ import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-route
 import {
   LayoutGrid, Users, FileText, ListChecks, AlertTriangle, Send, BarChart3, Settings, Menu, X, LogOut,
 } from "lucide-react";
+import { toast } from "sonner";
 import { V, V2_STYLES } from "./ui";
-import { AGENT_STYLES } from "./agents";
+import { AGENT_STYLES, ShimmerText } from "./agents";
+import { motion } from "framer-motion";
+import brandMark from "@/assets/brand/fynhelp-icon-red-new.png";
 import { CommandMenu, useCommandMenu } from "./components/CommandMenu";
-import { PERIODS, V2StoreProvider, useV2 } from "./store";
+import { V2StoreProvider, useV2 } from "./store";
 
-/** Partners live in Portfolio and MIS. Juniors also work the queues. */
-const PARTNER_NAV = ["/v2", "/v2/clients", "/v2/reports", "/v2/settings"];
 
 const NAV = [
   { to: "/v2", label: "Portfolio", icon: LayoutGrid, exact: true },
@@ -45,9 +46,14 @@ export default function V2Shell() {
 
 function ShellBody() {
   const [open, setOpen] = useState(false);
-  const { hydrated, session, onboarded, firm, signOut, period, setPeriod, role, setRole, review, exceptions, chases, firmRole, canSignOff } = useV2();
+  const { hydrated, session, onboarded, firm, signOut, period, setPeriod, periods, role, setRole, review, exceptions, chases, firmRole, canSignOff } = useV2();
   const navigate = useNavigate();
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  // The page actually on screen (not one still loading), without a trailing slash.
+  const pathname = useRouterState({ select: (s) => (s.resolvedLocation ?? s.location).pathname.replace(/(.)\/+$/, "$1") });
+  // A toast belongs to the page it was raised on.
+  useEffect(() => {
+    toast.dismiss();
+  }, [pathname]);
   const title =
     TITLES[pathname] ??
     (pathname.startsWith("/v2/clients/") ? "Client workspace" : pathname.startsWith("/v2/reports/") ? "MIS report" : "FynHelp");
@@ -72,8 +78,20 @@ function ShellBody() {
 
   if (!hydrated && !resetting) {
     return (
-      <div className="v2" style={{ minHeight: "100vh", display: "grid", placeItems: "center", color: V.muted, fontSize: 13 }}>
-        Loading your workspace
+      <div className="v2" role="status" aria-live="polite" style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: V.bg }}>
+        <div style={{ display: "grid", justifyItems: "center", gap: 16 }}>
+          <motion.img
+            src={brandMark}
+            alt=""
+            width={56}
+            height={56}
+            style={{ width: 56, height: 56, objectFit: "contain" }}
+            animate={{ scale: [1, 1.06, 1], opacity: [0.85, 1, 0.85] }}
+            transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <ShimmerText text="Opening your practice…" agent="extract" style={{ fontSize: 15, fontWeight: 600 }} />
+          <div className="v2-bar" style={{ width: 160 }}><i style={{ background: V.brand }} /></div>
+        </div>
       </div>
     );
   }
@@ -130,7 +148,7 @@ function ShellBody() {
           )}
 
           <nav className="v2-nav" style={{ flex: 1, overflowY: "auto" }}>
-            {NAV.filter((n) => role === "Junior" || PARTNER_NAV.includes(n.to)).map(({ to, label, icon: Icon, ...rest }) => (
+            {NAV.map(({ to, label, icon: Icon, ...rest }) => (
               <Link
                 key={to}
                 to={to}
@@ -183,7 +201,7 @@ function ShellBody() {
                 value={period}
                 onChange={(e) => setPeriod(e.target.value)}
               >
-                {PERIODS.map((p) => <option key={p} value={p}>{p}</option>)}
+                {periods.map((p) => <option key={p} value={p}>{p}</option>)}
               </select>
               <div style={{ textAlign: "right", lineHeight: 1.25 }} className="v2-hide-sm">
                 <div style={{ fontSize: 12.5, fontWeight: 600 }}>{session?.name || session?.email || ""}</div>

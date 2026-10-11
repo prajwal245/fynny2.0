@@ -4,17 +4,23 @@ import { motion } from "framer-motion";
 import { ChevronLeft, Download, Printer } from "lucide-react";
 import { Card, Drawer, EmptyState, PageHeader, V, formatDate, formatINR } from "../ui";
 import { AgentStatusBadge, AnimatedCounter, FadeIn, RowSkeleton } from "../agents";
-import { Txn, useV2 } from "../store";
+import { Txn, monthOf, useV2 } from "../store";
 import { downloadExcel, printReport } from "../lib/exportReport";
 import { toast } from "sonner";
 
 export default function ReportDetailPage() {
   const { reportId } = useParams({ from: "/v2/reports/$reportId" });
-  const { reports, clientName, firm, role, session, signOffReport, requestCorrection, canSignOff } = useV2();
+  const { reports, clientName, firm, role, session, signOffReport, requestCorrection, canSignOff, exceptions, review, docs } = useV2();
   const report = reports.find((r) => r.id === reportId);
   const [source, setSource] = useState<{ label: string; rows: Txn[] } | null>(null);
   const [insightsReady, setInsightsReady] = useState(false);
   const [note, setNote] = useState("");
+  // Sign-off is a deliberate two-step action, and reopening needs a reason.
+  const [confirming, setConfirming] = useState(false);
+  const [ackOpen, setAckOpen] = useState(false);
+  const [signing, setSigning] = useState(false);
+  const [reopening, setReopening] = useState(false);
+  const [reopenReason, setReopenReason] = useState("");
 
   useEffect(() => {
     const t = setTimeout(() => setInsightsReady(true), 900);
@@ -26,6 +32,31 @@ export default function ReportDetailPage() {
   }
 
   const net = report.revenue - report.expenses;
+  const inPeriod = (d?: string) => Boolean(d) && monthOf(d!) === report.period;
+  const open = {
+    exceptions: exceptions.filter((e) => e.clientId === report.clientId && e.status === "open" && inPeriod(e.date)).length,
+    review: review.filter((r) => r.clientId === report.clientId && r.status === "open").length,
+    unmatched: docs
+      .filter((d) => d.clientId === report.clientId)
+      .flatMap((d) => d.rows)
+      .filter((r) => r.side === "bank" && inPeriod(r.date) && (r.matchStatus === "unmatched" || r.matchStatus === "exception")).length,
+  };
+  const openTotal = open.exceptions + open.review + open.unmatched;
+  const openText = [
+    open.exceptions && `${open.exceptions} open exception${open.exceptions === 1 ? "" : "s"}`,
+    open.review && `${open.review} row${open.review === 1 ? "" : "s"} in the Review Queue`,
+    open.unmatched && `${open.unmatched} unreconciled bank line${open.unmatched === 1 ? "" : "s"}`,
+  ].filter(Boolean).join(", ");
+  const exceptionTemplate = report.template === "Exception and Review Summary";
+  const signOff = async () => {
+    setSigning(true);
+    const ok = await signOffReport(report.id, session?.name ?? "Partner", { acknowledgeOpen: openTotal > 0 && ackOpen });
+    setSigning(false);
+    if (ok) {
+      setConfirming(false);
+      setAckOpen(false);
+    }
+  };
   const allRows = [...report.sources.revenue, ...report.sources.expenses];
 
   const meta = { clientName: clientName(report.clientId), firmName: firm?.name ?? "FynHelp" };
@@ -48,13 +79,13 @@ export default function ReportDetailPage() {
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <AgentStatusBadge agent="narrate" label="Narrate" />
             <button className="v2-btn v2-btn-ghost" onClick={() => { printReport(report, meta); toast.success("Choose Save as PDF in the print dialog"); }}><Printer size={15} /> PDF</button>
-            <button className="v2-btn v2-btn-ghost" onClick={() => { downloadExcel(report, meta); toast.success("Excel file downloaded"); }}><Download size={15} /> Excel</button>
+            <button className="v2-btn v2-btn-ghost" onClick={() => { void downloadExcel(report, meta).then(() => toast.success("Excel file downloaded", { duration: 2500 })).catch(() => toast.error("The Excel file could not be created. Try again.")); }}><Download size={15} /> Excel</button>
           </div>
         }
       />
 
       {report.warnings && report.warnings.length > 0 && (
-        <Card style={{ marginBottom: 18, borderLeft: `3px solid ${V.maroon}` }}>
+        <Card style={{ marginBottom: 18, borderLeft: `3px solid ${V.beige}`, background: V.cream }}>
           {report.warnings.map((w) => (
             <div key={w} style={{ fontSize: 13, color: V.body, lineHeight: 1.6 }}>{w}</div>
           ))}
@@ -66,13 +97,29 @@ export default function ReportDetailPage() {
           <div>
             <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: V.muted, fontWeight: 700 }}>Signed off</div>
             <div style={{ fontSize: 14, marginTop: 6 }}>{report.signedOff.by} accepted this report on {formatDate(report.signedOff.at)}.</div>
+            {report.signedOffWithOpen && (
+              <div style={{ fontSize: 12.5, color: V.body, marginTop: 4 }}>
+                Signed off with {report.signedOffWithOpen.exceptions} exception(s), {report.signedOffWithOpen.review} review row(s) and {report.signedOffWithOpen.unmatched} unreconciled line(s) left out.
+              </div>
+            )}
+            {role === "Partner" && canSignOff && (
+              reopening ? (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
+                  <input className="v2-input" style={{ width: 300 }} autoFocus placeholder="Why it needs reopening" value={reopenReason} onChange={(e) => setReopenReason(e.target.value)} />
+                  <button className="v2-btn v2-btn-primary" disabled={!reopenReason.trim()} onClick={() => { requestCorrection(report.id, `Reopened: ${reopenReason.trim()}`); setReopening(false); setReopenReason(""); toast.success("Report reopened. Sign it off again when it is right."); }}>Reopen report</button>
+                  <button className="v2-btn v2-btn-quiet" onClick={() => setReopening(false)}>Cancel</button>
+                </div>
+              ) : (
+                <button className="v2-btn v2-btn-quiet" style={{ marginTop: 12 }} onClick={() => setReopening(true)}>Reopen</button>
+              )
+            )}
           </div>
         ) : report.correction ? (
           <div>
             <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: V.muted, fontWeight: 700 }}>Correction requested</div>
             <div style={{ fontSize: 14, marginTop: 6 }}>{report.correction.note}</div>
-            {role === "Partner" && canSignOff && (
-              <button className="v2-btn v2-btn-primary" style={{ marginTop: 12 }} onClick={() => { signOffReport(report.id, session?.name ?? "Partner"); }}>Sign off now</button>
+            {role === "Partner" && canSignOff && !confirming && (
+              <button className="v2-btn v2-btn-primary" style={{ marginTop: 12 }} onClick={() => setConfirming(true)}>Sign off now</button>
             )}
           </div>
         ) : role === "Partner" && canSignOff ? (
@@ -80,7 +127,7 @@ export default function ReportDetailPage() {
             <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: V.muted, fontWeight: 700 }}>Partner review</div>
             <div style={{ fontSize: 14, marginTop: 6, marginBottom: 12 }}>Open any number to see the transactions behind it, then accept or send it back.</div>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-              <button className="v2-btn v2-btn-primary" onClick={() => { signOffReport(report.id, session?.name ?? "Partner"); }}>Sign off</button>
+              <button className="v2-btn v2-btn-primary" onClick={() => setConfirming(true)} disabled={confirming}>Sign off</button>
               <input className="v2-input" style={{ width: 280 }} placeholder="What needs correcting" value={note} onChange={(e) => setNote(e.target.value)} />
               <button className="v2-btn v2-btn-ghost" disabled={!note.trim()} onClick={() => { requestCorrection(report.id, note.trim()); setNote(""); toast.success("Sent back to the team"); }}>Request correction</button>
             </div>
@@ -90,6 +137,30 @@ export default function ReportDetailPage() {
         )}
       </Card>
 
+      {confirming && !report.signedOff && (
+        <Card style={{ marginBottom: 18, borderLeft: `3px solid ${openTotal ? V.maroon : V.green}` }} data-testid="signoff-confirm">
+          <div style={{ fontSize: 14.5, fontWeight: 600 }}>Sign off {clientName(report.clientId)}, {report.period}?</div>
+          {openTotal > 0 ? (
+            <>
+              <div style={{ fontSize: 13.5, color: V.body, marginTop: 6 }}>
+                Still open: {openText}. They are left out of these figures. Clearing them first is recommended.
+              </div>
+              <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13.5, marginTop: 10 }}>
+                <input type="checkbox" checked={ackOpen} onChange={(e) => setAckOpen(e.target.checked)} />
+                I have checked these and want to sign off with them left out.
+              </label>
+            </>
+          ) : (
+            <div style={{ fontSize: 13.5, color: V.body, marginTop: 6 }}>Nothing is open for this client and month. Once signed off, the report can be shared with the client; you can reopen it later if something changes.</div>
+          )}
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <button className="v2-btn v2-btn-primary" disabled={signing || (openTotal > 0 && !ackOpen)} data-busy={signing} onClick={signOff}>Confirm sign off</button>
+            <button className="v2-btn v2-btn-quiet" onClick={() => { setConfirming(false); setAckOpen(false); }}>Cancel</button>
+          </div>
+        </Card>
+      )}
+
+      {!exceptionTemplate && (
       <div className="v2-grid-cards" style={{ marginBottom: 20 }}>
         {metrics.map((m, i) => (
           <motion.div key={m.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, delay: i * 0.07 }}>
@@ -98,12 +169,51 @@ export default function ReportDetailPage() {
               <div style={{ fontSize: 32, fontWeight: 600, marginTop: 10, color: m.tone, letterSpacing: "-0.03em" }}>
                 <AnimatedCounter value={m.value} format={(n) => formatINR(n)} />
               </div>
-              <div style={{ fontSize: 12, color: V.muted, marginTop: 6 }}>{m.rows.length} source transactions. Click to open.</div>
+              <div style={{ fontSize: 12, color: V.muted, marginTop: 6 }}>{m.rows.length} source transaction{m.rows.length === 1 ? "" : "s"}. Click to open.</div>
             </Card>
           </motion.div>
         ))}
       </div>
+      )}
 
+      {!exceptionTemplate && report.otherFlows && report.otherFlows.length > 0 && (
+        <Card style={{ marginBottom: 20 }} data-testid="other-flows">
+          <h3 style={{ fontSize: 15.5 }}>Not counted as revenue or expenses</h3>
+          <div style={{ fontSize: 12.5, color: V.muted, marginTop: 4, marginBottom: 12 }}>Cash that moved this month but is not income or expense.</div>
+          <div style={{ display: "grid", gap: 8 }}>
+            {report.otherFlows.map((f) => (
+              <button key={f.key} className="v2-btn v2-btn-quiet" style={{ justifyContent: "space-between", width: "100%" }} onClick={() => setSource({ label: f.label, rows: f.rows })}>
+                <span>{f.label} · {f.count} line{f.count === 1 ? "" : "s"}</span>
+                <span className="num" style={{ color: f.direction === "out" ? V.maroon : V.green }}>{formatINR(f.direction === "out" ? -f.amount : f.amount)}</span>
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {exceptionTemplate && (
+        <Card style={{ marginBottom: 20 }} data-testid="exception-summary">
+          <h3 style={{ fontSize: 15.5, marginBottom: 12 }}>Open exceptions and review items</h3>
+          {report.bankSummary.length === 0 || report.bankSummary.every((b) => !b.value) ? (
+            <p style={{ fontSize: 13.5, color: V.body, margin: 0 }}>Nothing open for {report.period}: every bank line is matched or decided and the Review Queue is empty.</p>
+          ) : (
+            <table className="v2-table">
+              <thead><tr><th>Item</th><th style={{ textAlign: "right" }}>Count</th><th /></tr></thead>
+              <tbody>
+                {report.bankSummary.map((b) => (
+                  <tr key={b.label}>
+                    <td>{b.label}</td>
+                    <td className="num" style={{ textAlign: "right" }}>{b.value}</td>
+                    <td style={{ textAlign: "right" }}>{b.rows.length > 0 && <button className="v2-btn v2-btn-quiet" onClick={() => setSource({ label: b.label, rows: b.rows })}>Open lines</button>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Card>
+      )}
+
+      {!exceptionTemplate && (
       <Card>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
           <h3 style={{ fontSize: 15.5 }}>Insights</h3>
@@ -130,6 +240,7 @@ export default function ReportDetailPage() {
           </div>
         )}
       </Card>
+      )}
 
       {report.variances.length > 0 && report.template !== "Bank Reconciliation Summary" && (
         <Card style={{ marginTop: 18, padding: 0 }} className="v2-scroll">
@@ -153,7 +264,7 @@ export default function ReportDetailPage() {
         </Card>
       )}
 
-      {report.bankSummary.length > 0 && (report.template === "Bank Reconciliation Summary" || report.template === "Working Paper") && (
+      {!exceptionTemplate && report.bankSummary.length > 0 && (report.template === "Bank Reconciliation Summary" || report.template === "Working Paper") && (
         <Card style={{ marginTop: 18 }}>
           <h3 style={{ fontSize: 15.5, marginBottom: 12 }}>Bank reconciliation summary</h3>
           <div className="v2-grid-cards">

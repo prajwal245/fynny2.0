@@ -104,6 +104,8 @@ export interface CreateChaseInput {
   business_id: string;
   type: string;
   contact: string; // a name or an email address
+  /** Where follow-ups go; defaults to the client's saved email. */
+  email?: string;
   phone?: string;
   due?: string | null;
   note?: string;
@@ -118,9 +120,7 @@ export async function createChase(
   const client = await assertClient(db, ctx, input.business_id);
   const contactIsEmail = isEmail(input.contact);
   const meta = clientMeta(client.notes);
-  const contactEmail = contactIsEmail
-    ? input.contact.trim()
-    : client.client_email;
+  const contactEmail = input.email?.trim() || (contactIsEmail ? input.contact.trim() : client.client_email);
   const contactName = contactIsEmail
     ? (meta.contactName ?? null)
     : input.contact.trim() || meta.contactName || null;

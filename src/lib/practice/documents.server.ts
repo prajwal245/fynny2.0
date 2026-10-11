@@ -357,6 +357,40 @@ export async function processExtraction(
   );
   await logAiCalls(db, doc.ca_firm_id, doc.id, outcome.aiCalls);
   if (outcome.error) return failWith(outcome.error.message, outcome.error.code);
+  if (outcome.register) {
+    // A register is summarised, not reconciled: no transactions, nothing to review.
+    const reg = outcome.register;
+    const money = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+    const headline = `${reg.label}: ${reg.entries} entr${reg.entries === 1 ? "y" : "ies"}${reg.totals.length ? `, ${reg.totals.map((t) => `${t.label.toLowerCase()} ${money(t.amount)}`).join(", ")}` : ""}.`;
+    await db.from("ca_txns").delete().eq("extraction_id", doc.id).neq("match_status", "matched");
+    await db.from("ca_review_items").delete().eq("extraction_id", doc.id).eq("status", "open");
+    await db
+      .from("ca_document_extractions")
+      .update({
+        extract_status: "parsed",
+        review_state: "auto_accepted",
+        classification: reg.kind,
+        file_kind: outcome.kind,
+        confidence: 1,
+        row_count: reg.entries,
+        txn_count: 0,
+        review_count: 0,
+        duplicate_count: 0,
+        error_message: null,
+        extracted: {
+          ...(doc.extracted ?? {}),
+          source: (doc.extracted as { source?: string } | null)?.source ?? "Manual",
+          kind: outcome.kind,
+          register: reg,
+          text_preview: outcome.sourceText.slice(0, 20_000),
+        },
+        extract_finished_at: new Date().toISOString(),
+      })
+      .eq("id", doc.id);
+    await logActivity(db, doc.ca_firm_id, doc.business_id, "extract", `${filename} read as ${headline} ${reg.note}`);
+    await finishRun(db, runId, runStarted, { summary: `${filename}: ${headline}`, detail: { register: reg.kind, entries: reg.entries } });
+    return { status: "parsed", txns: 0, review: 0, duplicates: 0, pipeline: [] as { period: string; status: string }[] };
+  }
   if (outcome.rows.length === 0)
     return failWith(
       "No transactions were found in this file. Check that it is the statement or ledger export itself, not a summary or cover page.",

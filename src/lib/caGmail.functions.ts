@@ -54,13 +54,26 @@ export const pollGmailNow = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<{ ok: boolean; detail: string; documents: number }> => {
     await assertFirmMember(context.supabase as never, data.firmId);
     const { pollGmailInboxes, describePoll } = await import("@/lib/practice/gmailIntake.server");
-    const summary = await pollGmailInboxes({ firmId: data.firmId, budgetMs: 30_000 });
+    const summary = await pollGmailInboxes({ firmId: data.firmId, budgetMs: 30_000, trigger: "manual" });
     if (summary.documents > 0) {
       const { processQueue } = await import("@/lib/practice/documents.server");
       await processQueue(3).catch(() => undefined);
     }
-    const failed = summary.inboxes.some((i) => i.error);
+    const failed = Boolean(summary.problem) || summary.inboxes.some((i) => i.error);
     return { ok: !failed, detail: describePoll(summary), documents: summary.documents };
+  });
+
+/** Runs every step of Gmail intake for real and reports which one fails. */
+export const gmailHealthCheck = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { firmId: string }) => {
+    if (!input?.firmId) throw new Error("firmId is required");
+    return input;
+  })
+  .handler(async ({ data, context }) => {
+    await assertFirmMember(context.supabase as never, data.firmId);
+    const { gmailHealth } = await import("@/lib/practice/gmailIntake.server");
+    return gmailHealth(data.firmId);
   });
 
 /** Exchange the Google code for tokens and store the connection. */

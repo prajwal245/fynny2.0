@@ -85,7 +85,8 @@ export default function CAGmailCallbackPage() {
         const res = await complete({ data: { code, state, origin } });
         try { window.sessionStorage.removeItem(ORIGIN_KEY); } catch { /* ignore */ }
         toast.success(`Gmail connected — ${res.gmailAddress}`);
-        navigate(returnPath(), { replace: true });
+        const back = returnPath();
+        navigate(back.startsWith("/v2") ? `${back}${back.includes("?") ? "&" : "?"}gmail=connected` : back, { replace: true });
       } catch (e) {
         console.error("[fyn:gmail] callback failed:", e instanceof Error ? e.message : e);
         setErrorMsg(e instanceof Error ? e.message : "Could not complete the Gmail connection.");

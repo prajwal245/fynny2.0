@@ -13,7 +13,7 @@ import {
   formatINR,
 } from "../ui";
 import { AgentStatusBadge } from "../agents";
-import { EXCEPTION_REASONS, Exception, useV2 } from "../store";
+import { EXCEPTION_REASONS, Exception, monthOf, useV2 } from "../store";
 
 /**
  * Exception Queue. Cross-client as a page; the client's Exceptions tab when
@@ -23,8 +23,11 @@ import { EXCEPTION_REASONS, Exception, useV2 } from "../store";
 export default function ExceptionsPage({
   clientId: scopedClient,
 }: { clientId?: string } = {}) {
-  const { exceptions, clients, clientName, setExceptionStatus, runs, docs } =
+  const { exceptions, clients, clientName, setExceptionStatus, reopenException, runs, docs, period } =
     useV2();
+  // The queue follows the period in the top bar; "All periods" shows everything.
+  const [scope, setScope] = useState<"period" | "all">("period");
+  const [confirmAction, setConfirmAction] = useState<null | "ignore" | "reconciled_external">(null);
   const [client, setClient] = useState(scopedClient ?? "all");
   const [reason, setReason] = useState("all");
   const [openId, setOpenId] = useState<string | null>(null);
@@ -32,12 +35,17 @@ export default function ExceptionsPage({
   const [note, setNote] = useState("");
 
   const reconRunning = runs.some((r) => r.agent === "recon" && r.status === "running");
-  const list = exceptions.filter(
-    (e) =>
-      e.status === "open" &&
-      (client === "all" || e.clientId === client) &&
-      (reason === "all" || e.reason === reason),
-  );
+  const inScope = (e: (typeof exceptions)[number]) =>
+    (client === "all" || e.clientId === client) && (scope === "all" || monthOf(e.date) === period);
+  const openInScope = exceptions.filter((e) => e.status === "open" && inScope(e));
+  // A bank line and its book entry often fail together: show the pair once (the bank side).
+  const openTxnIds = new Set(openInScope.map((e) => e.txnId).filter(Boolean) as string[]);
+  const twinOf = (e: (typeof exceptions)[number]) =>
+    e.side === "books" &&
+    openInScope.some((b) => b.side !== "books" && b.candidateIds?.[0] === e.txnId && e.candidateIds?.[0] === b.txnId);
+  const list = openInScope.filter((e) => (reason === "all" || e.reason === reason) && !twinOf(e));
+  const decided = exceptions.filter((e) => e.status !== "open" && inScope(e));
+  void openTxnIds;
   const active = exceptions.find((e) => e.id === openId) ?? null;
 
   // Any other unmatched entry on the opposite side, same direction, for a manual match.
@@ -71,9 +79,24 @@ export default function ExceptionsPage({
   };
   const toggle = (id: string) =>
     setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
-  const close = () => setOpenId(null);
+  const close = () => {
+    setOpenId(null);
+    setConfirmAction(null);
+  };
 
-  const act = (
+  // What the picked entries add up to against this line.
+  const amountOf = (id: string) => {
+    if (!active) return 0;
+    const i = active.candidateIds?.indexOf(id) ?? -1;
+    if (i >= 0 && active.candidateAmounts?.[i] !== undefined) return Math.abs(active.candidateAmounts[i]);
+    const row = docs.flatMap((d) => d.rows).find((r) => r.id === id);
+    return Math.abs(row?.amount ?? 0);
+  };
+  const pickedTotal = picked.reduce((s, id) => s + amountOf(id), 0);
+  const difference = active ? Math.round((Math.abs(active.amount) - pickedTotal) * 100) / 100 : 0;
+  const differs = picked.length > 0 && Math.abs(difference) >= 0.01;
+
+  const act = async (
     e: Exception,
     action: "match" | "reconciled_external" | "ignore",
     ids?: string[],
@@ -82,22 +105,36 @@ export default function ExceptionsPage({
       toast.error("Pick the entry this matches");
       return;
     }
-    setExceptionStatus(
+    if (action === "match" && differs && !note.trim()) {
+      toast.error("Add a note saying why the amounts differ");
+      return;
+    }
+    if (action !== "match" && !note.trim()) {
+      toast.error("Add a short note for the audit trail");
+      return;
+    }
+    const ok = await setExceptionStatus(
       e.id,
       action === "ignore" ? "ignored" : "resolved",
       action === "ignore"
         ? { note }
-        : { action, counterpartIds: ids, note: note || undefined },
+        : { action, counterpartIds: ids, note: note || undefined, allowDifference: action === "match" && differs },
     );
+    if (!ok) return;
     toast.success(
       action === "match"
-        ? "Matched manually. Matched count updated."
+        ? "Matched. It now counts in the MIS."
         : action === "ignore"
-          ? "Exception ignored"
-          : "Marked as reconciled",
+          ? "Ignored. It stays out of the MIS."
+          : "Marked as reconciled outside FynHelp.",
+      { action: { label: "Undo", onClick: () => void reopenException(e.id) }, duration: 8000 },
     );
+    setConfirmAction(null);
     close();
   };
+  // Matching from the table is only offered when the suggestion is for the same amount.
+  const safeMatch = (e: Exception) =>
+    Boolean(e.candidateIds?.length) && e.candidateAmounts?.[0] !== undefined && Math.abs(Math.abs(e.candidateAmounts[0]) - Math.abs(e.amount)) < 0.01;
 
   return (
     <>
@@ -137,6 +174,16 @@ export default function ExceptionsPage({
         )}
         <select
           className="v2-input"
+          style={{ width: "auto", minWidth: 180 }}
+          value={scope}
+          onChange={(e) => setScope(e.target.value as "period" | "all")}
+          aria-label="Period"
+        >
+          <option value="period">{period}</option>
+          <option value="all">All periods</option>
+        </select>
+        <select
+          className="v2-input"
           style={{ width: "auto", minWidth: 200 }}
           value={reason}
           onChange={(e) => setReason(e.target.value)}
@@ -153,11 +200,13 @@ export default function ExceptionsPage({
       {list.length === 0 ? (
         <EmptyState
           icon={<ShieldCheck size={22} />}
-          title="No open exceptions"
+          title={scope === "period" ? `No open exceptions in ${period}` : "No open exceptions"}
           description={
             reason !== "all"
               ? "Nothing open with this reason code."
-              : "Every line has a match. Anything the Recon agent cannot settle will appear here with a reason code."
+              : decided.length
+                ? `${decided.filter((d) => d.status === "resolved").length} matched or resolved and ${decided.filter((d) => d.status === "ignored").length} ignored${scope === "period" ? ` in ${period}` : ""}. Ignored lines stay out of the MIS.`
+                : "Anything the Recon agent cannot settle appears here with a reason code."
           }
         />
       ) : (
@@ -230,30 +279,20 @@ export default function ExceptionsPage({
                         }}
                         onClick={(ev) => ev.stopPropagation()}
                       >
+                        {safeMatch(e) && (
+                          <button
+                            className="v2-btn v2-btn-quiet"
+                            title="Match with the suggested entry (same amount)"
+                            onClick={() => void act(e, "match")}
+                          >
+                            Match
+                          </button>
+                        )}
                         <button
                           className="v2-btn v2-btn-quiet"
-                          disabled={!e.candidateIds?.length}
-                          title={
-                            e.candidateIds?.length
-                              ? "Match with the suggested entry"
-                              : "No suggested entry; open to choose one"
-                          }
-                          onClick={() => act(e, "match")}
+                          onClick={() => openItem(e)}
                         >
-                          Match
-                        </button>
-                        <button
-                          className="v2-btn v2-btn-quiet"
-                          onClick={() => act(e, "ignore")}
-                        >
-                          Ignore
-                        </button>
-                        <button
-                          className="v2-btn v2-btn-quiet"
-                          title="Mark as reconciled outside FynHelp"
-                          onClick={() => act(e, "reconciled_external")}
-                        >
-                          Resolve
+                          Decide
                         </button>
                       </div>
                     </td>
@@ -388,13 +427,22 @@ export default function ExceptionsPage({
                   ))}
                 </div>
                 <div style={{ fontSize: 12, color: V.muted, marginTop: 6 }}>
-                  Pick more than one book entry for a split or part payment.
+                  {active.side === "books"
+                    ? "Pick every bank line that paid this entry (part payments)."
+                    : "Pick more than one book entry when one payment covers several bills."}
                 </div>
               </div>
             )}
 
+            {differs && (
+              <div role="alert" style={{ background: V.warnBg, color: V.warnFg, borderRadius: 12, padding: "10px 12px", fontSize: 13 }}>
+                The picked {picked.length > 1 ? "entries add up to" : "entry is"} {formatINR(pickedTotal)}, a difference of {formatINR(Math.abs(difference))}.
+                Pick the other part of the payment, or write why the amounts differ to match anyway.
+              </div>
+            )}
+
             <div>
-              <label className="v2-label">Note (kept on the audit trail)</label>
+              <label className="v2-label">Note (kept on the audit trail){differs || confirmAction ? " · required" : ""}</label>
               <input
                 className="v2-input"
                 value={note}
@@ -404,26 +452,35 @@ export default function ExceptionsPage({
             </div>
 
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <button
-                className="v2-btn v2-btn-primary"
-                disabled={picked.length === 0}
-                onClick={() => act(active, "match", picked)}
-              >
-                Match{" "}
-                {picked.length > 1 ? `${picked.length} entries` : "selected"}
-              </button>
-              <button
-                className="v2-btn v2-btn-ghost"
-                onClick={() => act(active, "reconciled_external")}
-              >
-                Reconciled elsewhere
-              </button>
-              <button
-                className="v2-btn v2-btn-ghost"
-                onClick={() => act(active, "ignore")}
-              >
-                Ignore
-              </button>
+              {confirmAction ? (
+                <>
+                  <div style={{ width: "100%", fontSize: 13, color: V.body }}>
+                    {confirmAction === "ignore"
+                      ? "Ignore this line? It stays out of the MIS. You can undo for a few seconds after."
+                      : "Mark this line as reconciled outside FynHelp? It will count as reconciled."}
+                  </div>
+                  <button className="v2-btn v2-btn-primary" disabled={!note.trim()} onClick={() => void act(active, confirmAction)}>
+                    {confirmAction === "ignore" ? "Ignore line" : "Mark reconciled"}
+                  </button>
+                  <button className="v2-btn v2-btn-quiet" onClick={() => setConfirmAction(null)}>Cancel</button>
+                </>
+              ) : (
+                <>
+                  <button
+                    className="v2-btn v2-btn-primary"
+                    disabled={picked.length === 0 || (differs && !note.trim())}
+                    onClick={() => void act(active, "match", picked)}
+                  >
+                    {differs ? "Match with difference" : `Match ${picked.length > 1 ? `${picked.length} entries` : "selected"}`}
+                  </button>
+                  <button className="v2-btn v2-btn-ghost" onClick={() => setConfirmAction("reconciled_external")}>
+                    Reconciled elsewhere
+                  </button>
+                  <button className="v2-btn v2-btn-ghost" onClick={() => setConfirmAction("ignore")}>
+                    Ignore
+                  </button>
+                </>
+              )}
             </div>
           </div>
         )}

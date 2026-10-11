@@ -27,6 +27,7 @@ import {
   rowsFromTable,
 } from "./table";
 import { isTallyXml, rowsFromTally } from "./tally";
+import { detectRegister, summariseRegister, type RegisterSummary } from "./registers";
 import { rowsFromStatementText } from "./textStatement";
 
 export type FileKind =
@@ -95,6 +96,8 @@ export interface ExtractOutcome {
   sourceText: string;
   aiCalls: AiCallRecord[];
   documentKind: string | null;
+  /** Set for GST/TDS/payroll/gateway registers: summarised, never turned into transactions. */
+  register?: RegisterSummary | null;
   error: { code: string; message: string } | null;
 }
 
@@ -383,9 +386,19 @@ export async function runExtract(
     );
   }
 
+  const asRegister = (table: string[][]): ExtractOutcome | null => {
+    const reg = detectRegister(table, input.filename);
+    if (!reg) return null;
+    const register = summariseRegister(reg, table);
+    return { kind, rows: [], duplicateRows: 0, sourceText: sourceText.slice(0, 200_000), aiCalls: calls, documentKind: reg, register, error: null };
+  };
+
   if (kind === "csv") {
     sourceText = decodeText(input.bytes);
-    parsed = rowsFromTable(parseDelimited(sourceText));
+    const table = parseDelimited(sourceText);
+    const reg = asRegister(table);
+    if (reg) return reg;
+    parsed = rowsFromTable(table, input.side);
     documentKind = input.side === "bank" ? "bank_statement" : "ledger_export";
   } else if (kind === "xlsx") {
     if (!deps.sheetRows)
@@ -408,7 +421,9 @@ export async function runExtract(
       .slice(0, 2000)
       .map((r) => r.join(", "))
       .join("\n");
-    parsed = rowsFromTable(rows);
+    const reg = asRegister(rows);
+    if (reg) return reg;
+    parsed = rowsFromTable(rows, input.side);
     documentKind = input.side === "bank" ? "bank_statement" : "ledger_export";
   } else if (kind === "tally_xml") {
     sourceText = decodeText(input.bytes);

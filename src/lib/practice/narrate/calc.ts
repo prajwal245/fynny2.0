@@ -304,7 +304,10 @@ export function ruleInsights(f: MisFigures, matched: NarrateTxn[]): Insight[] {
   const net = n.net_movement.value;
   const topIns = f.largest.receipts.slice(0, 3).map((r) => r.id);
   const topOuts = f.largest.payments.slice(0, 3).map((r) => r.id);
-  const netIds = net >= 0 ? topIns : topOuts;
+  // A statement about totals cites every line in those totals, not just the largest three.
+  const netIds = matched.map((t) => t.id);
+  void topIns;
+  void topOuts;
   if (netIds.length) {
     out.push({
       text:
@@ -322,8 +325,8 @@ export function ruleInsights(f: MisFigures, matched: NarrateTxn[]): Insight[] {
     const share = round2((topR.total / n.total_receipts.value) * 100);
     if (share >= 40) {
       out.push({
-        text: `${topR.party} accounts for ${share}% of receipts (${inr(topR.total)} across ${topR.count} transactions), a concentration worth noting.`,
-        cited_transaction_ids: topR.txn_ids.slice(0, 20),
+        text: `${topR.party} accounts for ${share}% of receipts (${inr(topR.total)} across ${topR.count} transaction${topR.count === 1 ? "" : "s"}), a concentration worth noting.`,
+        cited_transaction_ids: topR.txn_ids,
         confidence: 1,
         origin: "rules",
         source: sourceLabel(topR.txn_ids),
@@ -346,7 +349,7 @@ export function ruleInsights(f: MisFigures, matched: NarrateTxn[]): Insight[] {
   if (charges) {
     out.push({
       text: `Bank charges totalled ${inr(charges.total)} across ${charges.count} debit${charges.count === 1 ? "" : "s"}.`,
-      cited_transaction_ids: charges.txn_ids.slice(0, 20),
+      cited_transaction_ids: charges.txn_ids,
       confidence: 1,
       origin: "rules",
       source: sourceLabel(charges.txn_ids),

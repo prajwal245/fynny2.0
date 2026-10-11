@@ -54,7 +54,8 @@ export async function listTeam(db: Db, ctx: FirmContext) {
       };
     }),
   );
-  return { members, canManage: canManageTeam(ctx), roles: TEAM_ROLES };
+  // The app has two working views: partners sign off, juniors prepare.
+  return { members, canManage: canManageTeam(ctx), roles: ["partner", "junior"] as TeamRole[] };
 }
 
 export async function inviteMember(

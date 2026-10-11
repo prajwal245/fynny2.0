@@ -23,7 +23,7 @@ async function withFirm<T>(
     // Surface the human message; codes stay in server logs.
     const err = e as { code?: string; message?: string };
     if (err.code) console.error(`[practice] ${err.code}: ${err.message}`);
-    throw new Error(err.message ?? "Something went wrong");
+    throw new Error(typeof err.message === "string" && err.message ? err.message : "Something went wrong. Please try again.");
   }
 }
 
@@ -208,15 +208,22 @@ export const resolvePracticeReview = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) =>
-    withFirm(context.userId, async (db, ctx) =>
-      (await import("./documents.server")).resolveReviewItem(
+    withFirm(context.userId, async (db, ctx) => {
+      const result = await (await import("./documents.server")).resolveReviewItem(
         db,
         ctx,
         data.id,
         data.action,
         data.patch,
-      ),
-    ),
+      );
+      // A confirmed line can complete its month: let Recon pick it up now.
+      const txnId = (result as { txn_id?: string | null }).txn_id;
+      if (data.action === "confirm" && txnId) {
+        const orch = await import("./orchestrator.server");
+        await orch.afterReviewConfirmed(db, ctx.firmId, txnId).catch(() => null);
+      }
+      return result;
+    }),
   );
 
 /* ── Recon + Exception Queue ───────────────────────────── */
@@ -240,6 +247,15 @@ export const runPracticeRecon = createServerFn({ method: "POST" })
     }),
   );
 
+export const reopenPracticeException = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: uuid }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) =>
+      (await import("./recon.server")).reopenException(db, ctx, data.id),
+    ),
+  );
+
 export const resolvePracticeException = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) =>
@@ -249,6 +265,7 @@ export const resolvePracticeException = createServerFn({ method: "POST" })
         action: z.enum(["match", "reconciled_external", "ignore"]),
         counterpart_ids: z.array(uuid).max(20).optional(),
         note: z.string().max(500).optional(),
+        allow_difference: z.boolean().optional(),
       })
       .parse(d),
   )
@@ -262,6 +279,7 @@ export const resolvePracticeException = createServerFn({ method: "POST" })
         data.action,
         data.counterpart_ids,
         data.note,
+        { allowDifference: data.allow_difference },
       );
       // Clearing the last exception can make the month ready for its MIS.
       const { data: ex } = await db
@@ -380,6 +398,7 @@ export const signOffPracticeReport = createServerFn({ method: "POST" })
         id: uuid,
         by: z.string().min(1).max(120),
         note: z.string().max(1000).optional(),
+        acknowledge_open: z.boolean().optional(),
       })
       .parse(d),
   )
@@ -391,6 +410,7 @@ export const signOffPracticeReport = createServerFn({ method: "POST" })
         data.id,
         data.by,
         data.note,
+        { acknowledgeOpen: data.acknowledge_open },
       ),
     ),
   );
@@ -423,6 +443,7 @@ export const createPracticeChase = createServerFn({ method: "POST" })
         business_id: uuid,
         type: z.string().min(1).max(200),
         contact: z.string().min(1).max(200),
+        email: z.string().email().max(254).optional(),
         phone: z.string().max(30).optional(),
         due: z.string().max(20).nullable().optional(),
         note: z.string().max(1000).optional(),

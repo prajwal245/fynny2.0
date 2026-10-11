@@ -105,6 +105,11 @@ beforeAll(async () => {
     }
     if ((req.headers.authorization ?? "") !== "Bearer fresh-token") return send(401, { error: { message: "Invalid Credentials", status: "UNAUTHENTICATED" } });
     const base = "/gmail/v1/users/me/messages";
+    if (url.pathname === "/gmail/v1/users/me/profile") return send(200, { emailAddress: `inbox.${stamp}@raoassociates.in`, messagesTotal: 1234 });
+    if (url.pathname === base && (url.searchParams.get("q") ?? "").includes("newer_than")) {
+      const q = url.searchParams.get("q") ?? "";
+      return send(200, { messages: q.includes("from:me") ? [{ id: "self-1" }] : Object.values(inbox).map((m) => ({ id: m.id })) });
+    }
     if (url.pathname === base) {
       const q = url.searchParams.get("q") ?? "";
       if (!q.includes("-from:me") || !q.includes("-in:spam")) return send(400, { error: { message: "query missing exclusions" } });
@@ -282,4 +287,24 @@ describe.runIf(RUN)("Gmail intake end to end", () => {
     expect(c!.is_active).toBe(false);
     expect(c!.error_message).toMatch(/connect Gmail again/);
   }, 120_000);
+  it("health check runs every step and names what to fix", async () => {
+    const { gmailHealth, pollGmailInboxes } = await import("@/lib/practice/gmailIntake.server");
+    tokenMode = "ok";
+    await db.from("ca_gmail_connections").update({ is_active: true, error_message: null, last_auto_poll_at: null }).eq("id", connId);
+    let h = await gmailHealth(FIRM, db);
+    const byKey = Object.fromEntries(h.steps.map((s) => [s.key, s]));
+    expect(byKey.keys.ok).toBe(true);
+    expect(byKey.database.ok).toBe(true);
+    expect(byKey.connected.ok).toBe(true);
+    expect(byKey.google.ok).toBe(true);
+    expect(byKey.inbox.detail).toMatch(/sent from .* itself/);
+    // Never checked by the background job yet: says so.
+    expect(byKey.background.ok).toBe(false);
+    await pollGmailInboxes({ firmId: FIRM, budgetMs: 30_000, trigger: "background" });
+    h = await gmailHealth(FIRM, db);
+    expect(h.steps.find((s) => s.key === "background")?.ok).toBe(true);
+    // Subjects are kept so Settings can list recent emails.
+    const { data: rows } = await db.from("ca_gmail_processed").select("subject").eq("connection_id", connId).eq("part_id", "*").not("subject", "is", null).limit(1);
+    expect(rows?.length).toBe(1);
+  }, 60_000);
 });

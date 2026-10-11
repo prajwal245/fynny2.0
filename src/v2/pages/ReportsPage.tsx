@@ -6,7 +6,7 @@ import { BarChart3, Plus } from "lucide-react";
 import { Card, EmptyState, Modal, PageHeader, V, formatDate, formatINR } from "../ui";
 import { AgentGlyph, AgentStatusBadge, ProcessingCard, ShimmerText } from "../agents";
 import { parsePeriod } from "@/lib/practice/core";
-import { PERIODS, REPORT_TEMPLATES, ReportTemplate, useV2 } from "../store";
+import { REPORT_TEMPLATES, ReportTemplate, useV2 } from "../store";
 
 const TEMPLATE_HINT: Record<ReportTemplate, string> = {
   "Monthly MIS": "Revenue, expenses, variances and the transactions behind them.",
@@ -18,7 +18,7 @@ const TEMPLATE_HINT: Record<ReportTemplate, string> = {
 
 /** MIS and Reports. All clients as a page; the client's MIS tab when given a clientId. */
 export default function ReportsPage({ clientId: scopedClient }: { clientId?: string } = {}) {
-  const { reports: allReports, clients, clientName, generateReport, runs, dismissRun, isRunning, matchedTxns, period: currentPeriod } = useV2();
+  const { reports: allReports, clients, clientName, generateReport, runs, dismissRun, isRunning, matchedTxns, period: currentPeriod, periods } = useV2();
   const reports = scopedClient ? allReports.filter((r) => r.clientId === scopedClient) : allReports;
   const [open, setOpen] = useState(false);
   const [clientId, setClientId] = useState(scopedClient ?? clients[0]?.id ?? "");
@@ -32,7 +32,8 @@ export default function ReportsPage({ clientId: scopedClient }: { clientId?: str
   let matchedInPeriod = 0;
   try {
     const p = parsePeriod(period);
-    matchedInPeriod = clientId ? matchedTxns(clientId).filter((t) => t.date >= p.start && t.date <= p.end).length : 0;
+    // Bank lines only, the same count the report uses (a match pairs a bank line with its book entry).
+    matchedInPeriod = clientId ? matchedTxns(clientId).filter((t) => t.side === "bank" && t.date >= p.start && t.date <= p.end).length : 0;
   } catch { matchedInPeriod = 0; }
   const narrating = clientId ? runs.some((r) => r.agent === "narrate" && r.target === clientId && r.status === "running") : false;
 
@@ -119,7 +120,7 @@ export default function ReportsPage({ clientId: scopedClient }: { clientId?: str
           <div>
             <label className="v2-label">Period</label>
             <select className="v2-input" value={period} onChange={(e) => setPeriod(e.target.value)}>
-              {PERIODS.map((p) => <option key={p} value={p}>{p}</option>)}
+              {periods.map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
           <div>

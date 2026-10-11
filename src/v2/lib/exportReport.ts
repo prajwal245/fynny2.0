@@ -1,7 +1,7 @@
 /**
  * FynHelp v2 — report exports.
- * PDF uses the browser print pipeline on branded HTML, Excel uses a
- * spreadsheet friendly HTML table that Excel and Sheets both open cleanly.
+ * PDF uses the browser print pipeline on branded HTML; Excel is a real .xlsx
+ * workbook (SheetJS) with one sheet per part of the report.
  */
 import type { Report } from "../store";
 
@@ -108,29 +108,53 @@ export function printReport(report: Report, meta: ExportMeta) {
   doc.close();
 }
 
-export function downloadExcel(report: Report, meta: ExportMeta) {
-  const all = [...report.sources.revenue, ...report.sources.expenses];
-  const sheet = `<!doctype html><html><head><meta charset="utf-8" /></head><body>
-  <table>
-    <tr><td colspan="3"><b>${esc(meta.clientName)} — ${esc(report.template)} — ${esc(report.period)}</b></td></tr>
-    <tr><td>Generated</td><td>${day(report.generated)}</td><td>${esc(meta.firmName)}</td></tr>
-    <tr></tr>
-    <tr><td><b>Revenue</b></td><td>${report.revenue}</td></tr>
-    <tr><td><b>Expenses</b></td><td>${report.expenses}</td></tr>
-    <tr><td><b>Net</b></td><td>${report.revenue - report.expenses}</td></tr>
-    <tr></tr>
-    <tr><td><b>Line</b></td><td><b>Current</b></td><td><b>Prior</b></td></tr>
-    ${report.variances.map((v) => `<tr><td>${esc(v.label)}</td><td>${v.current}</td><td>${v.prior}</td></tr>`).join("")}
-    <tr></tr>
-    <tr><td><b>Date</b></td><td><b>Particulars</b></td><td><b>Amount</b></td></tr>
-    ${all.map((r) => `<tr><td>${day(r.date)}</td><td>${esc(r.particulars)}</td><td>${r.amount}</td></tr>`).join("")}
-  </table></body></html>`;
-
-  const blob = new Blob([sheet], { type: "application/vnd.ms-excel" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${meta.clientName.replace(/\s+/g, "-")}-${report.template.replace(/\s+/g, "-")}-${report.period.replace(/\s+/g, "-")}.xls`;
-  a.click();
-  window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+/** A real .xlsx workbook: Summary, Insights, Other flows, Variances and every source transaction. */
+export async function downloadExcel(report: Report, meta: ExportMeta) {
+  const XLSX = await import("xlsx");
+  const status = report.signedOff
+    ? `Signed off by ${report.signedOff.by} on ${day(report.signedOff.at)}`
+    : report.correction
+      ? `Correction requested: ${report.correction.note}`
+      : "Awaiting partner sign off";
+  const summary: (string | number)[][] = [
+    [meta.clientName],
+    [`${report.template} — ${report.period}`],
+    ["Prepared by", meta.firmName],
+    ["Generated", day(report.generated)],
+    ["Status", status],
+    [],
+    ["Line", "Amount (₹)"],
+    ["Revenue", report.revenue],
+    ["Expenses", report.expenses],
+    ["Net", report.revenue - report.expenses],
+    ...(report.otherFlows ?? []).map((f) => [`${f.label} (not revenue/expense)`, f.direction === "out" ? -f.amount : f.amount]),
+    [],
+    ["Unmatched lines left out", report.excluded],
+    ...(report.warnings ?? []).map((w) => ["Note", w]),
+  ];
+  const wb = XLSX.utils.book_new();
+  const add = (name: string, rows: (string | number | null)[][], widths: number[]) => {
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = widths.map((wch) => ({ wch }));
+    XLSX.utils.book_append_sheet(wb, ws, name);
+  };
+  add("Summary", summary, [44, 22]);
+  add("Insights", [["Insight", "Based on"], ...report.insights.map((i) => [i.text, i.source])], [90, 40]);
+  if (report.variances.length)
+    add("Variances", [["Line", "Current (₹)", "Prior (₹)", "Change (₹)"], ...report.variances.map((v) => [v.label, v.current, v.prior, v.current - v.prior])], [40, 16, 16, 16]);
+  if (report.bankSummary.length)
+    add("Bank summary", [["Line", "Value"], ...report.bankSummary.map((b) => [b.label, b.value])], [44, 18]);
+  const tx = (label: string, rows: { date: string; particulars: string; amount: number }[]) => rows.map((r) => [label, r.date, r.particulars, r.amount]);
+  add(
+    "Transactions",
+    [
+      ["Figure", "Date", "Particulars", "Amount (₹)"],
+      ...tx("Revenue", report.sources.revenue),
+      ...tx("Expenses", report.sources.expenses),
+      ...(report.otherFlows ?? []).flatMap((f) => tx(f.label, f.rows)),
+    ],
+    [26, 12, 60, 16],
+  );
+  const file = `${meta.clientName.replace(/\s+/g, "-")}-${report.template.replace(/\s+/g, "-")}-${report.period.replace(/\s+/g, "-")}.xlsx`;
+  XLSX.writeFile(wb, file);
 }

@@ -63,6 +63,8 @@ export interface PollSummary {
   inboxes: InboxResult[];
   documents: number;
   ms: number;
+  /** Set when nothing could be checked at all, in words for the firm. */
+  problem?: string;
 }
 
 class GmailApiError extends Error {
@@ -126,7 +128,17 @@ async function disconnect(db: Db, conn: Connection, message: string) {
  * Only one run refreshes at a time (atomic lock); the others wait for it.
  */
 async function accessToken(db: Db, conn: Connection, force = false): Promise<string> {
-  const { decryptToken, encryptToken, refreshAccessTokenDetailed } = await import("@/lib/caGmail.server");
+  const g = await import("@/lib/caGmail.server");
+  const { encryptToken, refreshAccessTokenDetailed } = g;
+  // Tokens saved under a different GMAIL_ENCRYPTION_KEY can never be read again.
+  const decryptToken = async (enc: string) => {
+    try {
+      return await g.decryptToken(enc);
+    } catch {
+      await disconnect(db, conn, "The saved Google access could not be read because the server's encryption key changed. Connect Gmail again.");
+      throw new GmailApiError(401, "revoked", "Saved Google access could not be read");
+    }
+  };
   if (!force && new Date(conn.token_expiry).getTime() - Date.now() > 5 * 60 * 1000) return decryptToken(conn.access_token_enc);
 
   const { data: claimed } = await db.rpc("claim_gmail_token_refresh", { p_connection_id: conn.id });
@@ -188,10 +200,12 @@ type Claim = "claimed" | "skip";
 /** Claims an email (or one of its parts) for this run. Exactly-once across parallel runs. */
 async function claim(db: Db, conn: Connection, messageId: string, partId: string, extra: Record<string, unknown> = {}): Promise<Claim> {
   const row = { connection_id: conn.id, ca_firm_id: conn.ca_firm_id, message_id: messageId, part_id: partId, outcome: "processing", ...extra };
-  const { data: inserted } = await db
+  const { data: inserted, error } = await db
     .from("ca_gmail_processed")
     .upsert(row, { onConflict: "connection_id,message_id,part_id", ignoreDuplicates: true })
     .select("message_id");
+  // A missing table or column must not look like "already done": say so.
+  if (error) throw new GmailApiError(0, "database", `The database is not ready for Gmail intake (${error.message}).`);
   if (inserted?.length) return "claimed";
   const { data: existing } = await db
     .from("ca_gmail_processed")
@@ -330,8 +344,9 @@ async function processEmail(db: Db, conn: Connection, token: string, messageId: 
   const headers = payload.headers ?? [];
   const fromEmail = parseAddress(gmailHeader(headers, "From")).email;
 
+  const subjectLine = gmailHeader(headers, "Subject").slice(0, 300);
   if (systemSender(fromEmail)) {
-    await settle(db, conn, messageId, "*", { outcome: "skipped", reason: "email from FynHelp or a mail server", sender_email: fromEmail });
+    await settle(db, conn, messageId, "*", { outcome: "skipped", reason: "email from FynHelp or a mail server", sender_email: fromEmail, subject: subjectLine });
     out.skipped.system_email = (out.skipped.system_email ?? 0) + 1;
     return;
   }
@@ -343,18 +358,20 @@ async function processEmail(db: Db, conn: Connection, token: string, messageId: 
       outcome: "skipped",
       reason: skipped.length ? `no documents (${[...new Set(skipped.map((s) => s.reason))].join(", ")})` : "no documents",
       sender_email: fromEmail,
+      subject: subjectLine,
     });
     return;
   }
 
   const sender = await identify(db, conn, headers, payload, internal);
   const subject = gmailHeader(headers, "Subject").slice(0, 300);
+  await settle(db, conn, messageId, "*", { subject, sender_email: sender.email });
   const receivedAt = msg.internalDate ? new Date(Number(msg.internalDate)).toISOString() : null;
   let filed = 0;
   let unassigned = 0;
 
   for (const a of take) {
-    if ((await claim(db, conn, messageId, a.partId, { filename: a.filename, sender_email: sender.email })) === "skip") continue;
+    if ((await claim(db, conn, messageId, a.partId, { filename: a.filename, sender_email: sender.email, subject })) === "skip") continue;
     try {
       const bytes = await attachmentBytes(token, messageId, a);
       if (!bytes.length) {
@@ -456,7 +473,7 @@ async function processEmail(db: Db, conn: Connection, token: string, messageId: 
 
 /* ─────────────────────────── One inbox, all inboxes ─────────────────────────── */
 
-async function pollInbox(db: Db, conn: Connection, internal: Set<string>, deadlineAt: number): Promise<InboxResult> {
+async function pollInbox(db: Db, conn: Connection, internal: Set<string>, deadlineAt: number, trigger: "manual" | "background"): Promise<InboxResult> {
   const out: InboxResult = { gmail: conn.gmail_address, emails: 0, filed: 0, unassigned: 0, duplicates: 0, skipped: {}, complete: false };
   const startedAt = new Date();
   try {
@@ -498,7 +515,8 @@ async function pollInbox(db: Db, conn: Connection, internal: Set<string>, deadli
       // Only move the window forward once everything in it has been seen.
       ...(out.complete ? { last_polled_at: startedAt.toISOString() } : {}),
       error_message: null,
-      last_poll_stats: { ...out, at: startedAt.toISOString() },
+      last_poll_stats: { ...out, at: startedAt.toISOString(), trigger },
+      ...(trigger === "background" ? { last_auto_poll_at: startedAt.toISOString() } : {}),
     });
   } catch (e) {
     const err = e as GmailApiError;
@@ -511,7 +529,11 @@ async function pollInbox(db: Db, conn: Connection, internal: Set<string>, deadli
       await disconnect(db, conn, "FynHelp was not allowed to read this inbox. Connect Gmail again and tick the box that lets FynHelp view your email messages.");
     } else {
       out.error = err.message || "Gmail check failed";
-      await setConnection(db, conn.id, { error_message: `Last check failed: ${out.error} Retrying automatically.`, last_poll_stats: { ...out, at: startedAt.toISOString() } });
+      await setConnection(db, conn.id, {
+        error_message: `Last check failed: ${out.error} Retrying automatically.`,
+        last_poll_stats: { ...out, at: startedAt.toISOString(), trigger },
+        ...(trigger === "background" ? { last_auto_poll_at: startedAt.toISOString() } : {}),
+      });
     }
     console.error(`[fyn:gmail] ${conn.gmail_address}: ${out.error}`);
   }
@@ -522,7 +544,7 @@ async function pollInbox(db: Db, conn: Connection, internal: Set<string>, deadli
  * Checks every active inbox (or one firm's) until the time budget runs out.
  * Never throws: each inbox's problem is recorded on that connection.
  */
-export async function pollGmailInboxes(opts: { firmId?: string; budgetMs?: number; db?: Db } = {}): Promise<PollSummary> {
+export async function pollGmailInboxes(opts: { firmId?: string; budgetMs?: number; db?: Db; trigger?: "manual" | "background" } = {}): Promise<PollSummary> {
   const started = Date.now();
   const deadlineAt = started + (opts.budgetMs ?? 25_000);
   const db = opts.db ?? (await adminDb());
@@ -530,7 +552,10 @@ export async function pollGmailInboxes(opts: { firmId?: string; budgetMs?: numbe
   try {
     gmailCredentials();
   } catch {
-    return { inboxes: [], documents: 0, ms: 0 };
+    return { inboxes: [], documents: 0, ms: 0, problem: "Gmail is not set up on the server: GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET are missing in Vercel." };
+  }
+  if (!process.env["GMAIL_ENCRYPTION_KEY"]) {
+    return { inboxes: [], documents: 0, ms: 0, problem: "Gmail is not set up on the server: GMAIL_ENCRYPTION_KEY is missing in Vercel." };
   }
   let query = db
     .from("ca_gmail_connections")
@@ -545,7 +570,7 @@ export async function pollGmailInboxes(opts: { firmId?: string; budgetMs?: numbe
   for (const conn of conns) {
     if (Date.now() > deadlineAt) break;
     if (!internalByFirm.has(conn.ca_firm_id)) internalByFirm.set(conn.ca_firm_id, await firmAddresses(db, conn.ca_firm_id, conns));
-    inboxes.push(await pollInbox(db, conn, internalByFirm.get(conn.ca_firm_id)!, deadlineAt));
+    inboxes.push(await pollInbox(db, conn, internalByFirm.get(conn.ca_firm_id)!, deadlineAt, opts.trigger ?? "background"));
   }
   const documents = inboxes.reduce((n, i) => n + i.filed + i.unassigned, 0);
   if (inboxes.length) console.log(`[fyn:gmail] checked ${inboxes.length} inbox(es): ${documents} new document(s) in ${Date.now() - started} ms`);
@@ -554,7 +579,8 @@ export async function pollGmailInboxes(opts: { firmId?: string; budgetMs?: numbe
 
 /** One sentence for the person who clicked "Check now". */
 export function describePoll(s: PollSummary): string {
-  if (!s.inboxes.length) return "No connected inbox to check.";
+  if (s.problem) return s.problem;
+  if (!s.inboxes.length) return "No connected Gmail inbox. Connect one in Settings → Integrations.";
   const i = s.inboxes[0];
   if (i.disconnected) return i.error ?? "Gmail needs reconnecting.";
   if (i.error) return `Could not finish checking ${i.gmail}: ${i.error}`;
@@ -562,8 +588,141 @@ export function describePoll(s: PollSummary): string {
   if (i.filed) parts.push(`${i.filed} filed under clients`);
   if (i.unassigned) parts.push(`${i.unassigned} waiting in Unassigned for a client`);
   if (i.duplicates) parts.push(`${i.duplicates} already received`);
-  const head = parts.length ? `New documents: ${parts.join(", ")}.` : "No new documents.";
+  const head = parts.length
+    ? `New documents: ${parts.join(", ")}.`
+    : i.emails
+      ? `Looked at ${i.emails} new email${i.emails === 1 ? "" : "s"}; none had a document to read.`
+      : "No new emails with attachments since the last check.";
   const skippedTotal = Object.values(i.skipped).reduce((a, b) => a + b, 0);
   const tail = skippedTotal ? ` Skipped ${skippedTotal} non-document attachment${skippedTotal === 1 ? "" : "s"} (logos, invites).` : "";
   return `${head}${tail}${i.complete ? "" : " More emails are still being checked."}`;
+}
+
+/* ─────────────────────────── Health check ─────────────────────────── */
+
+export interface HealthStep {
+  key: string;
+  label: string;
+  ok: boolean | null;
+  detail: string;
+}
+
+/**
+ * Runs every part of Gmail intake for real, one step at a time, and says in
+ * plain words which one fails and what to do. Read-only: it never files,
+ * claims or changes an email.
+ */
+export async function gmailHealth(firmId: string, db?: Db): Promise<{ steps: HealthStep[]; ok: boolean }> {
+  db = db ?? (await adminDb());
+  const steps: HealthStep[] = [];
+  const add = (key: string, label: string, ok: boolean | null, detail: string) => steps.push({ key, label, ok, detail });
+  const done = () => ({ steps, ok: steps.every((s) => s.ok !== false) });
+
+  // 1. Server settings
+  const g = await import("@/lib/caGmail.server");
+  const missing: string[] = [];
+  try {
+    g.gmailCredentials();
+  } catch {
+    missing.push("GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET");
+  }
+  if (!process.env["GMAIL_ENCRYPTION_KEY"]) missing.push("GMAIL_ENCRYPTION_KEY");
+  add("keys", "Google keys on the server", missing.length === 0, missing.length ? `Missing in Vercel: ${missing.join(", ")}. Add them and redeploy.` : "Client ID, secret and encryption key are set.");
+  if (missing.length) return done();
+
+  // 2. Database
+  const probes = await Promise.all([
+    db.from("ca_gmail_processed").select("message_id").limit(1),
+    db.from("ca_gmail_connections").select("last_poll_stats, last_auto_poll_at, refresh_locked_until").limit(1),
+    db.rpc("claim_gmail_token_refresh", { p_connection_id: "00000000-0000-0000-0000-000000000000" }),
+  ]);
+  const dbErr = probes.find((p) => p.error)?.error;
+  add("database", "Database ready", !dbErr, dbErr ? `A Gmail table or function is missing (${dbErr.message}). The "Supabase setup" GitHub workflow applies it on the next push to main.` : "Intake tables and functions are in place.");
+  if (dbErr) return done();
+
+  // 3. Connection
+  const { data: conns } = await db
+    .from("ca_gmail_connections")
+    .select("id, ca_firm_id, user_id, gmail_address, access_token_enc, refresh_token_enc, token_expiry, last_polled_at, last_auto_poll_at, is_active, error_message")
+    .eq("ca_firm_id", firmId)
+    .order("created_at", { ascending: false });
+  const active = (conns ?? []).find((c) => c.is_active) as (Connection & { last_auto_poll_at: string | null; error_message: string | null }) | undefined;
+  const lastInactive = (conns ?? []).find((c) => !c.is_active);
+  add(
+    "connected",
+    "Inbox connected",
+    Boolean(active),
+    active
+      ? `${active.gmail_address}`
+      : lastInactive?.error_message
+        ? `Not connected: ${lastInactive.error_message}`
+        : "No Gmail connected. Use Connect Gmail in Settings → Integrations.",
+  );
+  if (!active) return done();
+
+  // 4. Google access
+  let token = "";
+  try {
+    token = await accessToken(db, active);
+    const profile = await gmailGet<{ emailAddress: string; messagesTotal: number }>(token, "/profile");
+    add("google", "Google access", true, `FynHelp can read ${profile.emailAddress} (${profile.messagesTotal.toLocaleString("en-IN")} emails in the mailbox).`);
+  } catch (e) {
+    const err = e as GmailApiError;
+    const detail =
+      err.reason === "revoked"
+        ? "Google access was removed or can no longer be read. Connect Gmail again."
+        : err.status === 403
+          ? "Google refused: FynHelp was not allowed to read email. Connect again and tick the box that lets FynHelp view your email messages. If the Gmail API is not enabled in Google Cloud, enable it."
+          : `Google did not answer: ${err.message}`;
+    add("google", "Google access", false, detail);
+    return done();
+  }
+
+  // 5. What is waiting in the inbox
+  try {
+    const since = windowStart(active.last_polled_at, new Date());
+    const count = async (q: string) =>
+      ((await gmailGet<{ messages?: unknown[]; resultSizeEstimate?: number }>(token, `/messages?${new URLSearchParams({ q, maxResults: "100" })}`)).messages ?? []).length;
+    const sinceSec = Math.floor(since.getTime() / 1000);
+    const [waiting, recentAll, fromSelf] = await Promise.all([
+      count(searchQuery(since)),
+      count(`has:attachment newer_than:14d`),
+      count(`has:attachment newer_than:14d from:me`),
+    ]);
+    const { data: seen } = await db.from("ca_gmail_processed").select("message_id").eq("connection_id", active.id).eq("part_id", "*").gte("created_at", new Date(sinceSec * 1000).toISOString());
+    const sinceText = since.toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" });
+    const notes: string[] = [`${waiting} email${waiting === 1 ? "" : "s"} with attachments received since ${sinceText} (IST); ${seen?.length ?? 0} already handled.`];
+    if (fromSelf > 0) notes.push(`${fromSelf} email${fromSelf === 1 ? "" : "s"} with attachments in the last 14 days were sent from ${active.gmail_address} itself; those are never read. Send test emails from the client's address instead.`);
+    if (recentAll === 0) notes.push("No email with an attachment arrived in the last 14 days.");
+    add("inbox", "Emails waiting", true, notes.join(" "));
+  } catch (e) {
+    add("inbox", "Emails waiting", false, `Could not search the inbox: ${(e as Error).message}`);
+  }
+
+  // 6. Clients' email addresses
+  const { data: clients } = await db.from("ca_clients").select("client_name, client_email").eq("ca_firm_id", firmId);
+  const withEmail = (clients ?? []).filter((c) => (c.client_email ?? "").includes("@"));
+  add(
+    "clients",
+    "Client emails saved",
+    (clients ?? []).length === 0 ? null : withEmail.length > 0,
+    (clients ?? []).length === 0
+      ? "No clients yet. Emails will wait in Unassigned until you add one."
+      : `${withEmail.length} of ${(clients ?? []).length} clients have an email. Only mail from a client's saved email (or a sender you filed before) files itself; the rest waits in Unassigned.`,
+  );
+
+  // 7. Background checks
+  const lastAuto = active.last_auto_poll_at ? new Date(active.last_auto_poll_at) : null;
+  const ageMin = lastAuto ? Math.round((Date.now() - lastAuto.getTime()) / 60000) : null;
+  add(
+    "background",
+    "Automatic checks",
+    ageMin !== null && ageMin <= 30,
+    ageMin === null
+      ? "Never checked automatically yet. Set up the 5-minute job (cron-job.org calling /api/public/practice-tick); until then, new mail only arrives when someone clicks Check now."
+      : ageMin <= 30
+        ? `Last automatic check ${ageMin} minute${ageMin === 1 ? "" : "s"} ago.`
+        : `Last automatic check was ${ageMin >= 120 ? `${Math.round(ageMin / 60)} hours` : `${ageMin} minutes`} ago. The 5-minute job is not running: check cron-job.org and CRON_SECRET.`,
+  );
+  return done();
 }

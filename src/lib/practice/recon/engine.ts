@@ -2,10 +2,14 @@
  * Recon agent — deterministic bank vs books matching.
  *
  *   Stage 1  exact  amount = amount, date = date, reference equal (or both empty)
+ *   Stage 1b pair   same amount within 2 days and the only such pair either
+ *                   way (a bank UTR never equals a Tally voucher number)
  *   Stage 2  fuzzy  weighted score (amount 40%, date 25%, counterparty 25%,
  *                   reference 10%) inside a tolerance and a date window
  *   Stage 3  rules  counterparty alias table + narration rules (bank charges,
  *                   interest …) with their own windows
+ *   Stage 4  split  one book entry paid in 2–3 bank lines, or one bank line
+ *                   covering 2–3 book entries: exact sum, same party
  *
  * No AI is involved: the same input always produces the same matches, and
  * every match and exception carries the numbers that explain it.
@@ -141,6 +145,9 @@ export interface MatchExplanation {
   reference_score: number;
   rule?: string;
   alias?: string;
+  /** Lines matched together as one part payment share a group id. */
+  group?: string;
+  note?: string;
 }
 
 export interface MatchDecision {
@@ -422,6 +429,33 @@ export function reconcile(
     });
   }
 
+  // Stage 1b — same amount within 2 days, and the only such pair either way.
+  // References are ignored: a bank UTR or cheque number never equals a Tally
+  // voucher number. Uniqueness is what makes this safe.
+  const PAIR_WINDOW = 2;
+  const samePair = (a: ReconTxn, b: ReconTxn) =>
+    a.direction === b.direction &&
+    toPaise(a.amount) === toPaise(b.amount) &&
+    daysBetween(a.txn_date, b.txn_date) <= PAIR_WINDOW;
+  for (const t of bank) {
+    if (usedBank.has(t.id)) continue;
+    const cands = books.filter((b) => !usedBook.has(b.id) && samePair(t, b));
+    if (cands.length !== 1) continue;
+    const b = cands[0];
+    if (bank.some((o) => o.id !== t.id && !usedBank.has(o.id) && samePair(o, b))) continue;
+    usedBank.add(t.id);
+    usedBook.add(b.id);
+    const gap = daysBetween(t.txn_date, b.txn_date);
+    const s = fuzzyScore(t, b, cfg, aliases);
+    matches.push({
+      bank_txn_id: t.id,
+      book_txn_ids: [b.id],
+      stage: gap === 0 ? "exact" : "fuzzy",
+      score: gap === 0 ? 1 : Math.max(0.9, s.score),
+      explanation: { ...s.explanation, note: "Only entry with this amount within 2 days" },
+    });
+  }
+
   // Stage 2 — fuzzy, globally greedy on score with an ambiguity guard.
   type Pair = {
     bank: ReconTxn;
@@ -570,6 +604,69 @@ export function reconcile(
       stage: "rules",
       score: Math.max(0.75, s.score),
       explanation: { ...s.explanation, rule: rule.name },
+    });
+  }
+
+  // Stage 4 — part payments: an exact sum of 2–3 lines from the same party.
+  const SPLIT_WINDOW = 31;
+  const partyOk = (a: ReconTxn, b: ReconTxn) => {
+    const [bk, bo] = a.side === "bank" ? [a, b] : [b, a];
+    return counterpartyScore(bk, bo, aliases) >= 0.6;
+  };
+  const findSplit = (target: ReconTxn, pool: ReconTxn[]): ReconTxn[] | null => {
+    const goal = toPaise(target.amount);
+    const c = pool
+      .filter(
+        (o) =>
+          o.direction === target.direction &&
+          toPaise(o.amount) < goal &&
+          daysBetween(o.txn_date, target.txn_date) <= SPLIT_WINDOW &&
+          partyOk(target, o),
+      )
+      .sort(byDateThenId)
+      .slice(0, 12);
+    const found: ReconTxn[][] = [];
+    for (let i = 0; i < c.length; i++)
+      for (let j = i + 1; j < c.length; j++) {
+        const two = toPaise(c[i].amount) + toPaise(c[j].amount);
+        if (two === goal) found.push([c[i], c[j]]);
+        for (let k = j + 1; k < c.length && two < goal; k++)
+          if (two + toPaise(c[k].amount) === goal) found.push([c[i], c[j], c[k]]);
+      }
+    // Only an unambiguous split is safe to make on its own.
+    return found.length === 1 ? found[0] : null;
+  };
+  for (const b of books) {
+    if (usedBook.has(b.id)) continue;
+    const parts = findSplit(b, bank.filter((t) => !usedBank.has(t.id)));
+    if (!parts) continue;
+    const group = `split:${b.id}`;
+    parts.forEach((t, i) => {
+      usedBank.add(t.id);
+      const s = fuzzyScore(t, b, cfg, aliases);
+      matches.push({
+        bank_txn_id: t.id,
+        book_txn_ids: [b.id],
+        stage: "rules",
+        score: 0.85,
+        explanation: { ...s.explanation, amount_diff: 0, group, note: `Part ${i + 1} of ${parts.length} of one book entry` },
+      });
+    });
+    usedBook.add(b.id);
+  }
+  for (const t of bank) {
+    if (usedBank.has(t.id)) continue;
+    const parts = findSplit(t, books.filter((b) => !usedBook.has(b.id)));
+    if (!parts) continue;
+    usedBank.add(t.id);
+    for (const b of parts) usedBook.add(b.id);
+    const s = fuzzyScore(t, parts[0], cfg, aliases);
+    matches.push({
+      bank_txn_id: t.id,
+      book_txn_ids: parts.map((b) => b.id),
+      stage: "rules",
+      score: 0.85,
+      explanation: { ...s.explanation, amount_diff: 0, note: `One bank line covering ${parts.length} book entries` },
     });
   }
 

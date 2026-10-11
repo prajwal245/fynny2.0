@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AGENTS, ShimmerText, type AgentKey } from "../agents";
 
-const INK = "#141414";
+const INK = "#2A0F0C";
 const SOFT = "rgba(255,255,255,.62)";
 const LINE = "rgba(255,255,255,.12)";
 
@@ -131,7 +131,7 @@ export function OnboardingPanel(props: {
   }
 
   return (
-    <aside className="onb-panel" aria-label="What your agents will do" style={{ background: INK, color: "#fff", padding: "clamp(28px,4vw,56px)", display: "flex", flexDirection: "column", justifyContent: "center", position: "sticky", top: 0, height: "100vh" }}>
+    <aside className="onb-panel" aria-label="What your agents will do" style={{ background: "radial-gradient(120% 90% at 100% 0%, #8A1E18 0%, #4A120E 45%, #2A0F0C 100%)", color: "#fff", padding: "clamp(28px,4vw,56px)", display: "flex", flexDirection: "column", justifyContent: "center", position: "sticky", top: 0, height: "100vh" }}>
       <AnimatePresence mode="wait">
         <motion.div key={`${step}:${props.mode}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.3 }} style={{ display: "grid", gap: 16, maxWidth: 420 }}>
           <div style={{ fontSize: 11, letterSpacing: ".16em", textTransform: "uppercase", color: SOFT, fontWeight: 700 }}>FynHelp agents</div>

@@ -27,6 +27,7 @@ import {
   searchQuery,
   senderVerdict,
   windowStart,
+  isSystemSender,
   type GmailPart,
   type PickedAttachment,
 } from "./gmailRules";
@@ -193,10 +194,7 @@ async function firmAddresses(db: Db, firmId: string, conns: Connection[]): Promi
   return out;
 }
 
-const systemSender = (email: string) => {
-  const own = (process.env.PRACTICE_FROM_EMAIL ?? "").toLowerCase();
-  return email.endsWith("@fynhelp.com") || (own !== "" && email === own) || /^(mailer-daemon|postmaster)@/i.test(email);
-};
+const systemSender = (email: string) => isSystemSender(email, process.env.PRACTICE_FROM_EMAIL ?? "");
 
 /* ─────────────────────────── One email ─────────────────────────── */
 

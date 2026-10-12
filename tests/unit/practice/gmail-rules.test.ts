@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   base64UrlToBytes,
+  isSystemSender,
   forwardedSender,
   parseAddress,
   pickAttachments,
@@ -151,5 +152,20 @@ describe("token refresh failures", () => {
     expect(refreshFailure(503, null)).toBe("transient");
     expect(refreshFailure(500, { error: "internal_failure" })).toBe("transient");
     expect(refreshFailure(0, null)).toBe("transient");
+  });
+});
+
+describe("isSystemSender", () => {
+  it("skips FynHelp's own sending address and mail-server bounces", () => {
+    expect(isSystemSender("noreply@fynhelp.com")).toBe(true);
+    expect(isSystemSender("no-reply@fynhelp.com")).toBe(true);
+    expect(isSystemSender("notifications@mail.fynhelp.com")).toBe(true);
+    expect(isSystemSender("MAILER-DAEMON@googlemail.com")).toBe(true);
+    expect(isSystemSender("reminders@firm.in", "reminders@firm.in")).toBe(true);
+  });
+  it("reads mail from people, including people at fynhelp.com", () => {
+    expect(isSystemSender("nidhi@fynhelp.com")).toBe(false);
+    expect(isSystemSender("accounts@client.in")).toBe(false);
+    expect(isSystemSender("noreply@groww.in")).toBe(false);
   });
 });

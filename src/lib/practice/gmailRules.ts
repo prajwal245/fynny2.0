@@ -195,3 +195,16 @@ export function plainText(payload: GmailPart): string {
 }
 
 export { header as gmailHeader };
+
+/**
+ * Mail the intake must never read: what FynHelp itself sends (reminders,
+ * invites) and bounces from mail servers. People who happen to work at
+ * fynhelp.com are ordinary senders.
+ */
+export function isSystemSender(email: string, ownFrom = ""): boolean {
+  const e = email.trim().toLowerCase();
+  const own = ownFrom.trim().toLowerCase() || "noreply@fynhelp.com";
+  if (e === own) return true;
+  if (/^(mailer-daemon|postmaster)@/.test(e)) return true;
+  return /^(no-?reply|notifications?|alerts?|bounces?|mailer)(\+[^@]*)?@(\w+\.)*fynhelp\.com$/.test(e);
+}

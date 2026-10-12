@@ -4,9 +4,13 @@
  * Razorpay needs these environment variables (all server-side):
  *   RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET      API keys (Dashboard → Account & Settings → API keys)
  *   RAZORPAY_WEBHOOK_SECRET                   the secret typed when adding the webhook
+ * Optional:
+ *   FYNHELP_GST_PERCENT                       added on top of list prices (e.g. 18); default 0
  *   RAZORPAY_PLAN_{STARTER|PROFESSIONAL|SCALE}_{MONTHLY|ANNUAL}
- *                                             plan ids (plan_...) created in Subscriptions → Plans
- * Without them the trial still runs and pauses work at the end; the Billing
+ *                                             use an existing plan id instead of the one FynHelp creates
+ * The six Razorpay plans are created on first use and remembered in
+ * ca_billing_plans, per key (test and live keys have separate plans).
+ * Without keys the trial still runs and pauses work at the end; the Billing
  * screen says payments are being set up.
  */
 import type { Db, FirmContext } from "./db.server";
@@ -15,6 +19,7 @@ import { PracticeError } from "./core";
 import {
   accessFor,
   PLANS,
+  planAmountPaise,
   planEnvKey,
   statusFromRazorpay,
   trialEndFrom,
@@ -55,16 +60,63 @@ export async function loadBilling(db: Db, firmId: string): Promise<Row> {
   return (again as Row) ?? { plan: "starter", cycle: "monthly", status: "trialing", trial_ends_at: row.trial_ends_at, current_period_end: null, razorpay_subscription_id: null };
 }
 
-function configuredPlans() {
+function allPlans() {
   const out: { plan: PlanKey; cycle: Cycle }[] = [];
-  for (const plan of Object.keys(PLANS) as PlanKey[])
-    for (const cycle of ["monthly", "annual"] as Cycle[]) if (env(planEnvKey(plan, cycle))) out.push({ plan, cycle });
+  for (const plan of Object.keys(PLANS) as PlanKey[]) for (const cycle of ["monthly", "annual"] as Cycle[]) out.push({ plan, cycle });
   return out;
+}
+
+
+interface RzpPlan {
+  id: string;
+  period: string;
+  interval: number;
+  item: { name: string; amount: number; currency: string };
+  notes?: Record<string, string> | null;
+}
+
+/**
+ * The Razorpay plan id for a plan and cycle: an env override, else the one
+ * remembered for this key, else an existing matching plan in the Razorpay
+ * account, else a new one created now.
+ */
+async function planIdFor(db: Db, plan: PlanKey, cycle: Cycle): Promise<string> {
+  const override = env(planEnvKey(plan, cycle));
+  if (override) return override;
+  const keyId = env("RAZORPAY_KEY_ID") ?? "";
+  const amount = planAmountPaise(plan, cycle, Number(env("FYNHELP_GST_PERCENT") ?? 0));
+  const { data: known } = await db
+    .from("ca_billing_plans")
+    .select("razorpay_plan_id")
+    .eq("key_id", keyId)
+    .eq("plan", plan)
+    .eq("cycle", cycle)
+    .eq("amount_paise", amount)
+    .maybeSingle();
+  if (known?.razorpay_plan_id) return String(known.razorpay_plan_id);
+  const period = cycle === "annual" ? "yearly" : "monthly";
+  const name = `FynHelp ${PLANS[plan].name} (${cycle === "annual" ? "yearly" : "monthly"})`;
+  const list = await rzp<{ items?: RzpPlan[] }>("GET", "/plans?count=100");
+  const found = (list.items ?? []).find(
+    (p) => p.period === period && p.interval === 1 && p.item?.amount === amount && p.item?.currency === "INR" && p.notes?.fynhelp_plan === plan,
+  );
+  const made =
+    found ??
+    (await rzp<RzpPlan>("POST", "/plans", {
+      period,
+      interval: 1,
+      item: { name, amount, currency: "INR", description: `${PLANS[plan].clientsIncluded} client entities included, unlimited users` },
+      notes: { fynhelp_plan: plan, cycle },
+    }));
+  await db
+    .from("ca_billing_plans")
+    .upsert({ key_id: keyId, plan, cycle, amount_paise: amount, razorpay_plan_id: made.id }, { onConflict: "key_id,plan,cycle,amount_paise" });
+  return made.id;
 }
 
 export async function billingView(db: Db, ctx: FirmContext): Promise<BillingView> {
   const row = await loadBilling(db, ctx.firmId);
-  const available = env("RAZORPAY_KEY_ID") && env("RAZORPAY_KEY_SECRET") ? configuredPlans() : [];
+  const available = env("RAZORPAY_KEY_ID") && env("RAZORPAY_KEY_SECRET") ? allPlans() : [];
   return {
     plan: row.plan,
     cycle: row.cycle,
@@ -143,11 +195,11 @@ interface RzpSubscription {
  */
 export async function startCheckout(db: Db, ctx: FirmContext, plan: PlanKey, cycle: Cycle) {
   if (!canSignOff(ctx)) throw new PracticeError("forbidden", "Only a partner can choose the firm's plan.");
-  const planId = env(planEnvKey(plan, cycle));
-  if (!planId) throw new PracticeError("payments_not_ready", "This plan cannot be bought online yet. Email support@fynhelp.com and we will activate it.");
+  auth(); // says "payments are being set up" when the keys are missing
   const row = await loadBilling(db, ctx.firmId);
   if (row.razorpay_subscription_id && ["pending", "active", "past_due"].includes(row.status))
     throw new PracticeError("has_plan", "This firm already has a plan. To change it, email support@fynhelp.com and we will switch it for you.");
+  const planId = await planIdFor(db, plan, cycle);
   const sub = await rzp<RzpSubscription & { short_url?: string }>("POST", "/subscriptions", {
     plan_id: planId,
     // Razorpay needs a number of billing cycles: ten years either way.

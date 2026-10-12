@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accessFor, statusFromRazorpay, trialEndFrom, TRIAL_MAX_CLIENTS, planEnvKey } from "@/lib/practice/billing/plans";
+import { accessFor, statusFromRazorpay, trialEndFrom, TRIAL_MAX_CLIENTS, planEnvKey, planAmountPaise } from "@/lib/practice/billing/plans";
 
 const now = new Date("2026-10-12T10:00:00Z");
 const row = (o: Partial<Parameters<typeof accessFor>[0]>) => ({
@@ -48,5 +48,11 @@ describe("trial and plan access", () => {
     expect(statusFromRazorpay("cancelled")).toBe("cancelled");
     expect(statusFromRazorpay("created")).toBeNull();
     expect(planEnvKey("professional", "annual")).toBe("RAZORPAY_PLAN_PROFESSIONAL_ANNUAL");
+  });
+  it("prices plans in paise, adding GST only when a rate is set", () => {
+    expect(planAmountPaise("starter", "monthly")).toBe(299900);
+    expect(planAmountPaise("professional", "annual")).toBe(6119000);
+    expect(planAmountPaise("starter", "monthly", 18)).toBe(353882);
+    expect(planAmountPaise("scale", "monthly", Number("not a number"))).toBe(1299900);
   });
 });

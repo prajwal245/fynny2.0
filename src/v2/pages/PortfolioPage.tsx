@@ -1,3 +1,5 @@
+import { closeStage } from "../lib/closeStage";
+import { FirstCloseCard, useFirstCloseSteps } from "../components/FirstCloseGuide";
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
@@ -13,6 +15,7 @@ import { openExceptionsIn } from "../lib/exceptions";
 export default function PortfolioPage() {
   const { clients, docs, review, exceptions, chases, runs, period, closeStateFor, session, agentRuns } = useV2();
   const needs = useNeedsYou();
+  const guide = useFirstCloseSteps();
   const [adding, setAdding] = useState(false);
 
   // Same month as the sidebar badge and the queue.
@@ -65,7 +68,7 @@ export default function PortfolioPage() {
           <div className="today-grid" style={{ marginBottom: 26 }}>
             <NeedsYou items={needs} />
             <div style={{ display: "grid", gap: 18 }}>
-              <SetupChecklist />
+              {guide.done < guide.steps.length ? <FirstCloseCard /> : <SetupChecklist />}
               <AgentActivity runs={agentRuns} />
             </div>
           </div>
@@ -81,17 +84,17 @@ export default function PortfolioPage() {
                 const started = cd.length > 0;
                 const reading = cd.some((d) => d.status === "Uploading" || d.status === "Processing" || d.status === "Queued");
                 const monthHasData = cd.some((d) => d.rows.some((r) => r.date && monthOf(r.date) === period));
-                const status: { label: string; tone: Tone } = !started
-                  ? { label: "Not started", tone: "neutral" }
-                  : !monthHasData
-                  ? reading
-                    ? { label: "Reading documents", tone: "info" }
-                    : { label: "Waiting for documents", tone: "neutral" }
-                  : ex > 0
-                  ? { label: "Needs attention", tone: "bad" }
-                  : rv > 0 || ch > 0
-                    ? { label: "Ready for review", tone: "warn" }
-                    : { label: "All clear", tone: "good" };
+                const monthRows = cd.flatMap((d) => d.rows).filter((r) => r.date && monthOf(r.date) === period);
+                const status: { label: string; tone: Tone } = closeStage({
+                  hasDocs: started,
+                  reading,
+                  bank: monthRows.filter((r) => r.side === "bank"),
+                  books: monthRows.filter((r) => r.side === "books"),
+                  registersInMonth: monthHasData,
+                  openExceptions: ex,
+                  openReview: rv,
+                  openChases: ch,
+                });
                 return (
                   <motion.div
                     key={c.id}

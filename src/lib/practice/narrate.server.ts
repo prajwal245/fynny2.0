@@ -10,6 +10,7 @@ import {
   sha256Hex,
   signedAmount,
   sumRupees,
+  formatRupees,
   type Period,
   round2,
 } from "./core";
@@ -24,7 +25,7 @@ import {
 } from "./db.server";
 import { practiceLlm } from "./llm.server";
 import { statutoryDueDates } from "./india";
-import { BUCKET_LABELS, gatewayGrossUp, misBucket, settlementsFromRegister, type MisBucket, type Settlement } from "./narrate/flows";
+import { BUCKET_LABELS, cleanParty, gatewayGrossUp, misBucket, returnedChequePairs, settlementsFromRegister, type MisBucket, type Settlement } from "./narrate/flows";
 import {
   computeFigures,
   ruleInsights,
@@ -140,7 +141,15 @@ export async function generateReport(
           .limit(200)
       : Promise.resolve({ data: [] as { reason_code: string; amount: number | null; txn_id: string | null; txn_side: string | null; status: string; resolution_action: string | null; resolution_note: string | null; resolved_at: string | null }[] }),
   ]);
-  const matched = statement.filter((t) => t.match_status === "matched");
+  const matchedRaw = statement.filter((t) => t.match_status === "matched");
+  // The books say who a matched line is really with ("Kaveri Fashions Pvt Ltd",
+  // or "Suspense A/c"), so their party name and ledger decide how it is shown.
+  const books = await bookSideOf(db, ctx.firmId, matchedRaw.map((t) => t.id));
+  const matched = matchedRaw.map((t) => {
+    const b = books.get(t.id);
+    return { ...t, counterparty: b?.party || cleanParty(t.counterparty) || t.counterparty };
+  });
+  const bookText = (id: string) => books.get(id)?.text ?? "";
   const unmatched = statement.filter(
     (t) => t.match_status !== "matched" && t.match_status !== "ignored",
   );
@@ -159,7 +168,40 @@ export async function generateReport(
   }
 
   const figures = computeFigures(matched, prior, statement);
-  let insights: Insight[] = ruleInsights(figures, matched);
+  // Bucket every matched line once: bank narration plus what the books say.
+  const pairs = returnedChequePairs(statement);
+  const pairIds = new Set(pairs.flatMap((p) => [p.deposit, p.ret]));
+  const bucketOf = new Map<string, MisBucket>(
+    matched.map((t) => [
+      t.id,
+      pairIds.has(t.id) ? "returned_cheque" : misBucket({ ...t, description: `${t.description ?? ""} ${bookText(t.id)}` }),
+    ]),
+  );
+  const revenueTxns = matched.filter((t) => bucketOf.get(t.id) === "revenue");
+  const expenseTxns = matched.filter((t) => bucketOf.get(t.id) === "expense");
+  let insights: Insight[] = ruleInsights(figures, matched, revenueTxns);
+  const suspense = matched.filter((t) => bucketOf.get(t.id) === "unidentified");
+  if (suspense.length) {
+    const total = sumRupees(suspense.map((t) => t.amount));
+    insights.unshift({
+      text: `${formatRupees(total)} received across ${suspense.length} line${suspense.length === 1 ? " is" : "s are"} booked to Suspense. Find out who paid and rebook ${suspense.length === 1 ? "it" : "them"}; ${suspense.length === 1 ? "it is" : "they are"} not counted as revenue.`,
+      cited_transaction_ids: suspense.map((t) => t.id),
+      confidence: 1,
+      origin: "rules",
+      source: `${suspense.length} transaction${suspense.length === 1 ? "" : "s"}`,
+    });
+  }
+  if (pairs.length) {
+    const total = sumRupees(pairs.map((p) => p.amount));
+    const ids = pairs.flatMap((p) => [p.deposit, p.ret]);
+    insights.unshift({
+      text: `${pairs.length} cheque${pairs.length === 1 ? " was" : "s were"} returned (${formatRupees(total)}). The deposit${pairs.length === 1 ? " is" : "s are"} left out of revenue; check the receipt${pairs.length === 1 ? " has" : "s have"} been reversed in the books.`,
+      cited_transaction_ids: ids,
+      confidence: 1,
+      origin: "rules",
+      source: `${ids.length} transactions`,
+    });
+  }
   const aiMeta: {
     provider: string | null;
     model: string | null;
@@ -276,15 +318,28 @@ export async function generateReport(
 
   const ins = matched.filter((t) => t.direction === "in");
   const outs = matched.filter((t) => t.direction === "out");
-  // Operating revenue and expenses only; other cash flows are listed separately.
-  const bucketOf = new Map(matched.map((t) => [t.id, misBucket(t)]));
-  const revenueTxns = matched.filter((t) => bucketOf.get(t.id) === "revenue");
-  const expenseTxns = matched.filter((t) => bucketOf.get(t.id) === "expense");
+  // Operating revenue and expenses only; other cash flows are listed separately,
+  // each as a signed net (money in positive, money out negative) with In and Out.
   const otherFlows = (Object.keys(BUCKET_LABELS) as MisBucket[])
     .filter((b) => b !== "revenue" && b !== "expense")
     .map((b) => {
-      const list = matched.filter((t) => bucketOf.get(t.id) === b);
-      return { key: b, label: BUCKET_LABELS[b], direction: list[0]?.direction ?? "in", amount: sumRupees(list.map((t) => t.amount)), count: list.length, rows: inrRows(list) };
+      let list = matched.filter((t) => bucketOf.get(t.id) === b);
+      // A return still waiting in the exceptions belongs next to its deposit.
+      if (b === "returned_cheque") list = statement.filter((t) => pairIds.has(t.id)).map((t) => matched.find((m) => m.id === t.id) ?? t);
+      const inAmt = sumRupees(list.filter((t) => t.direction === "in").map((t) => t.amount));
+      const outAmt = sumRupees(list.filter((t) => t.direction === "out").map((t) => t.amount));
+      const net = round2(inAmt - outAmt);
+      return {
+        key: b,
+        label: BUCKET_LABELS[b],
+        direction: (net < 0 ? "out" : "in") as "in" | "out",
+        amount: Math.abs(net),
+        net,
+        in: inAmt,
+        out: outAmt,
+        count: list.length,
+        rows: inrRows(list),
+      };
     })
     .filter((f) => f.count > 0);
   // Gateway payouts arrive net of fees: with the settlement report uploaded,
@@ -682,6 +737,13 @@ export async function signOffReport(
     open = { exceptions: ex.count ?? 0, review: rv.count ?? 0, unmatched: um.count ?? 0 };
   }
   const openTotal = open.exceptions + open.review + open.unmatched;
+  // A correction the partner asked for is either marked done or overridden with a reason.
+  const pendingCorrection = (data.content as { correction?: { note?: string; resolved_at?: string | null } | null } | null)?.correction;
+  if (pendingCorrection?.note && !pendingCorrection.resolved_at && !(opts.acknowledgeOpen && note?.trim()))
+    throw new PracticeError(
+      "needs_confirmation",
+      `A correction request is still open: "${pendingCorrection.note}". Mark it corrected, or sign off with a note saying why it no longer applies.`,
+    );
   if (openTotal > 0 && !opts.acknowledgeOpen)
     throw new PracticeError(
       "needs_confirmation",
@@ -697,6 +759,11 @@ export async function signOffReport(
     signOffNote: note ?? null,
     signedOffWithOpen: openTotal > 0 ? open : null,
     correction: null,
+    // The request stays on record with how it ended.
+    corrections_history: [
+      ...(((data.content as { corrections_history?: unknown[] } | null)?.corrections_history as unknown[]) ?? []),
+      ...(pendingCorrection?.note ? [{ ...pendingCorrection, closed_by_signoff: !pendingCorrection.resolved_at, signoff_note: note ?? null }] : []),
+    ],
   };
   await db
     .from("ca_reports_log")
@@ -730,12 +797,15 @@ export async function requestCorrection(
     .eq("ca_firm_id", ctx.firmId)
     .maybeSingle();
   if (!data) throw new PracticeError("not_found", "Report not found.");
+  const byName = await personName(db, ctx.userId);
   const content = {
     ...((data.content ?? {}) as Record<string, unknown>),
     correction: {
       note,
       at: new Date().toISOString().slice(0, 10),
       by: ctx.userId,
+      by_name: byName,
+      resolved_at: null,
     },
   };
   await db
@@ -752,7 +822,87 @@ export async function requestCorrection(
     ctx.firmId,
     data.business_id,
     "narrate",
-    `Correction requested on the ${data.report_type} for ${data.period}. ${note}`,
+    `${byName} asked for a correction on the ${data.report_type} for ${data.period}: ${note}`,
   );
   return { ok: true };
+}
+
+/** Someone on the team says the requested correction is done; the partner can sign off again. */
+export async function markCorrected(db: Db, ctx: FirmContext, reportId: string, what?: string) {
+  const { data } = await db
+    .from("ca_reports_log")
+    .select("id, business_id, content, report_type, period")
+    .eq("id", reportId)
+    .eq("ca_firm_id", ctx.firmId)
+    .maybeSingle();
+  if (!data) throw new PracticeError("not_found", "Report not found.");
+  const c = (data.content ?? {}) as Record<string, unknown> & { correction?: Record<string, unknown> | null };
+  if (!c.correction?.note) return { ok: true };
+  const byName = await personName(db, ctx.userId);
+  await db
+    .from("ca_reports_log")
+    .update({
+      status: "ready_for_review",
+      content: { ...c, correction: { ...c.correction, resolved_at: new Date().toISOString(), resolved_by: ctx.userId, resolved_by_name: byName, resolution: what?.trim() || null } },
+    })
+    .eq("id", reportId);
+  await logActivity(
+    db,
+    ctx.firmId,
+    data.business_id,
+    "narrate",
+    `${byName} marked the correction on the ${data.report_type} for ${data.period} as done${what?.trim() ? `: ${what.trim()}` : ""}. Ready for the partner to sign off.`,
+  );
+  return { ok: true };
+}
+
+async function personName(db: Db, userId: string): Promise<string> {
+  try {
+    const { data } = await db.auth.admin.getUserById(userId);
+    return String((data?.user?.user_metadata as { full_name?: string } | undefined)?.full_name || data?.user?.email || "Someone");
+  } catch {
+    return "Someone";
+  }
+}
+
+/**
+ * For each matched bank line, the book entries it was matched to: their
+ * party (ledger) name and the words that say what kind of entry it is.
+ */
+async function bookSideOf(db: Db, firmId: string, bankIds: string[]): Promise<Map<string, { party: string; text: string }>> {
+  const out = new Map<string, { party: string; text: string }>();
+  if (!bankIds.length) return out;
+  const matches: { bank_txn_id: string; book_txn_ids: string[] }[] = [];
+  for (let i = 0; i < bankIds.length; i += 300) {
+    const { data } = await db
+      .from("ca_recon_matches")
+      .select("bank_txn_id, book_txn_ids")
+      .eq("ca_firm_id", firmId)
+      .eq("status", "active")
+      .in("bank_txn_id", bankIds.slice(i, i + 300));
+    matches.push(...((data ?? []) as typeof matches));
+  }
+  const bookIds = [...new Set(matches.flatMap((m) => m.book_txn_ids ?? []))];
+  const book = new Map<string, { counterparty: string | null; description: string | null; category: string | null }>();
+  for (let i = 0; i < bookIds.length; i += 300) {
+    const { data } = await db.from("ca_txns").select("id, counterparty, description, category").in("id", bookIds.slice(i, i + 300));
+    for (const r of data ?? []) book.set(r.id as string, r as never);
+  }
+  for (const m of matches) {
+    const rows = (m.book_txn_ids ?? []).map((id) => book.get(id)).filter(Boolean) as { counterparty: string | null; description: string | null; category: string | null }[];
+    if (!rows.length) continue;
+    // Tally ledgers carry the party in Particulars, which lands in description.
+    const nameOf = (r: (typeof rows)[number]) => {
+      const cp = (r.counterparty ?? "").trim();
+      if (cp) return cp;
+      const d = (r.description ?? "").trim();
+      return d && d.length <= 60 && !/\d{6,}/.test(d) ? d : "";
+    };
+    const parties = [...new Set(rows.map(nameOf).filter(Boolean))];
+    // One party across the entries: show it.
+    const party = parties.length === 1 && !/^(cash|bank|sundry)$/i.test(parties[0]) ? parties[0] : "";
+    const text = rows.map((r) => `${r.counterparty ?? ""} ${r.description ?? ""} ${r.category ?? ""}`).join(" ");
+    out.set(m.bank_txn_id, { party, text });
+  }
+  return out;
 }

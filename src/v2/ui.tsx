@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
  * FynHelp v2 dashboard — design system primitives.
  * Self-contained: does not touch any existing app styling.
  */
-import { ReactNode, CSSProperties } from "react";
+import { ReactNode, CSSProperties, useEffect, useRef } from "react";
 import { motion, AnimatePresence, useIsPresent } from "framer-motion";
 import { X } from "lucide-react";
 
@@ -219,11 +219,46 @@ export function Layer({ style, children, className }: { style: CSSProperties; ch
   return <div className={className} style={{ ...style, pointerEvents: present ? "auto" : "none" }}>{children}</div>;
 }
 
+/**
+ * Each opening gets its own key, so a panel reopened while the last one is
+ * still sliding out mounts fresh instead of staying off-screen. Esc closes it
+ * and focus goes back to whatever opened it.
+ */
+function useOverlay(open: boolean, onClose: () => void) {
+  const count = useRef(0);
+  const wasOpen = useRef(false);
+  const opener = useRef<HTMLElement | null>(null);
+  if (open && !wasOpen.current) {
+    count.current++;
+    if (typeof document !== "undefined") opener.current = document.activeElement as HTMLElement | null;
+  }
+  wasOpen.current = open;
+  const close = useRef(onClose);
+  close.current = onClose;
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        close.current();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      const el = opener.current;
+      if (el && typeof el.focus === "function" && document.contains(el)) setTimeout(() => el.focus({ preventScroll: true }), 0);
+    };
+  }, [open]);
+  return `overlay-${count.current}`;
+}
+
 export function Drawer({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
+  const key = useOverlay(open, onClose);
   return portal(
     <AnimatePresence>
       {open && (
-        <Layer style={{ position: "fixed", inset: 0, zIndex: 80 }}>
+        <Layer key={key} style={{ position: "fixed", inset: 0, zIndex: 80 }}>
           <motion.div
             onClick={onClose}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -259,10 +294,11 @@ export function IconButton({ label, onClick, children, disabled, style }: { labe
 }
 
 export function Modal({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
+  const key = useOverlay(open, onClose);
   return portal(
     <AnimatePresence>
       {open && (
-        <Layer style={{ position: "fixed", inset: 0, zIndex: 80, display: "grid", placeItems: "center", padding: 18 }}>
+        <Layer key={key} style={{ position: "fixed", inset: 0, zIndex: 80, display: "grid", placeItems: "center", padding: 18 }}>
           <motion.div
             onClick={onClose}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}

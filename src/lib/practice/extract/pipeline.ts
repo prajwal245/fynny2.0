@@ -68,6 +68,8 @@ export interface AiCallRecord {
 
 export interface ExtractDeps {
   llm: LlmClient | null;
+  /** Most time the row-classification step may take; rules carry on after it. */
+  aiBudgetMs?: number;
   /** Text layer of a PDF. Throws `PdfPasswordError` for protected files. */
   pdfText?: (bytes: Uint8Array) => Promise<{ text: string; pages: number }>;
   /** Rows of the first sheet with data in an Excel workbook. */
@@ -137,6 +139,8 @@ export function detectKind(
     return "image";
   if (/\.(jpe?g|png|webp|heic)$/.test(name) || mime?.startsWith("image/"))
     return "image";
+  // Named .pdf (or sent as a PDF) but no PDF signature: damaged or renamed.
+  if (/\.pdf$/.test(name) || mime === "application/pdf") return "unsupported";
   // Word, PowerPoint and similar share Excel's zip container: name them before sniffing.
   if (/\.(docx?|pptx?|odt|pages|rtf|zip|rar|7z)$/.test(name)) return "unsupported";
   if (looksLikeSpreadsheetBinary(bytes)) return "xlsx"; // includes Excel renamed to .csv
@@ -243,17 +247,26 @@ async function aiClassify(
   const verdicts = new Map<number, AiRowVerdict>();
   if (!deps.llm || rows.length === 0) return verdicts;
   const limit = deps.maxAiRows ?? 240;
+  // A file with clear columns is already read in code; the AI only adds a
+  // second opinion, and never for long: a slow provider must not keep a
+  // 20-line statement waiting a minute. Rules carry on when time is up.
   const eligible = rows.filter((r) => r.amount && r.date).slice(0, limit);
+  const deadline = Date.now() + (deps.aiBudgetMs ?? 8_000);
   for (let i = 0; i < eligible.length; i += BATCH) {
+    const left = deadline - Date.now();
+    if (left < 1_500) break;
     const batch = eligible.slice(i, i + BATCH);
     const user = classifyUserPrompt(batch, side);
     const started = Date.now();
     try {
-      const res = await deps.llm.json({
-        purpose: "extract_classify",
-        system: CLASSIFY_SYSTEM_PROMPT,
-        user,
-      });
+      const res = await Promise.race([
+        deps.llm.json({
+          purpose: "extract_classify",
+          system: CLASSIFY_SYSTEM_PROMPT,
+          user,
+        }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("AI classification took too long; rules used")), left)),
+      ]);
       const list = ((res.data ?? {}) as { rows?: AiRowVerdict[] }).rows ?? [];
       for (const v of list)
         if (typeof v?.index === "number") verdicts.set(v.index, v);
@@ -388,7 +401,7 @@ export async function runExtract(
       "unsupported_type",
       /\.(docx?|odt|pages|rtf)$/i.test(input.filename)
         ? "Word documents are not read. Upload the bank statement or ledger as PDF, CSV or Excel, or the Tally XML export."
-        : /\.pdf$/i.test(input.filename)
+        : /\.pdf$/i.test(input.filename) || input.mime === "application/pdf"
           ? "This file is named .pdf but is not a valid PDF: it may be damaged, incomplete or renamed. Download it again from the bank or ask the client to resend it."
           : /\.(xlsx?|xlsm)$/i.test(input.filename)
             ? "This file is named as Excel but could not be opened as a spreadsheet: it may be damaged or renamed. Save it again from Excel, or export it as CSV."

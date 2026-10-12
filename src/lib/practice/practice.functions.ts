@@ -95,6 +95,13 @@ export const updatePracticeClient = createServerFn({ method: "POST" })
     ),
   );
 
+export const archivePracticeClient = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: uuid, reason: z.string().max(300).default("") }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./clients.server")).archivePracticeClient(db, ctx, data.id, data.reason)),
+  );
+
 /* ── documents / Extract ───────────────────────────────── */
 
 export const registerPracticeUpload = createServerFn({ method: "POST" })
@@ -133,10 +140,24 @@ export const registerPracticeUpload = createServerFn({ method: "POST" })
       const { data: row } = await db
         .from("ca_document_extractions")
         .select(
-          "extract_status, txn_count, review_count, duplicate_count, error_message, classification, extracted",
+          "extract_status, txn_count, review_count, duplicate_count, error_message, classification, extracted, business_id, original_filename, created_at",
         )
         .eq("id", res.extraction_id)
         .maybeSingle();
+      // The same file already in the firm: say where, so it can be opened or moved here.
+      let existing: { id: string; clientId: string | null; clientName: string | null; filename: string; at: string; sameClient: boolean } | null = null;
+      if (res.duplicate && row) {
+        const bid = (row.business_id as string | null) ?? null;
+        const { data: cl } = bid ? await db.from("ca_clients").select("client_name").eq("ca_firm_id", ctx.firmId).eq("business_id", bid).maybeSingle() : { data: null };
+        existing = {
+          id: res.extraction_id,
+          clientId: bid,
+          clientName: (cl?.client_name as string | undefined) ?? null,
+          filename: String(row.original_filename ?? ""),
+          at: String(row.created_at ?? "").slice(0, 10),
+          sameClient: bid === (data.business_id ?? null),
+        };
+      }
       // Which months the file's lines fall in, so the app can say when none is the month on screen.
       const { data: dated } = await db
         .from("ca_txns")
@@ -159,6 +180,7 @@ export const registerPracticeUpload = createServerFn({ method: "POST" })
         classification: row?.classification ?? null,
         months,
         register: register ? { label: register.label ?? "Register", entries: register.entries ?? 0 } : null,
+        existing,
       };
     }),
   );
@@ -354,6 +376,13 @@ export const reversePracticeMatch = createServerFn({ method: "POST" })
     ),
   );
 
+export const unmatchPracticeMatch = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: uuid, note: z.string().min(1).max(500) }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./recon.server")).unmatchFromRecon(db, ctx, data.id, data.note)),
+  );
+
 export const getPracticeTransactionHistory = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ id: uuid }).parse(d))
@@ -453,6 +482,13 @@ export const signOffPracticeReport = createServerFn({ method: "POST" })
         { acknowledgeOpen: data.acknowledge_open },
       ),
     ),
+  );
+
+export const markPracticeReportCorrected = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: uuid, what: z.string().max(500).optional() }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./narrate.server")).markCorrected(db, ctx, data.id, data.what)),
   );
 
 export const requestPracticeReportCorrection = createServerFn({

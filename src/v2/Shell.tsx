@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   LayoutGrid, Users, FileText, ListChecks, AlertTriangle, Send, BarChart3, Settings, Menu, X, LogOut,
@@ -14,6 +14,7 @@ import { CommandMenu, useCommandMenu } from "./components/CommandMenu";
 import { V2StoreProvider, monthOf, useV2 } from "./store";
 import { openExceptionsIn } from "./lib/exceptions";
 import { TrialBanner } from "./components/TrialBanner";
+import { FirstCloseLauncher, FirstRunWelcome } from "./components/FirstCloseGuide";
 
 
 const NAV = [
@@ -54,6 +55,28 @@ function ShellBody() {
   const navigate = useNavigate();
   // The page actually on screen (not one still loading), without a trailing slash.
   const pathname = useRouterState({ select: (s) => (s.resolvedLocation ?? s.location).pathname.replace(/(.)\/+$/, "$1") });
+  // Messages belong to the screen they were shown on: when the page or month
+  // changes, older ones are cleared (one fired just before the move stays).
+  const toastSeen = useRef(new Map<string | number, number>());
+  useEffect(() => {
+    const t = setInterval(() => {
+      const now = Date.now();
+      const live = new Set<string | number>();
+      for (const x of toast.getToasts()) {
+        live.add(x.id);
+        if (!toastSeen.current.has(x.id)) toastSeen.current.set(x.id, now);
+      }
+      for (const id of [...toastSeen.current.keys()]) if (!live.has(id)) toastSeen.current.delete(id);
+    }, 500);
+    return () => clearInterval(t);
+  }, []);
+  useEffect(() => {
+    const now = Date.now();
+    for (const x of toast.getToasts()) {
+      const seen = toastSeen.current.get(x.id);
+      if (seen !== undefined && now - seen > 1200) toast.dismiss(x.id);
+    }
+  }, [pathname, period]);
   // A toast belongs to the page it was raised on.
   useEffect(() => {
     toast.dismiss();
@@ -180,6 +203,7 @@ function ShellBody() {
           </nav>
 
           <div style={{ borderTop: `1px solid ${V.line}`, paddingTop: 14, fontSize: 11.5, color: V.muted, padding: "14px 8px 0", display: "grid", gap: 6, justifyItems: "start" }}>
+            <FirstCloseLauncher />
             <a className="v2-btn v2-btn-quiet" href="/guide" target="_blank" rel="noreferrer" data-testid="guide-link">
               <BookOpen size={14} /> Resource &amp; Product Guide
             </a>
@@ -232,6 +256,7 @@ function ShellBody() {
 
           <main style={{ padding: 24, flex: 1, maxWidth: 1280, width: "100%" }}>
             <TrialBanner partnerView={partnerView} />
+            <FirstRunWelcome />
             <Outlet />
             {/* Live agent cards dock at the bottom of the page: opening or closing one never moves what is under the cursor. */}
             <div data-testid="run-dock" style={{ position: "sticky", bottom: 16, zIndex: 30, display: "grid", gap: 10, width: "min(520px, 100%)", marginLeft: "auto", marginTop: runs.length ? 18 : 0 }}>

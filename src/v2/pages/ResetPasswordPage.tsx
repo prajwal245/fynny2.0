@@ -90,6 +90,7 @@ export default function ResetPasswordPage() {
             </button>
           </form>
         )}
+        <a className="v2-link" href="/v2/onboarding?mode=signin" style={{ fontSize: 13, justifySelf: "start" }}>Back to sign in</a>
       </div>
     </div>
   );

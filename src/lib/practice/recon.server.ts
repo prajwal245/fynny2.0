@@ -25,6 +25,7 @@ import { decisionCount,
   DEFAULT_RULES,
   REASON_LABELS,
   reconcile,
+  withoutUnmatchedPairs,
   type ExceptionDecision,
   type ReconRule,
   type ReconTxn,
@@ -94,6 +95,24 @@ async function loadScope(
       .range(from, to),
   );
   return rows.map(num);
+}
+
+/** Matched bank lines from 45 days before the period to its end: a returned
+ *  cheque's deposit is usually already matched to the receipt in the books. */
+async function chequeContext(db: Db, firmId: string, businessId: string, period: Period): Promise<TxnRow[]> {
+  const from = new Date(`${period.start}T00:00:00Z`);
+  from.setUTCDate(from.getUTCDate() - 45);
+  const { data } = await db
+    .from("ca_txns")
+    .select(TXN_COLS)
+    .eq("ca_firm_id", firmId)
+    .eq("business_id", businessId)
+    .eq("side", "bank")
+    .eq("match_status", "matched")
+    .gte("txn_date", from.toISOString().slice(0, 10))
+    .lte("txn_date", period.end)
+    .limit(2000);
+  return ((data ?? []) as TxnRow[]).map(num);
 }
 
 export interface ReconSummary {
@@ -191,7 +210,7 @@ export async function runRecon(
     );
 
   const { rules, aliases } = await firmRules(db, ctx.firmId);
-  const outcome = reconcile(bank, books, { rules, aliases });
+  const outcome = withoutUnmatchedPairs(reconcile(bank, books, { rules, aliases, pairContext: await chequeContext(db, ctx.firmId, businessId, period) }), await unmatchedPairs(db, ctx.firmId, businessId), scope);
 
   const { data: run, error: runErr } = await db
     .from("ca_recon_runs")
@@ -856,7 +875,7 @@ export async function refreshOpenReasons(db: Db, ctx: FirmContext, businessId: s
   if (!bank.length && !books.length) return;
   const { rules, aliases } = await firmRules(db, ctx.firmId);
   // Only explain what is left: lines a person has not decided keep their exception.
-  const outcome = reconcile(bank, books, { rules, aliases });
+  const outcome = withoutUnmatchedPairs(reconcile(bank, books, { rules, aliases, pairContext: await chequeContext(db, ctx.firmId, businessId, period) }), await unmatchedPairs(db, ctx.firmId, businessId), scope);
   const byTxn = new Map(outcome.exceptions.map((e) => [e.txn_id, e]));
   const { data: open } = await db
     .from("ca_exceptions")
@@ -877,4 +896,60 @@ export async function refreshOpenReasons(db: Db, ctx: FirmContext, businessId: s
       .eq("id", row.id)
       .eq("status", "open");
   }
+}
+
+/** Bank and book lines a partner unmatched, so Recon never pairs them again on its own. */
+async function unmatchedPairs(db: Db, firmId: string, businessId: string) {
+  const { data } = await db
+    .from("ca_recon_matches")
+    .select("bank_txn_id, book_txn_ids, reversed_at, reversed_by, notes, explanation")
+    .eq("ca_firm_id", firmId)
+    .eq("business_id", businessId)
+    .eq("status", "reversed")
+    .contains("explanation", { unmatched_by_partner: true })
+    .limit(500);
+  const out = new Map<string, { at: string; note: string | null; by: string | null }>();
+  for (const r of data ?? [])
+    for (const b of (r.book_txn_ids as string[]) ?? [])
+      out.set(`${r.bank_txn_id}|${b}`, {
+        at: String(r.reversed_at ?? ""),
+        note: (r.notes as string | null) ?? null,
+        by: ((r.explanation as { unmatched_by_name?: string } | null)?.unmatched_by_name as string | undefined) ?? null,
+      });
+  return out;
+}
+
+/**
+ * A partner takes back a match Recon made: both sides go straight back into
+ * the Exception Queue with the partner's note, and Recon will not pair them
+ * again on its own.
+ */
+export async function unmatchFromRecon(db: Db, ctx: FirmContext, matchId: string, note: string) {
+  const { canSignOff } = await import("./db.server");
+  if (!canSignOff(ctx)) throw new PracticeError("forbidden", "Only a partner can unmatch a reconciled pair.");
+  if (!note.trim()) throw new PracticeError("invalid", "Add a short note saying why the match is wrong.");
+  const { data: m } = await db
+    .from("ca_recon_matches")
+    .select("id, business_id, period_start, period_end, explanation, bank_txn_id")
+    .eq("id", matchId)
+    .eq("ca_firm_id", ctx.firmId)
+    .maybeSingle();
+  if (!m) throw new PracticeError("not_found", "Match not found.");
+  let byName = "a partner";
+  try {
+    const { data: u } = await db.auth.admin.getUserById(ctx.userId);
+    byName = String((u?.user?.user_metadata as { full_name?: string } | undefined)?.full_name || u?.user?.email || byName);
+  } catch {
+    /* name is a nicety */
+  }
+  await db
+    .from("ca_recon_matches")
+    .update({ explanation: { ...((m.explanation as object) ?? {}), unmatched_by_partner: true, unmatched_by_name: byName } })
+    .eq("id", matchId);
+  await reverseMatch(db, ctx, matchId, note.trim());
+  // Put both lines back in front of the team now, not at the next run.
+  const { data: bankLine } = await db.from("ca_txns").select("txn_date").eq("id", m.bank_txn_id).maybeSingle();
+  const month = String(m.period_start ?? bankLine?.txn_date ?? "").slice(0, 7);
+  if (month) await runRecon(db, ctx, m.business_id as string, month);
+  return { status: "unmatched" };
 }

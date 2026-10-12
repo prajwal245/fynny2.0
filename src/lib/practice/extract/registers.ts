@@ -120,8 +120,11 @@ export function summariseRegister(kind: RegisterKind, rows: string[][]): Registe
     push("IGST", col("igst"));
     push("CGST", col("cgst"));
     push("SGST", col("sgst", "utgst"));
-    push("Invoice total", col("invoice value", "invoice amount", "total value", "total amount", /^total$/, "grand total"));
     const [ti, ii, ci, si] = [col("taxable value", "taxable amount", "taxable"), col("igst"), col("cgst"), col("sgst", "utgst")];
+    const totalCol = col("invoice value", "invoice amount", "total value", "total amount", /^total$/, "grand total");
+    // Always shown: from the register's own total column, else taxable value plus the taxes.
+    if (totalCol >= 0) push("Invoice total", totalCol);
+    else if (ti >= 0) totals.push({ label: "Invoice total", amount: round2(sum(ti) + sum(ii) + sum(ci) + sum(si) + sum(col("cess"))) });
     const gi = col("supplier gstin", "customer gstin", "party gstin", "gstin");
     const ri = col("invoice no", "invoice number", "inv no", "bill no", "invoice");
     if (ti >= 0)

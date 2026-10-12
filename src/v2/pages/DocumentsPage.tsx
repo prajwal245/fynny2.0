@@ -489,7 +489,7 @@ export default function DocumentsPage({
               <Badge>{active.source}</Badge>
               {active.register ? (
                 <Badge tone="info">{active.register.label} · reference only</Badge>
-              ) : active.side ? (
+              ) : active.side && active.status !== "Failed" ? (
                 <Badge tone="info">
                   {active.side === "bank" ? "Bank side" : "Books side"}
                 </Badge>

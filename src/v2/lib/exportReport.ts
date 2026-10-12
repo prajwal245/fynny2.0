@@ -1,6 +1,7 @@
 /**
  * FynHelp v2 — report exports.
- * PDF uses the browser print pipeline on branded HTML; Excel is a real .xlsx
+ * PDF is a real file built from the branded HTML (jsPDF); Print uses the
+ * browser's print view of the same HTML; Excel is a real .xlsx
  * workbook (SheetJS) with one sheet per part of the report.
  */
 import type { Report } from "../store";
@@ -63,11 +64,11 @@ export function buildReportHtml(report: Report, meta: ExportMeta) {
 
   const flows = report.otherFlows ?? [];
   const otherFlowsTable = !flows.length ? "" : `
-  <h3>Taxes, advances and transfers (not revenue or expense)</h3>
+  <h3>Not counted as revenue or expenses</h3>
   <table>
     <thead><tr><th>Line</th><th class="r">Amount</th><th class="r">Transactions</th></tr></thead>
     <tbody>
-      ${flows.map((f) => `<tr><td>${esc(f.label)}</td><td class="r">${inr(f.direction === "out" ? -f.amount : f.amount)}</td><td class="r">${f.count}</td></tr>`).join("")}
+      ${flows.map((f) => { const m = flowMoney(f); return `<tr><td>${esc(f.label)}${m.in && m.out ? `<br><small>In ${inr(m.in)} · Out ${inr(m.out)}</small>` : ""}</td><td class="r">${inr(m.net)}</td><td class="r">${f.count}</td></tr>`; }).join("")}
     </tbody>
   </table>`;
   const gatewayNote = !report.gateway ? "" : `
@@ -170,7 +171,7 @@ export async function downloadExcel(report: Report, meta: ExportMeta) {
     ["Revenue", report.revenue],
     ["Expenses", report.expenses],
     ["Net", report.revenue - report.expenses],
-    ...(report.otherFlows ?? []).map((f) => [`${f.label} (not revenue/expense)`, f.direction === "out" ? -f.amount : f.amount]),
+    ...(report.otherFlows ?? []).map((f) => [`${f.label} (not revenue/expense, net)`, flowMoney(f).net]),
     [],
     ["Unmatched lines left out", report.excluded],
     ...(report.warnings ?? []).map((w) => ["Note", w]),
@@ -200,6 +201,83 @@ export async function downloadExcel(report: Report, meta: ExportMeta) {
     ],
     [26, 12, 60, 16],
   );
-  const file = `${meta.clientName.replace(/\s+/g, "-")}-${report.template.replace(/\s+/g, "-")}-${report.period.replace(/\s+/g, "-")}.xlsx`;
+  const file = reportFileName(report, meta, "xlsx");
   XLSX.writeFile(wb, file);
+}
+
+/** A flow's signed net (in positive, out negative) and its in and out totals. Older reports stored one figure; their rows still carry signed amounts. */
+export function flowMoney(f: { direction: "in" | "out"; amount: number; rows: { amount: number }[]; net?: number; in?: number; out?: number }) {
+  if (typeof f.net === "number") return { net: f.net, in: f.in ?? 0, out: f.out ?? 0 };
+  const inAmt = f.rows.filter((r) => r.amount > 0).reduce((t, r) => t + r.amount, 0);
+  const outAmt = f.rows.filter((r) => r.amount < 0).reduce((t, r) => t - r.amount, 0);
+  const round = (n: number) => Math.round(n * 100) / 100;
+  return f.rows.length ? { net: round(inAmt - outAmt), in: round(inAmt), out: round(outAmt) } : { net: f.direction === "out" ? -f.amount : f.amount, in: 0, out: 0 };
+}
+
+/** File name a CA can attach as is: Client-Name_Monthly-MIS_July-2026.pdf */
+export function reportFileName(report: Report, meta: ExportMeta, ext: "pdf" | "xlsx") {
+  const part = (s: string) => s.replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "");
+  return `${part(meta.clientName)}_${part(report.template)}_${part(report.period)}.${ext}`;
+}
+
+/**
+ * A real PDF file, downloaded straight away: the same branded layout as the
+ * print view, laid out on A4 pages. Nothing opens and the tab never locks.
+ */
+export async function downloadPdf(report: Report, meta: ExportMeta) {
+  const html = buildReportHtml(report, meta);
+  const style = html.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? "";
+  const body = html.match(/<body>([\s\S]*?)<\/body>/)?.[1] ?? "";
+  // A separate document, so only the report's own styles apply (the app's CSS
+  // uses colour functions the renderer cannot read).
+  const host = document.createElement("iframe");
+  host.setAttribute("aria-hidden", "true");
+  host.tabIndex = -1;
+  host.style.cssText = "position:fixed;left:-12000px;top:0;width:794px;height:1123px;border:0;background:#fff;";
+  document.body.appendChild(host);
+  const doc = host.contentDocument!;
+  doc.open();
+  doc.write(`<!doctype html><html><head><meta charset="utf-8"><style>${style}</style></head><body style="margin:0;background:#fff"><div class="fyn-pdf" style="padding:36px;font-family:'Geist',system-ui,-apple-system,Helvetica,Arial,sans-serif;color:#141414;font-variant-numeric:tabular-nums">${body}</div></body></html>`);
+  doc.close();
+  try {
+    // Rendered as an image of the page: PDF base fonts have no ₹ glyph, so text
+    // mode would print the currency wrongly. What you see is what is saved.
+    const [{ jsPDF }, { default: html2canvas }] = await Promise.all([import("jspdf"), import("html2canvas")]);
+    const el = doc.querySelector(".fyn-pdf") as HTMLElement;
+    const canvas = await html2canvas(el, { scale: 2, backgroundColor: "#ffffff", logging: false, windowWidth: 794 });
+    const pdf = new jsPDF({ unit: "pt", format: "a4", compress: true });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const margin = 24;
+    const sliceH = Math.floor(((pageH - margin * 2) * canvas.width) / pageW);
+    // Cut between rows where possible: step back to the nearest all-white line.
+    const ctx = canvas.getContext("2d");
+    const blankAt = (y: number) => {
+      if (!ctx) return true;
+      const row = ctx.getImageData(0, y, canvas.width, 1).data;
+      for (let i = 0; i < row.length; i += 16) if (row[i] < 245 || row[i + 1] < 245 || row[i + 2] < 245) return false;
+      return true;
+    };
+    let y = 0;
+    let first = true;
+    while (y < canvas.height) {
+      let h = Math.min(sliceH, canvas.height - y);
+      if (y + h < canvas.height) {
+        let cut = h;
+        while (cut > h * 0.7 && !blankAt(y + cut)) cut--;
+        if (cut > h * 0.7) h = cut;
+      }
+      const part = document.createElement("canvas");
+      part.width = canvas.width;
+      part.height = h;
+      part.getContext("2d")!.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+      if (!first) pdf.addPage();
+      pdf.addImage(part.toDataURL("image/jpeg", 0.92), "JPEG", 0, margin, pageW, (h * pageW) / canvas.width);
+      first = false;
+      y += h;
+    }
+    pdf.save(reportFileName(report, meta, "pdf"));
+  } finally {
+    host.remove();
+  }
 }

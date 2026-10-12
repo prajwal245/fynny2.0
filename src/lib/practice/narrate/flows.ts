@@ -13,7 +13,9 @@ export type MisBucket =
   | "advance_paid"
   | "loan_capital"
   | "transfer"
-  | "refund";
+  | "refund"
+  | "returned_cheque"
+  | "unidentified";
 
 export const BUCKET_LABELS: Record<MisBucket, string> = {
   revenue: "Revenue",
@@ -25,6 +27,8 @@ export const BUCKET_LABELS: Record<MisBucket, string> = {
   loan_capital: "Loans and capital",
   transfer: "Transfers between own accounts",
   refund: "Refunds and reversals",
+  returned_cheque: "Returned cheques (deposit and its return)",
+  unidentified: "Unidentified receipts (suspense)",
 };
 
 interface Line {
@@ -43,8 +47,13 @@ const LOAN = /\b(loan|emi|od a\/?c|cc a\/?c|overdraft|capital|director'?s? (cont
 const TRANSFER = /\b(self|own a\/?c|own account|sweep|fd (booking|closure|maturity)|fixed deposit|inter ?account|contra|transfer to (my|own)|a\/c transfer)\b/i;
 const REFUND = /\b(refund|reversal|reversed|rev\b|chargeback|returned)\b/i;
 
+/** Ledgers a CA parks money in until they know what it is. */
+export const SUSPENSE = /\b(suspense|unidentified|unknown receipts?|unknown party|unreconciled receipts?)\b/i;
+
 export function misBucket(t: Line): MisBucket {
   const text = `${t.description ?? ""} ${t.counterparty ?? ""}`;
+  // Booked to Suspense in the books: cash that is not yet anyone's income.
+  if (t.direction === "in" && SUSPENSE.test(text)) return "unidentified";
   if (t.category === "transfer" || TRANSFER.test(text)) return "transfer";
   if (LOAN.test(text)) return "loan_capital";
   if (t.direction === "in") {
@@ -113,4 +122,73 @@ export function gatewayGrossUp(
   }
   const round = (n: number) => Math.round(n * 100) / 100;
   return { fees: round(matches.reduce((t, m) => t + m.fee, 0)), tax: round(matches.reduce((t, m) => t + m.tax, 0)), matches };
+}
+
+/* ── Returned cheques ─────────────────────────────────────────────── */
+
+const CHQ_RETURN = /\b(chq|cheque|clg|clearing|inward|outward)?\b.*\b(ret|rtn|return(ed)?|dishono?u?r(ed)?|bounced?|insuff(icient)?\s*(funds?|bal))\b/i;
+const CHARGE_WORDS = /\b(charges?|chgs?|chg|fee|gst)\b/i;
+const CHQ_NO = /\b(\d{6})\b/;
+
+interface ChequeLine {
+  id: string;
+  direction: "in" | "out";
+  amount: number;
+  txn_date: string;
+  description: string | null;
+  counterparty: string | null;
+  reference?: string | null;
+}
+
+/** The six-digit cheque number in a bank line, if it has one. */
+export function chequeNumber(t: { description: string | null; reference?: string | null }): string | null {
+  return `${t.reference ?? ""} ${t.description ?? ""}`.match(CHQ_NO)?.[1] ?? null;
+}
+
+/** A bank debit that returns a cheque deposited earlier (not the bank's charge for it). */
+export function isChequeReturn(t: { direction: "in" | "out"; description: string | null }): boolean {
+  const d = t.description ?? "";
+  return t.direction === "out" && CHQ_RETURN.test(d) && !CHARGE_WORDS.test(d);
+}
+
+/**
+ * Pairs each cheque return with the deposit it reverses: same cheque number,
+ * same amount, deposited up to 45 days earlier. Both lines of a pair are
+ * neither revenue nor expense, whatever the books say yet.
+ */
+export function returnedChequePairs(lines: ChequeLine[]): { deposit: string; ret: string; cheque: string; amount: number }[] {
+  const pairs: { deposit: string; ret: string; cheque: string; amount: number }[] = [];
+  const used = new Set<string>();
+  const days = (a: string, b: string) => (new Date(b).getTime() - new Date(a).getTime()) / 864e5;
+  for (const r of lines.filter(isChequeReturn)) {
+    const no = chequeNumber(r);
+    const dep = lines.find(
+      (d) =>
+        d.direction === "in" &&
+        !used.has(d.id) &&
+        Math.abs(d.amount - r.amount) < 0.01 &&
+        days(d.txn_date, r.txn_date) >= 0 &&
+        days(d.txn_date, r.txn_date) <= 45 &&
+        (no ? chequeNumber(d) === no : false),
+    );
+    if (!dep) continue;
+    used.add(dep.id);
+    pairs.push({ deposit: dep.id, ret: r.id, cheque: no ?? "", amount: r.amount });
+  }
+  return pairs;
+}
+
+/* ── Party names ─────────────────────────────────────────────────── */
+
+const BANK_PREFIX = /^(?:(?:chq|cheque)\s*(?:dep(?:osit)?)?|dep(?:osit)?|clg|neft\s*(?:cr|dr)?|rtgs\s*(?:cr|dr)?|imps\s*(?:cr|dr)?|upi\s*(?:cr|dr)?|by|to|trf|transfer)\b[\s:/\-]*/i;
+
+/** A bank's party text without the channel words and cheque or reference numbers. */
+export function cleanParty(raw: string | null): string {
+  let s = (raw ?? "").trim();
+  for (let i = 0; i < 4; i++) {
+    const next = s.replace(BANK_PREFIX, "").replace(/^\d{5,}\b[\s:/\-]*/, "").trim();
+    if (next === s) break;
+    s = next;
+  }
+  return s.replace(/[\s\-/]+\d{6,}$/, "").trim() || (raw ?? "").trim();
 }

@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { Link, useParams } from "@tanstack/react-router";
+import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { ChevronLeft } from "lucide-react";
-import { Badge, Card, EmptyState, PageHeader, Stat, Tabs, V, formatDate, formatINR } from "../ui";
+import { Badge, Card, EmptyState, Modal, PageHeader, Stat, Tabs, V, formatDate, formatINR } from "../ui";
+import AddClientModal from "../components/AddClientModal";
 import { AgentGlyph, AgentStatusBadge, AgentTimeline, AnimatedCounter, ShimmerText } from "../agents";
 import { monthOf, useV2 } from "../store";
 import { CloseProgress, NextAction } from "../components/CloseProgress";
@@ -17,12 +18,19 @@ import ReportsPage from "./ReportsPage";
 import ChaserPage from "./ChaserPage";
 import { parsePeriod } from "@/lib/practice/core";
 import { openExceptionsIn } from "../lib/exceptions";
+import { MatchDrawer } from "../components/MatchDrawer";
+import { closeStage } from "../lib/closeStage";
 
 const STATUS_LABEL: Record<string, string> = { matched: "Matched", exception: "Exception", unmatched: "Not run", ignored: "Ignored" };
 
 export default function ClientWorkspacePage() {
   const { clientId } = useParams({ from: "/v2/clients/$clientId" });
-  const { clients, docs, exceptions, reports, chases, review, runs, recon, runRecon, generateReport, period, closeStateFor, activityFor, agentRunsFor, isReadyForMis } = useV2();
+  const [viewMatch, setViewMatch] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const [archiveReason, setArchiveReason] = useState("");
+  const navigate = useNavigate();
+  const { canSignOff, role, archiveClient, clients, docs, exceptions, reports, chases, review, runs, recon, runRecon, generateReport, period, closeStateFor, activityFor, agentRunsFor, isReadyForMis } = useV2();
   const client = clients.find((c) => c.id === clientId);
   // Deep links from Today ("Resolve exceptions") open the right tab: /v2/clients/:id?tab=exceptions
   const [tab, setTab] = useState(() => {
@@ -99,17 +107,16 @@ export default function ClientWorkspacePage() {
   // "All clear" only once this month has documents and nothing is open.
   const reading = cDocs.some((d) => d.status === "Uploading" || d.status === "Processing" || d.status === "Queued");
   const monthHasData = bankSide.length + bookSide.length > 0 || cDocs.some((d) => d.register && (!range || (d.date >= range.start && d.date <= range.end)));
-  const status = cDocs.length === 0 && !reading
-    ? { label: "Not started", tone: "neutral" as const }
-    : !monthHasData
-    ? reading
-      ? { label: "Reading documents", tone: "info" as const }
-      : { label: "Waiting for documents", tone: "neutral" as const }
-    : cEx.length > 0
-    ? { label: "Needs attention", tone: "bad" as const }
-    : cReview.length > 0 || cChases.length > 0
-      ? { label: "Ready for review", tone: "warn" as const }
-      : { label: "All clear", tone: "good" as const };
+  const status = closeStage({
+    hasDocs: cDocs.length > 0,
+    reading,
+    bank: bankSide,
+    books: bookSide,
+    registersInMonth: monthHasData,
+    openExceptions: cEx.length,
+    openReview: cReview.length,
+    openChases: cChases.length,
+  });
 
   return (
     <>
@@ -119,8 +126,28 @@ export default function ClientWorkspacePage() {
       <PageHeader
         title={client.name}
         subtitle={`${client.entityType}${client.gstin ? ` · ${client.gstin}` : ""} · closing ${period}`}
-        action={<Badge tone={status.tone}>{status.label}</Badge>}
+        action={
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <Badge tone={status.tone}>{status.label}</Badge>
+            <button className="v2-btn v2-btn-quiet v2-btn-sm" onClick={() => setEditing(true)} data-testid="edit-client">Edit details</button>
+            {canSignOff && role === "Partner" && (
+              <button className="v2-btn v2-btn-quiet v2-btn-sm" onClick={() => setArchiving(true)} data-testid="archive-client">Archive</button>
+            )}
+          </div>
+        }
       />
+      <AddClientModal open={editing} onClose={() => setEditing(false)} editing={client} />
+      <Modal open={archiving} onClose={() => setArchiving(false)} title={`Archive ${client.name}?`}>
+        <p style={{ fontSize: 13.5, color: V.body, margin: "0 0 12px", lineHeight: 1.6 }}>
+          The client leaves your portfolio and its follow-ups stop. Nothing is deleted: documents, matches, reports and the audit trail are kept.
+        </p>
+        <label className="v2-label" htmlFor="archive-reason">Reason (kept on the audit trail)</label>
+        <input id="archive-reason" className="v2-input" placeholder="e.g. added by mistake, duplicate of another client" value={archiveReason} onChange={(e) => setArchiveReason(e.target.value)} />
+        <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+          <button className="v2-btn v2-btn-primary" disabled={!archiveReason.trim()} onClick={() => void archiveClient(client.id, archiveReason.trim()).then((ok) => { if (ok) navigate({ to: "/v2/clients" }); })}>Archive client</button>
+          <button className="v2-btn v2-btn-quiet" onClick={() => setArchiving(false)}>Cancel</button>
+        </div>
+      </Modal>
 
       <Tabs
         value={tab}
@@ -131,7 +158,7 @@ export default function ClientWorkspacePage() {
           { value: "review", label: "Review Queue", count: cReview.length },
           { value: "exceptions", label: "Exception Queue", count: cEx.length },
           { value: "recon", label: "Recon" },
-          { value: "mis", label: "MIS", count: cReports.length },
+          { value: "mis", label: "MIS", count: cReports.filter((r) => r.period === period).length },
           { value: "chaser", label: "Chaser", count: cChases.length },
           { value: "activity", label: "Activity", count: timeline.length + agentRunsFor(client.id).length },
         ]}
@@ -237,6 +264,9 @@ export default function ClientWorkspacePage() {
                           <td className="num" style={{ color: r.amount < 0 ? V.maroon : V.green }}>{formatINR(r.amount)}</td>
                           <td><Badge tone={r.matchStatus === "matched" ? "good" : r.matchStatus === "exception" ? "bad" : r.matchStatus === "ignored" ? "neutral" : "warn"}>{STATUS_LABEL[r.matchStatus ?? "unmatched"] ?? r.matchStatus}</Badge></td>
                           <td className="v2-sticky-end" style={{ textAlign: "right" }}>
+                            {r.id && r.matchStatus === "matched" && (
+                              <button className="v2-btn v2-btn-quiet" onClick={() => setViewMatch(r.id!)} aria-label={`View match for ${r.particulars}`}>View</button>
+                            )}
                             {r.id && r.matchStatus !== "matched" && r.matchStatus !== "ignored" && (
                               r.matchStatus === "exception" || exceptions.some((e) => e.status === "open" && e.txnId === r.id) ? (
                                 <button className="v2-btn v2-btn-quiet" onClick={() => matchLine(r.id!)} aria-label={`Match ${r.particulars}`}><Link2 size={14} /> Match</button>
@@ -256,6 +286,8 @@ export default function ClientWorkspacePage() {
           )}
         </>
       )}
+
+      <MatchDrawer txnId={viewMatch} onClose={() => setViewMatch(null)} />
 
       {tab === "mis" && <ReportsPage clientId={client.id} />}
 

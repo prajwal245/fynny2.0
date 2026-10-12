@@ -19,6 +19,7 @@ import {
   useEffect,
 } from "react";
 import { toast } from "sonner";
+import { useRouter } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import {
   createPracticeChase,
@@ -30,6 +31,8 @@ import {
   reprocessPracticeDocument,
   registerPracticeUpload,
   requestPracticeReportCorrection,
+  markPracticeReportCorrected,
+  archivePracticeClient,
   resolvePracticeException,
   reopenPracticeException,
   savePracticeFirm,
@@ -147,12 +150,15 @@ export type Report = {
   /** Rows deliberately excluded because recon could not match them. */
   excluded: number;
   signedOff?: { by: string; at: string };
-  correction?: { note: string; at: string };
+  /** Matched lines for the month changed after this report was generated. */
+  stale?: boolean;
+  status?: string;
+  correction?: { note: string; at: string; byName?: string | null; resolvedAt?: string | null; resolvedByName?: string | null; resolution?: string | null };
   revenue: number;
   expenses: number;
   sources: { revenue: Txn[]; expenses: Txn[] };
   /** Cash that moved but is not revenue or expense: taxes, advances, loans, transfers. */
-  otherFlows?: { key: string; label: string; direction: "in" | "out"; amount: number; count: number; rows: Txn[] }[];
+  otherFlows?: { key: string; label: string; direction: "in" | "out"; amount: number; count: number; rows: Txn[]; net?: number; in?: number; out?: number }[];
   signedOffWithOpen?: { exceptions: number; review: number; unmatched: number } | null;
   /** Gateway payouts grossed up from the settlement report. */
   gateway?: { payouts: number; fees: number; gst_on_fees: number; settlements: string[] } | null;
@@ -429,6 +435,8 @@ type Store = {
   matchedTxns: (clientId: string) => Txn[];
   signOffReport: (reportId: string, by: string, opts?: { acknowledgeOpen?: boolean; note?: string }) => Promise<boolean>;
   requestCorrection: (reportId: string, note: string) => void;
+  markCorrected: (reportId: string, what?: string) => Promise<boolean>;
+  archiveClient: (id: string, reason: string) => Promise<boolean>;
   period: string;
   setPeriod: (p: string) => void;
   /** The last 12 months plus every month that has transactions, newest first. */
@@ -462,6 +470,7 @@ const sb = supabase as unknown as {
 };
 
 export function V2StoreProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const [clients, setClients] = useState<Client[]>([]);
   const [docs, setDocs] = useState<Doc[]>([]);
   const [review, setReview] = useState<ReviewItem[]>([]);
@@ -870,11 +879,23 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
         const d = docs.find((x) => x.name === r.title && (!r.clientId || x.clientId === r.clientId) && done.has(x.status) && x.id !== r.target && !(r as AgentRun).knownDocIds?.includes(x.id));
         if (!d) return r;
         changed = true;
-        return { ...r, trail: [...(r.trail ?? []), r.stage], stage: "Read. Checking whether Recon can run for the month…" };
+        // The file is read: the card says so and closes, instead of lingering
+        // while the follow-up checks finish in the background.
+        const n = d.rows?.length ?? 0;
+        const result =
+          d.status === "Failed"
+            ? `Could not be read${d.error ? `: ${d.error}` : ""}`
+            : d.status === "Needs review"
+              ? `Read: ${n} line${n === 1 ? "" : "s"}, some wait in the Review Queue`
+              : n
+                ? `Read: ${n} transaction${n === 1 ? "" : "s"}`
+                : "Read";
+        timers.current.push(setTimeout(() => dismissRun(r.id), d.status === "Failed" ? 12000 : 3500));
+        return { ...r, trail: [...(r.trail ?? []), r.stage.replace(/^Uploading securely$/, "Uploaded securely")], status: d.status === "Failed" ? "failed" : "succeeded", result, error: d.status === "Failed" ? d.error ?? "Could not be read" : undefined, finishedAt: Date.now() } as AgentRun;
       });
       return changed ? next : p;
     });
-  }, [docs]);
+  }, [docs, dismissRun]);
 
   const waitForClient = useCallback(async (clientId: string) => {
     await firmReady.current;
@@ -1017,6 +1038,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
         const fid = firmId.current ?? (await firmReady.current);
         if (!fid) throw new Error("Create your practice first.");
         const path = `${fid}/${clientId}/v2/${Date.now()}_${safeName(name)}`;
+        setStage("Uploading securely");
         const { error: upErr } = await sb.storage
           .from("ca-client-documents")
           .upload(path, file, {
@@ -1063,11 +1085,29 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       )
         .then((res) => {
           // The live Extract card already shows the outcome; only problems also toast.
-          if (res.duplicate)
-            toast.info(
-              `${name} was already received earlier. Nothing was added twice.`,
-              { duration: 9000 },
-            );
+          if (res.duplicate) {
+            const ex = res.existing;
+            const open = () => {
+              if (ex?.clientId) void router.navigate({ to: "/v2/clients/$clientId", params: { clientId: ex.clientId }, search: { tab: "documents", doc: ex.id } as never });
+              else void router.navigate({ to: "/v2/documents" });
+            };
+            if (ex && !ex.sameClient && clientId)
+              toast.info(
+                ex.clientId
+                  ? `${name} is already filed under ${ex.clientName ?? "another client"} (as ${ex.filename}, ${ex.at}). Nothing was added twice.`
+                  : `${name} is already in Unassigned (as ${ex.filename}). Nothing was added twice.`,
+                {
+                  duration: 15000,
+                  action: { label: "Move it here", onClick: () => void assignDocRef.current?.(ex.id, clientId) },
+                  cancel: { label: "Open it", onClick: open },
+                },
+              );
+            else
+              toast.info(`${name} was already received${ex?.at ? ` on ${ex.at}` : " earlier"}${ex?.filename && ex.filename !== name ? ` as ${ex.filename}` : ""}. Nothing was added twice.`, {
+                duration: 9000,
+                ...(ex ? { action: { label: "Open it", onClick: open } } : {}),
+              });
+          }
           else if (res.extract_status === "failed")
             toast.error(`${name}: ${res.error_message ?? "could not be read"}`);
           else warnIfOtherMonth(name, res.months ?? {});
@@ -1153,6 +1193,8 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
     },
     [refresh, waitForClient],
   );
+  const assignDocRef = useRef(assignDoc);
+  assignDocRef.current = assignDoc;
 
   const openDocument = useCallback(async (id: string) => {
     // Open the tab first so pop-up blockers allow it, then point it at the file.
@@ -1357,6 +1399,42 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
         .finally(() => {
           void refresh();
         });
+    },
+    [refresh],
+  );
+
+  const archiveClient = useCallback(
+    async (id: string, reason: string) => {
+      try {
+        await archivePracticeClient({ data: { id, reason } });
+        setClients((p) => p.filter((c) => c.id !== id));
+        toast.success("Client archived. Its history is kept.");
+        return true;
+      } catch (e) {
+        toast.error(errMsg(e));
+        return false;
+      } finally {
+        void refresh();
+      }
+    },
+    [refresh],
+  );
+
+  const markCorrected = useCallback(
+    async (reportId: string, what?: string) => {
+      setReports((p) =>
+        p.map((r) => (r.id === reportId && r.correction ? { ...r, correction: { ...r.correction, resolvedAt: new Date().toISOString(), resolution: what ?? null } } : r)),
+      );
+      try {
+        await markPracticeReportCorrected({ data: { id: reportId, what } });
+        toast.success("Marked corrected. The partner can sign off now.", { duration: 3000 });
+        return true;
+      } catch (e) {
+        toast.error(errMsg(e));
+        return false;
+      } finally {
+        void refresh();
+      }
     },
     [refresh],
   );
@@ -1742,6 +1820,8 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       matchedTxns,
       signOffReport,
       requestCorrection,
+      markCorrected,
+      archiveClient,
       clientName: (id: string) =>
         clients.find((c) => c.id === id)?.name ?? "Unassigned",
       period,
@@ -1770,6 +1850,8 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       matchedTxns,
       signOffReport,
       requestCorrection,
+      markCorrected,
+      archiveClient,
       period,
       periods,
       role,

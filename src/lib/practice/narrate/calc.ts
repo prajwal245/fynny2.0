@@ -304,7 +304,7 @@ const sourceLabel = (ids: string[]) =>
   `${ids.length} transaction${ids.length === 1 ? "" : "s"}`;
 
 /** Insights written by rules. Always grounded; used alone when no AI is configured. */
-export function ruleInsights(f: MisFigures, matched: NarrateTxn[]): Insight[] {
+export function ruleInsights(f: MisFigures, matched: NarrateTxn[], revenue?: NarrateTxn[]): Insight[] {
   const out: Insight[] = [];
   const n = f.numbers;
   if (!matched.length) return out;
@@ -327,12 +327,17 @@ export function ruleInsights(f: MisFigures, matched: NarrateTxn[]): Insight[] {
       source: sourceLabel(netIds),
     });
   }
-  const topR = f.receipts_by_party[0];
-  if (topR && n.total_receipts.value > 0 && f.receipts_by_party.length > 1) {
-    const share = round2((topR.total / n.total_receipts.value) * 100);
+  // Concentration is measured against revenue, not every rupee in (loans and
+  // capital would hide how much the client depends on one customer).
+  const base = revenue ?? matched.filter((t) => t.direction === "in");
+  const baseTotal = sumRupees(base.map((t) => t.amount));
+  const parties = groupParties(base.filter((t) => t.direction === "in"));
+  const topR = parties[0];
+  if (topR && baseTotal > 0 && parties.length > 1) {
+    const share = round2((topR.total / baseTotal) * 100);
     if (share >= 40) {
       out.push({
-        text: `${topR.party} accounts for ${share}% of receipts (${inr(topR.total)} across ${topR.count} transaction${topR.count === 1 ? "" : "s"}), a concentration worth noting.`,
+        text: `${topR.party} accounts for ${share}% of ${revenue ? "revenue" : "receipts"} (${inr(topR.total)} across ${topR.count} transaction${topR.count === 1 ? "" : "s"}), a concentration worth noting.`,
         cited_transaction_ids: topR.txn_ids,
         confidence: 1,
         origin: "rules",

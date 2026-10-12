@@ -5,7 +5,7 @@
  */
 import { useState } from "react";
 import { toast } from "sonner";
-import { FileWarning, Lightbulb, RotateCcw, Trash2, UserPlus } from "lucide-react";
+import { Check, FileWarning, Lightbulb, RotateCcw, Trash2, UserPlus } from "lucide-react";
 import { Card, V } from "../ui";
 import { ReviewItem, useV2 } from "../store";
 
@@ -111,6 +111,17 @@ export function ReviewGuide({ items }: { items: ReviewItem[] }) {
                       }}
                     >
                       <RotateCcw size={15} /> Read again as a register
+                    </button>
+                  )}
+                  {!unassigned && !looksLikeRegister && (
+                    <button
+                      className="v2-btn v2-btn-ghost"
+                      onClick={() => {
+                        g.items.forEach((r) => resolveReview(r.id, "confirmed"));
+                        toast.success(`${n} row${n === 1 ? "" : "s"} from ${g.docName} confirmed as transactions`);
+                      }}
+                    >
+                      <Check size={15} /> Confirm all {n}
                     </button>
                   )}
                   <button

@@ -64,6 +64,8 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
           "id, business_id, client_name, client_email, client_phone, gstin, notes, do_not_disturb, created_at",
         )
         .eq("ca_firm_id", f)
+        // Archived clients keep their history but leave the workspace.
+        .neq("client_status", "archived")
         .order("created_at", { ascending: false }),
       db
         .from("ca_document_extractions")
@@ -92,7 +94,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       db
         .from("ca_reports_log")
         .select(
-          "id, business_id, period, report_type, content, created_at, signed_off_at, status",
+          "id, business_id, period, period_start, period_end, report_type, content, created_at, signed_off_at, status, input_hash",
         )
         .eq("ca_firm_id", f)
         .order("created_at", { ascending: false })
@@ -405,6 +407,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
     };
   });
 
+  const staleIds = await staleReportIds(db, ctx.firmId, (rRes.data ?? []) as ReportRow[]);
   const reports = (rRes.data ?? []).map((r) => {
     const c = (r.content ?? {}) as Record<string, unknown> & {
       signedOffBy?: string;
@@ -435,7 +438,18 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
             at: String(r.signed_off_at).slice(0, 10),
           }
         : undefined,
-      correction: c.correction ?? undefined,
+      stale: staleIds.has(r.id),
+      status: r.status ?? "generated",
+      correction: (c.correction as Record<string, string | null> | null)?.note
+        ? {
+            note: (c.correction as Record<string, string | null>).note,
+            at: (c.correction as Record<string, string | null>).at,
+            byName: (c.correction as Record<string, string | null>).by_name ?? null,
+            resolvedAt: (c.correction as Record<string, string | null>).resolved_at ?? null,
+            resolvedByName: (c.correction as Record<string, string | null>).resolved_by_name ?? null,
+            resolution: (c.correction as Record<string, string | null>).resolution ?? null,
+          }
+        : undefined,
     };
   });
 
@@ -585,4 +599,56 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
     agentRuns,
     readyForMis,
   };
+}
+
+interface ReportRow {
+  id: string;
+  business_id: string;
+  period_start: string | null;
+  period_end: string | null;
+  input_hash: string | null;
+}
+
+/**
+ * Reports whose matched bank lines have changed since they were generated
+ * (a revised ledger, a new recon, an unmatch): same fingerprint the report
+ * was made from, recomputed from today's data.
+ */
+async function staleReportIds(db: Db, firmId: string, rows: ReportRow[]): Promise<Set<string>> {
+  const out = new Set<string>();
+  const checkable = rows.filter((r) => r.input_hash && r.period_start && r.period_end && r.business_id);
+  if (!checkable.length) return out;
+  const { sha256Hex } = await import("./core");
+  const byBiz = new Map<string, ReportRow[]>();
+  for (const r of checkable) (byBiz.get(r.business_id) ?? byBiz.set(r.business_id, []).get(r.business_id)!).push(r);
+  await Promise.all(
+    [...byBiz.entries()].map(async ([biz, list]) => {
+      const from = list.reduce((m, r) => (r.period_start! < m ? r.period_start! : m), list[0].period_start!);
+      const to = list.reduce((m, r) => (r.period_end! > m ? r.period_end! : m), list[0].period_end!);
+      const { data } = await db
+        .from("ca_txns")
+        .select("id, amount, txn_date, direction")
+        .eq("ca_firm_id", firmId)
+        .eq("business_id", biz)
+        .eq("side", "bank")
+        .eq("match_status", "matched")
+        .gte("txn_date", from)
+        .lte("txn_date", to)
+        .limit(20000);
+      const lines = data ?? [];
+      for (const r of list) {
+        const inPeriod = lines.filter((t) => String(t.txn_date) >= r.period_start! && String(t.txn_date) <= r.period_end!);
+        const hash = await sha256Hex(
+          new TextEncoder().encode(
+            inPeriod
+              .map((t) => `${t.id}:${Number(t.amount)}:${t.txn_date}:${t.direction}`)
+              .sort()
+              .join("|"),
+          ),
+        );
+        if (hash !== r.input_hash) out.add(r.id);
+      }
+    }),
+  );
+  return out;
 }

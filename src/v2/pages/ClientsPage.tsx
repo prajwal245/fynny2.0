@@ -8,11 +8,21 @@ import AddClientModal from "../components/AddClientModal";
 export default function ClientsPage() {
   const { clients } = useV2();
   const [q, setQ] = useState("");
-  const [adding, setAdding] = useState(false);
+  // "?add=1" (from the first-run guide) opens Add client straight away.
+  const [adding, setAdding] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("add") === "1");
   const navigate = useNavigate();
 
   const filtered = useMemo(
-    () => clients.filter((c) => c.name.toLowerCase().includes(q.trim().toLowerCase())),
+    () => {
+      const needle = q.trim().toLowerCase();
+      if (!needle) return clients;
+      // Name, GSTIN, PAN (characters 3 to 12 of the GSTIN), contact person and email.
+      return clients.filter((c) =>
+        [c.name, c.gstin, c.gstin ? c.gstin.slice(2, 12) : "", c.contactName, c.email]
+          .filter(Boolean)
+          .some((v) => String(v).toLowerCase().includes(needle)),
+      );
+    },
     [clients, q],
   );
 
@@ -35,7 +45,7 @@ export default function ClientsPage() {
         <>
           <Card style={{ padding: 14, marginBottom: 16, display: "flex", alignItems: "center", gap: 10 }}>
             <Search size={16} color={V.muted} />
-            <input className="v2-input" style={{ border: "none", padding: 0 }} placeholder="Search clients" value={q} onChange={(e) => setQ(e.target.value)} />
+            <input className="v2-input" style={{ border: "none", padding: 0 }} placeholder="Search by name, GSTIN, PAN, contact or email" aria-label="Search clients" value={q} onChange={(e) => setQ(e.target.value)} />
           </Card>
 
           <Card style={{ padding: 0 }} className="v2-scroll">

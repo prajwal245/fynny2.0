@@ -137,6 +137,9 @@ afterAll(async () => {
 describe.runIf(RUN)("Gmail intake end to end", () => {
   let db: import("@/lib/practice/db.server").Db;
   let connId = "";
+  let clientName = "";
+  let oldPath = "";
+  let oldDocId = "";
 
   const ledger = async (messageId: string) => {
     const { data } = await db.from("ca_gmail_processed").select("part_id, outcome, reason, extraction_id, business_id").eq("connection_id", connId).eq("message_id", messageId);
@@ -178,6 +181,20 @@ describe.runIf(RUN)("Gmail intake end to end", () => {
       .single();
     if (error) throw error;
     connId = data!.id;
+    // Emails that only the subject ties to the client, and a teammate's own email.
+    const { data: client } = await db.from("ca_clients").select("client_name").eq("ca_firm_id", FIRM).eq("business_id", CLIENT).single();
+    clientName = String(client!.client_name);
+    inbox.m14_subject = msg(`m14-${stamp}`, { From: `Accounts <ac.${stamp}@new-auditor.in>`, Subject: `${clientName} statement for September`, "Authentication-Results": pass }, [att("1", "sbi_sep.csv", "text/csv", csv(`SUBJ-${stamp}`))]);
+    inbox.m15_teammate = msg(`m15-${stamp}`, { From: `Priya <${STAFF_EMAIL}>`, Subject: "Scanned papers", "Authentication-Results": pass }, [att("1", "scan.csv", "text/csv", csv(`TEAM-${stamp}`))]);
+    // Left behind by the old rule: an unfiled document from a sender with no link to a client.
+    oldPath = `${FIRM}/unassigned/gmail/old-${stamp}.csv`;
+    await db.storage.from("ca-client-documents").upload(oldPath, new TextEncoder().encode(csv(`OLD-${stamp}`)), { contentType: "text/csv", upsert: true });
+    const { data: old } = await db
+      .from("ca_document_extractions")
+      .insert({ ca_firm_id: FIRM, business_id: null, original_filename: "groww_contract_note.csv", storage_path: oldPath, source_type: "gmail", gmail_message_id: `old-${stamp}`, gmail_match_method: "none", content_hash: `old-${stamp}`, extract_status: "queued", source_metadata: {} })
+      .select("id")
+      .single();
+    oldDocId = old!.id;
   });
 
   it("files, skips and explains each kind of email correctly", async () => {
@@ -192,11 +209,28 @@ describe.runIf(RUN)("Gmail intake end to end", () => {
     const d1 = await docsFor(inbox.m1_client.id);
     expect(d1.map((d) => [d.original_filename, d.business_id])).toEqual([["hdfc_sep.csv", CLIENT]]);
 
-    // 2. Unknown sender: waits in Unassigned with a reason.
-    const d2 = await docsFor(inbox.m2_unknown.id);
-    expect(d2).toHaveLength(1);
-    expect(d2[0].business_id).toBeNull();
-    expect(d2[0].error_message).toMatch(/not the email of any client/);
+    // 2. Unknown sender with nothing tying it to a client: left alone, and
+    //    neither its subject nor its sender is kept.
+    expect(await docsFor(inbox.m2_unknown.id)).toHaveLength(0);
+    const { data: l2 } = await db.from("ca_gmail_processed").select("outcome, reason, subject, sender_email").eq("connection_id", connId).eq("message_id", inbox.m2_unknown.id);
+    expect(l2).toEqual([{ outcome: "skipped", reason: "not from or about a client", subject: null, sender_email: null }]);
+
+    // 14. New sender, but the subject names the client: taken in, client suggested.
+    const d14 = await docsFor(inbox.m14_subject.id);
+    expect(d14).toHaveLength(1);
+    expect(d14[0].business_id).toBeNull();
+    expect((d14[0].source_metadata as Record<string, unknown>).suggested_business_id).toBe(CLIENT);
+
+    // 15. A teammate's own email: taken in for someone to file.
+    const d15 = await docsFor(inbox.m15_teammate.id);
+    expect(d15).toHaveLength(1);
+    expect(d15[0].gmail_match_method).toBe("internal");
+
+    // Clean-up: the old rule's unrelated document and its file are gone.
+    const { data: gone } = await db.from("ca_document_extractions").select("id").eq("id", oldDocId);
+    expect(gone).toEqual([]);
+    const { data: file } = await db.storage.from("ca-client-documents").download(oldPath);
+    expect(file).toBeNull();
 
     // 3. Forwarded by staff: the client inside the forward is the sender.
     const d3 = await docsFor(inbox.m3_forward.id);
@@ -213,8 +247,10 @@ describe.runIf(RUN)("Gmail intake end to end", () => {
     expect(await docsFor(inbox.m5_duplicate.id)).toHaveLength(0);
     expect((await ledger(inbox.m5_duplicate.id)).find((l) => l.part_id === "1")?.outcome).toBe("duplicate");
 
-    // 6. FynHelp's own email: ignored.
+    // 6. FynHelp's own email: ignored, nothing about it kept.
     expect((await ledger(inbox.m6_system.id))[0].outcome).toBe("skipped");
+    const { data: l6 } = await db.from("ca_gmail_processed").select("subject, sender_email").eq("connection_id", connId).eq("message_id", inbox.m6_system.id);
+    expect(l6![0]).toEqual({ subject: null, sender_email: null });
 
     // 7. Google failed twice on the attachment: retried and filed.
     expect((await docsFor(inbox.m7_flaky.id))[0]?.business_id).toBe(CLIENT);
@@ -261,10 +297,11 @@ describe.runIf(RUN)("Gmail intake end to end", () => {
   it("learns a sender once a person files their document", async () => {
     const { assignDocument } = await import("@/lib/practice/documents.server");
     const { pollGmailInboxes } = await import("@/lib/practice/gmailIntake.server");
-    const [d2] = await docsFor(inbox.m2_unknown.id);
+    const [d2] = await docsFor(inbox.m14_subject.id);
     const { data: firm } = await db.from("ca_firms").select("user_id, firm_name").eq("id", FIRM).single();
     await assignDocument(db, { firmId: FIRM, firmName: firm!.firm_name, firmEmail: null, userId: firm!.user_id, role: "owner" }, d2.id, CLIENT);
-    inbox.m13_learned = msg(`m13-${stamp}`, { From: `Someone <new.contact.${stamp}@example-traders.in>`, "Authentication-Results": pass }, [att("1", "sep2.csv", "text/csv", csv(`LEARN-${stamp}`))]);
+    // Same sender, a subject that no longer names the client: known now.
+    inbox.m13_learned = msg(`m13-${stamp}`, { From: `Accounts <ac.${stamp}@new-auditor.in>`, "Authentication-Results": pass }, [att("1", "sep2.csv", "text/csv", csv(`LEARN-${stamp}`))]);
     await pollGmailInboxes({ firmId: FIRM, budgetMs: 60_000 });
     const [d13] = await docsFor(inbox.m13_learned.id);
     expect(d13.business_id).toBe(CLIENT);

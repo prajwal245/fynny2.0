@@ -3,7 +3,7 @@ import ContactPage from "@/pages/ContactPage";
 import { breadcrumbLd, seo, webPageLd } from "@/lib/seo";
 
 const description =
-  "Talk to FynHelp about pricing, the free Pilot for small practices, or moving your firm's month-end close onto FynHelp. A person replies within one working day.";
+  "Talk to FynHelp about pricing, the 14-day free trial, or moving your firm's month-end close onto FynHelp. A person replies within one working day.";
 
 export const Route = createFileRoute("/_main/contact")({
   component: ContactPage,

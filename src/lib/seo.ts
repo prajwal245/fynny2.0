@@ -144,7 +144,6 @@ export function websiteLd(): JsonLd {
 
 /** Plans as shown on /pricing (monthly, exclusive of GST). Keep in step with the pricing page. */
 const PLANS = [
-  { name: "Pilot", price: "0", description: "Extract, Recon and Narrate for up to 3 client entities, free." },
   { name: "Starter", price: "2999", description: "15 active client entities included, unlimited users." },
   { name: "Professional", price: "5999", description: "40 active client entities included, Chaser follow-ups, unlimited users." },
   { name: "Scale", price: "12999", description: "100 active client entities included, unlimited users." },

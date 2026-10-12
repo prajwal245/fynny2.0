@@ -173,6 +173,10 @@ export async function handleWhatsappWebhook(payload: {
         });
         continue;
       }
+      if (!(await (await import("./billing.server")).firmCanWork(db, channel.ca_firm_id))) {
+        results.push({ message: "-", status: "firm paused: trial or plan ended" });
+        continue;
+      }
       await db
         .from("ca_whatsapp_channels")
         .update({ last_message_at: new Date().toISOString() })

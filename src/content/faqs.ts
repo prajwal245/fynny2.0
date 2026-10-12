@@ -12,6 +12,10 @@ export const HOME_FAQS: [string, string][] = [
 
 export const PRICING_FAQS: [string, string][] = [
   [
+    "How does the free trial work?",
+    "Every firm gets 14 days of Starter free, for up to 15 clients, with no card. Choose a plan any time from Settings, Billing and pay through Razorpay by UPI, card or net banking. If the trial ends without a plan, new uploads and reconciliations pause, but your data stays and you can still view and export it.",
+  ],
+  [
     "What counts as an active client entity?",
     "Any client entity with at least one document processed or reconciliation run in the calendar month. Clients you did not touch that month cost you nothing — you pay for work you actually did.",
   ],

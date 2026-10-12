@@ -579,8 +579,13 @@ export async function pollGmailInboxes(opts: { firmId?: string; budgetMs?: numbe
 
   const internalByFirm = new Map<string, Set<string>>();
   const inboxes: InboxResult[] = [];
+  const { firmCanWork } = await import("./billing.server");
+  const working = new Map<string, boolean>();
   for (const conn of conns) {
     if (Date.now() > deadlineAt) break;
+    // A firm whose trial or plan has ended is not read until it chooses a plan.
+    if (!working.has(conn.ca_firm_id)) working.set(conn.ca_firm_id, await firmCanWork(db, conn.ca_firm_id));
+    if (!working.get(conn.ca_firm_id)) continue;
     if (!internalByFirm.has(conn.ca_firm_id)) internalByFirm.set(conn.ca_firm_id, await firmAddresses(db, conn.ca_firm_id, conns));
     inboxes.push(await pollInbox(db, conn, internalByFirm.get(conn.ca_firm_id)!, deadlineAt, opts.trigger ?? "background"));
   }

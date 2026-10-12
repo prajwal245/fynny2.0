@@ -28,7 +28,7 @@ const STYLES = `
 .fh-form-done .tick { width:52px; height:52px; border-radius:99px; background:rgba(31,90,70,.12); color:${C.green}; font-size:22px; font-weight:700; display:flex; align-items:center; justify-content:center; margin:0 auto 16px; }
 `;
 
-const TOPICS = ["Starting a trial", "Pricing and plans", "The free Pilot program", "CA firm partnership", "Something else"];
+const TOPICS = ["Starting a trial", "Pricing and plans", "Plans and billing", "CA firm partnership", "Something else"];
 
 export default function ContactPage() {
   const [name, setName] = useState("");
@@ -62,7 +62,7 @@ export default function ContactPage() {
                   Talk to a human, <span className="ital">not a ticket queue.</span>
                 </h1>
                 <p className="sub" style={{ marginInline: "auto" }}>
-                  Questions on pricing, the free Pilot program, or onboarding your firm's book of
+                  Questions on pricing, the free trial, or onboarding your firm's book of
                   clients — we reply within one working day.
                 </p>
               </div>
@@ -87,8 +87,7 @@ export default function ContactPage() {
               <div className="fh-ccard">
                 <h3>Pricing and plans</h3>
                 <p>
-                  Per-client billing, flat-firm quotes, and the free Pilot program for books under
-                  three clients. <a href="mailto:pricing@fynhelp.com">pricing@fynhelp.com</a>
+                  Per-client billing, flat-firm quotes, and the 14-day free trial. <a href="mailto:pricing@fynhelp.com">pricing@fynhelp.com</a>
                 </p>
               </div>
             </Reveal>

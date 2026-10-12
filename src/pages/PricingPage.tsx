@@ -125,8 +125,8 @@ const TIERS: Tier[] = [
         ],
       },
     ],
-    cta: { label: "Start free", to: SIGNUP_URL },
-    trialNote: "Free to start · no card required",
+    cta: { label: "Start free trial", to: SIGNUP_URL },
+    trialNote: "14-day free trial · no card required",
   },
   {
     name: "Professional",
@@ -151,8 +151,8 @@ const TIERS: Tier[] = [
         ],
       },
     ],
-    cta: { label: "Start free", to: SIGNUP_URL, primary: true },
-    trialNote: "Free to start · no card required",
+    cta: { label: "Start free trial", to: SIGNUP_URL, primary: true },
+    trialNote: "14-day free trial · no card required",
   },
   {
     name: "Scale",
@@ -323,7 +323,7 @@ export default function PricingPage() {
 
         <Reveal delay={120}>
           <div className="fh-trust">
-            <span><b>Free to start</b> · no card</span>
+            <span><b>14-day free trial</b> · no card</span>
             <span><b>Cancel anytime</b></span>
             <span><b>Unlimited users</b> on all tiers</span>
                         <span><b>Every number</b> source-traceable</span>
@@ -394,14 +394,15 @@ export default function PricingPage() {
         <Reveal>
           <div className="fh-pilot">
             <h3>
-              Fewer than 3 clients? <span className="ital">The Pilot program is free.</span>
+              Try Starter free <span className="ital">for 14 days.</span>
             </h3>
             <p>
-              The full Extract, Recon, Narrate pipeline for up to 3 client entities. No card, no
-              clock — we only ask for feedback while we build alongside you.
+              Extract, Recon, Narrate and Chaser for up to 15 clients, with your whole team. No card
+              needed. Choose a plan any time; you pay only from the day you choose, through Razorpay
+              (UPI, cards or net banking).
             </p>
-            <Link to={SIGNUP_URL} className="fh-btn fh-btn-coral" onClick={() => trackCta("start", "pricing-pilot")}>
-              Start the free Pilot
+            <Link to={SIGNUP_URL} className="fh-btn fh-btn-coral" onClick={() => trackCta("start", "pricing-trial")}>
+              Start the 14-day free trial
             </Link>
           </div>
         </Reveal>
@@ -422,7 +423,7 @@ export default function PricingPage() {
       <CtaBand
         title="Start with one client."
         italic="Scale when the book does."
-        lead="Free to start. Unlimited users from day one, and every number stays traceable to its source document."
+        lead="14-day free trial of Starter. Unlimited users from day one, and every number stays traceable to its source document."
         location="pricing-final"
       />
     </SiteShell>

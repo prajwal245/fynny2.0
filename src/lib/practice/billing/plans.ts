@@ -125,3 +125,10 @@ export function statusFromRazorpay(s: string): BillingStatus | null {
 export function planEnvKey(plan: PlanKey, cycle: Cycle): string {
   return `RAZORPAY_PLAN_${plan.toUpperCase()}_${cycle.toUpperCase()}`;
 }
+
+/** What one billing period of a plan costs, in paise, with GST added on top when a rate is given. */
+export function planAmountPaise(plan: PlanKey, cycle: Cycle, gstPercent = 0): number {
+  const rupees = cycle === "annual" ? PLANS[plan].annual : PLANS[plan].monthly;
+  const gst = Number.isFinite(gstPercent) && gstPercent > 0 ? gstPercent : 0;
+  return Math.round(rupees * 100 * (1 + gst / 100));
+}

@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "@tanstack/react-router";
+import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { ChevronLeft, Download, Printer } from "lucide-react";
 import { Card, Drawer, EmptyState, PageHeader, V, formatDate, formatINR } from "../ui";
 import { AgentStatusBadge, AnimatedCounter, FadeIn, RowSkeleton } from "../agents";
 import { Txn, monthOf, useV2 } from "../store";
-import { downloadExcel, printReport } from "../lib/exportReport";
+import { downloadExcel, downloadPdf, flowMoney, printReport } from "../lib/exportReport";
 import { toast } from "sonner";
 import { openExceptions } from "../lib/exceptions";
+import { latestIds } from "../lib/reportStatus";
 
 /** Older reports stored "SALARY — SALARY": show the text once. */
 function dedupeParticulars(p: string): string {
@@ -17,7 +18,7 @@ function dedupeParticulars(p: string): string {
 
 export default function ReportDetailPage() {
   const { reportId } = useParams({ from: "/v2/reports/$reportId" });
-  const { reports, clientName, firm, session, signOffReport, requestCorrection, partnerView, exceptions, review, docs } = useV2();
+  const { reports, clientName, firm, session, signOffReport, requestCorrection, markCorrected, generateReport, partnerView, exceptions, review, docs } = useV2();
   const report = reports.find((r) => r.id === reportId);
   const [source, setSource] = useState<{ label: string; rows: Txn[] } | null>(null);
   const [insightsReady, setInsightsReady] = useState(false);
@@ -28,6 +29,11 @@ export default function ReportDetailPage() {
   const [signing, setSigning] = useState(false);
   const [reopening, setReopening] = useState(false);
   const [reopenReason, setReopenReason] = useState("");
+  const [fixNote, setFixNote] = useState("");
+  const [overrideNote, setOverrideNote] = useState("");
+  const [regenerating, setRegenerating] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const t = setTimeout(() => setInsightsReady(true), 900);
@@ -55,9 +61,16 @@ export default function ReportDetailPage() {
     open.unmatched && `${open.unmatched} unreconciled bank line${open.unmatched === 1 ? "" : "s"}`,
   ].filter(Boolean).join(", ");
   const exceptionTemplate = report.template === "Exception and Review Summary";
+  const correctionOpen = !!report.correction && !report.correction.resolvedAt;
+  const latestSet = latestIds(reports);
+  const isLatest = latestSet.has(report.id);
+  const latestId = [...latestSet].find((id) => { const o = reports.find((x) => x.id === id); return o && o.clientId === report.clientId && o.period === report.period && o.template === report.template; });
   const signOff = async () => {
     setSigning(true);
-    const ok = await signOffReport(report.id, session?.name ?? "Partner", { acknowledgeOpen: openTotal > 0 && ackOpen });
+    const ok = await signOffReport(report.id, session?.name ?? "Partner", {
+      acknowledgeOpen: (openTotal > 0 && ackOpen) || (correctionOpen && !!overrideNote.trim()),
+      note: correctionOpen ? `Signed off without the requested correction: ${overrideNote.trim()}` : undefined,
+    });
     setSigning(false);
     if (ok) {
       setConfirming(false);
@@ -100,11 +113,44 @@ export default function ReportDetailPage() {
         action={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <AgentStatusBadge agent="narrate" label="Narrate" />
-            <button className="v2-btn v2-btn-ghost" onClick={() => { printReport(report, meta); toast.success("Choose Save as PDF in the print dialog"); }}><Printer size={15} /> PDF</button>
+            <button className="v2-btn v2-btn-ghost" data-testid="download-pdf" disabled={pdfBusy} onClick={() => {
+              setPdfBusy(true);
+              void downloadPdf(report, meta)
+                .then(() => toast.success("PDF downloaded", { duration: 2500 }))
+                .catch(() => toast.error("The PDF could not be created. Try Print instead."))
+                .finally(() => setPdfBusy(false));
+            }}><Download size={15} /> {pdfBusy ? "Preparing PDF…" : "PDF"}</button>
+            <button className="v2-btn v2-btn-quiet" onClick={() => printReport(report, meta)} aria-label="Print"><Printer size={15} /></button>
             <button className="v2-btn v2-btn-ghost" onClick={() => { void downloadExcel(report, meta).then(() => toast.success("Excel file downloaded", { duration: 2500 })).catch(() => toast.error("The Excel file could not be created. Try again.")); }}><Download size={15} /> Excel</button>
           </div>
         }
       />
+
+      {(report.stale || !isLatest) && (
+        <Card style={{ marginBottom: 18, borderLeft: `3px solid ${V.maroon}` }} data-testid="stale-banner">
+          <div style={{ display: "flex", gap: 12, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
+            <div style={{ fontSize: 13.5, minWidth: 0 }}>
+              {!isLatest ? (
+                <><b>A newer version exists.</b> This {report.template} for {report.period} has been superseded.</>
+              ) : (
+                <><b>Data changed since this report was generated.</b> Matched lines for {report.period} are different now (a new upload, recon run or unmatch). Regenerate before sending it to the client.</>
+              )}
+            </div>
+            {isLatest ? (
+              <button className="v2-btn v2-btn-primary" disabled={regenerating} onClick={() => {
+                setRegenerating(true);
+                generateReport(report.clientId, report.period, report.template, (r) => {
+                  setRegenerating(false);
+                  toast.success("Regenerated");
+                  navigate({ to: "/v2/reports/$reportId", params: { reportId: r.id } });
+                });
+              }}>{regenerating ? "Regenerating…" : "Regenerate"}</button>
+            ) : (
+              <Link className="v2-btn v2-btn-ghost" to="/v2/reports/$reportId" params={{ reportId: latestId! }}>Open the latest</Link>
+            )}
+          </div>
+        </Card>
+      )}
 
       {report.warnings && report.warnings.length > 0 && (
         <Card style={{ marginBottom: 18, borderLeft: `3px solid ${V.beige}`, background: V.cream }}>
@@ -137,11 +183,26 @@ export default function ReportDetailPage() {
             )}
           </div>
         ) : report.correction ? (
-          <div>
-            <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: V.muted, fontWeight: 700 }}>Correction requested</div>
-            <div style={{ fontSize: 14, marginTop: 6 }}>{report.correction.note}</div>
+          <div data-testid="correction-card">
+            <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: V.muted, fontWeight: 700 }}>
+              {report.correction.resolvedAt ? "Correction done" : "Correction requested"}
+            </div>
+            <div style={{ fontSize: 14, marginTop: 6 }}>
+              {report.correction.byName ? <b>{report.correction.byName}: </b> : null}"{report.correction.note}"
+            </div>
+            {report.correction.resolvedAt ? (
+              <div style={{ fontSize: 13, color: V.body, marginTop: 6 }}>
+                Marked corrected{report.correction.resolvedByName ? ` by ${report.correction.resolvedByName}` : ""} on {formatDate(report.correction.resolvedAt)}
+                {report.correction.resolution ? `: ${report.correction.resolution}` : "."}
+              </div>
+            ) : (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
+                <input className="v2-input" style={{ width: 300 }} placeholder="What was changed (optional)" value={fixNote} onChange={(e) => setFixNote(e.target.value)} />
+                <button className="v2-btn v2-btn-ghost" data-testid="mark-corrected" onClick={() => { void markCorrected(report.id, fixNote.trim() || undefined); setFixNote(""); }}>Mark corrected</button>
+              </div>
+            )}
             {partnerView && !confirming && (
-              <button className="v2-btn v2-btn-primary" style={{ marginTop: 12 }} onClick={() => setConfirming(true)}>Sign off now</button>
+              <button className="v2-btn v2-btn-primary" style={{ marginTop: 12 }} onClick={() => setConfirming(true)}>Sign off{report.correction.resolvedAt ? "" : " anyway"}</button>
             )}
           </div>
         ) : partnerView ? (
@@ -162,6 +223,14 @@ export default function ReportDetailPage() {
       {confirming && !report.signedOff && (
         <Card style={{ marginBottom: 18, borderLeft: `3px solid ${openTotal ? V.maroon : V.green}` }} data-testid="signoff-confirm">
           <div style={{ fontSize: 14.5, fontWeight: 600 }}>Sign off {clientName(report.clientId)}, {report.period}?</div>
+          {correctionOpen && (
+            <div style={{ marginTop: 8 }} data-testid="signoff-correction">
+              <div style={{ fontSize: 13.5, color: V.maroon }}>
+                A correction request is still open: "{report.correction!.note}". Mark it corrected first, or say why it no longer applies.
+              </div>
+              <input className="v2-input" style={{ marginTop: 8, width: "100%" }} placeholder="Why you are signing off without the correction" value={overrideNote} onChange={(e) => setOverrideNote(e.target.value)} />
+            </div>
+          )}
           {openTotal > 0 ? (
             <>
               <div style={{ fontSize: 13.5, color: V.body, marginTop: 6 }}>
@@ -176,7 +245,7 @@ export default function ReportDetailPage() {
             <div style={{ fontSize: 13.5, color: V.body, marginTop: 6 }}>Nothing is open for this client and month. Once signed off, the report can be shared with the client; you can reopen it later if something changes.</div>
           )}
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-            <button className="v2-btn v2-btn-primary" disabled={signing || (openTotal > 0 && !ackOpen)} data-busy={signing} onClick={signOff}>Confirm sign off</button>
+            <button className="v2-btn v2-btn-primary" disabled={signing || (openTotal > 0 && !ackOpen) || (correctionOpen && !overrideNote.trim())} data-busy={signing} onClick={signOff}>Confirm sign off</button>
             <button className="v2-btn v2-btn-quiet" onClick={() => { setConfirming(false); setAckOpen(false); }}>Cancel</button>
           </div>
         </Card>
@@ -227,12 +296,22 @@ export default function ReportDetailPage() {
           <h3 style={{ fontSize: 15.5 }}>Not counted as revenue or expenses</h3>
           <div style={{ fontSize: 12.5, color: V.muted, marginTop: 4, marginBottom: 12 }}>Cash that moved this month but is not income or expense.</div>
           <div style={{ display: "grid", gap: 8 }}>
-            {report.otherFlows.map((f) => (
-              <button key={f.key} className="v2-btn v2-btn-quiet" style={{ justifyContent: "space-between", width: "100%" }} onClick={() => setSource({ label: f.label, rows: f.rows })}>
-                <span>{f.label} · {f.count} line{f.count === 1 ? "" : "s"}</span>
-                <span className="num" style={{ color: f.direction === "out" ? V.maroon : V.green }}>{formatINR(f.direction === "out" ? -f.amount : f.amount)}</span>
-              </button>
-            ))}
+            {report.otherFlows.map((f) => {
+              const m = flowMoney(f);
+              return (
+                <button key={f.key} data-testid={`flow-${f.key}`} className="v2-btn v2-btn-quiet" style={{ justifyContent: "space-between", width: "100%", alignItems: "flex-start" }} onClick={() => setSource({ label: f.label, rows: f.rows })}>
+                  <span style={{ textAlign: "left" }}>
+                    {f.label} · {f.count} line{f.count === 1 ? "" : "s"}
+                    {m.in > 0 && m.out > 0 && (
+                      <span style={{ display: "block", fontSize: 12, color: V.muted, fontWeight: 400 }}>
+                        In {formatINR(m.in)} · Out {formatINR(m.out)}
+                      </span>
+                    )}
+                  </span>
+                  <span className="num" style={{ color: m.net < 0 ? V.maroon : m.net > 0 ? V.green : V.body }}>{formatINR(m.net)}</span>
+                </button>
+              );
+            })}
           </div>
         </Card>
       )}

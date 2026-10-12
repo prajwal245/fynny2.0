@@ -156,7 +156,7 @@ function RootComponent() {
         <HelmetProvider>
           <TooltipProvider>
             <Toaster />
-            <Sonner />
+            <Sonner position="top-center" visibleToasts={3} gap={10} />
             <RouteTracker />
             <SkipToContent />
             <ScrollManager />

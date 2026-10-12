@@ -43,6 +43,19 @@ export async function createPracticeClient(
   const name = input.name?.trim();
   if (!name) throw new PracticeError("invalid", "Client name is required.");
   const { gstin, email, phone } = clean(input);
+  // One client per name (ignoring case and punctuation) and per GSTIN.
+  const { data: existing } = await db
+    .from("ca_clients")
+    .select("client_name, gstin, client_status")
+    .eq("ca_firm_id", ctx.firmId);
+  const key = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const live = (existing ?? []).filter((c) => c.client_status !== "archived");
+  const sameName = live.find((c) => key(String(c.client_name ?? "")) === key(name));
+  if (sameName) throw new PracticeError("conflict", `A client named "${sameName.client_name}" already exists.`);
+  if (gstin) {
+    const sameGstin = live.find((c) => String(c.gstin ?? "").toUpperCase() === gstin);
+    if (sameGstin) throw new PracticeError("conflict", `${sameGstin.client_name} already has the GSTIN ${gstin}.`);
+  }
   // The screen may supply the id so it can navigate to the client straight away.
   const { data: biz, error: bizErr } = await db
     .from("businesses")
@@ -141,5 +154,30 @@ export async function updatePracticeClient(
       .from("businesses")
       .update({ business_name: patch.name.trim().slice(0, 200) })
       .eq("id", businessId);
+  return { ok: true };
+}
+
+/**
+ * Takes a client out of the workspace without deleting anything: documents,
+ * matches, reports and the audit trail stay. Partners only.
+ */
+export async function archivePracticeClient(db: Db, ctx: FirmContext, businessId: string, reason: string) {
+  const { canSignOff } = await import("./db.server");
+  if (!canSignOff(ctx)) throw new PracticeError("forbidden", "Only a partner can archive a client.");
+  const { data: c } = await db
+    .from("ca_clients")
+    .select("id, client_name")
+    .eq("ca_firm_id", ctx.firmId)
+    .eq("business_id", businessId)
+    .maybeSingle();
+  if (!c) throw new PracticeError("not_found", "Client not found.");
+  await db.from("ca_clients").update({ client_status: "archived" }).eq("id", c.id);
+  await db
+    .from("ca_document_requests")
+    .update({ status: "closed", next_follow_up_at: null })
+    .eq("ca_firm_id", ctx.firmId)
+    .eq("business_id", businessId)
+    .eq("status", "open");
+  await logActivity(db, ctx.firmId, businessId, "system", `${c.client_name} archived${reason.trim() ? `: ${reason.trim()}` : ""}. Its documents, reports and history are kept.`);
   return { ok: true };
 }

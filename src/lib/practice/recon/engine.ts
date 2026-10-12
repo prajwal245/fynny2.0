@@ -14,6 +14,7 @@
  * No AI is involved: the same input always produces the same matches, and
  * every match and exception carries the numbers that explain it.
  */
+import { returnedChequePairs } from "../narrate/flows";
 import {
   daysBetween,
   formatRupees,
@@ -83,10 +84,22 @@ export const DEFAULT_RULES: ReconRule[] = [
       "chgs",
       "sms charges",
       "sms chg",
+      "sms chgs",
+      "chq ret chgs",
+      "chq return charges",
+      "cheque return charges",
       "amc",
       "service charge",
       "min bal",
+      "non-maint",
+      "non maint",
+      "debit card fee",
+      "card fee",
+      "imps chg",
+      "neft chg",
+      "rtgs chg",
       "gst on chg",
+      "gst on charges",
     ],
     direction: "out",
     tag: "bank_charge",
@@ -374,6 +387,9 @@ export function reconcile(
     config?: Partial<ReconConfig>;
     rules?: ReconRule[];
     aliases?: CounterpartyAlias[];
+    /** Bank lines outside the run (already matched, or the prior weeks), so a
+     *  returned cheque can still be paired with its deposit. */
+    pairContext?: ReconTxn[];
   } = {},
 ): ReconOutcome {
   const cfg: ReconConfig = { ...DEFAULT_RECON_CONFIG, ...(opts.config ?? {}) };
@@ -558,10 +574,9 @@ export function reconcile(
     const rule = rules.find(
       (r) =>
         (!r.direction || r.direction === t.direction) &&
-        includesAny(
-          `${t.description ?? ""} ${t.counterparty ?? ""}`,
-          r.narration_any,
-        ),
+        (includesAny(`${t.description ?? ""} ${t.counterparty ?? ""}`, r.narration_any) ||
+          // Extract already read it as a bank charge (or interest, tax): trust that.
+          (!!t.category && t.category === r.tag)),
     );
     if (!rule) continue;
     tags[t.id] = rule.tag;
@@ -670,6 +685,7 @@ export function reconcile(
     });
   }
 
+  const bankById0 = new Map(bank.map((t) => [t.id, t]));
   // Everything left becomes an exception with a specific reason.
   const exceptions: ExceptionDecision[] = [];
   const leftBank = bank.filter((t) => !usedBank.has(t.id));
@@ -690,6 +706,19 @@ export function reconcile(
     exceptions.push(
       explain(b, books, leftBank, cfg, aliases, null, ambiguous.has(b.id)),
     );
+
+  // A returned cheque: the bank took back a deposit whose receipt is still in
+  // the books. Say so plainly instead of "no candidate".
+  const pairPool = [...bank, ...(opts.pairContext ?? []).filter((t) => t.side === "bank" && !bankById0.has(t.id))];
+  const poolById = new Map(pairPool.map((t) => [t.id, t]));
+  for (const p of returnedChequePairs(pairPool)) {
+    const e = exceptions.find((x) => x.txn_id === p.ret);
+    if (!e) continue;
+    const dep = poolById.get(p.deposit);
+    e.reason_code = "no_candidate";
+    e.candidates = [];
+    e.detail = `Cheque ${p.cheque ? `${p.cheque} ` : ""}returned${dep ? ` (deposited ${dep.txn_date}${dep.counterparty ? ` from ${dep.counterparty}` : ""})` : ""}. The receipt is still in the books: reverse it there, then mark this reconciled. The deposit is left out of revenue.`;
+  }
 
   const byStage: Record<MatchStage, number> = { exact: 0, fuzzy: 0, rules: 0 };
   let matchedPaise = 0;
@@ -923,4 +952,44 @@ export const REASON_LABELS: Record<ReasonCode, string> = {
 export function decisionCount(exceptions: { txn_id: string; side: string; candidates: { txn_id: string }[] }[]): number {
   const bankFirst = new Map(exceptions.filter((e) => e.side !== "books").map((e) => [e.txn_id, e.candidates[0]?.txn_id]));
   return exceptions.filter((e) => !(e.side === "books" && e.candidates[0] && bankFirst.get(e.candidates[0].txn_id) === e.txn_id)).length;
+}
+
+/**
+ * Pairs a partner unmatched stay apart: any match the engine proposes again
+ * for such a pair is dropped and both sides become exceptions that say why,
+ * with the other side offered as a candidate in case it was right after all.
+ */
+export function withoutUnmatchedPairs(
+  outcome: ReconOutcome,
+  blocked: Map<string, { at: string; note: string | null; by: string | null }>,
+  lines: ReconTxn[],
+): ReconOutcome {
+  if (!blocked.size) return outcome;
+  const byId = new Map(lines.map((t) => [t.id, t]));
+  const keep: MatchDecision[] = [];
+  const extra: ExceptionDecision[] = [];
+  for (const m of outcome.matches) {
+    const hit = m.book_txn_ids.map((b) => blocked.get(`${m.bank_txn_id}|${b}`)).find(Boolean);
+    if (!hit) {
+      keep.push(m);
+      continue;
+    }
+    const why = `Unmatched by ${hit.by ?? "a partner"} on ${hit.at.slice(0, 10)}${hit.note ? `: ${hit.note}` : ""}. Match it by hand if the pair is right after all.`;
+    const asCandidate = (id: string): Candidate | null => {
+      const t = byId.get(id);
+      return t ? { txn_id: t.id, score: m.score, reason: "Unmatched earlier", amount: t.amount, txn_date: t.txn_date, description: t.description } : null;
+    };
+    const bankCands = m.book_txn_ids.map(asCandidate).filter(Boolean) as Candidate[];
+    extra.push({ txn_id: m.bank_txn_id, side: "bank", reason_code: "no_candidate", stage_reached: m.stage, candidates: bankCands, tag: null, detail: why });
+    for (const b of m.book_txn_ids) {
+      const c = asCandidate(m.bank_txn_id);
+      extra.push({ txn_id: b, side: "books", reason_code: "no_candidate", stage_reached: m.stage, candidates: c ? [c] : [], tag: null, detail: why });
+    }
+  }
+  const dropped = new Set(extra.map((e) => e.txn_id));
+  return {
+    ...outcome,
+    matches: keep,
+    exceptions: [...outcome.exceptions.filter((e) => !dropped.has(e.txn_id)), ...extra],
+  };
 }

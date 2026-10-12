@@ -1,6 +1,7 @@
 /**
  * FynHelp v2 — report exports.
- * PDF uses the browser print pipeline on branded HTML; Excel is a real .xlsx
+ * PDF is a real file built from the branded HTML (jsPDF); Print uses the
+ * browser's print view of the same HTML; Excel is a real .xlsx
  * workbook (SheetJS) with one sheet per part of the report.
  */
 import type { Report } from "../store";
@@ -63,11 +64,11 @@ export function buildReportHtml(report: Report, meta: ExportMeta) {
 
   const flows = report.otherFlows ?? [];
   const otherFlowsTable = !flows.length ? "" : `
-  <h3>Taxes, advances and transfers (not revenue or expense)</h3>
+  <h3>Not counted as revenue or expenses</h3>
   <table>
     <thead><tr><th>Line</th><th class="r">Amount</th><th class="r">Transactions</th></tr></thead>
     <tbody>
-      ${flows.map((f) => `<tr><td>${esc(f.label)}</td><td class="r">${inr(f.direction === "out" ? -f.amount : f.amount)}</td><td class="r">${f.count}</td></tr>`).join("")}
+      ${flows.map((f) => { const m = flowMoney(f); return `<tr><td>${esc(f.label)}${m.in && m.out ? `<br><small>In ${inr(m.in)} · Out ${inr(m.out)}</small>` : ""}</td><td class="r">${inr(m.net)}</td><td class="r">${f.count}</td></tr>`; }).join("")}
     </tbody>
   </table>`;
   const gatewayNote = !report.gateway ? "" : `
@@ -170,7 +171,7 @@ export async function downloadExcel(report: Report, meta: ExportMeta) {
     ["Revenue", report.revenue],
     ["Expenses", report.expenses],
     ["Net", report.revenue - report.expenses],
-    ...(report.otherFlows ?? []).map((f) => [`${f.label} (not revenue/expense)`, f.direction === "out" ? -f.amount : f.amount]),
+    ...(report.otherFlows ?? []).map((f) => [`${f.label} (not revenue/expense, net)`, flowMoney(f).net]),
     [],
     ["Unmatched lines left out", report.excluded],
     ...(report.warnings ?? []).map((w) => ["Note", w]),
@@ -200,6 +201,59 @@ export async function downloadExcel(report: Report, meta: ExportMeta) {
     ],
     [26, 12, 60, 16],
   );
-  const file = `${meta.clientName.replace(/\s+/g, "-")}-${report.template.replace(/\s+/g, "-")}-${report.period.replace(/\s+/g, "-")}.xlsx`;
+  const file = reportFileName(report, meta, "xlsx");
   XLSX.writeFile(wb, file);
+}
+
+/** A flow's signed net (in positive, out negative) and its in and out totals. Older reports stored one figure; their rows still carry signed amounts. */
+export function flowMoney(f: { direction: "in" | "out"; amount: number; rows: { amount: number }[]; net?: number; in?: number; out?: number }) {
+  if (typeof f.net === "number") return { net: f.net, in: f.in ?? 0, out: f.out ?? 0 };
+  const inAmt = f.rows.filter((r) => r.amount > 0).reduce((t, r) => t + r.amount, 0);
+  const outAmt = f.rows.filter((r) => r.amount < 0).reduce((t, r) => t - r.amount, 0);
+  const round = (n: number) => Math.round(n * 100) / 100;
+  return f.rows.length ? { net: round(inAmt - outAmt), in: round(inAmt), out: round(outAmt) } : { net: f.direction === "out" ? -f.amount : f.amount, in: 0, out: 0 };
+}
+
+/** File name a CA can attach as is: Client-Name_Monthly-MIS_July-2026.pdf */
+export function reportFileName(report: Report, meta: ExportMeta, ext: "pdf" | "xlsx") {
+  const part = (s: string) => s.replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "");
+  return `${part(meta.clientName)}_${part(report.template)}_${part(report.period)}.${ext}`;
+}
+
+/**
+ * A real PDF file, downloaded straight away: the same branded layout as the
+ * print view, laid out on A4 pages. Nothing opens and the tab never locks.
+ */
+export async function downloadPdf(report: Report, meta: ExportMeta) {
+  const html = buildReportHtml(report, meta);
+  const style = html.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? "";
+  const body = html.match(/<body>([\s\S]*?)<\/body>/)?.[1] ?? "";
+  const host = document.createElement("div");
+  host.setAttribute("aria-hidden", "true");
+  host.style.cssText = "position:fixed;left:-12000px;top:0;width:794px;background:#fff;";
+  // Scope the report's own styles to this box so the app is untouched.
+  const scoped = style.replace(/(^|\})\s*([^{}@]+)\{/g, (_m, close: string, sel: string) => `${close} ${sel.split(",").map((x) => `.fyn-pdf ${x.trim() === "body" ? "" : x.trim()}`).join(", ")} {`);
+  host.innerHTML = `<style>${scoped}</style><div class="fyn-pdf" style="padding:36px;font-family:'Geist',system-ui,-apple-system,Helvetica,Arial,sans-serif;color:#141414;font-variant-numeric:tabular-nums">${body}</div>`;
+  document.body.appendChild(host);
+  try {
+    const { jsPDF } = await import("jspdf");
+    const pdf = new jsPDF({ unit: "pt", format: "a4", compress: true });
+    await new Promise<void>((resolve, reject) => {
+      pdf
+        .html(host.querySelector(".fyn-pdf") as HTMLElement, {
+          x: 0,
+          y: 0,
+          width: 595.28,
+          windowWidth: 794,
+          autoPaging: "text",
+          margin: [18, 0, 24, 0],
+          html2canvas: { scale: 0.75, backgroundColor: "#ffffff", logging: false },
+          callback: () => resolve(),
+        })
+        .catch(reject);
+    });
+    pdf.save(reportFileName(report, meta, "pdf"));
+  } finally {
+    host.remove();
+  }
 }

@@ -77,6 +77,18 @@ export function useNeedsYou(): NeedsItem[] {
         action: { label: "Fix", to: `/v2/clients/${d.clientId}?tab=documents&doc=${d.id}` },
       });
     }
+    // A correction a partner asked for is the team's job until someone marks it done.
+    for (const r of reports.filter((r) => r.correction && !r.correction.resolvedAt && !r.signedOff)) {
+      items.push({
+        key: `corr:${r.id}`,
+        rank: 0,
+        icon: <FileWarning size={16} />,
+        tone: "bad",
+        title: `Correct the ${r.template} for ${clientName(r.clientId)}, ${r.period}`,
+        detail: `${r.correction!.byName ? `${r.correction!.byName}: ` : ""}"${r.correction!.note}". Fix it, then mark it corrected on the report.`,
+        action: { label: "Open report", to: `/v2/reports/${r.id}` },
+      });
+    }
     for (const c of clients) {
       const all = openExceptions(exceptions).filter((e) => e.clientId === c.id);
       const ex = all.filter((e) => monthOf(e.date) === period).length;

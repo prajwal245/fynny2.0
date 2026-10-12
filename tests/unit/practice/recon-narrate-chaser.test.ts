@@ -461,3 +461,64 @@ describe("reason codes (retest N11)", () => {
     expect(ex.detail).toContain("more than the books");
   });
 });
+
+describe("retest round 4: money in the right bucket", () => {
+  it("pairs a returned cheque with its deposit (not the return charges)", async () => {
+    const { returnedChequePairs, isChequeReturn } = await import("@/lib/practice/narrate/flows");
+    const lines = [
+      bank("dep", "2026-07-04", 50000, "in", "CHQ DEP 123456 KAVERI FASHIONS"),
+      bank("ret", "2026-07-08", 50000, "out", "CHQ RET 123456 INSUFF FUNDS"),
+      bank("chg", "2026-07-08", 590, "out", "CHQ RETURN CHARGES INCL GST"),
+      bank("other", "2026-07-09", 50000, "in", "CHQ DEP 654321 OTHER PARTY"),
+    ];
+    expect(isChequeReturn(lines[2])).toBe(false);
+    expect(returnedChequePairs(lines)).toEqual([{ deposit: "dep", ret: "ret", cheque: "123456", amount: 50000 }]);
+  });
+
+  it("explains a returned cheque in Recon instead of 'no candidate'", () => {
+    const res = reconcile(
+      [bank("dep", "2026-07-04", 50000, "in", "CHQ DEP 123456 KAVERI FASHIONS"), bank("ret", "2026-07-08", 50000, "out", "CHQ RET 123456 INSUFF FUNDS")],
+      [book("r1", "2026-07-04", 50000, "in", "Receipt", null, "Kaveri Fashions")],
+    );
+    const e = res.exceptions.find((x) => x.txn_id === "ret")!;
+    expect(e.detail).toMatch(/Cheque 123456 returned/);
+    expect(e.detail).toMatch(/reverse it/);
+  });
+
+  it("still explains the return when its deposit was matched in an earlier run", () => {
+    const res = reconcile(
+      [bank("ret", "2026-07-08", 50000, "out", "CHQ RET 123456 INSUFF FUNDS")],
+      [],
+      { pairContext: [bank("dep", "2026-07-04", 50000, "in", "CHQ DEP 123456 KAVERI FASHIONS")] },
+    );
+    expect(res.exceptions.find((x) => x.txn_id === "ret")!.detail).toMatch(/Cheque 123456 returned \(deposited 2026-07-04/);
+  });
+
+  it("keeps receipts booked to Suspense out of revenue", async () => {
+    const { misBucket } = await import("@/lib/practice/narrate/flows");
+    expect(misBucket({ direction: "in", category: null, description: "UPI CR 99887766 Suspense A/c", counterparty: null })).toBe("unidentified");
+    expect(misBucket({ direction: "in", category: null, description: "NEFT CR SALES", counterparty: "Kaveri Fashions" })).toBe("revenue");
+    expect(misBucket({ direction: "in", category: null, description: "Director loan received", counterparty: null })).toBe("loan_capital");
+  });
+
+  it("cleans bank party text", async () => {
+    const { cleanParty } = await import("@/lib/practice/narrate/flows");
+    expect(cleanParty("DEP 123456 SUNRISE TRADERS")).toBe("SUNRISE TRADERS");
+    expect(cleanParty("CHQ DEP 123456 KAVERI FASHIONS")).toBe("KAVERI FASHIONS");
+    expect(cleanParty("NEFT CR-BIG CLIENT LTD")).toBe("BIG CLIENT LTD");
+    expect(cleanParty("Office Mart")).toBe("Office Mart");
+  });
+
+  it("measures concentration against revenue, not loans", () => {
+    const sale = (id: string, amt: number, party: string): NarrateTxn => ({ id, side: "bank", direction: "in", amount: amt, txn_date: "2026-07-05", counterparty: party, description: "NEFT CR", category: null, reference: null, balance: null, row_index: 1, extraction_id: null });
+    const matched = [sale("s1", 60000, "Kaveri"), sale("s2", 40000, "Sunrise"), sale("l1", 900000, "Director Loan")];
+    const f = computeFigures(matched, [], matched);
+    const text = ruleInsights(f, matched, matched.slice(0, 2)).map((i) => i.text).join(" ");
+    expect(text).toMatch(/Kaveri accounts for 60% of revenue/);
+  });
+
+  it("tags charges Extract recognised even with unusual wording", () => {
+    const res = reconcile([{ ...bank("c", "2026-07-08", 590, "out", "CHQ RETURN CHARGES INCL GST"), category: "bank_charge" }], []);
+    expect(res.exceptions[0].detail).toMatch(/Tagged as bank charge/);
+  });
+});

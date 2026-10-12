@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { Link } from "@tanstack/react-router";
 import { Modal, V } from "../ui";
 import { ENTITY_TYPES, useV2, Client } from "../store";
 
@@ -9,12 +10,18 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 type Form = { name: string; entityType: string; gstin: string; contactName: string; email: string; phone: string };
 
-function validate(f: Form): Partial<Record<keyof Form, string>> {
+/** Same name ignoring case, spaces and punctuation ("Sample Client Pvt. Ltd." = "sample client pvt ltd"). */
+export const sameName = (a: string, b: string) => a.toLowerCase().replace(/[^a-z0-9]/g, "") === b.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+function validate(f: Form, others: Client[]): Partial<Record<keyof Form, string>> {
   const errors: Partial<Record<keyof Form, string>> = {};
   if (!f.name.trim()) errors.name = "Enter the client's name.";
+  else if (others.some((c) => sameName(c.name, f.name))) errors.name = "A client with this name already exists.";
   const g = f.gstin.trim().toUpperCase();
   // Short enough for two lines, so the form never changes height under the cursor.
-  if (g && gstinProblem(g))
+  if (g && !gstinProblem(g) && others.some((c) => (c.gstin ?? "").toUpperCase() === g))
+    errors.gstin = "Another client already has this GSTIN.";
+  else if (g && gstinProblem(g))
     errors.gstin = g.length !== 15 || !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(g)
       ? "Should be 15 characters, like 27AABCS1429B1ZU."
       : `Last character should be ${gstinCheckChar(g.slice(0, 14))}. Check for a typo.`;
@@ -25,8 +32,10 @@ function validate(f: Form): Partial<Record<keyof Form, string>> {
 }
 
 export default function AddClientModal({ open, onClose, editing }: { open: boolean; onClose: () => void; editing?: Client }) {
-  const { addClient, updateClient } = useV2();
+  const { addClient, updateClient, clients } = useV2();
   const [form, setForm] = useState<Form>({ name: "", entityType: ENTITY_TYPES[0], gstin: "", contactName: "", email: "", phone: "" });
+  const others = clients.filter((c) => c.id !== editing?.id);
+  const twin = others.find((c) => sameName(c.name, form.name) || (!!form.gstin.trim() && (c.gstin ?? "").toUpperCase() === form.gstin.trim().toUpperCase()));
   const [errors, setErrors] = useState<Partial<Record<keyof Form, string>>>({});
 
   useEffect(() => {
@@ -50,7 +59,7 @@ export default function AddClientModal({ open, onClose, editing }: { open: boole
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    const found = validate(form);
+    const found = validate(form, others);
     setErrors(found);
     if (Object.values(found).some(Boolean)) return;
     const clean = { ...form, gstin: form.gstin.trim().toUpperCase(), phone: form.phone.replace(/[^\d+]/g, "") };
@@ -71,7 +80,17 @@ export default function AddClientModal({ open, onClose, editing }: { open: boole
       {/* Messages sit in a fixed-height line so the form never jumps when one appears or clears. */}
       <div style={{ minHeight: id === "gstin" ? 32 : 16, marginTop: 4, fontSize: 12, lineHeight: 1.35 }}>
         {errors[id] ? (
-          <div role="alert" style={{ color: V.maroon }}>{errors[id]}</div>
+          <div role="alert" style={{ color: V.maroon }}>
+            {errors[id]}
+            {twin && (id === "name" || id === "gstin") && /already/.test(errors[id] ?? "") && (
+              <>
+                {" "}
+                <Link to="/v2/clients/$clientId" params={{ clientId: twin.id }} onClick={onClose} style={{ color: V.maroon, fontWeight: 600 }}>
+                  Open {twin.name}
+                </Link>
+              </>
+            )}
+          </div>
         ) : hint ? (
           <div style={{ color: V.muted }}>{hint}</div>
         ) : null}

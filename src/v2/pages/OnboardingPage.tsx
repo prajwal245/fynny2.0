@@ -247,11 +247,11 @@ export default function OnboardingPage() {
     <div className="onb" data-step={step}>
       <style>{ONB_STYLES}</style>
       <div className="onb-main">
-        <div className="onb-brand">
+        <a className="onb-brand" href="/" aria-label="FynHelp home" style={{ color: "inherit", textDecoration: "none" }}>
           <span className="onb-logo">F</span>
           <span style={{ fontWeight: 700, letterSpacing: "-0.02em" }}>FynHelp</span>
           <span style={{ color: V.muted, fontSize: 12.5 }}>Practice OS for CA firms</span>
-        </div>
+        </a>
 
         {step > 0 && (
           <ol className="onb-rail" aria-label="Setup progress">
@@ -323,13 +323,15 @@ export default function OnboardingPage() {
                 <p className="onb-foot" style={{ textAlign: "center" }}>
                   {mode === "signup" ? (
                     <>Already have an account, or invited by your firm? <button type="button" className="v2-link" onClick={() => setMode("signin")}>Sign in</button></>
+                  ) : mode === "forgot" ? (
+                    <>Remembered it? <button type="button" className="v2-link" onClick={() => setMode("signin")}>Back to sign in</button></>
                   ) : (
                     <>New to FynHelp? <button type="button" className="v2-link" onClick={() => setMode("signup")}>Create an account</button></>
                   )}
                 </p>
                 {mode === "signup" && (
                   <p className="onb-foot" style={{ textAlign: "center", marginTop: -6 }}>
-                    Free to start. No card needed. By creating an account you agree to the{" "}
+                    14-day free trial of Starter. No card needed. By creating an account you agree to the{" "}
                     <a className="v2-link" href="/terms" target="_blank" rel="noreferrer">Terms</a> and{" "}
                     <a className="v2-link" href="/privacy" target="_blank" rel="noreferrer">Privacy policy</a>.
                   </p>

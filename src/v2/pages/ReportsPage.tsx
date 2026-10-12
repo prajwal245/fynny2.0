@@ -3,10 +3,11 @@ import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { BarChart3, Plus } from "lucide-react";
-import { Card, EmptyState, Modal, PageHeader, V, formatDate, formatINR } from "../ui";
+import { Badge, Card, EmptyState, Modal, PageHeader, V, formatDate, formatINR } from "../ui";
 import { AgentGlyph, AgentStatusBadge, ShimmerText } from "../agents";
 import { parsePeriod } from "@/lib/practice/core";
 import { REPORT_TEMPLATES, ReportTemplate, useV2 } from "../store";
+import { latestIds, reportState } from "../lib/reportStatus";
 
 const TEMPLATE_HINT: Record<ReportTemplate, string> = {
   "Monthly MIS": "Revenue, expenses, variances and the transactions behind them.",
@@ -19,7 +20,12 @@ const TEMPLATE_HINT: Record<ReportTemplate, string> = {
 /** MIS and Reports. All clients as a page; the client's MIS tab when given a clientId. */
 export default function ReportsPage({ clientId: scopedClient }: { clientId?: string } = {}) {
   const { reports: allReports, clients, clientName, generateReport, runs, isRunning, matchedTxns, period: currentPeriod, periods } = useV2();
-  const reports = scopedClient ? allReports.filter((r) => r.clientId === scopedClient) : allReports;
+  const [fClient, setFClient] = useState("");
+  const [fMonth, setFMonth] = useState("");
+  const latest = latestIds(allReports);
+  const reports = (scopedClient ? allReports.filter((r) => r.clientId === scopedClient) : allReports)
+    .filter((r) => (!fClient || r.clientId === fClient) && (!fMonth || r.period === fMonth));
+  const months = [...new Set(allReports.filter((r) => !scopedClient || r.clientId === scopedClient).map((r) => r.period))];
   const [open, setOpen] = useState(false);
   const [clientId, setClientId] = useState(scopedClient ?? clients[0]?.id ?? "");
   const [period, setPeriod] = useState(currentPeriod);
@@ -69,10 +75,23 @@ export default function ReportsPage({ clientId: scopedClient }: { clientId?: str
           description="Generate an MIS after reconciliation has matched transactions. Only matched transactions are used, and every number is source-traceable."
           action={<button className="v2-btn v2-btn-primary" onClick={() => setOpen(true)}><Plus size={15} /> Generate MIS</button>}
         />
-      ) : reports.length > 0 && (
+      ) : (reports.length > 0 || fClient || fMonth) && (
+        <>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }} data-testid="report-filters">
+          {!scopedClient && (
+            <select className="v2-input" style={{ width: "auto" }} aria-label="Client" value={fClient} onChange={(e) => setFClient(e.target.value)}>
+              <option value="">All clients</option>
+              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          )}
+          <select className="v2-input" style={{ width: "auto" }} aria-label="Month" value={fMonth} onChange={(e) => setFMonth(e.target.value)}>
+            <option value="">All months</option>
+            {months.map((m) => <option key={m} value={m}>{m}</option>)}
+          </select>
+        </div>
         <Card style={{ padding: 0 }} className="v2-scroll">
           <table className="v2-table v2-table-stack">
-            <thead><tr>{!scopedClient && <th>Client</th>}<th>Period</th><th>Template</th><th>Revenue</th><th>Expenses</th><th>Generated</th></tr></thead>
+            <thead><tr>{!scopedClient && <th>Client</th>}<th>Period</th><th>Template</th><th>Status</th><th>Revenue</th><th>Expenses</th><th>Generated</th></tr></thead>
             <tbody>
               <AnimatePresence initial={false}>
                 {reports.map((r) => (
@@ -86,7 +105,11 @@ export default function ReportsPage({ clientId: scopedClient }: { clientId?: str
                   >
                     {!scopedClient && <td style={{ fontWeight: 600 }}>{clientName(r.clientId)}</td>}
                     <td style={{ color: V.body }}>{r.period}</td>
-                    <td style={{ color: V.body }}>{r.template}</td>
+                    <td style={{ color: V.body }}>{r.template}{latest.has(r.id) && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: V.maroon }}>Latest</span>}</td>
+                    <td>
+                      <Badge tone={reportState(r, latest).tone}>{reportState(r, latest).label}</Badge>
+                      {r.stale && latest.has(r.id) && <div style={{ fontSize: 11.5, color: V.maroon, marginTop: 4 }}>Data changed since</div>}
+                    </td>
                     <td className="num" style={{ color: V.green }}>{formatINR(r.revenue)}</td>
                     <td className="num" style={{ color: V.maroon }}>{formatINR(r.expenses)}</td>
                     <td className="num" style={{ color: V.body }}>{formatDate(r.generated)}</td>
@@ -96,6 +119,7 @@ export default function ReportsPage({ clientId: scopedClient }: { clientId?: str
             </tbody>
           </table>
         </Card>
+        </>
       )}
 
       <Modal open={open} onClose={() => setOpen(false)} title="Generate MIS">

@@ -194,6 +194,55 @@ async function firmAddresses(db: Db, firmId: string, conns: Connection[]): Promi
   return out;
 }
 
+/** Recorded on emails passed over because nothing ties them to a client. */
+export const NOT_CLIENT_REASON = "not from or about a client";
+
+/**
+ * Whether an email belongs in the practice: from a client's saved address or
+ * a sender filed before, matched to a client by domain, name, GSTIN or the
+ * subject, or sent or forwarded by someone at the firm (their choice to share it).
+ */
+function isAboutClient(s: Sender): boolean {
+  return !!(s.businessId || s.suggestedBusinessId || s.method === "ambiguous" || s.method.endsWith("_forwarded") || s.method.startsWith("internal"));
+}
+
+/**
+ * Takes out what the old rule let in: documents from senders with no link to
+ * any client, still unfiled in Unassigned. Their files, rows and the email's
+ * subject and sender are removed. Anything a person already filed stays.
+ */
+export async function purgeUnrelatedGmail(db: Db, firmId: string): Promise<number> {
+  const { data } = await db
+    .from("ca_document_extractions")
+    .select("id, storage_path, gmail_message_id, source_metadata")
+    .eq("ca_firm_id", firmId)
+    .eq("source_type", "gmail")
+    .is("business_id", null)
+    .eq("gmail_match_method", "none")
+    .limit(200);
+  const rows = (data ?? []).filter((r) => !(r.source_metadata as { suggested_business_id?: string | null } | null)?.suggested_business_id);
+  if (!rows.length) return 0;
+  const paths = rows.map((r) => String(r.storage_path)).filter(Boolean);
+  if (paths.length) await db.storage.from(BUCKET).remove(paths);
+  await db.from("ca_document_extractions").delete().in("id", rows.map((r) => r.id));
+  const messages = [...new Set(rows.map((r) => r.gmail_message_id).filter(Boolean) as string[])];
+  if (messages.length) {
+    await db
+      .from("ca_gmail_processed")
+      .update({ outcome: "skipped", reason: NOT_CLIENT_REASON, subject: null, sender_email: null, filename: null, extraction_id: null, updated_at: new Date().toISOString() })
+      .eq("ca_firm_id", firmId)
+      .in("message_id", messages);
+  }
+  await db
+    .from("ca_notifications")
+    .delete()
+    .eq("ca_firm_id", firmId)
+    .eq("type", "gmail_document")
+    .is("business_id", null)
+    .like("title", "Email from % needs a client");
+  return rows.length;
+}
+
 const systemSender = (email: string) => isSystemSender(email, process.env.PRACTICE_FROM_EMAIL ?? "");
 
 /* ─────────────────────────── One email ─────────────────────────── */
@@ -276,14 +325,20 @@ async function identify(db: Db, conn: Connection, headers: { name: string; value
       name = "";
       forwarded = true;
     } else {
+      // A teammate's own email counts only when its subject names a client.
+      // No sender to match on (it is the firm itself), only the subject.
+      const bySubject = await identifyClient(db as never, conn.ca_firm_id, "subject-only@invalid.invalid", "", subject);
+      const suggested = bySubject.businessId ?? bySubject.suggestedBusinessId ?? null;
       return {
         email: from.email,
         name: from.name,
         businessId: null,
-        suggestedBusinessId: null,
-        method: "internal",
-        confidence: 0,
-        note: "Sent by someone at your firm. Choose the client this belongs to.",
+        suggestedBusinessId: suggested,
+        method: suggested ? "internal_subject" : "internal",
+        confidence: suggested ? 0.6 : 0,
+        note: suggested
+          ? "Sent by someone at your firm and the subject names this client. Confirm the client."
+          : "Sent by someone at your firm. Choose the client this belongs to.",
       };
     }
   }
@@ -354,9 +409,8 @@ async function processEmail(db: Db, conn: Connection, token: string, messageId: 
   const headers = payload.headers ?? [];
   const fromEmail = parseAddress(gmailHeader(headers, "From")).email;
 
-  const subjectLine = gmailHeader(headers, "Subject").slice(0, 300);
   if (systemSender(fromEmail)) {
-    await settle(db, conn, messageId, "*", { outcome: "skipped", reason: "email from FynHelp or a mail server", sender_email: fromEmail, subject: subjectLine });
+    await settle(db, conn, messageId, "*", { outcome: "skipped", reason: "email from FynHelp or a mail server" });
     out.skipped.system_email = (out.skipped.system_email ?? 0) + 1;
     return;
   }
@@ -367,13 +421,19 @@ async function processEmail(db: Db, conn: Connection, token: string, messageId: 
     await settle(db, conn, messageId, "*", {
       outcome: "skipped",
       reason: skipped.length ? `no documents (${[...new Set(skipped.map((s) => s.reason))].join(", ")})` : "no documents",
-      sender_email: fromEmail,
-      subject: subjectLine,
     });
     return;
   }
 
   const sender = await identify(db, conn, headers, payload, internal);
+  // Only mail from or about a client is taken in. Everything else in the
+  // inbox stays private: no attachment is downloaded and neither the sender
+  // nor the subject is kept.
+  if (!isAboutClient(sender)) {
+    await settle(db, conn, messageId, "*", { outcome: "skipped", reason: NOT_CLIENT_REASON });
+    out.skipped.not_client = (out.skipped.not_client ?? 0) + 1;
+    return;
+  }
   const subject = gmailHeader(headers, "Subject").slice(0, 300);
   await settle(db, conn, messageId, "*", { subject, sender_email: sender.email });
   const receivedAt = msg.internalDate ? new Date(Number(msg.internalDate)).toISOString() : null;
@@ -582,7 +642,10 @@ export async function pollGmailInboxes(opts: { firmId?: string; budgetMs?: numbe
   for (const conn of conns) {
     if (Date.now() > deadlineAt) break;
     // A firm whose trial or plan has ended is not read until it chooses a plan.
-    if (!working.has(conn.ca_firm_id)) working.set(conn.ca_firm_id, await firmCanWork(db, conn.ca_firm_id));
+    if (!working.has(conn.ca_firm_id)) {
+      working.set(conn.ca_firm_id, await firmCanWork(db, conn.ca_firm_id));
+      await purgeUnrelatedGmail(db, conn.ca_firm_id).catch((e) => console.error(`[fyn:gmail] cleanup failed: ${e instanceof Error ? e.message : e}`));
+    }
     if (!working.get(conn.ca_firm_id)) continue;
     if (!internalByFirm.has(conn.ca_firm_id)) internalByFirm.set(conn.ca_firm_id, await firmAddresses(db, conn.ca_firm_id, conns));
     inboxes.push(await pollInbox(db, conn, internalByFirm.get(conn.ca_firm_id)!, deadlineAt, opts.trigger ?? "background"));
@@ -723,7 +786,7 @@ export async function gmailHealth(firmId: string, db?: Db): Promise<{ steps: Hea
     (clients ?? []).length === 0 ? null : withEmail.length > 0,
     (clients ?? []).length === 0
       ? "No clients yet. Emails will wait in Unassigned until you add one."
-      : `${withEmail.length} of ${(clients ?? []).length} clients have an email. Only mail from a client's saved email (or a sender you filed before) files itself; the rest waits in Unassigned.`,
+      : `${withEmail.length} of ${(clients ?? []).length} clients have an email. Only mail from a client's saved email (or a sender you filed before) files itself; mail that only looks like a client's waits in Unassigned, and mail with no link to any client is left alone.`,
   );
 
   // 7. Background checks

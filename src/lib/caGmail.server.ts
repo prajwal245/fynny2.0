@@ -201,7 +201,7 @@ export async function revokeToken(accessToken: string): Promise<void> {
 export interface ClientMatch {
   /** Set only when the sender identifies exactly one client for certain. */
   businessId: string | null;
-  method: "exact" | "learned" | "domain" | "name" | "gstin" | "ambiguous" | "none";
+  method: "exact" | "learned" | "domain" | "name" | "gstin" | "subject" | "ambiguous" | "none";
   confidence: number;
   /** A likely client that a person must confirm. Never filed automatically. */
   suggestedBusinessId?: string | null;
@@ -312,6 +312,17 @@ async function matchSender(
   if (gstin) {
     const byGstin = list.find((c: any) => (c.gstin ?? "").toUpperCase() === gstin);
     if (byGstin) return { businessId: byGstin.business_id, method: "gstin", confidence: 0.7 };
+  }
+
+  // Layer 6 — the client's name in the subject ("Rajpal documents for July").
+  // Every meaningful word of exactly one client's name must appear.
+  const subjectTokens = new Set(normaliseName(subject).split(/\s+/).filter((t) => t.length > 2));
+  if (subjectTokens.size) {
+    const named = list.filter((c: any) => {
+      const tokens = normaliseName(String(c.client_name ?? "")).split(/\s+/).filter((t) => t.length > 2);
+      return tokens.length > 0 && tokens.every((t) => subjectTokens.has(t));
+    });
+    if (named.length === 1) return { businessId: named[0].business_id, method: "subject", confidence: 0.6 };
   }
 
   return { businessId: null, method: "none", confidence: 0 };

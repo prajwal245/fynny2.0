@@ -29,6 +29,7 @@ export function GmailHealth({ firmId, lastResult, autoRun }: { firmId: string; l
   const [running, setRunning] = useState(false);
   const [rows, setRows] = useState<Row[]>([]);
   const [parts, setParts] = useState<Record<string, { filed: number; unassigned: number; duplicate: number }>>({});
+  const [passedOver, setPassedOver] = useState(0);
 
   const loadRows = useCallback(async () => {
     const { data } = await supabase
@@ -47,7 +48,10 @@ export function GmailHealth({ firmId, lastResult, autoRun }: { firmId: string; l
       else if (r.outcome === "duplicate") t.duplicate++;
     }
     setParts(tally);
-    setRows(all.filter((r) => r.part_id === "*").slice(0, 10));
+    const emails = all.filter((r) => r.part_id === "*");
+    // Only client mail is listed; the rest of the inbox is a count, nothing more.
+    setRows(emails.filter((r) => r.outcome !== "skipped").slice(0, 10));
+    setPassedOver(emails.filter((r) => r.outcome === "skipped").length);
   }, [firmId]);
 
   const runCheck = useCallback(async () => {
@@ -128,10 +132,20 @@ export function GmailHealth({ firmId, lastResult, autoRun }: { firmId: string; l
       )}
 
       <div>
-        <div style={{ fontSize: 12, letterSpacing: ".08em", textTransform: "uppercase", color: V.muted, fontWeight: 600, marginBottom: 6 }}>Recent emails</div>
+        <div style={{ fontSize: 12, letterSpacing: ".08em", textTransform: "uppercase", color: V.muted, fontWeight: 600, marginBottom: 6 }}>Recent client emails</div>
+        <p style={{ fontSize: 12.5, color: V.body, margin: "0 0 8px", lineHeight: 1.55 }} data-testid="gmail-privacy-rule">
+          FynHelp only takes in emails with attachments that come from a client's saved email, a sender you filed before, an address at a
+          client's domain, or that name a client or its GSTIN in the subject. Forward anything else to this inbox to bring it in.
+          {passedOver > 0 && (
+            <>
+              {" "}
+              <b>{passedOver} other email{passedOver === 1 ? " was" : "s were"} left alone</b>; nothing from {passedOver === 1 ? "it" : "them"} was saved.
+            </>
+          )}
+        </p>
         {rows.length === 0 ? (
           <div style={{ fontSize: 12.5, color: V.body }}>
-            None yet. Emails with attachments that arrive after connecting show here with what FynHelp did with each one.
+            No client emails yet. Documents your clients email to this inbox show here with what FynHelp did with each one.
           </div>
         ) : (
           <div style={{ display: "grid", gap: 6 }} data-testid="gmail-recent">

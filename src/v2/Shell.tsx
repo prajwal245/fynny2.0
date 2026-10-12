@@ -13,6 +13,7 @@ import brandMark from "@/assets/brand/fynhelp-icon-red-new.png";
 import { CommandMenu, useCommandMenu } from "./components/CommandMenu";
 import { V2StoreProvider, monthOf, useV2 } from "./store";
 import { openExceptionsIn } from "./lib/exceptions";
+import { TrialBanner } from "./components/TrialBanner";
 
 
 const NAV = [
@@ -230,6 +231,7 @@ function ShellBody() {
           </header>
 
           <main style={{ padding: 24, flex: 1, maxWidth: 1280, width: "100%" }}>
+            <TrialBanner partnerView={partnerView} />
             <Outlet />
             {/* Live agent cards dock at the bottom of the page: opening or closing one never moves what is under the cursor. */}
             <div data-testid="run-dock" style={{ position: "sticky", bottom: 16, zIndex: 30, display: "grid", gap: 10, width: "min(520px, 100%)", marginLeft: "auto", marginTop: runs.length ? 18 : 0 }}>

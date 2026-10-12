@@ -41,6 +41,16 @@ export const getPracticeWorkspace = createServerFn({ method: "GET" })
     ),
   );
 
+/** Like withFirm, for actions that start new work: paused once the trial or plan has ended. */
+async function withWork<T>(userId: string, fn: (db: Db, ctx: FirmContext) => Promise<T>, opts: { newClient?: boolean } = {}): Promise<T> {
+  return withFirm(userId, async (db, ctx) => {
+    const billing = await import("./billing.server");
+    if (opts.newClient) await billing.assertClientRoom(db, ctx.firmId);
+    else await billing.assertCanWork(db, ctx.firmId);
+    return fn(db, ctx);
+  });
+}
+
 /* ── clients ───────────────────────────────────────────── */
 
 const clientInput = z.object({
@@ -57,9 +67,9 @@ export const createPracticeClient = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => clientInput.extend({ id: uuid.optional() }).parse(d))
   .handler(async ({ data, context }) =>
-    withFirm(context.userId, async (db, ctx) =>
+    withWork(context.userId, async (db, ctx) =>
       (await import("./clients.server")).createPracticeClient(db, ctx, data),
-    ),
+    { newClient: true }),
   );
 
 export const updatePracticeClient = createServerFn({ method: "POST" })
@@ -103,7 +113,7 @@ export const registerPracticeUpload = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) =>
-    withFirm(context.userId, async (db, ctx) => {
+    withWork(context.userId, async (db, ctx) => {
       const { assertClient } = await import("./db.server");
       if (data.business_id) await assertClient(db, ctx, data.business_id);
       const docs = await import("./documents.server");
@@ -157,7 +167,7 @@ export const reprocessPracticeDocument = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ id: uuid }).parse(d))
   .handler(async ({ data, context }) =>
-    withFirm(context.userId, async (db, ctx) => {
+    withWork(context.userId, async (db, ctx) => {
       const { data: doc } = await db
         .from("ca_document_extractions")
         .select("id")
@@ -254,7 +264,7 @@ export const runPracticeRecon = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ business_id: uuid, period }).parse(d))
   .handler(async ({ data, context }) =>
-    withFirm(context.userId, async (db, ctx) => {
+    withWork(context.userId, async (db, ctx) => {
       const orch = await import("./orchestrator.server");
       const { parsePeriod } = await import("./core");
       const label = parsePeriod(data.period).label;
@@ -369,7 +379,7 @@ export const generatePracticeReport = createServerFn({ method: "POST" })
     z.object({ business_id: uuid, period, template }).parse(d),
   )
   .handler(async ({ data, context }) =>
-    withFirm(context.userId, async (db, ctx) =>
+    withWork(context.userId, async (db, ctx) =>
       (await import("./orchestrator.server")).withRun(
         db,
         {
@@ -482,7 +492,7 @@ export const createPracticeChase = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) =>
-    withFirm(context.userId, async (db, ctx) =>
+    withWork(context.userId, async (db, ctx) =>
       (await import("./chaser.server")).createChase(db, ctx, data),
     ),
   );
@@ -493,7 +503,7 @@ export const sendPracticeFollowUp = createServerFn({ method: "POST" })
     z.object({ id: uuid, channel: z.enum(["Email", "WhatsApp"]) }).parse(d),
   )
   .handler(async ({ data, context }) =>
-    withFirm(context.userId, async (db, ctx) =>
+    withWork(context.userId, async (db, ctx) =>
       (await import("./chaser.server")).sendFollowUp(
         db,
         ctx,
@@ -530,7 +540,7 @@ export const setPracticeChaseStatus = createServerFn({ method: "POST" })
 export const runPracticeFollowUpsNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) =>
-    withFirm(context.userId, async (_db, ctx) =>
+    withWork(context.userId, async (_db, ctx) =>
       (await import("./chaser.server")).runDueFollowups(new Date(), ctx.firmId),
     ),
   );
@@ -771,4 +781,38 @@ export const updatePracticePipelineSettings = createServerFn({
         data,
       );
     }),
+  );
+
+/* ── billing ──────────────────────────────────────────── */
+
+export const getPracticeBilling = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./billing.server")).billingView(db, ctx)),
+  );
+
+export const startPracticeCheckout = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z.object({ plan: z.enum(["starter", "professional", "scale"]), cycle: z.enum(["monthly", "annual"]) }).parse(d),
+  )
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) =>
+      (await import("./billing.server")).startCheckout(db, ctx, data.plan, data.cycle),
+    ),
+  );
+
+export const confirmPracticeCheckout = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z
+      .object({
+        razorpay_payment_id: z.string().min(4).max(64),
+        razorpay_subscription_id: z.string().min(4).max(64),
+        razorpay_signature: z.string().min(16).max(256),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./billing.server")).confirmCheckout(db, ctx, data)),
   );

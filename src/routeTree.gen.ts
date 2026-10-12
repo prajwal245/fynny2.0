@@ -111,6 +111,7 @@ import { Route as ApiPublicCaIntegrationSyncRouteImport } from './routes/api/pub
 import { Route as ApiPublicCaInvoicePaymentWebhookRouteImport } from './routes/api/public/ca-invoice-payment-webhook'
 import { Route as ApiPublicCaPollGmailRouteImport } from './routes/api/public/ca-poll-gmail'
 import { Route as ApiPublicPracticeTickRouteImport } from './routes/api/public/practice-tick'
+import { Route as ApiPublicRazorpayWebhookRouteImport } from './routes/api/public/razorpay-webhook'
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp-webhook'
 import { Route as SharedMisTokenRouteImport } from './routes/shared.mis.$token'
 import { Route as V2ClientsIndexRouteImport } from './routes/v2/clients.index'
@@ -731,6 +732,12 @@ const ApiPublicPracticeTickRoute = ApiPublicPracticeTickRouteImport.update({
   path: '/api/public/practice-tick',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicRazorpayWebhookRoute =
+  ApiPublicRazorpayWebhookRouteImport.update({
+    id: '/api/public/razorpay-webhook',
+    path: '/api/public/razorpay-webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicWhatsappWebhookRoute =
   ApiPublicWhatsappWebhookRouteImport.update({
     id: '/api/public/whatsapp-webhook',
@@ -1368,6 +1375,7 @@ export interface FileRoutesByFullPath {
   '/api/public/ca-invoice-payment-webhook': typeof ApiPublicCaInvoicePaymentWebhookRoute
   '/api/public/ca-poll-gmail': typeof ApiPublicCaPollGmailRoute
   '/api/public/practice-tick': typeof ApiPublicPracticeTickRoute
+  '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/whatsapp-webhook': typeof ApiPublicWhatsappWebhookRoute
   '/shared/mis/$token': typeof SharedMisTokenRoute
   '/v2/clients/$clientId': typeof V2ClientsClientIdRoute
@@ -1556,6 +1564,7 @@ export interface FileRoutesByTo {
   '/api/public/ca-invoice-payment-webhook': typeof ApiPublicCaInvoicePaymentWebhookRoute
   '/api/public/ca-poll-gmail': typeof ApiPublicCaPollGmailRoute
   '/api/public/practice-tick': typeof ApiPublicPracticeTickRoute
+  '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/whatsapp-webhook': typeof ApiPublicWhatsappWebhookRoute
   '/shared/mis/$token': typeof SharedMisTokenRoute
   '/v2/clients/$clientId': typeof V2ClientsClientIdRoute
@@ -1755,6 +1764,7 @@ export interface FileRoutesById {
   '/api/public/ca-invoice-payment-webhook': typeof ApiPublicCaInvoicePaymentWebhookRoute
   '/api/public/ca-poll-gmail': typeof ApiPublicCaPollGmailRoute
   '/api/public/practice-tick': typeof ApiPublicPracticeTickRoute
+  '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/whatsapp-webhook': typeof ApiPublicWhatsappWebhookRoute
   '/shared/mis/$token': typeof SharedMisTokenRoute
   '/v2/clients/$clientId': typeof V2ClientsClientIdRoute
@@ -1950,6 +1960,7 @@ export interface FileRouteTypes {
     | '/api/public/ca-invoice-payment-webhook'
     | '/api/public/ca-poll-gmail'
     | '/api/public/practice-tick'
+    | '/api/public/razorpay-webhook'
     | '/api/public/whatsapp-webhook'
     | '/shared/mis/$token'
     | '/v2/clients/$clientId'
@@ -2138,6 +2149,7 @@ export interface FileRouteTypes {
     | '/api/public/ca-invoice-payment-webhook'
     | '/api/public/ca-poll-gmail'
     | '/api/public/practice-tick'
+    | '/api/public/razorpay-webhook'
     | '/api/public/whatsapp-webhook'
     | '/shared/mis/$token'
     | '/v2/clients/$clientId'
@@ -2336,6 +2348,7 @@ export interface FileRouteTypes {
     | '/api/public/ca-invoice-payment-webhook'
     | '/api/public/ca-poll-gmail'
     | '/api/public/practice-tick'
+    | '/api/public/razorpay-webhook'
     | '/api/public/whatsapp-webhook'
     | '/shared/mis/$token'
     | '/v2/clients/$clientId'
@@ -2461,6 +2474,7 @@ export interface RootRouteChildren {
   ApiPublicCaInvoicePaymentWebhookRoute: typeof ApiPublicCaInvoicePaymentWebhookRoute
   ApiPublicCaPollGmailRoute: typeof ApiPublicCaPollGmailRoute
   ApiPublicPracticeTickRoute: typeof ApiPublicPracticeTickRoute
+  ApiPublicRazorpayWebhookRoute: typeof ApiPublicRazorpayWebhookRoute
   ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
   SharedMisTokenRoute: typeof SharedMisTokenRoute
   CaIntegrationsGmailCallbackRoute: typeof CaIntegrationsGmailCallbackRoute
@@ -3180,6 +3194,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/practice-tick'
       fullPath: '/api/public/practice-tick'
       preLoaderRoute: typeof ApiPublicPracticeTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/razorpay-webhook': {
+      id: '/api/public/razorpay-webhook'
+      path: '/api/public/razorpay-webhook'
+      fullPath: '/api/public/razorpay-webhook'
+      preLoaderRoute: typeof ApiPublicRazorpayWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/whatsapp-webhook': {
@@ -4326,6 +4347,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicCaInvoicePaymentWebhookRoute: ApiPublicCaInvoicePaymentWebhookRoute,
   ApiPublicCaPollGmailRoute: ApiPublicCaPollGmailRoute,
   ApiPublicPracticeTickRoute: ApiPublicPracticeTickRoute,
+  ApiPublicRazorpayWebhookRoute: ApiPublicRazorpayWebhookRoute,
   ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,
   SharedMisTokenRoute: SharedMisTokenRoute,
   CaIntegrationsGmailCallbackRoute: CaIntegrationsGmailCallbackRoute,

@@ -4,7 +4,7 @@
 
 FynHelp works on top of the ledger a firm already uses; it does not replace Tally or Zoho. Four agents run each client's month: Extract reads bank statements (PDF, Excel, CSV, scans and photos), Tally or Zoho exports, and GST, TDS, payroll and payment-gateway reports, checking GSTIN check digits and TDS rates; Recon matches bank to books (exact matches, same-day matches, close matches, the firm's own rules, then split payments); Narrate drafts the monthly MIS from matched transactions only, with every figure linked to its source lines; Chaser follows up with clients for missing documents by email and WhatsApp and stops when they arrive. Unsure lines and unmatched transactions always go to a person, and only a partner can sign off a report.
 
-Pricing is per active client entity with unlimited users: a free Pilot for up to 3 clients, Starter ₹2,999/month (15 clients), Professional ₹5,999/month (40 clients) and Scale ₹12,999/month (100 clients), exclusive of GST.
+Pricing is per active client entity with unlimited users and a 14-day free trial of Starter (no card): Starter ₹2,999/month (15 clients), Professional ₹5,999/month (40 clients) and Scale ₹12,999/month (100 clients), exclusive of GST.
 
 ## Product
 

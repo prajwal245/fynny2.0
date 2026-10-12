@@ -358,8 +358,8 @@ const TRUST = [
 ];
 
 const PLANS = [
-  { name: "Starter", monthly: 2999, clients: "15 client entities included", extra: "Extra client \u20B9149 (cap 25)", adds: ["Extract, Recon and MIS reports", "Full audit trail", "Unlimited users"], cta: "Start free" },
-  { name: "Professional", monthly: 5999, clients: "40 client entities included", extra: "Extra client \u20B9119", adds: ["Everything in Starter", "Chaser follow-ups by email and WhatsApp", "Gmail intake for client documents", "Shareable MIS links for clients"], cta: "Start free", popular: true },
+  { name: "Starter", monthly: 2999, clients: "15 client entities included", extra: "Extra client \u20B9149 (cap 25)", adds: ["Extract, Recon and MIS reports", "Full audit trail", "Unlimited users"], cta: "Start free trial" },
+  { name: "Professional", monthly: 5999, clients: "40 client entities included", extra: "Extra client \u20B9119", adds: ["Everything in Starter", "Chaser follow-ups by email and WhatsApp", "Gmail intake for client documents", "Shareable MIS links for clients"], cta: "Choose Professional", popular: true },
   { name: "Scale", monthly: 12999, clients: "100 client entities included", extra: "Extra client \u20B999 (no cap)", adds: ["Everything in Professional", "Set-up with a founder on a call", "Volume pricing for larger books"], cta: "Talk to us" },
 ];
 
@@ -543,7 +543,7 @@ export default function HomePage() {
                 <div className="fh-maroon-card">
                   <div className="lbl">Starter plan</div>
                   <div className="v num">{inr(2999)}<small style={{ fontSize: 16 }}>/mo</small></div>
-                  <div className="fh-uptick">Free pilot for fewer than 3 entities</div>
+                  <div className="fh-uptick">14-day free trial, no card needed</div>
                   <div className="fh-line">
                     <span>Client entities included</span>
                     <b>15</b>
@@ -715,7 +715,7 @@ export default function HomePage() {
             <h2 className="fh-h2">
               Choose a plan <span className="ital">that fits</span>
             </h2>
-            <p className="fh-lead">Annual billing saves 15% on every plan. Fewer than 3 entities? The pilot is free.</p>
+            <p className="fh-lead">Every firm starts with a 14-day free trial of Starter, no card needed. Annual billing saves 15%.</p>
             <div className="fh-billing" role="group" aria-label="Billing period">
               <button
                 type="button"

@@ -415,8 +415,16 @@ export async function runDueFollowups(now = new Date(), firmId?: string) {
     skipped: 0,
     failed: 0,
   };
+  const { firmCanWork } = await import("./billing.server");
+  const working = new Map<string, boolean>();
   for (const row of (data ?? []) as ChaseRow[]) {
     summary.checked++;
+    // Follow-ups stop while a firm's trial or plan has ended.
+    if (!working.has(row.ca_firm_id)) working.set(row.ca_firm_id, await firmCanWork(db, row.ca_firm_id));
+    if (!working.get(row.ca_firm_id)) {
+      summary.skipped++;
+      continue;
+    }
     if (!firmNames.has(row.ca_firm_id)) {
       const { data: f } = await db
         .from("ca_firms")

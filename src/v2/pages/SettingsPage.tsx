@@ -19,6 +19,7 @@ import { Lock } from "lucide-react";
 import { RowSkeleton, ShimmerText } from "../agents";
 import { useV2 } from "../store";
 import { AgentSettings } from "../components/AgentSettings";
+import { BillingSection } from "../components/BillingSection";
 import { GmailHealth } from "../components/GmailHealth";
 import { GmailIcon, WhatsAppIcon } from "../components/BrandIcons";
 
@@ -233,6 +234,8 @@ export default function SettingsPage() {
           </button>
         </Card>
       )}
+
+      <BillingSection />
 
       <Section
         title="Firm profile"

@@ -15,7 +15,7 @@ import { GmailIcon } from "./BrandIcons";
 const ACCEPT = ".csv,.xls,.xlsx,.xml,.pdf,.png,.jpg,.jpeg,.heic,.webp";
 
 export function ReconGuide({ clientId, onUpload, onTab }: { clientId: string; onUpload: () => void; onTab?: (tab: string) => void }) {
-  const { docs, period, setPeriod, addDoc, assignDoc, addChase, clients, firm, clientName } = useV2();
+  const { docs, period, setPeriod, addDoc, assignDoc, addChase, clients, firm, clientName, partnerView } = useV2();
   const fileRef = useRef<HTMLInputElement>(null);
   const [pick, setPick] = useState("");
   const [busy, setBusy] = useState(false);
@@ -115,7 +115,7 @@ export function ReconGuide({ clientId, onUpload, onTab }: { clientId: string; on
             <button className="v2-btn v2-btn-ghost" onClick={askClient}>
               <Send size={15} /> Ask the client
             </button>
-            {!firm?.gmailConnected && (
+            {!firm?.gmailConnected && partnerView && (
               <button className="v2-btn v2-btn-ghost" onClick={onUpload} title="Statements emailed by the client file themselves">
                 <GmailIcon size={15} /> Connect Gmail
               </button>

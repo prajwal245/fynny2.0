@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { ChevronLeft } from "lucide-react";
 import { Badge, Card, EmptyState, PageHeader, Stat, Tabs, V, formatDate, formatINR } from "../ui";
 import { AgentGlyph, AgentStatusBadge, AgentTimeline, AnimatedCounter, ShimmerText } from "../agents";
-import { useV2 } from "../store";
+import { monthOf, useV2 } from "../store";
 import { CloseProgress, NextAction } from "../components/CloseProgress";
 import { AgentRunsCard } from "../components/AgentRuns";
 import { ReconGuide } from "../components/ReconGuide";
@@ -16,7 +16,7 @@ import ExceptionsPage from "./ExceptionsPage";
 import ReportsPage from "./ReportsPage";
 import ChaserPage from "./ChaserPage";
 import { parsePeriod } from "@/lib/practice/core";
-import { openExceptions } from "../lib/exceptions";
+import { openExceptionsIn } from "../lib/exceptions";
 
 const STATUS_LABEL: Record<string, string> = { matched: "Matched", exception: "Exception", unmatched: "Not run", ignored: "Ignored" };
 
@@ -31,6 +31,9 @@ export default function ClientWorkspacePage() {
     return t && ["overview", "documents", "review", "exceptions", "recon", "mis", "chaser", "activity"].includes(t) ? t : "overview";
   });
 
+  // "Fix" in Needs you names the failed file: /v2/clients/:id?tab=documents&doc=<id>
+  const focusDoc = typeof window === "undefined" ? undefined : new URLSearchParams(window.location.search).get("doc") ?? undefined;
+
   if (!client) {
     return (
       <EmptyState
@@ -42,7 +45,8 @@ export default function ClientWorkspacePage() {
   }
 
   const cDocs = docs.filter((d) => d.clientId === client.id);
-  const cEx = openExceptions(exceptions).filter((e) => e.clientId === client.id);
+  // Counted for the month on screen, like the Exception Queue it opens.
+  const cEx = openExceptionsIn(exceptions, monthOf, period).filter((e) => e.clientId === client.id);
   const cReview = review.filter((r) => r.clientId === client.id && r.status === "open");
   const cReports = reports.filter((r) => r.clientId === client.id);
   const close = closeStateFor(client.id);
@@ -92,8 +96,15 @@ export default function ClientWorkspacePage() {
   const result = recon[client.id]?.period && recon[client.id]?.period !== period ? undefined : recon[client.id];
   const periodEx = cEx.filter((e) => !range || (e.date >= range.start && e.date <= range.end));
 
-  const status = cDocs.length === 0
+  // "All clear" only once this month has documents and nothing is open.
+  const reading = cDocs.some((d) => d.status === "Uploading" || d.status === "Processing" || d.status === "Queued");
+  const monthHasData = bankSide.length + bookSide.length > 0 || cDocs.some((d) => d.register && (!range || (d.date >= range.start && d.date <= range.end)));
+  const status = cDocs.length === 0 && !reading
     ? { label: "Not started", tone: "neutral" as const }
+    : !monthHasData
+    ? reading
+      ? { label: "Reading documents", tone: "info" as const }
+      : { label: "Waiting for documents", tone: "neutral" as const }
     : cEx.length > 0
     ? { label: "Needs attention", tone: "bad" as const }
     : cReview.length > 0 || cChases.length > 0
@@ -174,7 +185,7 @@ export default function ClientWorkspacePage() {
         </motion.div>
       )}
 
-      {tab === "documents" && <DocumentsPage clientId={client.id} />}
+      {tab === "documents" && <DocumentsPage clientId={client.id} focusDocId={focusDoc} />}
 
       {tab === "review" && <ReviewPage clientId={client.id} />}
 

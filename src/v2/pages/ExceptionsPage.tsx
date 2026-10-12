@@ -55,7 +55,9 @@ export default function ExceptionsPage({
   const liveCandidates = (e: Exception) =>
     e.candidates
       .map((label, i) => ({ label, id: e.candidateIds?.[i], amount: e.candidateAmounts?.[i] }))
-      .filter((c) => !c.id || !matchedIds.has(c.id));
+      .filter((c) => !c.id || !matchedIds.has(c.id))
+      // Never suggest an entry at less than half or more than double the amount (stored before this rule).
+      .filter((c) => c.amount === undefined || !e.amount || (Math.abs(c.amount) / Math.abs(e.amount) >= 0.5 && Math.abs(c.amount) / Math.abs(e.amount) <= 2));
 
   // Any other unmatched entry on the opposite side, same direction, for a manual match.
   const others = useMemo(() => {
@@ -248,11 +250,11 @@ export default function ExceptionsPage({
               <tr>
                 {!scopedClient && <th>Client</th>}
                 <th>Reason</th>
-                <th>Side</th>
-                <th>Narration</th>
+                <th className="v2-hide-md">Side</th>
+                <th style={{ minWidth: 220 }}>Narration</th>
                 <th>Amount</th>
                 <th>Date</th>
-                <th>Best candidate</th>
+                <th className="v2-hide-md">Best candidate</th>
                 <th className="v2-sticky-end" />
               </tr>
             </thead>
@@ -277,7 +279,7 @@ export default function ExceptionsPage({
                     <td>
                       <Badge tone="warn">{e.reason}</Badge>{e.precedent && <span title="The Recon agent learned a decision for this line" style={{ marginLeft: 6 }}><Badge tone="info">Learned</Badge></span>}
                     </td>
-                    <td style={{ color: V.body }}>
+                    <td className="v2-hide-md" style={{ color: V.body }}>
                       {e.side === "books" ? "Books" : "Bank"}
                     </td>
                     <td style={{ color: V.body }}>
@@ -299,7 +301,7 @@ export default function ExceptionsPage({
                     <td className="num" style={{ color: V.body }}>
                       {formatDate(e.date)}
                     </td>
-                    <td style={{ color: V.body, fontSize: 12.5 }}>
+                    <td className="v2-hide-md" style={{ color: V.body, fontSize: 12.5 }}>
                       {liveCandidates(e)[0]?.label ?? "No candidate found"}
                     </td>
                     <td className="v2-sticky-end">
@@ -485,7 +487,7 @@ export default function ExceptionsPage({
             {active.precedent && (
               <div data-testid="learned-decision" style={{ background: V.cream, borderLeft: `3px solid ${V.brand}`, borderRadius: 12, padding: "10px 12px", fontSize: 13, display: "grid", gap: 8 }}>
                 <div>
-                  <b>Learned from your team:</b> this line was {active.precedent.action === "ignore" ? "ignored" : "marked reconciled elsewhere"}
+                  <b>Learned from your team:</b> {active.precedent.by ? <><b>{active.precedent.by}</b> </> : "this line was "}{active.precedent.by ? (active.precedent.action === "ignore" ? "ignored this line" : "marked this line reconciled elsewhere") : (active.precedent.action === "ignore" ? "ignored" : "marked reconciled elsewhere")}
                   {active.precedent.times > 1 ? ` ${active.precedent.times} times` : ""}, last on {formatDate(active.precedent.at.slice(0, 10))}
                   {active.precedent.note ? <> with the note "{active.precedent.note}"</> : null}. Nothing is applied until you confirm.
                 </div>

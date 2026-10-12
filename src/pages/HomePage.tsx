@@ -654,14 +654,14 @@ export default function HomePage() {
                     </div>
                   </div>
                   <div className="fh-side">
-                    <div className="fh-side-t">With FynHelp</div>
+                    <div className="fh-side-t">With FynHelp · sample data</div>
                     <div className="fh-row">
                       <span className="fh-dot" />
                       <span className="num">391 auto-matched</span>
                     </div>
                     <div className="fh-row flag">
                       <span className="fh-dot" />
-                      Variance ₹4,120 · INV-2291
+                      Variance ₹4,120 · INV-2293
                     </div>
                     <div className="fh-row flag">
                       <span className="fh-dot" />

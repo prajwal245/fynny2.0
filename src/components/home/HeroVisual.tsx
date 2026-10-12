@@ -44,13 +44,13 @@ const FEEDS = [
 ];
 
 const FIELDS = [
-  { k: "Invoice no.", v: "INV-2294" },
+  { k: "Invoice no.", v: "INV-2293" },
   { k: "Taxable value", v: "₹1,77,034" },
   { k: "GST 18%", v: "₹31,866" },
   { k: "TDS 194C", v: "₹3,540" },
 ];
 
-const NARRATION = "Part receipt against INV-2294 — balance ₹1,96,780 due 08 Sep. Client confirmed on WhatsApp.";
+const NARRATION = "Part receipt against INV-2293 — balance ₹1,96,780 due 08 Sep. Client confirmed on WhatsApp.";
 
 const LOG = [
   { t: 320, s: "3 bank feeds connected · 5 new lines" },
@@ -76,6 +76,7 @@ const CSS = `
 .hv-dots { display:flex; gap:6px; }
 .hv-dots i { width:9px; height:9px; border-radius:50%; background:rgba(23,18,8,.12); display:block; }
 .hv-dots i:first-child { background:rgba(226,103,63,.55); }
+.hv-sample { font-size:9.5px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:#8A5A0C; background:rgba(176,122,24,.12); border-radius:999px; padding:3px 8px; white-space:nowrap; }
 .hv-title { font-size:12px; font-weight:600; letter-spacing:-.01em; color:rgba(23,18,8,.72); }
 .hv-live { display:inline-flex; align-items:center; gap:7px; font-size:10.5px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#1F5A46; white-space:nowrap; }
 .hv-live i { width:7px; height:7px; border-radius:50%; background:#1F5A46; animation:hv-beat 2s ease-in-out infinite; }
@@ -156,12 +157,14 @@ const CSS = `
 @media (max-width:640px){ .hv-src{ display:none; } .hv-ref{ width:auto; } }
 
 /* stage panel — one panel per agent, cross-faded */
-.hv-stage { position:relative; margin-top:12px; min-height:132px; }
-.hv-panel { position:absolute; inset:0; border:1px solid rgba(23,18,8,.07); border-radius:16px; padding:12px; background:rgba(23,18,8,.018);
+.hv-stage { position:relative; margin-top:12px; min-height:132px; display:grid; }
+.hv-panel { grid-area:1 / 1; position:relative; border:1px solid rgba(23,18,8,.07); border-radius:16px; padding:12px; background:rgba(23,18,8,.018);
   opacity:0; transform:translateY(10px) scale(.985); pointer-events:none;
   transition:opacity .45s ease, transform .5s cubic-bezier(.16,1,.3,1); }
 .hv-panel.on { opacity:1; transform:none; }
 @media (max-width:640px){ .hv-stage{ min-height:170px; } }
+/* Hidden panels keep their size out of the layout calculation only by being transparent; the
+   grid sizes the stage to the tallest panel, so the footer never sits under a panel. */
 
 /* collect panel */
 .hv-pipes { display:grid; gap:6px; margin-top:10px; }
@@ -307,6 +310,7 @@ export default function HeroVisual() {
               <i />
             </span>
             <span className="hv-title">August close · Sharma &amp; Co · 38 entities</span>
+            <span className="hv-sample" title="An animated example, not a real firm's figures">Sample data</span>
           </div>
           <span className="hv-live">
             <i /> {stageIdx >= STAGES.length ? "Ready for review" : "Running"}
@@ -380,7 +384,7 @@ export default function HeroVisual() {
                     <span className="hv-party">{!r.ok && cleared ? `${r.party} · part receipt` : r.party}</span>
                     <span className="hv-amt">{r.amt}</span>
                     <span className={`hv-ref ${isRead ? "" : "hide"}`}>
-                      {!r.ok && cleared ? "INV-2294 · cleared" : r.ref}
+                      {!r.ok && cleared ? "INV-2293 · cleared" : r.ref}
                     </span>
                   </div>
                 );
@@ -400,7 +404,7 @@ export default function HeroVisual() {
                         <span className="rail">
                           <i style={{ width: `${p * 100}%` }} />
                         </span>
-                        <b>{p >= 1 ? `${f.lines} lines` : "syncing…"}</b>
+                        <b>{p >= 1 ? `${f.lines} line${f.lines === 1 ? "" : "s"}` : "syncing…"}</b>
                       </div>
                     );
                   })}
@@ -439,7 +443,7 @@ export default function HeroVisual() {
                   <div className="hv-side">
                     <div className="h">Ledger</div>
                     <div className="l">
-                      <span>INV-2294</span>
+                      <span>INV-2293</span>
                       <b>₹2,00,900</b>
                     </div>
                   </div>

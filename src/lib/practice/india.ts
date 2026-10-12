@@ -36,6 +36,16 @@ export function gstinCheckChar(first14: string): string {
   return GSTIN_CHARS[(36 - (sum % 36)) % 36];
 }
 
+/** Why a GSTIN is not valid, in words a person can act on; null when it is valid. */
+export function gstinProblem(raw: string): string | null {
+  const g = raw.trim().toUpperCase();
+  if (!GSTIN_SHAPE.test(g))
+    return "A GSTIN has 15 characters: state code, PAN, entity number, Z and a check character, like 27AABCS1429B1ZU.";
+  if (gstinCheckChar(g.slice(0, 14)) !== g[14])
+    return `The last character of this GSTIN does not match the rest (it should be ${gstinCheckChar(g.slice(0, 14))} for these first 14), so one character is probably mistyped.`;
+  return null;
+}
+
 export function validGstin(raw: string): boolean {
   const g = raw.trim().toUpperCase();
   return GSTIN_SHAPE.test(g) && gstinCheckChar(g.slice(0, 14)) === g[14];

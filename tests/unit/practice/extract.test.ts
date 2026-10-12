@@ -332,3 +332,20 @@ describe("pipeline", () => {
     expect(a).toBe(b);
   });
 });
+
+describe("damaged or renamed files (retest 3)", () => {
+  it("a .pdf that is not a PDF says so", async () => {
+    const out = await runExtract(
+      { bytes: enc("this is not a pdf at all"), filename: "statement.pdf", mime: "application/pdf", side: "bank", businessId: null },
+      { llm: null },
+    );
+    expect(out.error?.message).toMatch(/not a valid PDF/);
+  });
+  it("a PDF that cannot be opened is reported as damaged, not as a scan", async () => {
+    const out = await runExtract(
+      { bytes: enc("%PDF-1.7 truncated"), filename: "statement.pdf", mime: "application/pdf", side: "bank", businessId: null },
+      { llm: null, pdfText: async () => { throw new Error("Invalid PDF structure"); } },
+    );
+    expect(out.error?.message).toMatch(/damaged/);
+  });
+});

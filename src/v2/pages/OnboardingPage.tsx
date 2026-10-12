@@ -21,6 +21,7 @@ import { confirmPendingAccount, createAccount } from "@/lib/accountSignup.functi
 import { ENTITY_TYPES, useV2 } from "../store";
 import { OnboardingPanel } from "../components/OnboardingPanel";
 import { GmailIcon } from "../components/BrandIcons";
+import { gstinProblem } from "@/lib/practice/india";
 
 export const STEPS = ["Account", "Firm", "First client", "First document", "You're set"];
 const STEP_HINT = [
@@ -102,6 +103,7 @@ export default function OnboardingPage() {
     return { name: session?.name ?? "", email: session?.email ?? fromLink, password: "" };
   });
   const [firmForm, setFirmForm] = useState({ name: firm?.name ?? "", city: firm?.city ?? "", frn: firm?.frn ?? "" });
+  const [gstinErr, setGstinErr] = useState<string | null>(null);
   const [client, setClient] = useState({ name: "", entityType: ENTITY_TYPES[0], gstin: "", contactName: "", email: "", phone: "" });
   const [clientId, setClientId] = useState<string | null>(null);
   const [uploaded, setUploaded] = useState<string | null>(null);
@@ -208,7 +210,10 @@ export default function OnboardingPage() {
 
   const submitClient = (e: React.FormEvent) => {
     e.preventDefault();
-    const created = addClient(client);
+    const gp = client.gstin.trim() ? gstinProblem(client.gstin) : null;
+    setGstinErr(gp);
+    if (gp) return;
+    const created = addClient({ ...client, gstin: client.gstin.trim().toUpperCase() });
     setClientId(created.id);
     next();
   };
@@ -365,7 +370,10 @@ export default function OnboardingPage() {
                       </Field>
                     </div>
                     <div className="onb-2col">
-                      <Field label="GSTIN" optional><input className="v2-input v2-mono" value={client.gstin} onChange={(e) => setClient({ ...client, gstin: e.target.value })} placeholder="27AABCS1429B1ZP" /></Field>
+                      <Field label="GSTIN" optional>
+                        <input className="v2-input v2-mono" value={client.gstin} aria-invalid={Boolean(gstinErr)} style={gstinErr ? { borderColor: V.maroon } : undefined} onChange={(e) => { setClient({ ...client, gstin: e.target.value }); setGstinErr(null); }} placeholder="27AABCS1429B1ZU" />
+                        {gstinErr && <div role="alert" style={{ fontSize: 12, color: V.maroon, marginTop: 4 }}>{gstinErr}</div>}
+                      </Field>
                       <Field label="WhatsApp number" optional><input className="v2-input" value={client.phone} onChange={(e) => setClient({ ...client, phone: e.target.value })} placeholder="919820011223" /></Field>
                     </div>
                   </div>

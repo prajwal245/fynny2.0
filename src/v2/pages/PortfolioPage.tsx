@@ -4,18 +4,19 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Users, Plus } from "lucide-react";
 import { Badge, Card, EmptyState, PageHeader, Stat, V, formatDate, Tone } from "../ui";
 import { AgentStatusBadge, AnimatedCounter } from "../agents";
-import { useV2 } from "../store";
+import { monthOf, useV2 } from "../store";
 import { CloseProgress } from "../components/CloseProgress";
 import { AgentActivity, NeedsYou, SetupChecklist, TODAY_STYLES, agentSummary, greeting, useNeedsYou } from "../components/Today";
 import AddClientModal from "../components/AddClientModal";
-import { openExceptions } from "../lib/exceptions";
+import { openExceptionsIn } from "../lib/exceptions";
 
 export default function PortfolioPage() {
   const { clients, docs, review, exceptions, chases, runs, period, closeStateFor, session, agentRuns } = useV2();
   const needs = useNeedsYou();
   const [adding, setAdding] = useState(false);
 
-  const openEx = openExceptions(exceptions);
+  // Same month as the sidebar badge and the queue.
+  const openEx = openExceptionsIn(exceptions, monthOf, period);
   const openRev = review.filter((r) => r.status === "open");
   const openChase = chases.filter((c) => c.status !== "Resolved");
 
@@ -76,9 +77,16 @@ export default function PortfolioPage() {
                 const ex = openEx.filter((e) => e.clientId === c.id).length;
                 const rv = openRev.filter((r) => r.clientId === c.id).length;
                 const ch = openChase.filter((h) => h.clientId === c.id).length;
-                const started = docs.some((d) => d.clientId === c.id);
+                const cd = docs.filter((d) => d.clientId === c.id);
+                const started = cd.length > 0;
+                const reading = cd.some((d) => d.status === "Uploading" || d.status === "Processing" || d.status === "Queued");
+                const monthHasData = cd.some((d) => d.rows.some((r) => r.date && monthOf(r.date) === period));
                 const status: { label: string; tone: Tone } = !started
                   ? { label: "Not started", tone: "neutral" }
+                  : !monthHasData
+                  ? reading
+                    ? { label: "Reading documents", tone: "info" }
+                    : { label: "Waiting for documents", tone: "neutral" }
                   : ex > 0
                   ? { label: "Needs attention", tone: "bad" }
                   : rv > 0 || ch > 0

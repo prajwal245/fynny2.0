@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { MessageCircle, X, Mail, Phone, CalendarClock } from "lucide-react";
 
-const WHATSAPP = "https://wa.me/919876543210";
+/**
+ * The support phone/WhatsApp number, digits with country code (e.g. "91XXXXXXXXXX").
+ * Empty: the WhatsApp and Call us options are hidden rather than showing a dummy number.
+ */
+const SUPPORT_PHONE = "";
+const WHATSAPP = SUPPORT_PHONE ? `https://wa.me/${SUPPORT_PHONE}` : "";
 const EMAIL = "mailto:support@fynhelp.com";
 const CALL = "https://calendly.com/nidhi-fynhelp/nidhi-meetings";
 
@@ -57,10 +62,10 @@ export default function FloatingContact() {
           <div style={{ padding: "8px 10px 6px", fontSize: 11, letterSpacing: "0.04em", textTransform: "uppercase", color: "rgba(23,18,8,0.45)" }}>
             Talk to us
           </div>
-          {item(WHATSAPP, MessageCircle, "WhatsApp", "Fastest response")}
+          {WHATSAPP && item(WHATSAPP, MessageCircle, "WhatsApp", "Fastest response")}
           {item(EMAIL, Mail, "Email support", "support@fynhelp.com")}
-          {item(CALL, CalendarClock, "Book a call", "15-minute intro")}
-          {item("tel:+919876543210", Phone, "Call us", "Mon–Sat, 10am–7pm IST")}
+          {item(CALL, CalendarClock, "Book a call", "20-minute call")}
+          {SUPPORT_PHONE && item(`tel:+${SUPPORT_PHONE}`, Phone, "Call us", "Mon–Sat, 10am–7pm IST")}
         </div>
       )}
       <button

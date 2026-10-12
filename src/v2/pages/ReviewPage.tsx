@@ -149,7 +149,7 @@ export default function ReviewPage({
         {confident.length > 0 && (
           <button className="v2-btn v2-btn-ghost" onClick={confirmConfident}>
             Confirm {confident.length} row{confident.length > 1 ? "s" : ""}{" "}
-            above 70 percent
+            at 70% confidence or more
           </button>
         )}
       </div>

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -89,7 +89,8 @@ const ACCEPT = ".csv,.tsv,.txt,.xml,.pdf,.xlsx,.xls,.jpg,.jpeg,.png,.webp";
  */
 export default function DocumentsPage({
   clientId: scopedClient,
-}: { clientId?: string } = {}) {
+  focusDocId,
+}: { clientId?: string; focusDocId?: string } = {}) {
   const {
     docs,
     clients,
@@ -170,6 +171,18 @@ export default function DocumentsPage({
     // An unassigned arrival may carry a suggestion; it is only pre-selected, never filed.
     setAssign({ clientId: d.clientId || d.suggestedClientId || "", side: d.register ? "register" : (d.side ?? "") });
   };
+
+  // Opened from "Fix" in Needs you: show that file among the failed ones, drawer open.
+  const focused = useRef(false);
+  useEffect(() => {
+    if (!focusDocId || focused.current) return;
+    const d = docs.find((x) => x.id === focusDocId);
+    if (!d) return;
+    focused.current = true;
+    if (d.status === "Failed") setTab("Failed");
+    openDoc(d);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when the file is known
+  }, [focusDocId, docs]);
 
   const fileIt = async () => {
     if (!active || !assign.clientId) {

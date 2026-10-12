@@ -17,6 +17,14 @@ async function assertFirmMember(
   throw new Error("You do not have access to this practice");
 }
 
+/** Connecting or disconnecting the firm's inbox is firm administration: partners only. */
+async function assertFirmPartner(userId: string, firmId: string): Promise<void> {
+  const { adminDb, firmContext, canSignOff } = await import("@/lib/practice/db.server");
+  const ctx = await firmContext(await adminDb(), userId);
+  if (ctx.firmId !== firmId) throw new Error("You do not have access to this practice");
+  if (!canSignOff(ctx)) throw new Error("Only a partner can connect or disconnect the firm's Gmail.");
+}
+
 /** Build the Google consent URL. */
 export const startGmailConnect = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -26,6 +34,7 @@ export const startGmailConnect = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }): Promise<{ url: string; redirectUri: string }> => {
     await assertFirmMember(context.supabase as never, data.firmId);
+    await assertFirmPartner(context.userId, data.firmId);
     const { gmailCredentials, redirectUriFor, GMAIL_SCOPES } = await import("@/lib/caGmail.server");
     const { clientId } = gmailCredentials();
     const redirectUri = redirectUriFor(data.origin ?? null);
@@ -212,6 +221,7 @@ export const disconnectGmail = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
     await assertFirmMember(context.supabase as never, data.firmId);
+    await assertFirmPartner(context.userId, data.firmId);
     let dbClient: { from: (t: string) => any };
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { AlertTriangle, ArrowRight, Check, CheckCircle2, FileWarning, ListChecks, PhoneCall, PenLine, Sparkles, X } from "lucide-react";
 import { Card, V } from "../ui";
 import { AGENTS, type AgentKey } from "../agents";
-import { useV2, type AgentRunRecord } from "../store";
+import { useV2, type AgentRunRecord, monthOf } from "../store";
 import { openExceptions } from "../lib/exceptions";
 
 export type NeedsItem = {
@@ -34,8 +34,9 @@ const TONE_FG: Record<NeedsItem["tone"], string> = { bad: V.maroon, warn: V.warn
 export function greeting(name: string) {
   const h = new Date().getHours();
   const part = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
-  const first = name.trim().replace(/^(ca|cs|cma|dr|mr|mrs|ms)\.?\s+/i, "").split(" ")[0];
-  return first ? `${part}, ${first}` : part;
+  // The full name: the first word is the surname for many Indian names, so it is never cut down to one word.
+  const full = name.trim().replace(/\s+/g, " ");
+  return full ? `${part}, ${full}` : part;
 }
 
 export function ago(iso: string) {
@@ -73,20 +74,32 @@ export function useNeedsYou(): NeedsItem[] {
         tone: "bad",
         title: `${d.name} needs attention`,
         detail: d.error ?? "The Extract agent could not read this file.",
-        action: { label: "Fix", to: `/v2/clients/${d.clientId}?tab=documents` },
+        action: { label: "Fix", to: `/v2/clients/${d.clientId}?tab=documents&doc=${d.id}` },
       });
     }
     for (const c of clients) {
-      const ex = openExceptions(exceptions).filter((e) => e.clientId === c.id).length;
+      const all = openExceptions(exceptions).filter((e) => e.clientId === c.id);
+      const ex = all.filter((e) => monthOf(e.date) === period).length;
+      const earlier = all.length - ex;
       if (ex)
         items.push({
           key: `ex:${c.id}`,
           rank: 2,
           icon: <AlertTriangle size={16} />,
           tone: "warn",
-          title: `Resolve ${ex} exception${ex === 1 ? "" : "s"} for ${c.name}`,
-          detail: "Recon matched everything else. Each one has a reason code and suggested matches.",
+          title: `Resolve ${ex} exception${ex === 1 ? "" : "s"} for ${c.name} in ${period}`,
+          detail: `Recon matched everything else. Each one has a reason code and suggested matches.${earlier ? ` ${earlier} more from other months: choose All periods in the queue.` : ""}`,
           action: { label: "Resolve", to: `/v2/clients/${c.id}?tab=exceptions` },
+        });
+      else if (earlier)
+        items.push({
+          key: `exo:${c.id}`,
+          rank: 4,
+          icon: <AlertTriangle size={16} />,
+          tone: "warn",
+          title: `${earlier} exception${earlier === 1 ? "" : "s"} from earlier months for ${c.name}`,
+          detail: `Nothing open in ${period}. Choose All periods in the Exception Queue to see them.`,
+          action: { label: "Open", to: `/v2/clients/${c.id}?tab=exceptions` },
         });
       const rv = review.filter((r) => r.clientId === c.id && r.status === "open").length;
       if (rv)
@@ -172,7 +185,14 @@ export function NeedsYou({ items }: { items: NeedsItem[] }) {
                   <span style={{ display: "block", fontSize: 12.5, color: V.body, marginTop: 2, lineHeight: 1.45 }}>{it.detail}</span>
                 </span>
                 {it.action.to ? (
-                  <Link className="v2-btn v2-btn-ghost v2-btn-sm" to={it.action.to}>{it.action.label} <ArrowRight size={13} /></Link>
+                  <Link
+                    className="v2-btn v2-btn-ghost v2-btn-sm"
+                    // "/v2/clients/x?tab=documents&doc=y": the router takes the path and the query separately.
+                    to={it.action.to.split("?")[0] as never}
+                    search={Object.fromEntries(new URLSearchParams(it.action.to.split("?")[1] ?? "")) as never}
+                  >
+                    {it.action.label} <ArrowRight size={13} />
+                  </Link>
                 ) : (
                   <button className="v2-btn v2-btn-primary v2-btn-sm" disabled={!it.action.run} data-busy={!it.action.run} onClick={it.action.run}>{it.action.label}</button>
                 )}

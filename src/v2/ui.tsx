@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
  * Self-contained: does not touch any existing app styling.
  */
 import { ReactNode, CSSProperties } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useIsPresent } from "framer-motion";
 import { X } from "lucide-react";
 
 /**
@@ -213,11 +213,17 @@ function portal(node: ReactNode) {
   return typeof document === "undefined" ? node : createPortal(node, document.body);
 }
 
+/** Overlay root: stops catching clicks the moment it starts closing, so the next click lands. */
+export function Layer({ style, children, className }: { style: CSSProperties; children: ReactNode; className?: string }) {
+  const present = useIsPresent();
+  return <div className={className} style={{ ...style, pointerEvents: present ? "auto" : "none" }}>{children}</div>;
+}
+
 export function Drawer({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
   return portal(
     <AnimatePresence>
       {open && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 80 }}>
+        <Layer style={{ position: "fixed", inset: 0, zIndex: 80 }}>
           <motion.div
             onClick={onClose}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -237,7 +243,7 @@ export function Drawer({ open, onClose, title, children }: { open: boolean; onCl
             </div>
             <div style={{ padding: 22, overflowY: "auto", flex: 1 }}>{children}</div>
           </motion.aside>
-        </div>
+        </Layer>
       )}
     </AnimatePresence>,
   );
@@ -256,7 +262,7 @@ export function Modal({ open, onClose, title, children }: { open: boolean; onClo
   return portal(
     <AnimatePresence>
       {open && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 80, display: "grid", placeItems: "center", padding: 18 }}>
+        <Layer style={{ position: "fixed", inset: 0, zIndex: 80, display: "grid", placeItems: "center", padding: 18 }}>
           <motion.div
             onClick={onClose}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -277,7 +283,7 @@ export function Modal({ open, onClose, title, children }: { open: boolean; onClo
             </div>
             {children}
           </motion.div>
-        </div>
+        </Layer>
       )}
     </AnimatePresence>,
   );

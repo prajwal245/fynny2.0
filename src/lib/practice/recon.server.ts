@@ -21,7 +21,7 @@ import {
   type Db,
   type FirmContext,
 } from "./db.server";
-import {
+import { decisionCount,
   DEFAULT_RULES,
   REASON_LABELS,
   reconcile,
@@ -360,10 +360,10 @@ export async function runRecon(
     books: books.length,
     matched: written,
     matched_total: matchedTotal,
-    exceptions: outcome.exceptions.length,
+    exceptions: decisionCount(outcome.exceptions),
     matched_by_stage: outcome.stats.matched_by_stage,
     exceptions_by_reason: outcome.stats.exceptions_by_reason,
-    message: reconMessage(written, bank.length, alreadyMatched ?? 0, outcome.stats.matched_by_stage, outcome.exceptions.length),
+    message: reconMessage(written, bank.length, alreadyMatched ?? 0, outcome.stats.matched_by_stage, decisionCount(outcome.exceptions)),
   };
   await db
     .from("ca_recon_runs")
@@ -841,3 +841,40 @@ export async function reopenException(db: Db, ctx: FirmContext, exceptionId: str
   return { status: "open" };
 }
 
+
+/**
+ * After a person decides one exception, the others may still point at the
+ * entry just used. Recompute only the reason, detail and suggestions of the
+ * open exceptions for that month; nothing is matched or logged here.
+ */
+export async function refreshOpenReasons(db: Db, ctx: FirmContext, businessId: string, periodStart: string | null, periodEnd: string | null) {
+  if (!periodStart || !periodEnd) return;
+  const period = parsePeriod({ start: periodStart, end: periodEnd });
+  const scope = await loadScope(db, ctx.firmId, businessId, period, ["unmatched", "exception"]);
+  const bank = scope.filter((t) => t.side === "bank");
+  const books = scope.filter((t) => t.side === "books");
+  if (!bank.length && !books.length) return;
+  const { rules, aliases } = await firmRules(db, ctx.firmId);
+  // Only explain what is left: lines a person has not decided keep their exception.
+  const outcome = reconcile(bank, books, { rules, aliases });
+  const byTxn = new Map(outcome.exceptions.map((e) => [e.txn_id, e]));
+  const { data: open } = await db
+    .from("ca_exceptions")
+    .select("id, txn_id")
+    .eq("ca_firm_id", ctx.firmId)
+    .eq("business_id", businessId)
+    .eq("status", "open")
+    .in("txn_id", scope.map((t) => t.id));
+  const txnById = new Map(scope.map((t) => [t.id, t]));
+  for (const row of open ?? []) {
+    const e = row.txn_id ? byTxn.get(row.txn_id) : undefined;
+    const t = row.txn_id ? txnById.get(row.txn_id) : undefined;
+    if (!e || !t) continue;
+    const fresh = exceptionRow(ctx, businessId, period, "", e, t);
+    await db
+      .from("ca_exceptions")
+      .update({ reason_code: fresh.reason_code, detail: fresh.detail, candidates: fresh.candidates, stage_reached: fresh.stage_reached, updated_at: new Date().toISOString() })
+      .eq("id", row.id)
+      .eq("status", "open");
+  }
+}

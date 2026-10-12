@@ -66,3 +66,12 @@ Swift Logistics,AABCS5678K,194C,20000,2,400`),
     expect(s.checks?.[0]).toMatchObject({ label: "TDS rates", ok: true });
   });
 });
+
+describe("GSTIN on the client forms", () => {
+  it("explains a mistyped last character", async () => {
+    const { gstinProblem } = await import("@/lib/practice/india");
+    expect(gstinProblem("27AABCS1429B1ZU")).toBeNull();
+    expect(gstinProblem("27AABCS1429B1ZP")).toMatch(/should be U/);
+    expect(gstinProblem("27AABCS")).toMatch(/15 characters/);
+  });
+});

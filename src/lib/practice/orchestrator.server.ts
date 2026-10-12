@@ -384,6 +384,8 @@ export type DecisionLesson = {
   direction: string;
   amount: number;
   by: string | null;
+  /** Who decided, as shown back to the team ("Learned from your team: Priya Iyer …"). */
+  by_name?: string | null;
   at: string;
 };
 
@@ -397,7 +399,10 @@ export async function rememberDecision(
 ) {
   const pattern = decisionPattern(t);
   if (!pattern) return;
-  const full: DecisionLesson = { ...lesson, side: t.side, direction: t.direction, amount: Number(t.amount), by: ctx.userId, at: new Date().toISOString() };
+  const { data: who } = await db.auth.admin.getUserById(ctx.userId).catch(() => ({ data: null }));
+  const meta = (who?.user?.user_metadata ?? {}) as { full_name?: string; name?: string };
+  const by_name = meta.full_name || meta.name || who?.user?.email || null;
+  const full: DecisionLesson = { ...lesson, side: t.side, direction: t.direction, amount: Number(t.amount), by: ctx.userId, by_name, at: new Date().toISOString() };
   const { data: existing } = await db
     .from("ca_agent_memory")
     .select("id, times_taught")

@@ -388,7 +388,11 @@ export async function runExtract(
       "unsupported_type",
       /\.(docx?|odt|pages|rtf)$/i.test(input.filename)
         ? "Word documents are not read. Upload the bank statement or ledger as PDF, CSV or Excel, or the Tally XML export."
-        : "Only CSV, Excel, Tally XML, PDF and image files can be read.",
+        : /\.pdf$/i.test(input.filename)
+          ? "This file is named .pdf but is not a valid PDF: it may be damaged, incomplete or renamed. Download it again from the bank or ask the client to resend it."
+          : /\.(xlsx?|xlsm)$/i.test(input.filename)
+            ? "This file is named as Excel but could not be opened as a spreadsheet: it may be damaged or renamed. Save it again from Excel, or export it as CSV."
+            : "Only CSV, Excel, Tally XML, PDF and image files can be read.",
     );
   }
 
@@ -457,7 +461,12 @@ export async function runExtract(
             "password_protected",
             "This PDF is password protected. Ask the client for an unlocked copy or the password.",
           );
-        pdf = null;
+        // A real PDF opens even when it is a scan; one that cannot be opened is damaged.
+        return fail(
+          kind,
+          "unreadable",
+          "This PDF is damaged or incomplete and cannot be opened. Download it again from the bank or ask the client to resend it.",
+        );
       }
     }
     const text = pdf?.text ?? "";

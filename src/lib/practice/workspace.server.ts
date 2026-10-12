@@ -328,8 +328,26 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
   });
 
   const learned = new Map<string, { action: string; note: string; times: number; at: string; by: string | null }>();
-  for (const m of (memRes.data ?? []) as { business_id: string; pattern: string; lesson: { action: string; note: string; by?: string | null; at?: string }; times_taught: number; updated_at: string }[])
-    learned.set(`${m.business_id}|${m.pattern}`, { action: m.lesson.action, note: m.lesson.note, times: m.times_taught, at: m.lesson.at ?? m.updated_at, by: m.lesson.by ?? null });
+  const memRows = (memRes.data ?? []) as { business_id: string; pattern: string; lesson: { action: string; note: string; by?: string | null; by_name?: string | null; at?: string }; times_taught: number; updated_at: string }[];
+  // Lessons learned before names were stored: look the person up once.
+  const missing = [...new Set(memRows.filter((m) => !m.lesson.by_name && m.lesson.by).map((m) => m.lesson.by as string))];
+  const names = new Map<string, string>();
+  await Promise.all(
+    missing.slice(0, 20).map(async (id) => {
+      const { data } = await db.auth.admin.getUserById(id).catch(() => ({ data: null }));
+      const meta = (data?.user?.user_metadata ?? {}) as { full_name?: string; name?: string };
+      const n = meta.full_name || meta.name || data?.user?.email;
+      if (n) names.set(id, n);
+    }),
+  );
+  for (const m of memRows)
+    learned.set(`${m.business_id}|${m.pattern}`, {
+      action: m.lesson.action,
+      note: m.lesson.note,
+      times: m.times_taught,
+      at: m.lesson.at ?? m.updated_at,
+      by: m.lesson.by_name ?? (m.lesson.by ? names.get(m.lesson.by) ?? null : null),
+    });
   const exceptions = (eRes.data ?? []).map((r) => {
     const cands = Array.isArray(r.candidates)
       ? (r.candidates as {

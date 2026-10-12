@@ -3,6 +3,7 @@
  * table keys on) plus the firm's `ca_clients` record and access grant.
  */
 import { PracticeError } from "./core";
+import { gstinProblem } from "./india";
 import {
   assertClient,
   clientMeta,
@@ -21,15 +22,10 @@ export interface ClientInput {
   doNotDisturb?: boolean;
 }
 
-const GSTIN = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
-
 function clean(input: ClientInput) {
   const gstin = input.gstin?.trim().toUpperCase() || null;
-  if (gstin && !GSTIN.test(gstin))
-    throw new PracticeError(
-      "invalid",
-      "GSTIN should be 15 characters, like 29AABCS1429B1ZL.",
-    );
+  const problem = gstin ? gstinProblem(gstin) : null;
+  if (problem) throw new PracticeError("invalid", problem);
   const email = input.email?.trim() || null;
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
     throw new PracticeError(

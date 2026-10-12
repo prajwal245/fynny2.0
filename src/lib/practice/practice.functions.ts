@@ -123,11 +123,33 @@ export const registerPracticeUpload = createServerFn({ method: "POST" })
       const { data: row } = await db
         .from("ca_document_extractions")
         .select(
-          "extract_status, txn_count, review_count, duplicate_count, error_message",
+          "extract_status, txn_count, review_count, duplicate_count, error_message, classification, extracted",
         )
         .eq("id", res.extraction_id)
         .maybeSingle();
-      return { ...res, ...row };
+      // Which months the file's lines fall in, so the app can say when none is the month on screen.
+      const { data: dated } = await db
+        .from("ca_txns")
+        .select("txn_date")
+        .eq("extraction_id", res.extraction_id)
+        .limit(5000);
+      const months: Record<string, number> = {};
+      for (const t of dated ?? []) {
+        const m = String(t.txn_date ?? "").slice(0, 7);
+        if (m) months[m] = (months[m] ?? 0) + 1;
+      }
+      const register = (row?.extracted as { register?: { label?: string; entries?: number } } | null)?.register ?? null;
+      return {
+        ...res,
+        extract_status: row?.extract_status ?? null,
+        txn_count: row?.txn_count ?? null,
+        review_count: row?.review_count ?? null,
+        duplicate_count: row?.duplicate_count ?? null,
+        error_message: row?.error_message ?? null,
+        classification: row?.classification ?? null,
+        months,
+        register: register ? { label: register.label ?? "Register", entries: register.entries ?? 0 } : null,
+      };
     }),
   );
 
@@ -251,9 +273,13 @@ export const reopenPracticeException = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ id: uuid }).parse(d))
   .handler(async ({ data, context }) =>
-    withFirm(context.userId, async (db, ctx) =>
-      (await import("./recon.server")).reopenException(db, ctx, data.id),
-    ),
+    withFirm(context.userId, async (db, ctx) => {
+      const recon = await import("./recon.server");
+      const res = await recon.reopenException(db, ctx, data.id);
+      const { data: ex } = await db.from("ca_exceptions").select("business_id, period_start, period_end").eq("id", data.id).maybeSingle();
+      if (ex?.business_id) await recon.refreshOpenReasons(db, ctx, ex.business_id, ex.period_start ? String(ex.period_start) : null, ex.period_end ? String(ex.period_end) : null).catch(() => undefined);
+      return res;
+    }),
   );
 
 export const resolvePracticeException = createServerFn({ method: "POST" })
@@ -288,6 +314,10 @@ export const resolvePracticeException = createServerFn({ method: "POST" })
         .eq("id", data.id)
         .maybeSingle();
       if (ex?.business_id && ex.period_start && ex.period_end) {
+        // The other open lines may have pointed at the entry just used: explain them again.
+        await (await import("./recon.server"))
+          .refreshOpenReasons(db, ctx, ex.business_id, String(ex.period_start), String(ex.period_end))
+          .catch(() => undefined);
         const { parsePeriod } = await import("./core");
         const orch = await import("./orchestrator.server");
         await orch
@@ -526,14 +556,16 @@ export const connectPracticeWhatsapp = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) =>
-    withFirm(context.userId, async (db, ctx) =>
-      (await import("./whatsapp.server")).connectWhatsappNumber(
+    withFirm(context.userId, async (db, ctx) => {
+      const { canSignOff } = await import("./db.server");
+      if (!canSignOff(ctx)) throw new Error("Only a partner can connect the firm's WhatsApp number.");
+      return (await import("./whatsapp.server")).connectWhatsappNumber(
         db,
         ctx,
         data.phone_number_id,
         data.display_phone,
-      ),
-    ),
+      );
+    }),
   );
 
 /* ── practice (firm) ───────────────────────────────────── */
@@ -552,6 +584,8 @@ export const savePracticeFirm = createServerFn({ method: "POST" })
         frn: z.string().max(40).optional(),
         email: z.string().max(200).optional(),
         partnerName: z.string().max(120).optional(),
+        /** Sent by the Settings page: an edit, not joining during onboarding. */
+        settings: z.boolean().optional(),
       })
       .parse(d),
   )
@@ -574,7 +608,10 @@ export const savePracticeFirm = createServerFn({ method: "POST" })
       existing = null;
     }
     const firmId = existing?.firmId ?? null;
-    if (existing && existing.role !== "owner") {
+    const mayEdit = existing && ["owner", "admin", "partner"].includes(existing.role);
+    if (existing && !mayEdit && data.settings)
+      throw new Error("Only a partner can change the firm's details.");
+    if (existing && !mayEdit) {
       // An invited colleague joined an existing practice; its details are not theirs to change.
       return {
         id: existing.firmId,
@@ -690,14 +727,17 @@ export const forgetPracticeMemory = createServerFn({ method: "POST" })
     z.object({ kind: z.enum(["lesson", "alias"]), id: uuid }).parse(d),
   )
   .handler(async ({ data, context }) =>
-    withFirm(context.userId, async (db, ctx) =>
-      (await import("./orchestrator.server")).forgetMemory(
+    withFirm(context.userId, async (db, ctx) => {
+      const { canSignOff } = await import("./db.server");
+      if (!canSignOff(ctx))
+        throw new Error("Only a partner can change what the agents remember.");
+      return (await import("./orchestrator.server")).forgetMemory(
         db,
         ctx,
         data.kind,
         data.id,
-      ),
-    ),
+      );
+    }),
   );
 
 export const getPracticePipelineSettings = createServerFn({ method: "GET" })

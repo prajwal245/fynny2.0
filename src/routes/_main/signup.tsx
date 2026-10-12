@@ -1,8 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { noindexHead } from "@/lib/seo";
-import { Navigate } from "@/lib/router-compat";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
+// Sign-up lives in the practice workspace.
 export const Route = createFileRoute("/_main/signup")({
-  head: () => noindexHead(),
-  component: () => <Navigate to="/login?mode=signup" replace />,
+  beforeLoad: () => {
+    throw redirect({ href: "/v2/onboarding?mode=signup" });
+  },
+  component: () => null,
 });

@@ -29,7 +29,9 @@ export function insightsPayload(
   return {
     client: clientName,
     period: periodLabel,
-    figures: Object.values(f.numbers).map((n) => ({
+    // Statement balances include unmatched and ignored lines, so they cannot be
+    // combined with matched totals in one sentence: the AI does not get them.
+    figures: Object.values(f.numbers).filter((n) => n.key !== "opening_balance" && n.key !== "closing_balance").map((n) => ({
       key: n.key,
       label: n.label,
       value: n.value,

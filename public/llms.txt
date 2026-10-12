@@ -2,7 +2,7 @@
 
 > FynHelp is month-end close software for chartered accountant (CA) firms in India. It collects client documents, reconciles bank statements to Tally or Zoho books, and drafts a source-traceable MIS that a partner signs off.
 
-FynHelp works on top of the ledger a firm already uses; it does not replace Tally or Zoho. Four agents run each client's month: Extract reads bank statements (PDF, Excel, CSV, scans and photos) and Tally or Zoho exports into transactions; Recon matches bank to books (exact matches, then close matches within ₹1 or 0.1% and 3 days, then the firm's own rules); Narrate drafts the monthly MIS from matched transactions only, with every figure linked to its source lines; Chaser follows up with clients for missing documents by email and WhatsApp and stops when they arrive. Unsure lines and unmatched transactions always go to a person, and only a partner can sign off a report.
+FynHelp works on top of the ledger a firm already uses; it does not replace Tally or Zoho. Four agents run each client's month: Extract reads bank statements (PDF, Excel, CSV, scans and photos), Tally or Zoho exports, and GST, TDS, payroll and payment-gateway reports, checking GSTIN check digits and TDS rates; Recon matches bank to books (exact matches, same-day matches, close matches, the firm's own rules, then split payments); Narrate drafts the monthly MIS from matched transactions only, with every figure linked to its source lines; Chaser follows up with clients for missing documents by email and WhatsApp and stops when they arrive. Unsure lines and unmatched transactions always go to a person, and only a partner can sign off a report.
 
 Pricing is per active client entity with unlimited users: a free Pilot for up to 3 clients, Starter ₹2,999/month (15 clients), Professional ₹5,999/month (40 clients) and Scale ₹12,999/month (100 clients), exclusive of GST.
 
@@ -13,7 +13,9 @@ Pricing is per active client entity with unlimited users: a free Pilot for up to
 - [Recon](https://www.fynhelp.com/agents/recon): Bank reconciliation for CA firms.
 - [Narrate](https://www.fynhelp.com/agents/narrate): Source-traceable MIS reports for chartered accountants.
 - [Chaser](https://www.fynhelp.com/agents/chaser): Automated client document follow-ups.
-- [For CA firms](https://www.fynhelp.com/ca-firms): Workflow automation for practices with 30 to 150 clients.
+- [For CA firms](https://www.fynhelp.com/ca-firms): Month-end workflow for CA practices.
+- [Walkthrough](https://www.fynhelp.com/blog/month-end-close-walkthrough-sample-files): One month-end close, step by step, on free sample files.
+- [Sample files](https://www.fynhelp.com/samples): Made-up statements, ledgers and registers to try the product.
 - [Pricing](https://www.fynhelp.com/pricing): Plans per client entity.
 
 ## Company

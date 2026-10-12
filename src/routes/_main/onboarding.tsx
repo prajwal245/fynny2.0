@@ -1,8 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { noindexHead } from "@/lib/seo";
-import OnboardingPage from "@/pages/OnboardingPage";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
+// The old SME onboarding is retired; firms set up in the practice workspace.
 export const Route = createFileRoute("/_main/onboarding")({
-  head: () => noindexHead("Get started — FynHelp"),
-  component: OnboardingPage,
+  beforeLoad: () => {
+    throw redirect({ href: "/v2/onboarding?mode=signup" });
+  },
+  component: () => null,
 });

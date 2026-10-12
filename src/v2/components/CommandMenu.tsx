@@ -8,7 +8,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import { Search } from "lucide-react";
-import { V } from "../ui";
+import { Layer, V } from "../ui";
 import { AGENTS, type AgentKey } from "../agents";
 import { useV2 } from "../store";
 
@@ -120,7 +120,7 @@ export function CommandMenu({ open, onClose }: { open: boolean; onClose: () => v
   return createPortal(
     <AnimatePresence>
       {open && (
-        <div className="v2" style={{ position: "fixed", inset: 0, zIndex: 90, display: "grid", placeItems: "start center", paddingTop: "12vh", paddingInline: 16 }}>
+        <Layer className="v2" style={{ position: "fixed", inset: 0, zIndex: 90, display: "grid", placeItems: "start center", paddingTop: "12vh", paddingInline: 16 }}>
           <motion.div onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} style={{ position: "absolute", inset: 0, background: "rgba(20,20,20,.28)" }} />
           <motion.div
             role="dialog"
@@ -174,7 +174,7 @@ export function CommandMenu({ open, onClose }: { open: boolean; onClose: () => v
               <span>Try “recon sundara” or “mis”</span>
             </div>
           </motion.div>
-        </div>
+        </Layer>
       )}
     </AnimatePresence>,
     document.body,

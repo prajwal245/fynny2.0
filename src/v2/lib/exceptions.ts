@@ -12,3 +12,8 @@ export function openExceptions<T extends Ex>(all: T[]): T[] {
   );
   return open.filter((e) => !(e.side === "books" && e.txnId && e.candidateIds?.[0] && bankPairs.has(`${e.candidateIds[0]}|${e.txnId}`)));
 }
+
+/** The same rule for the month on screen: what the sidebar, client tabs and close progress count. */
+export function openExceptionsIn<T extends Ex & { date: string }>(all: T[], monthOf: (iso: string) => string | null, period: string): T[] {
+  return openExceptions(all).filter((e) => monthOf(e.date) === period);
+}

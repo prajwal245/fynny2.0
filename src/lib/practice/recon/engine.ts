@@ -874,7 +874,8 @@ function explain(
   if (!sameParty && (tag || ratio < 0.5)) {
     return {
       ...base,
-      candidates: tag ? [] : candidates,
+      // An entry for another party at a very different amount is not a suggestion.
+      candidates: [],
       reason_code: "no_candidate",
       detail: tag
         ? `Tagged as ${tag.replace(/_/g, " ")} with no matching entry in the ${t.side === "bank" ? "books" : "bank"}. Book it or mark it reconciled.`
@@ -913,3 +914,13 @@ export const REASON_LABELS: Record<ReasonCode, string> = {
   partial_payment_suspect: "Partial payment suspect",
   reference_mismatch: "Reference mismatch",
 };
+
+/**
+ * How many decisions a set of exceptions needs: a bank line and its book
+ * entry that point at each other are one decision. The Exception Queue, the
+ * sidebar badge and the Recon log all count this way.
+ */
+export function decisionCount(exceptions: { txn_id: string; side: string; candidates: { txn_id: string }[] }[]): number {
+  const bankFirst = new Map(exceptions.filter((e) => e.side !== "books").map((e) => [e.txn_id, e.candidates[0]?.txn_id]));
+  return exceptions.filter((e) => !(e.side === "books" && e.candidates[0] && bankFirst.get(e.candidates[0].txn_id) === e.txn_id)).length;
+}

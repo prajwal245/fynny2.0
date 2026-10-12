@@ -19,14 +19,14 @@ const BELIEFS = [
   },
   {
     t: "Built for Indian statute, not adapted to it",
-    d: "GST, TDS, ITC blocking rules and the filing calendar are the model, not a localisation layer bolted onto a foreign product.",
+    d: "GST, TDS and the filing calendar are the model, not a localisation layer bolted onto a foreign product.",
   },
 ];
 
 const TIMELINE = [
   { y: "2024", t: "The problem, up close", d: "Months spent inside SME books and CA practices watching the same reconciliation repeated by hand, forty times over." },
-  { y: "2025", t: "The first agent", d: "A cash agent that rebuilt the 13 week forecast every morning. The first users stopped maintaining their own sheet within a fortnight." },
-  { y: "2026", t: "Eight agents and a practice OS", d: "A full finance desk for SMEs, and a firm wide operating layer for the CAs who serve them." },
+  { y: "2025", t: "The first agents", d: "Extraction and matching built around the documents Indian firms actually receive: bank PDFs, Tally exports and GST and TDS registers." },
+  { y: "2026", t: "A practice workspace for CA firms", d: "Extract, Recon, Narrate and Chaser in one workspace, with partner and junior roles and sign-off on every MIS." },
 ];
 
 export default function AboutPage() {
@@ -36,7 +36,7 @@ export default function AboutPage() {
         kicker="About FynHelp"
         title="We are building the intelligence layer"
         italic="between documents and the ledger"
-        sub="FynHelp reads what an Indian business already produces, invoices, statements, filings, and turns it into the handful of decisions a CFO would actually raise this week."
+        sub="FynHelp reads what a CA firm's clients already send, statements, Tally exports, invoices and registers, matches it to the books and leaves your team only the lines that need a decision."
         actions={
           <>
             <Link to={SIGNUP_URL} className="fh-btn fh-btn-primary" onClick={() => trackCta("start", "about-hero")}>
@@ -53,8 +53,8 @@ export default function AboutPage() {
         <div className="fh-strip">
           <div className="fh-strip-grid">
             <div><div className="v num">2024</div><div className="l">founded in Bengaluru</div></div>
-            <div><div className="v num">8</div><div className="l">finance agents shipped</div></div>
-            <div><div className="v num">2</div><div className="l">products, SME and CA firm</div></div>
+            <div><div className="v num">4</div><div className="l">agents: Extract, Recon, Narrate, Chaser</div></div>
+            <div><div className="v num">1</div><div className="l">workspace for the whole firm</div></div>
             <div><div className="v num">India</div><div className="l">first, by design</div></div>
           </div>
         </div>
@@ -85,10 +85,10 @@ export default function AboutPage() {
             <div className="fh-card">
               <h3>What we built instead</h3>
               <ul className="fh-list">
-                <li><Check size={15} /><span>Agents that run every day, not a dashboard you remember to open</span></li>
-                <li><Check size={15} /><span>Findings written as decisions, with the amount at stake</span></li>
+                <li><Check size={15} /><span>Agents that read, match and draft, so people only decide</span></li>
+                <li><Check size={15} /><span>Exceptions written as decisions, each with a reason code</span></li>
                 <li><Check size={15} /><span>Every figure linked to the transaction that produced it</span></li>
-                <li><Check size={15} /><span>The same engine serving the business and its CA</span></li>
+                <li><Check size={15} /><span>Indian rules built in: GSTIN, TDS rates, statutory due dates</span></li>
               </ul>
               <p className="fh-note">
                 The result is a shorter month end, and far fewer surprises inside it.
@@ -133,7 +133,7 @@ export default function AboutPage() {
 
       <CtaBand
         kicker="Come see it"
-        title="Thirty minutes with"
+        title="Twenty minutes with"
         italic="your own books"
         lead="No slides. We run the agents on one month of your data and read the findings together."
         location="about-final"

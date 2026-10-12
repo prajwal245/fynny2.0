@@ -3,8 +3,8 @@ import { toast } from "sonner";
 import { Modal, V } from "../ui";
 import { ENTITY_TYPES, useV2, Client } from "../store";
 
-// Same rule the server applies, checked here so a typo never closes the form.
-const GSTIN = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
+// Same rule the server applies (and the register checks use), checked here so a typo never closes the form.
+import { gstinCheckChar, gstinProblem } from "@/lib/practice/india";
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 type Form = { name: string; entityType: string; gstin: string; contactName: string; email: string; phone: string };
@@ -13,7 +13,11 @@ function validate(f: Form): Partial<Record<keyof Form, string>> {
   const errors: Partial<Record<keyof Form, string>> = {};
   if (!f.name.trim()) errors.name = "Enter the client's name.";
   const g = f.gstin.trim().toUpperCase();
-  if (g && !GSTIN.test(g)) errors.gstin = "A GSTIN has 15 characters, like 27AABCS1429B1ZP. Check it, or leave it empty.";
+  // Short enough for two lines, so the form never changes height under the cursor.
+  if (g && gstinProblem(g))
+    errors.gstin = g.length !== 15 || !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(g)
+      ? "Should be 15 characters, like 27AABCS1429B1ZU."
+      : `Last character should be ${gstinCheckChar(g.slice(0, 14))}. Check for a typo.`;
   if (f.email.trim() && !EMAIL.test(f.email.trim())) errors.email = "This email doesn't look complete.";
   const digits = f.phone.replace(/[^\d]/g, "");
   if (f.phone.trim() && (digits.length < 10 || digits.length > 13)) errors.phone = "Enter the number with country code, e.g. 91 98200 11223.";
@@ -64,11 +68,14 @@ export default function AddClientModal({ open, onClose, editing }: { open: boole
     <div>
       <label className="v2-label" htmlFor={`client-${id}`}>{label}</label>
       {input}
-      {errors[id] ? (
-        <div role="alert" style={{ fontSize: 12, color: V.maroon, marginTop: 4 }}>{errors[id]}</div>
-      ) : hint ? (
-        <div style={{ fontSize: 12, color: V.muted, marginTop: 4 }}>{hint}</div>
-      ) : null}
+      {/* Messages sit in a fixed-height line so the form never jumps when one appears or clears. */}
+      <div style={{ minHeight: id === "gstin" ? 32 : 16, marginTop: 4, fontSize: 12, lineHeight: 1.35 }}>
+        {errors[id] ? (
+          <div role="alert" style={{ color: V.maroon }}>{errors[id]}</div>
+        ) : hint ? (
+          <div style={{ color: V.muted }}>{hint}</div>
+        ) : null}
+      </div>
     </div>
   );
   const invalid = (k: keyof Form) => (errors[k] ? { borderColor: V.maroon } : undefined);
@@ -83,7 +90,7 @@ export default function AddClientModal({ open, onClose, editing }: { open: boole
               {ENTITY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           ))}
-          {field("gstin", "GSTIN · optional", <input id="client-gstin" className="v2-input v2-mono" style={invalid("gstin")} value={form.gstin} onChange={set("gstin")} placeholder="15 characters" aria-invalid={Boolean(errors.gstin)} />)}
+          {field("gstin", "GSTIN · optional", <input id="client-gstin" className="v2-input v2-mono" style={invalid("gstin")} value={form.gstin} onChange={set("gstin")} placeholder="15 characters" aria-invalid={Boolean(errors.gstin)} />, "Checked against its last character when you save.")}
         </div>
         <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit,minmax(min(180px, 100%), 1fr))" }}>
           {field("contactName", "Contact person · optional", <input id="client-contactName" className="v2-input" value={form.contactName} onChange={set("contactName")} placeholder="Who sends you documents" />)}

@@ -14,7 +14,8 @@ import {
   listPracticeTeam,
   revokePracticeMember,
 } from "@/lib/practice/practice.functions";
-import { Badge, Card, PageHeader, V, formatDate } from "../ui";
+import { Badge, Card, EmptyState, PageHeader, V, formatDate } from "../ui";
+import { Lock } from "lucide-react";
 import { RowSkeleton, ShimmerText } from "../agents";
 import { useV2 } from "../store";
 import { AgentSettings } from "../components/AgentSettings";
@@ -70,7 +71,7 @@ const Row = ({ children }: { children: React.ReactNode }) => (
 export const GMAIL_RETURN_KEY = "fynhelp.gmail.return";
 
 export default function SettingsPage() {
-  const { firm, firmId, saveFirm, session, partnerView } = useV2();
+  const { firm, firmId, saveFirm, session, partnerView, canSignOff, setRole } = useV2();
   const [form, setForm] = useState({ name: "", city: "", frn: "", email: "" });
   const [team, setTeam] = useState<Team | null>(null);
   const [intg, setIntg] = useState<Integrations | null>(null);
@@ -187,6 +188,30 @@ export default function SettingsPage() {
       ? `${window.location.origin}/api/public/whatsapp-webhook`
       : "/api/public/whatsapp-webhook";
 
+  // Settings are firm administration: partners only, whatever the address bar says.
+  if (!partnerView)
+    return (
+      <>
+        <PageHeader title="Settings" subtitle="Firm details, team, integrations and agent automation." />
+        <EmptyState
+          icon={<Lock size={22} />}
+          title="Settings are for partners"
+          description={
+            canSignOff
+              ? "You are working as Junior. Switch to Partner to change firm details, the team, integrations or what the agents remember."
+              : "Ask a partner in your firm to change firm details, the team, integrations or what the agents remember."
+          }
+          action={
+            canSignOff ? (
+              <button className="v2-btn v2-btn-primary" onClick={() => setRole("Partner")}>Switch to Partner</button>
+            ) : (
+              <a className="v2-btn v2-btn-primary" href="/v2">Back to Portfolio</a>
+            )
+          }
+        />
+      </>
+    );
+
   return (
     <>
       <PageHeader
@@ -258,14 +283,17 @@ export default function SettingsPage() {
           className="v2-btn v2-btn-primary"
           style={{ marginTop: 16 }}
           disabled={!form.name.trim()}
-          onClick={() => {
-            saveFirm({
-              name: form.name.trim(),
-              city: form.city.trim(),
-              frn: form.frn.trim(),
-              email: form.email.trim(),
-            });
-            toast.success("Firm details saved");
+          onClick={async () => {
+            const ok = await saveFirm(
+              {
+                name: form.name.trim(),
+                city: form.city.trim(),
+                frn: form.frn.trim(),
+                email: form.email.trim(),
+              },
+              { settings: true },
+            );
+            if (ok) toast.success("Firm details saved");
           }}
         >
           Save changes

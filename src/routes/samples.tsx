@@ -42,9 +42,9 @@ function SamplesPage() {
         ))}
       </ol>
 
-      <h2 style={{ fontSize: 22, letterSpacing: "-0.02em", margin: "40px 0 8px" }}>Complex client pack</h2>
+      <h2 style={{ fontSize: 22, letterSpacing: "-0.02em", margin: "40px 0 8px" }}>July 2026 walkthrough pack</h2>
       <p style={{ color: "#4a4844", margin: "0 0 16px", lineHeight: 1.6 }}>
-        Client "Retest R3 Pvt Ltd" (add it with any email), period July 2026. Upload R01 and R02, then the registers, then R10. In the Exception Queue: match Office Mart with a difference (₹300), ignore SB INT, mark BANK CHARGES reconciled elsewhere, and leave Meera Textiles ₹42,000 open. The Monthly MIS should show revenue ₹4,13,000, expenses ₹4,67,480.50, taxes ₹1,47,500 and advances ₹1,50,000, with 1 line left out. Then switch to August 2026 and upload R12 and R13.
+        Client "Sample Client Pvt Ltd" (add it with any email), period July 2026. A step-by-step guide with screenshots is on <a href="/blog/month-end-close-walkthrough-sample-files">the blog</a>. Upload R01 and R02, then the registers, then R10. In the Exception Queue: match Office Mart with a difference (₹300), ignore SB INT, mark BANK CHARGES reconciled elsewhere, and leave Meera Textiles ₹42,000 open. The Monthly MIS should show revenue ₹4,13,000, expenses ₹4,67,480.50, taxes ₹1,47,500 and advances ₹1,50,000, with 1 line left out. Then switch to August 2026 and upload R12 and R13.
       </p>
       <ol style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 10 }}>
         {RETEST.map((f) => (

@@ -111,9 +111,9 @@ const TIERS: Tier[] = [
       {
         head: "Core pipeline",
         feats: [
-          { t: "Extract", d: "Invoices, bank and GST statements in — clean structured data out. Any PDF, scan or email." },
-          { t: "Recon", d: "Books vs bank vs GST matched automatically. Exceptions flagged with reason codes." },
-          { t: "Narrate", d: "Draft narrations with sources attached, ready for partner review." },
+          { t: "Extract", d: "Bank statements, Tally exports, invoices and GST and TDS registers in, structured lines out. CSV, Excel, Tally XML, PDF or photo." },
+          { t: "Recon", d: "Bank matched to books automatically. Exceptions flagged with reason codes." },
+          { t: "Narrate", d: "A monthly MIS from matched lines, every figure linked to source, ready for partner sign-off." },
           { t: "Audit trail", d: "Click any number, see the original document it came from." },
         ],
       },
@@ -126,7 +126,7 @@ const TIERS: Tier[] = [
       },
     ],
     cta: { label: "Start free", to: SIGNUP_URL },
-    trialNote: "30 days free · no card required",
+    trialNote: "Free to start · no card required",
   },
   {
     name: "Professional",
@@ -144,15 +144,15 @@ const TIERS: Tier[] = [
       {
         head: "Everything in Starter, plus",
         feats: [
-          { t: "Chaser", d: "Polite automatic follow-ups for pending documents and open exceptions. Stop chasing clients by phone." },
-          { t: "White-label reports", d: "Client-facing outputs carry your firm's logo and colours, not ours." },
-          { t: "Priority processing", d: "Your documents jump the queue when month-end gets busy." },
+          { t: "Chaser", d: "Polite email follow-ups for pending documents, plus a WhatsApp quick-send link. Stop chasing clients by phone." },
+          { t: "Gmail intake", d: "Client documents emailed to your firm are read and filed against the right client." },
+          { t: "Shareable MIS links", d: "Send a client a read-only link to their signed-off MIS." },
           { t: "Fair use: 1,500 docs/mo", d: "Three times the Starter document capacity." },
         ],
       },
     ],
     cta: { label: "Start free", to: SIGNUP_URL, primary: true },
-    trialNote: "30 days free · no card required",
+    trialNote: "Free to start · no card required",
   },
   {
     name: "Scale",
@@ -168,10 +168,8 @@ const TIERS: Tier[] = [
       {
         head: "Everything in Professional, plus",
         feats: [
-          { t: "Multi-partner dashboards", d: "Per-partner views and role permissions for larger teams." },
-          { t: "Narration playbook", d: "Encode your firm's house style into custom narration templates." },
-          { t: "API and connectors", d: "Push extracted data and exceptions into your existing stack." },
-          { t: "Dedicated success manager", d: "A named contact plus quarterly reviews on match rates and time saved." },
+          { t: "Founder-led set-up", d: "We set up your firm and first clients with you on a call." },
+          { t: "Volume pricing", d: "Lower per-client rate and no cap on active clients." },
           { t: "Fair use: 4,000 docs/mo", d: "Built for full book volume at month-end." },
         ],
       },
@@ -189,12 +187,10 @@ const COMPARE: [string, string, string, string][] = [
   ["Extract · Recon · Narrate", "y", "y", "y"],
   ["Source-traceable audit trail", "y", "y", "y"],
   ["Chaser follow-ups", "n", "y", "y"],
-  ["White-label reports", "n", "y", "y"],
-  ["Priority processing", "n", "y", "y"],
-  ["Multi-partner dashboards and roles", "n", "n", "y"],
-  ["Narration playbook", "n", "n", "y"],
-  ["API and custom connectors", "n", "n", "y"],
-  ["Success manager and quarterly reviews", "n", "n", "y"],
+  ["Partner and junior roles", "y", "y", "y"],
+  ["Gmail intake", "n", "y", "y"],
+  ["Shareable MIS links", "n", "y", "y"],
+  ["Founder-led set-up", "n", "n", "y"],
 ];
 
 
@@ -216,13 +212,13 @@ export default function PricingPage() {
           <div className="in">
             <Reveal>
               <div>
-                <span className="fh-kicker">The intelligence layer on top of Tally and Zoho</span>
+                <span className="fh-kicker">Works alongside Tally and Zoho</span>
                 <h1>
                   Pay for the clients <span className="ital">you actually close.</span>
                 </h1>
                 <p className="sub" style={{ marginInline: "auto" }}>
-                  FynHelp sits on top of Tally, Zoho Books, and your bank feeds — extracting,
-                  reconciling, and narrating automatically. Your bill only grows when your book does.
+                  FynHelp reads your clients' statements and your Tally or Zoho exports, matches them and
+                  drafts the MIS. Your bill only grows when your book does.
                 </p>
                 <div style={{ marginTop: 24 }}>
                   <span
@@ -238,7 +234,7 @@ export default function PricingPage() {
                       borderRadius: 999,
                     }}
                   >
-                    Most firms recover their subscription two to three times over in junior hours saved
+                    Priced per active client entity, never per seat
                   </span>
                 </div>
               </div>
@@ -327,11 +323,10 @@ export default function PricingPage() {
 
         <Reveal delay={120}>
           <div className="fh-trust">
-            <span><b>30-day free trial</b> · no card</span>
+            <span><b>Free to start</b> · no card</span>
             <span><b>Cancel anytime</b></span>
             <span><b>Unlimited users</b> on all tiers</span>
-            <span><b>India data residency</b></span>
-            <span><b>Every number</b> source-traceable</span>
+                        <span><b>Every number</b> source-traceable</span>
             <span>All prices <b>exclude GST</b></span>
           </div>
         </Reveal>
@@ -341,10 +336,10 @@ export default function PricingPage() {
       <Section kicker="What you get" title="The pipeline," italic="explained." center>
         <div className="fh-minis">
           {[
-            ["E", "Extract", "All plans", "Any PDF, scan or email attachment in — clean structured data out. Invoices, bank statements and GST filings. No templates, no manual keying."],
-            ["R", "Recon", "All plans", "Books vs bank vs GST, matched automatically. Exceptions arrive flagged with reason codes, so your team only reviews what actually matters."],
-            ["N", "Narrate", "All plans", "Every reconciled line gets a draft narration with its source attached. Partners review and approve — nothing ever sends itself."],
-            ["C", "Chaser", "Professional and up", "Pending documents and unresolved exceptions trigger polite, automatic follow-ups to the right person. Your team stops chasing clients."],
+            ["E", "Extract", "All plans", "Statements, Tally exports, invoices and GST and TDS registers in, structured lines out. Lines it is unsure of wait in a review queue."],
+            ["R", "Recon", "All plans", "Bank matched to books automatically. Exceptions arrive flagged with reason codes, so your team only reviews what actually matters."],
+            ["N", "Narrate", "All plans", "A monthly MIS built from reconciled lines, with cited insights. Partners review and sign off; nothing ever sends itself."],
+            ["C", "Chaser", "Professional and up", "Pending documents trigger polite, scheduled email follow-ups to the client, with a WhatsApp quick-send link. Your team stops chasing."],
             ["A", "Audit trail", "All plans", "Click any number, see the original document. Every figure is traceable to source — built to survive partner review and scrutiny."],
             ["U", "Unlimited users", "All plans", "The whole firm, on every tier. No per-seat fees — because charging per employee punishes you for delegating."],
           ].map(([k, t, tag, d], i) => (
@@ -427,7 +422,7 @@ export default function PricingPage() {
       <CtaBand
         title="Start with one client."
         italic="Scale when the book does."
-        lead="Thirty days free on any plan. Unlimited users from day one, and every number stays traceable to its source document."
+        lead="Free to start. Unlimited users from day one, and every number stays traceable to its source document."
         location="pricing-final"
       />
     </SiteShell>

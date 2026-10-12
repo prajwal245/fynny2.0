@@ -3,6 +3,7 @@ import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-route
 import {
   LayoutGrid, Users, FileText, ListChecks, AlertTriangle, Send, BarChart3, Settings, Menu, X, LogOut,
   BookOpen,
+  Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import { V, V2_STYLES } from "./ui";
@@ -10,8 +11,8 @@ import { AGENT_STYLES, ProcessingCard, ShimmerText } from "./agents";
 import { AnimatePresence, motion } from "framer-motion";
 import brandMark from "@/assets/brand/fynhelp-icon-red-new.png";
 import { CommandMenu, useCommandMenu } from "./components/CommandMenu";
-import { V2StoreProvider, useV2 } from "./store";
-import { openExceptions } from "./lib/exceptions";
+import { V2StoreProvider, monthOf, useV2 } from "./store";
+import { openExceptionsIn } from "./lib/exceptions";
 
 
 const NAV = [
@@ -74,7 +75,8 @@ function ShellBody() {
       ? reports.filter((r) => !r.signedOff && !r.correction).length
       : reports.filter((r) => r.correction && !r.signedOff).length,
     "/v2/review": review.filter((r) => r.status === "open").length,
-    "/v2/exceptions": openExceptions(exceptions).length,
+    // Same count the Exception Queue opens with: the month selected at the top.
+    "/v2/exceptions": openExceptionsIn(exceptions, monthOf, period).length,
     "/v2/chaser": chases.filter((c) => c.status !== "Resolved").length,
   };
 
@@ -200,14 +202,15 @@ function ShellBody() {
               </button>
               <h2 className="truncate" style={{ fontSize: 16, fontWeight: 600 }}>{title}</h2>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, whiteSpace: "nowrap" }}>
               <button
                 className="v2-btn v2-btn-ghost v2-btn-sm v2-hide-sm"
                 onClick={() => command.setOpen(true)}
                 aria-label="Open command menu"
+                title="Search or run an agent (⌘K)"
                 style={{ color: V.muted, gap: 10 }}
               >
-                Search or run an agent… <span className="v2-kbd">⌘K</span>
+                <Search size={14} /> <span className="v2-hide-md">Search or run an agent…</span> <span className="v2-kbd">⌘K</span>
               </button>
               <label className="v2-hide-sm" style={{ fontSize: 11.5, color: V.muted }}>Period</label>
               <select
@@ -218,9 +221,9 @@ function ShellBody() {
               >
                 {periods.map((p) => <option key={p} value={p}>{p}</option>)}
               </select>
-              <div style={{ textAlign: "right", lineHeight: 1.25 }} className="v2-hide-sm">
-                <div style={{ fontSize: 12.5, fontWeight: 600 }}>{session?.name || session?.email || ""}</div>
-                <div style={{ fontSize: 11, color: V.muted }} data-testid="firm-role">{firmRole ? firmRole[0].toUpperCase() + firmRole.slice(1) : role}{canSignOff && role === "Junior" ? " · viewing as Junior" : ""} · {firm?.name || "Your firm"}</div>
+              <div style={{ textAlign: "right", lineHeight: 1.25, maxWidth: 220, minWidth: 0 }} className="v2-hide-md" title={`${session?.name || session?.email || ""} · ${firm?.name || ""}`}>
+                <div style={{ fontSize: 12.5, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>{session?.name || session?.email || ""}</div>
+                <div style={{ fontSize: 11, color: V.muted, overflow: "hidden", textOverflow: "ellipsis" }} data-testid="firm-role">{firmRole ? firmRole[0].toUpperCase() + firmRole.slice(1) : role}{canSignOff && role === "Junior" ? " · viewing as Junior" : ""} · {firm?.name || "Your firm"}</div>
               </div>
               <div style={{ width: 34, height: 34, borderRadius: 999, background: V.beige, display: "grid", placeItems: "center", fontSize: 12.5, fontWeight: 700 }}>{(session?.name || "F").split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()}</div>
             </div>
@@ -244,6 +247,8 @@ function ShellBody() {
         .v2-mobile-only { display:none; }
         @media (max-width:900px){ .v2-mobile-only { display:inline-flex; } }
         @media (max-width:560px){ .v2-hide-sm { display:none; } }
+        /* Laptop widths with a side panel open: keep the header on one line. */
+        @media (max-width:1180px){ .v2-hide-md { display:none !important; } }
       `}</style>
     </>
   );

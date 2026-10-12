@@ -297,6 +297,8 @@ export function monthOf(iso: string): string | null {
 export const DEFAULT_PERIOD = new Date().getDate() <= 15 ? PERIODS[1] : PERIODS[0];
 
 export type AgentRun = LiveRun & {
+  /** Documents with this run's file name that existed before it started (an older copy is not this upload). */
+  knownDocIds?: string[];
   /** entity this run belongs to: doc id, client id or report id */
   target: string;
   /** client the run is for, so every screen of that client can show it */
@@ -362,7 +364,7 @@ type Store = {
   signIn: (name: string, email: string) => void;
   signOut: () => void;
   /** Resolves true once the practice is saved on the server. */
-  saveFirm: (patch: Partial<Firm>) => Promise<boolean>;
+  saveFirm: (patch: Partial<Firm>, opts?: { settings?: boolean }) => Promise<boolean>;
   completeOnboarding: () => Promise<void>;
   refresh: () => Promise<void>;
   /** The practice id (null until onboarding creates it). */
@@ -703,7 +705,19 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /** Creates or updates the real practice record for the signed in user. */
-  const saveFirm = useCallback((patch: Partial<Firm>): Promise<boolean> => {
+  const saveFirm = useCallback((patch: Partial<Firm>, opts: { settings?: boolean } = {}): Promise<boolean> => {
+    if (opts.settings) {
+      // An edit from Settings: the server decides who may change the firm's details.
+      return savePracticeFirm({ data: { name: patch.name, city: patch.city, frn: patch.frn, email: patch.email, settings: true } })
+        .then(() => {
+          setFirm((p) => (p ? { ...p, ...patch } : p));
+          return true;
+        })
+        .catch((e) => {
+          toast.error(errMsg(e));
+          return false;
+        });
+    }
     setFirm((p) => ({
       name: "",
       partnerName: "",
@@ -748,6 +762,8 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
   const completeOnboarding = useCallback(() => boot(), [boot]);
 
   const runsRef = useRef<AgentRun[]>([]);
+  const docsRef = useRef<Doc[]>([]);
+  docsRef.current = docs;
   useEffect(() => {
     runsRef.current = runs;
   }, [runs]);
@@ -795,6 +811,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
         stage: opts.stage,
         status: "running",
         startedAt: Date.now(),
+        knownDocIds: agent === "extract" ? docsRef.current.filter((d) => d.name === title).map((d) => d.id) : undefined,
       };
       runsRef.current = [...runsRef.current, run];
       setRuns((p) => [...p, run]);
@@ -818,7 +835,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
         (v) => {
           settle();
           patch({ status: "succeeded", result: opts.describe(v), finishedAt: Date.now() });
-          later(6000);
+          later(3500);
           return v;
         },
         (e) => {
@@ -841,6 +858,23 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
     },
     [dismissRun],
   );
+
+  // An upload's card says "reading" only while the file is being read: once the
+  // file shows as read, the card moves on to the Recon check that follows.
+  useEffect(() => {
+    const done = new Set(["Parsed", "Needs review", "Failed"]);
+    setRuns((p) => {
+      let changed = false;
+      const next = p.map((r) => {
+        if (r.agent !== "extract" || r.status !== "running" || r.stage.startsWith("Read.")) return r;
+        const d = docs.find((x) => x.name === r.title && (!r.clientId || x.clientId === r.clientId) && done.has(x.status) && x.id !== r.target && !(r as AgentRun).knownDocIds?.includes(x.id));
+        if (!d) return r;
+        changed = true;
+        return { ...r, trail: [...(r.trail ?? []), r.stage], stage: "Read. Checking whether Recon can run for the month…" };
+      });
+      return changed ? next : p;
+    });
+  }, [docs]);
 
   const waitForClient = useCallback(async (clientId: string) => {
     await firmReady.current;
@@ -924,6 +958,27 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
   );
 
   /** Workflow A — upload the file, then the Extract agent reads it on the server. */
+  /** A file whose lines are all from another month than the one on screen: say so and offer that month. */
+  const warnIfOtherMonth = useCallback((name: string, months: Record<string, number>) => {
+    const keys = Object.keys(months);
+    if (!keys.length) return;
+    let current = "";
+    try {
+      current = parsePeriod(prefs.current.period).start.slice(0, 7);
+    } catch {
+      return;
+    }
+    if (keys.includes(current)) return;
+    const [top] = keys.sort((a, b) => months[b] - months[a]);
+    const label = new Date(`${top}-01T00:00:00`).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+    const total = keys.reduce((n, k) => n + months[k], 0);
+    toast.warning(`${name}: none of its ${total} line${total === 1 ? " is" : "s are"} dated in ${prefs.current.period}. Most are from ${label}.`, {
+      description: "Recon and the MIS use the month selected at the top. Switch to the file's month, or check you uploaded the right file.",
+      action: { label: `Open ${label}`, onClick: () => choosePeriod(label) },
+      duration: 15000,
+    });
+  }, [choosePeriod]);
+
   const addDoc = useCallback(
     (
       name: string,
@@ -1000,7 +1055,9 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
               ? "Already received earlier. Nothing was added twice."
               : res.extract_status === "failed"
                 ? `Could not be read: ${res.error_message ?? "unknown reason"}`
-                : `${res.txn_count ?? 0} transactions structured${res.review_count ? `, ${res.review_count} sent to Review Queue` : ""}${res.duplicate_count ? `, ${res.duplicate_count} duplicates skipped` : ""}`,
+                : res.register
+                  ? `Read as ${res.register.label}: ${res.register.entries} entr${res.register.entries === 1 ? "y" : "ies"}, kept as a register`
+                  : `${res.txn_count ?? 0} transaction${res.txn_count === 1 ? "" : "s"} structured${res.review_count ? `, ${res.review_count} sent to Review Queue` : ""}${res.duplicate_count ? `, ${res.duplicate_count} duplicates skipped` : ""}`,
         },
         work,
       )
@@ -1009,9 +1066,11 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
           if (res.duplicate)
             toast.info(
               `${name} was already received earlier. Nothing was added twice.`,
+              { duration: 9000 },
             );
           else if (res.extract_status === "failed")
             toast.error(`${name}: ${res.error_message ?? "could not be read"}`);
+          else warnIfOtherMonth(name, res.months ?? {});
         })
         .catch((e) => {
           setDocs((p) =>
@@ -1028,7 +1087,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
           void refresh();
         });
     },
-    [refresh, track, waitForClient],
+    [refresh, track, waitForClient, warnIfOtherMonth],
   );
 
   const firmIdReady = useCallback(
@@ -1187,16 +1246,20 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
 
   const reopenException = useCallback(
     async (id: string) => {
+      // Back in the list at once; the server confirms in the background.
+      const before = exceptions;
+      setExceptions((p) => p.map((e) => (e.id === id ? { ...e, status: "open" } : e)));
       try {
         await reopenPracticeException({ data: { id } });
         toast.success("Undone. The line is back in the queue.");
       } catch (e) {
+        setExceptions(before);
         toast.error(errMsg(e));
       } finally {
         void refresh();
       }
     },
-    [refresh],
+    [refresh, exceptions],
   );
 
   const clientTxns = useCallback(
@@ -1492,7 +1555,8 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       const openReview = review.filter(
         (r) => r.clientId === clientId && r.status === "open",
       );
-      const openEx = openExceptions(exceptions).filter((e) => e.clientId === clientId);
+      // The month on screen only: older months' exceptions belong to their own close.
+      const openEx = openExceptions(exceptions).filter((e) => e.clientId === clientId && monthOf(e.date) === period);
       const openChase = chases.filter(
         (c) => c.clientId === clientId && c.status !== "Resolved",
       );

@@ -24,13 +24,10 @@ import {
   Filter,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
-import FynIntelligence from "@/components/home/FynIntelligence";
 import FynLogo from "@/components/FynLogo";
-import BrandMarquee from "@/components/home/BrandMarquee";
-import HeroVisual from "@/components/home/HeroVisual";
 
-import AIRecommendedSection from "@/components/AIRecommendedSection";
 import { SiteFooter } from "@/components/site/SiteShell";
+import ProductShot from "@/components/site/ProductShot";
 
 /* ─────────────────────────────────────────────────────────
    FynHelp homepage — editorial fintech layout
@@ -315,23 +312,17 @@ const BARS = [38, 52, 44, 68, 58, 82, 64, 92, 74, 88, 70, 96];
 const MONTHS = ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];
 
 const FEATURES = [
-  { icon: FileSearch, t: "Document intake, classified", d: "Statements, invoices and GSTR files read into structured lines automatically, cutting manual entry." },
+  { icon: FileSearch, t: "Document intake, classified", d: "Statements, Tally exports and GST and TDS registers read into structured lines automatically, cutting manual entry." },
   { icon: GitCompareArrows, t: "Exact → fuzzy → your rules", d: "Transactions match fast and accurately, surfacing only the exceptions that need judgement." },
-  { icon: Users, t: "Queues split by role", d: "Juniors handle data, managers review exceptions, partners sign off — freeing staff for client strategy." },
+  { icon: Users, t: "Queues split by role", d: "Juniors prepare documents and exceptions, partners review and sign off, so seniors spend time on judgement." },
   { icon: Link2, t: "Source-linked numbers", d: "Every figure traces back to source, so even small practices can deliver records clients trust." },
 ];
 
 const TILES = [
-  { cls: "m", badge: "Lower Costs", fig: "₹0", cap: "Routine tasks run automatically through AI agents. No per-seat charges." },
-  { cls: "d", badge: "Higher Speed", fig: "15 min", cap: "Books process faster with fewer errors, per client, per month." },
-  { cls: "c", badge: "Advisory Focus", fig: "100%", cap: "Staff shift from data entry to client strategy and financial advice." },
-  { cls: "g", badge: "Wider Market", fig: "400→8", cap: "Small businesses can finally afford clean, accurate financial records." },
-];
-
-const MEASURE = [
-  ["98%", "of routine reconciliation decisions are made automatically, so staff move to advisory work."],
-  ["4.8s", "average document classification, from upload to structured lines."],
-  ["12", "compliance events tracked per entity, with due dates that move with the calendar."],
+  { cls: "m", badge: "Pricing", fig: "Per entity", cap: "Never per seat. Add your whole team, every role, at no extra cost." },
+  { cls: "d", badge: "Matching", fig: "5 passes", cap: "Exact, same-day, fuzzy, your firm\u2019s rules, then split payments. Only the rest reach a person." },
+  { cls: "c", badge: "Traceability", fig: "Every figure", cap: "Open any MIS number to see the bank and book lines behind it." },
+  { cls: "g", badge: "Indian rules", fig: "GST \u00b7 TDS", cap: "GSTIN check digits, TDS rates and statutory due dates checked on the registers you upload." },
 ];
 
 const PROBLEMS = [
@@ -343,10 +334,10 @@ const PROBLEMS = [
 
 const PIPELINE = [
   { icon: FileSearch, t: "Extract", d: "Multi-format documents classified and read into structured lines.", plan: "All plans" },
-  { icon: GitCompareArrows, t: "Recon", d: "Exact, fuzzy and firm-rule matching with variance thresholds you set.", plan: "All plans" },
-  { icon: MessageSquareText, t: "Narrate", d: "A plain-language monthly note grounded in the matched lines.", plan: "All plans" },
-  { icon: BellRing, t: "Chaser", d: "Automated document follow-ups, on the channel clients reply on.", plan: "Professional+" },
-  { icon: ScrollText, t: "Audit trail", d: "Who changed what, when, and from which source line. Exportable.", plan: "All plans" },
+  { icon: GitCompareArrows, t: "Recon", d: "Exact, fuzzy and firm-rule matching. Every exception gets a reason code.", plan: "All plans" },
+  { icon: MessageSquareText, t: "Narrate", d: "A monthly MIS built from matched lines, every figure linked to source.", plan: "All plans" },
+  { icon: BellRing, t: "Chaser", d: "Scheduled email follow-ups for missing documents, plus a WhatsApp quick-send link.", plan: "Professional+" },
+  { icon: ScrollText, t: "Audit trail", d: "Who decided what, when, with the note they left and the source line it touched.", plan: "All plans" },
   { icon: Users, t: "Unlimited users", d: "Your whole firm, every role. Never priced per seat.", plan: "All plans" },
 ];
 
@@ -361,25 +352,20 @@ const TRUST = [
   { icon: ShieldCheck, t: "No dummy numbers, ever", d: "If we don\u2019t have the data, the space stays empty. Never a placeholder figure dressed as real." },
   { icon: Link2, t: "Every match is explainable", d: "Each matched or flagged line names the rule behind it. Never \u201cAI decided\u201d." },
   { icon: Lock, t: "Read-only, revocable", d: "We read; we never write to your ledger. Revoke any connection at any time." },
-  { icon: ScrollText, t: "Full audit trail", d: "Every action logged and exportable, so a review reconstructs months later." },
-  { icon: Server, t: "Hosted in India", d: "Client data stays on Indian infrastructure. Certifications published only once verified." },
-  { icon: EyeOff, t: "No training on your data", d: "Learning is scoped to your firm and the client it came from. Never shared models." },
+  { icon: ScrollText, t: "Full audit trail", d: "Every decision is logged with who made it and why, so a review can be reconstructed months later." },
+  { icon: Server, t: "Private storage", d: "Files sit in private storage, shared only through short-lived links. We publish certifications only once they are verified." },
+  { icon: EyeOff, t: "No training on your data", d: "Learning is scoped to your firm and the client it came from. We never train shared models on it." },
 ];
 
 const PLANS = [
-  { name: "Starter", monthly: 2999, clients: "15 client entities included", extra: "Extra client \u20B9149 (cap 25)", adds: ["Extract, Recon, Narrate", "Full audit trail", "Unlimited users"], cta: "Start free" },
-  { name: "Professional", monthly: 5999, clients: "40 client entities included", extra: "Extra client \u20B9119", adds: ["Everything in Starter", "Chaser follow-ups", "White-label client packs", "Priority processing"], cta: "Start free", popular: true },
-  { name: "Scale", monthly: 12999, clients: "100 client entities included", extra: "Extra client \u20B999 (no cap)", adds: ["Everything in Professional", "Multi-partner dashboards", "API access", "Dedicated success manager"], cta: "Talk to us" },
+  { name: "Starter", monthly: 2999, clients: "15 client entities included", extra: "Extra client \u20B9149 (cap 25)", adds: ["Extract, Recon and MIS reports", "Full audit trail", "Unlimited users"], cta: "Start free" },
+  { name: "Professional", monthly: 5999, clients: "40 client entities included", extra: "Extra client \u20B9119", adds: ["Everything in Starter", "Chaser follow-ups by email and WhatsApp", "Gmail intake for client documents", "Shareable MIS links for clients"], cta: "Start free", popular: true },
+  { name: "Scale", monthly: 12999, clients: "100 client entities included", extra: "Extra client \u20B999 (no cap)", adds: ["Everything in Professional", "Set-up with a founder on a call", "Volume pricing for larger books"], cta: "Talk to us" },
 ];
 
 const inr = (n: number) => `\u20B9${n.toLocaleString("en-IN")}`;
 
 
-const QUOTES = [
-  ["We stopped opening three tabs per client. The exception queue is the only screen my seniors touch now.", "Pilot partner", "40-entity practice · Bengaluru"],
-  ["Every figure in the pack traces back to a bank line. That is what made partner sign-off quick.", "Managing partner", "Mid-size firm · Hyderabad"],
-  ["The chaser alone gave a junior back most of her week. Clients reply where they already are.", "Practice manager", "22-entity practice · Pune"],
-];
 
 
 
@@ -391,99 +377,6 @@ function Reveal({ children, delay = 0 }: { children: React.ReactNode; delay?: nu
   );
 }
 
-function DashboardMock() {
-  return (
-    <div className="fh-mock">
-      <div className="fh-mock-bar">
-        <div className="fh-mock-brand">
-          <FynLogo variant="dark" size="sm" />
-        </div>
-        <div className="fh-mock-icons">
-          <Search size={14} />
-          <Bell size={14} />
-          <div className="fh-mock-user">
-            <div className="fh-mock-av" />
-            <span>
-              <b>Adireddy T.</b>
-              Partner, Sharma &amp; Co
-            </span>
-          </div>
-        </div>
-      </div>
-      <div className="fh-mock-body">
-        <div className="fh-rail">
-          <i className="on" />
-          <i />
-          <i />
-          <i />
-          <i />
-          <i />
-        </div>
-        <div className="fh-mock-main">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
-            <div>
-              <div className="fh-mock-hi">Good morning, Adireddy</div>
-              <div className="fh-mock-sub">August close · 38 client entities · 2 need your sign-off</div>
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <span className="fh-chip">
-                <Filter size={11} /> Exceptions
-              </span>
-              <span className="fh-chip solid">
-                <Download size={11} /> Export MIS
-              </span>
-            </div>
-          </div>
-
-          <div className="fh-mock-grid">
-            <div className="fh-mini">
-              <div className="lbl">Transactions reconciled</div>
-              <div className="big num">1,24,880</div>
-              <div className="fh-bars">
-                {BARS.map((h, i) => (
-                  <span key={i} style={{ height: `${h}%` }} />
-                ))}
-              </div>
-              <div className="fh-axis">
-                {MONTHS.map((m) => (
-                  <span key={m}>{m}</span>
-                ))}
-              </div>
-            </div>
-            <div style={{ display: "grid", gap: 14 }}>
-              <div className="fh-mini">
-                <div className="lbl">Exceptions open</div>
-                <div className="big num">8</div>
-                <div className="fh-line">
-                  <span>Amount variance</span>
-                  <b>4</b>
-                </div>
-                <div className="fh-line">
-                  <span>No counterparty</span>
-                  <b>3</b>
-                </div>
-                <div className="fh-line">
-                  <span>Date window</span>
-                  <b>1</b>
-                </div>
-              </div>
-              <div className="fh-mini">
-                <div className="lbl">Close readiness</div>
-                <div className="big num">92%</div>
-                <div className="fh-pillrow">
-                  <span className="a" />
-                  <span className="b" />
-                  <span className="c" />
-                  <span />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function HomePage() {
   const [billing, setBilling] = useState<"monthly" | "annual">("monthly");
@@ -510,7 +403,7 @@ export default function HomePage() {
             <div className="fh-pills">
               <span className="fh-pill a">Built for CA firms</span>
               <span className="fh-pill">Exception-first</span>
-              <span className="fh-pill">Works with Tally &amp; Zoho</span>
+              <span className="fh-pill">Reads Tally &amp; Zoho exports</span>
             </div>
             <h1>
               Month-end close for CA firms, <span className="ital">without the scramble</span>
@@ -543,7 +436,9 @@ export default function HomePage() {
             </div>
           </Reveal>
           <Reveal delay={140}>
-            <HeroVisual />
+            <div style={{ maxWidth: 1080, margin: "44px auto 0" }}>
+              <ProductShot eager src="/guide/09-recon-results.jpg" alt="FynHelp reconciliation screen: bank and book lines for July, matched and unmatched counts, and the lines that still need a decision" />
+            </div>
           </Reveal>
         </div>
       </section>
@@ -552,7 +447,6 @@ export default function HomePage() {
 
 
 
-      <BrandMarquee />
 
       {/* ── STATEMENT + TILES ── */}
       <section className="fh-sec" style={{ paddingTop: 72 }}>
@@ -576,28 +470,6 @@ export default function HomePage() {
                     <div className="fig num">{t.fig}</div>
                     <div className="cap" style={{ marginTop: 8 }}>{t.cap}</div>
                   </div>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── MEASURABLE ── */}
-      <section className="fh-sec fh-center" style={{ paddingTop: 20 }}>
-        <div className="fh-wrap">
-          <Reveal>
-            <span className="fh-kicker">Why it works</span>
-            <h2 className="fh-h2">
-              Built for measurable <span className="ital">progress</span>
-            </h2>
-          </Reveal>
-          <div className="fh-cols" style={{ textAlign: "left" }}>
-            {MEASURE.map(([v, l], i) => (
-              <Reveal key={v} delay={i * 80}>
-                <div className="fh-col">
-                  <div className="v num">{v}</div>
-                  <div className="l">{l}</div>
                 </div>
               </Reveal>
             ))}
@@ -637,43 +509,7 @@ export default function HomePage() {
           </div>
 
           <Reveal delay={120}>
-            <div className="fh-frame">
-              <div className="fh-panel">
-                <div className="fh-panel-head">
-                  <span>August close · 393 txns</span>
-                  <span style={{ color: C.coral }}>Before / After</span>
-                </div>
-                <div className="fh-split">
-                  <div className="fh-side">
-                    <div className="fh-side-t">Today</div>
-                    <div className="fh-msg">&ldquo;Sir, August statement pending&rdquo;</div>
-                    <div className="fh-msg" style={{ opacity: 0.62 }}>&ldquo;Sent last week no?&rdquo;</div>
-                    <div className="fh-msg" style={{ opacity: 0.62 }}>recon_aug_v4_FINAL.xlsx</div>
-                    <div className="fh-summary">
-                      <b className="num">3 hrs</b> manual matching, per client
-                    </div>
-                  </div>
-                  <div className="fh-side">
-                    <div className="fh-side-t">With FynHelp</div>
-                    <div className="fh-row">
-                      <span className="fh-dot" />
-                      <span className="num">391 auto-matched</span>
-                    </div>
-                    <div className="fh-row flag">
-                      <span className="fh-dot" />
-                      Variance ₹4,120 · INV-2291
-                    </div>
-                    <div className="fh-row flag">
-                      <span className="fh-dot" />
-                      No counterparty · ₹18,000
-                    </div>
-                    <div className="fh-summary">
-                      <b className="num">15 min</b> review, 2 decisions
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <ProductShot src="/guide/11-exception-queue.jpg" alt="Exception queue: each unmatched line with its reason code and a Decide button" />
           </Reveal>
         </div>
       </section>
@@ -705,20 +541,20 @@ export default function HomePage() {
                   </div>
                 </div>
                 <div className="fh-maroon-card">
-                  <div className="lbl">Review time per client</div>
-                  <div className="v num">15 min</div>
-                  <div className="fh-uptick">↓ 92% vs manual matching</div>
+                  <div className="lbl">Starter plan</div>
+                  <div className="v num">{inr(2999)}<small style={{ fontSize: 16 }}>/mo</small></div>
+                  <div className="fh-uptick">Free pilot for fewer than 3 entities</div>
                   <div className="fh-line">
-                    <span>Auto-matched</span>
-                    <b>391</b>
+                    <span>Client entities included</span>
+                    <b>15</b>
                   </div>
                   <div className="fh-line">
-                    <span>Exceptions</span>
-                    <b>2</b>
+                    <span>Users</span>
+                    <b>Unlimited</b>
                   </div>
                   <div className="fh-line">
-                    <span>Source-linked figures</span>
-                    <b>100%</b>
+                    <span>Prices</span>
+                    <b>Excl. GST</b>
                   </div>
                 </div>
               </div>
@@ -753,7 +589,7 @@ export default function HomePage() {
             </div>
           </Reveal>
           <Reveal delay={110}>
-            <DashboardMock />
+            <ProductShot src="/guide/19-portfolio.jpg" alt="Portfolio: every client with its status for the month" />
           </Reveal>
         </div>
       </section>
@@ -822,7 +658,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      <FynIntelligence />
 
       {/* ── STEPS ── */}
       <section className="fh-sec">
@@ -865,34 +700,6 @@ export default function HomePage() {
                   </div>
                   <h3>{t.t}</h3>
                   <p>{t.d}</p>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── TESTIMONIALS ── */}
-      <section className="fh-sec fh-center">
-        <div className="fh-wrap">
-          <Reveal>
-            <span className="fh-kicker">Early practices</span>
-            <h2 className="fh-h2">
-              Better financial health starts <span className="ital">with better information</span>
-            </h2>
-          </Reveal>
-          <div className="fh-quotes">
-            {QUOTES.map(([q, who, sub], i) => (
-              <Reveal key={who} delay={i * 80}>
-                <div className="fh-quote">
-                  <p>&ldquo;{q}&rdquo;</p>
-                  <div className="who">
-                    <i />
-                    <span>
-                      {who}
-                      <small>{sub}</small>
-                    </span>
-                  </div>
                 </div>
               </Reveal>
             ))}
@@ -1036,7 +843,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      <AIRecommendedSection />
 
       {/* ── FOOTER ── */}
       <SiteFooter />

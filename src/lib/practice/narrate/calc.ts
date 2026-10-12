@@ -70,12 +70,19 @@ export interface MisFigures {
   largest: { receipts: SourceRow[]; payments: SourceRow[] };
 }
 
+/** "Party — narration", without repeating the party when the narration is the same text. */
+export function particularsOf(counterparty: string | null, description: string | null): string {
+  const party = counterparty?.trim() ?? "";
+  const desc = description?.trim() ?? "";
+  if (!party) return desc || "Transaction";
+  if (!desc || desc.toLowerCase() === party.toLowerCase() || desc.toLowerCase().includes(party.toLowerCase()) && desc.length - party.length < 4) return party.length >= desc.length ? party : desc;
+  return `${party} — ${desc}`;
+}
+
 export const toSourceRow = (t: NarrateTxn): SourceRow => ({
   id: t.id,
   date: t.txn_date,
-  particulars: t.counterparty
-    ? `${t.counterparty} — ${t.description ?? ""}`.trim().replace(/—\s*$/, "")
-    : t.description || "Transaction",
+  particulars: particularsOf(t.counterparty, t.description),
   amount: t.direction === "out" ? -t.amount : t.amount,
 });
 
@@ -361,7 +368,8 @@ export function ruleInsights(f: MisFigures, matched: NarrateTxn[]): Insight[] {
       Math.abs(v.change_pct) >= 20 &&
       v.current_txn_ids.length
     ) {
-      const ids = (v.key === "receipts" ? topIns : topOuts).slice(0, 3);
+      // A statement about a total cites every line in it, so the link opens exactly those lines.
+      const ids = v.current_txn_ids;
       if (ids.length)
         out.push({
           text: `${v.label} ${v.change_pct > 0 ? "rose" : "fell"} ${Math.abs(v.change_pct)}% against the previous period (${inr(v.current)} vs ${inr(v.prior)}).`,

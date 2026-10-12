@@ -23,6 +23,7 @@ import Layout from "@/components/Layout";
 import { Link } from "@/lib/router-compat";
 import { CTA_DEMO, CTA_NOTE, CTA_START, SIGNUP_URL, trackCta } from "@/components/site/cta";
 import { DemoLink } from "@/components/site/BookDemo";
+import ProductShot from "@/components/site/ProductShot";
 
 /**
  * /ca-firms — landing page for CA firms & accounting practices.
@@ -79,15 +80,15 @@ function Hero() {
             className="mt-7 max-w-xl text-[17px] leading-relaxed"
             style={{ color: "rgba(23,18,8,0.72)" }}
           >
-            Every month, your best people spend weeks pulling client data, assembling reports, and
-            chasing reconciliations. FynHelp automates the grunt work — so your firm can take on
-            more clients without hiring more staff.
+            Every month your team collects statements, matches bank lines to the books by hand and
+            rebuilds the same MIS. FynHelp reads the documents, matches what ties out and leaves your
+            team only the lines that need a decision.
           </p>
           <p
             className="mt-4 max-w-xl text-[17px] leading-relaxed"
             style={{ color: "rgba(23,18,8,0.72)" }}
           >
-            The intelligence layer on top of Tally and Zoho — for faster, trusted month-end close.
+            Works alongside Tally and Zoho: upload their exports, keep your ledger where it is.
           </p>
 
           <div className="mt-9 flex flex-wrap items-center gap-5">
@@ -105,98 +106,24 @@ function Hero() {
           </div>
 
           <p className="mt-8 text-sm" style={{ color: "rgba(23,18,8,0.55)" }}>
-            Built for accounting firms managing 30–150 business clients
+            Built for Indian CA firms that close books for business clients every month
           </p>
         </motion.div>
 
-        {/* Right — abstract dashboard mock */}
+        {/* Right — a real screenshot taken on the sample files */}
         <motion.div
           initial={{ opacity: 0, x: 30 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
           className="lg:col-span-2"
         >
-          <DashboardMock />
+          <ProductShot eager src="/guide/19-portfolio.jpg" alt="Portfolio: every client and its status for the month" />
         </motion.div>
       </div>
     </section>
   );
 }
 
-function DashboardMock() {
-  const rows = [
-    { name: "Sharma Textiles Pvt Ltd", state: "Ready", tone: "ok" },
-    { name: "BlinkIt Logistics", state: "Review", tone: "warn" },
-    { name: "Anand Steel Works", state: "Ready", tone: "ok" },
-    { name: "Coastal Foods LLP", state: "Syncing", tone: "muted" },
-    { name: "NovaTech Solutions", state: "Ready", tone: "ok" },
-  ];
-  return (
-    <div
-      className="rounded-xl border p-5"
-      style={{ background: CARD, borderColor: "rgba(23,18,8,0.08)", boxShadow: "0 30px 60px -30px rgba(23,18,8,0.25)" }}
-    >
-      <div className="flex items-center justify-between pb-4 border-b" style={{ borderColor: "rgba(23,18,8,0.08)" }}>
-        <div>
-          <div className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: "rgba(23,18,8,0.5)" }}>
-            Portfolio
-          </div>
-          <div className="text-lg font-semibold" style={{ ...serif, color: DARK }}>
-            48 client firms
-          </div>
-        </div>
-        <div
-          className="text-[11px] font-semibold px-2.5 py-1 rounded-full"
-          style={{ color: RED, background: RED_TINT }}
-        >
-          ● PREVIEW
-        </div>
-      </div>
-
-      <div className="mt-4 grid grid-cols-3 gap-3">
-        {[
-          { l: "MIS ready", v: "42" },
-          { l: "In review", v: "4" },
-          { l: "Pending", v: "2" },
-        ].map((s) => (
-          <div key={s.l} className="rounded-md p-3" style={{ background: SOFT }}>
-            <div className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: "rgba(23,18,8,0.5)" }}>
-              {s.l}
-            </div>
-            <div className="mt-1 text-xl font-bold tabular-nums" style={{ ...serif, color: DARK }}>
-              {s.v}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-5 space-y-2">
-        {rows.map((r) => (
-          <div
-            key={r.name}
-            className="flex items-center justify-between text-sm py-2.5 px-3 rounded-md"
-            style={{ background: SOFT }}
-          >
-            <span className="font-medium truncate" style={{ color: DARK }}>
-              {r.name}
-            </span>
-            <span
-              className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-              style={{
-                color:
-                  r.tone === "ok" ? "#0f6b3f" : r.tone === "warn" ? RED : "rgba(23,18,8,0.55)",
-                background:
-                  r.tone === "ok" ? "#0f6b3f14" : r.tone === "warn" ? RED_TINT : "rgba(23,18,8,0.06)",
-              }}
-            >
-              {r.state}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 /* ---------- SOCIAL PROOF STRIP (dark) ---------- */
 function ProofStrip() {
@@ -229,7 +156,7 @@ function Problem() {
     {
       icon: Clock,
       title: "Month-end eats your team alive",
-      body: "Junior staff spend 3–5 days per client compiling reports from scratch. Same data. Same format. Same process. Every single month.",
+      body: "Juniors rebuild the same reports for each client from scratch. Same data, same format, same process, every month.",
     },
     {
       icon: AlertTriangle,
@@ -263,7 +190,7 @@ function Problem() {
           Your firm's growth ceiling isn't clients. It's your team's time.
         </h2>
         <p className="mt-5 max-w-2xl text-lg" style={{ color: "rgba(255,255,255,0.65)" }}>
-          Every new client you take on adds the same 40 hours of manual work per month.
+          Every new client adds the same manual matching and report building, every month.
         </p>
 
         <div className="mt-14 grid md:grid-cols-2 gap-5">
@@ -295,10 +222,10 @@ function Problem() {
 /* ---------- HOW IT WORKS ---------- */
 function HowItWorks() {
   const steps = [
-    { n: "01", icon: FileSearch, title: "Upload", desc: "Bank statements, invoices, expense bills — any format." },
-    { n: "02", icon: FileSearch, title: "Extract", desc: "AI reads and classifies every line item with 98% accuracy." },
-    { n: "03", icon: FileText, title: "Reconcile", desc: "Lines matched against ledger in three passes." },
-    { n: "04", icon: FileStack, title: "Review", desc: "Exceptions resolved, reports generated automatically." },
+    { n: "01", icon: FileSearch, title: "Upload", desc: "Bank statements, Tally exports, invoices, GST and TDS registers. CSV, Excel, Tally XML, PDF or photos." },
+    { n: "02", icon: FileSearch, title: "Extract", desc: "Each line is read into date, amount and counterparty. Low-confidence lines go to a review queue." },
+    { n: "03", icon: FileText, title: "Reconcile", desc: "Bank matched to books: exact, same-day, fuzzy, your rules, then split payments." },
+    { n: "04", icon: FileStack, title: "Review", desc: "Your team decides the exceptions, a partner signs off the MIS." },
   ];
   return (
     <section id="how-it-works" style={{ background: CREAM }}>
@@ -351,10 +278,10 @@ function HowItWorks() {
 /* ---------- FEATURES ---------- */
 function Features() {
   const items = [
-    { icon: FileText, t: "Automated Client MIS", d: "Monthly reports generated directly from live client data." },
-    { icon: LineChart, t: "Live Financial Dashboards", d: "Every client's cash, receivables, payables in real time." },
-    { icon: Bell, t: "Early Warning Alerts", d: "Flags anomalies and cash risk before they become client calls." },
-    { icon: LayoutGrid, t: "Multi-Client Portfolio View", d: "Every client's financial health in one place." },
+    { icon: FileText, t: "Monthly client MIS", d: "Built from matched lines only, with every figure linked to its source. PDF and Excel." },
+    { icon: LineChart, t: "Exception queue", d: "Every unmatched line with a reason code. Match, ignore or book it, with a note on the audit trail." },
+    { icon: Bell, t: "Document chaser", d: "Follow up clients for missing statements by email or a WhatsApp link." },
+    { icon: LayoutGrid, t: "Portfolio view", d: "Every client's close status for the month in one place, with partner sign-off." },
   ];
   return (
     <section style={{ background: SOFT }}>

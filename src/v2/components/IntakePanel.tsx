@@ -52,7 +52,7 @@ export function IntakePanel({ upload, unassignedEmail, unassignedWhatsApp, onSho
   unassignedWhatsApp: number;
   onShowUnassigned: (tab: "Unassigned email" | "Unassigned WhatsApp") => void;
 }) {
-  const { firmId, refresh } = useV2();
+  const { firmId, refresh, partnerView } = useV2();
   const [channel, setChannel] = useState<Channel>(() => {
     try {
       const v = window.localStorage.getItem("fynhelp.intake.tab");
@@ -193,9 +193,13 @@ export function IntakePanel({ upload, unassignedEmail, unassignedWhatsApp, onSho
                   <div style={{ fontSize: 12.5, color: V.muted }}>Read-only. Only emails with attachments are looked at; your own sent mail never is. Disconnect any time.</div>
                 </div>
                 <div style={{ display: "grid", gap: 10, justifyItems: "start" }}>
-                  <button className="v2-btn v2-btn-primary v2-btn-lg" onClick={connect} disabled={busy === "connect"} data-busy={busy === "connect"}>
-                    <span style={{ background: "#fff", borderRadius: 6, padding: "2px 3px", display: "inline-grid" }}><GmailIcon size={16} /></span> Connect Gmail
-                  </button>
+                  {partnerView ? (
+                    <button className="v2-btn v2-btn-primary v2-btn-lg" onClick={connect} disabled={busy === "connect"} data-busy={busy === "connect"}>
+                      <span style={{ background: "#fff", borderRadius: 6, padding: "2px 3px", display: "inline-grid" }}><GmailIcon size={16} /></span> Connect Gmail
+                    </button>
+                  ) : (
+                    <div style={{ fontSize: 13.5, color: V.body }} data-testid="gmail-partner-only">A partner connects the firm's Gmail. Once connected, emailed statements show up here for everyone.</div>
+                  )}
                   <div style={{ fontSize: 12.5, color: V.body }}>On Google's screen, tick the box that lets FynHelp <b>view your email messages</b>.</div>
                   {gmail.connections.find((c) => c.error_message)?.error_message && (
                     <div style={{ fontSize: 12.5, color: V.maroon }}>Last time: {gmail.connections.find((c) => c.error_message)?.error_message}</div>

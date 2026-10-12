@@ -9,6 +9,12 @@ import { downloadExcel, printReport } from "../lib/exportReport";
 import { toast } from "sonner";
 import { openExceptions } from "../lib/exceptions";
 
+/** Older reports stored "SALARY — SALARY": show the text once. */
+function dedupeParticulars(p: string): string {
+  const [a, b] = p.split(" — ");
+  return b !== undefined && a.trim().toLowerCase() === b.trim().toLowerCase() ? a : p;
+}
+
 export default function ReportDetailPage() {
   const { reportId } = useParams({ from: "/v2/reports/$reportId" });
   const { reports, clientName, firm, session, signOffReport, requestCorrection, partnerView, exceptions, review, docs } = useV2();
@@ -65,10 +71,22 @@ export default function ReportDetailPage() {
 
   const meta = { clientName: clientName(report.clientId), firmName: firm?.name ?? "FynHelp" };
 
+  // The gateway gross-up is part of the Revenue and Expenses figures, so it is listed with their sources.
+  const g = report.gateway;
+  const grossUpIn: Txn[] = g ? [{ date: "", particulars: "Fees and GST on fees kept by the payment gateway (added back from the settlement report)", amount: g.fees + g.gst_on_fees }] : [];
+  const grossUpOut: Txn[] = g
+    ? [
+        { date: "", particulars: "Payment gateway fees (settlement report)", amount: -g.fees },
+        { date: "", particulars: "GST on payment gateway fees (18%)", amount: -g.gst_on_fees },
+      ]
+    : [];
+  // Every matched line the report knows: revenue, expenses, and taxes/advances/transfers.
+  const everyRow = [...allRows, ...(report.otherFlows ?? []).flatMap((f) => f.rows)];
+  const citedRows = (ids?: string[]) => (ids?.length ? everyRow.filter((r) => r.id && ids.includes(r.id)) : everyRow);
   const metrics = [
-    { label: "Revenue", value: report.revenue, tone: V.green, rows: report.sources.revenue },
-    { label: "Expenses", value: report.expenses, tone: V.maroon, rows: report.sources.expenses },
-    { label: "Net", value: net, tone: net >= 0 ? V.green : V.maroon, rows: allRows },
+    { label: "Revenue", value: report.revenue, tone: V.green, rows: [...report.sources.revenue, ...grossUpIn] },
+    { label: "Expenses", value: report.expenses, tone: V.maroon, rows: [...report.sources.expenses, ...grossUpOut] },
+    { label: "Net", value: net, tone: net >= 0 ? V.green : V.maroon, rows: [...allRows, ...grossUpIn, ...grossUpOut] },
   ];
 
   return (
@@ -232,7 +250,7 @@ export default function ReportDetailPage() {
                   <tr key={b.label}>
                     <td>{b.label}</td>
                     <td className="num" style={{ textAlign: "right" }}>{b.value}</td>
-                    <td style={{ textAlign: "right" }}>{b.rows.length > 0 && <button className="v2-btn v2-btn-quiet" onClick={() => setSource({ label: b.label, rows: b.rows })}>Open lines</button>}</td>
+                    <td style={{ textAlign: "right" }}>{b.rows.length > 0 && <button className="v2-btn v2-btn-quiet" onClick={() => setSource({ label: b.label, rows: b.rows })}>View {b.rows.length === 1 ? "line" : "lines"}</button>}</td>
                   </tr>
                 ))}
               </tbody>
@@ -279,9 +297,11 @@ export default function ReportDetailPage() {
                   <button
                     className="v2-btn v2-btn-quiet"
                     style={{ marginTop: 10 }}
-                    onClick={() => setSource({ label: i.source, rows: i.cited_transaction_ids?.length ? allRows.filter((r) => r.id && i.cited_transaction_ids!.includes(r.id)) : allRows })}
+                    onClick={() => setSource({ label: i.source, rows: citedRows(i.cited_transaction_ids) })}
                   >
-                    {i.source}
+                    {i.cited_transaction_ids?.length
+                      ? `${citedRows(i.cited_transaction_ids).length} transaction${citedRows(i.cited_transaction_ids).length === 1 ? "" : "s"}`
+                      : i.source}
                   </button>
                 </div>
               </FadeIn>
@@ -337,12 +357,21 @@ export default function ReportDetailPage() {
             <tbody>
               {source.rows.map((r, i) => (
                 <tr key={i}>
-                  <td className="num">{formatDate(r.date)}</td>
-                  <td>{r.particulars}</td>
+                  <td className="num">{r.date ? formatDate(r.date) : "—"}</td>
+                  <td>{dedupeParticulars(r.particulars)}</td>
                   <td className="num" style={{ textAlign: "right", color: r.amount < 0 ? V.maroon : V.green }}>{formatINR(r.amount)}</td>
                 </tr>
               ))}
             </tbody>
+            <tfoot>
+              <tr data-testid="source-total">
+                <td />
+                <td style={{ fontWeight: 700 }}>Total · {source.rows.length} line{source.rows.length === 1 ? "" : "s"}</td>
+                <td className="num" style={{ textAlign: "right", fontWeight: 700 }}>
+                  {formatINR(Math.round(source.rows.reduce((s, r) => s + r.amount, 0) * 100) / 100)}
+                </td>
+              </tr>
+            </tfoot>
           </table>
         )}
       </Drawer>

@@ -228,30 +228,54 @@ export async function downloadPdf(report: Report, meta: ExportMeta) {
   const html = buildReportHtml(report, meta);
   const style = html.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? "";
   const body = html.match(/<body>([\s\S]*?)<\/body>/)?.[1] ?? "";
-  const host = document.createElement("div");
+  // A separate document, so only the report's own styles apply (the app's CSS
+  // uses colour functions the renderer cannot read).
+  const host = document.createElement("iframe");
   host.setAttribute("aria-hidden", "true");
-  host.style.cssText = "position:fixed;left:-12000px;top:0;width:794px;background:#fff;";
-  // Scope the report's own styles to this box so the app is untouched.
-  const scoped = style.replace(/(^|\})\s*([^{}@]+)\{/g, (_m, close: string, sel: string) => `${close} ${sel.split(",").map((x) => `.fyn-pdf ${x.trim() === "body" ? "" : x.trim()}`).join(", ")} {`);
-  host.innerHTML = `<style>${scoped}</style><div class="fyn-pdf" style="padding:36px;font-family:'Geist',system-ui,-apple-system,Helvetica,Arial,sans-serif;color:#141414;font-variant-numeric:tabular-nums">${body}</div>`;
+  host.tabIndex = -1;
+  host.style.cssText = "position:fixed;left:-12000px;top:0;width:794px;height:1123px;border:0;background:#fff;";
   document.body.appendChild(host);
+  const doc = host.contentDocument!;
+  doc.open();
+  doc.write(`<!doctype html><html><head><meta charset="utf-8"><style>${style}</style></head><body style="margin:0;background:#fff"><div class="fyn-pdf" style="padding:36px;font-family:'Geist',system-ui,-apple-system,Helvetica,Arial,sans-serif;color:#141414;font-variant-numeric:tabular-nums">${body}</div></body></html>`);
+  doc.close();
   try {
-    const { jsPDF } = await import("jspdf");
+    // Rendered as an image of the page: PDF base fonts have no ₹ glyph, so text
+    // mode would print the currency wrongly. What you see is what is saved.
+    const [{ jsPDF }, { default: html2canvas }] = await Promise.all([import("jspdf"), import("html2canvas")]);
+    const el = doc.querySelector(".fyn-pdf") as HTMLElement;
+    const canvas = await html2canvas(el, { scale: 2, backgroundColor: "#ffffff", logging: false, windowWidth: 794 });
     const pdf = new jsPDF({ unit: "pt", format: "a4", compress: true });
-    await new Promise<void>((resolve, reject) => {
-      pdf
-        .html(host.querySelector(".fyn-pdf") as HTMLElement, {
-          x: 0,
-          y: 0,
-          width: 595.28,
-          windowWidth: 794,
-          autoPaging: "text",
-          margin: [18, 0, 24, 0],
-          html2canvas: { scale: 0.75, backgroundColor: "#ffffff", logging: false },
-          callback: () => resolve(),
-        })
-        .catch(reject);
-    });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const margin = 24;
+    const sliceH = Math.floor(((pageH - margin * 2) * canvas.width) / pageW);
+    // Cut between rows where possible: step back to the nearest all-white line.
+    const ctx = canvas.getContext("2d");
+    const blankAt = (y: number) => {
+      if (!ctx) return true;
+      const row = ctx.getImageData(0, y, canvas.width, 1).data;
+      for (let i = 0; i < row.length; i += 16) if (row[i] < 245 || row[i + 1] < 245 || row[i + 2] < 245) return false;
+      return true;
+    };
+    let y = 0;
+    let first = true;
+    while (y < canvas.height) {
+      let h = Math.min(sliceH, canvas.height - y);
+      if (y + h < canvas.height) {
+        let cut = h;
+        while (cut > h * 0.7 && !blankAt(y + cut)) cut--;
+        if (cut > h * 0.7) h = cut;
+      }
+      const part = document.createElement("canvas");
+      part.width = canvas.width;
+      part.height = h;
+      part.getContext("2d")!.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+      if (!first) pdf.addPage();
+      pdf.addImage(part.toDataURL("image/jpeg", 0.92), "JPEG", 0, margin, pageW, (h * pageW) / canvas.width);
+      first = false;
+      y += h;
+    }
     pdf.save(reportFileName(report, meta, "pdf"));
   } finally {
     host.remove();

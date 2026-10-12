@@ -1066,6 +1066,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
           if (res.duplicate)
             toast.info(
               `${name} was already received earlier. Nothing was added twice.`,
+              { duration: 9000 },
             );
           else if (res.extract_status === "failed")
             toast.error(`${name}: ${res.error_message ?? "could not be read"}`);

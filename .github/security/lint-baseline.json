@@ -12,16 +12,16 @@
     {
       "name": "auth_otp_long_expiry",
       "level": "WARN",
-      "schema": "auth",
+      "schema": "",
       "object": null,
       "reason": "OTP expiry left at provider default for now; tracked separately."
     },
     {
       "name": "auth_leaked_password_protection",
       "level": "WARN",
-      "schema": "auth",
+      "schema": "",
       "object": null,
-      "reason": "HaveIBeenPwned check disabled in Lovable Cloud; tracked separately."
+      "reason": "Turn on in Supabase → Authentication → Attack Protection (needs a paid plan). Accepted until then."
     },
     {
       "name": "anon_security_definer_function_executable",
@@ -78,6 +78,174 @@
       "schema": "public",
       "object": "pg_net",
       "reason": "Installed by the platform in public; moving it would break existing callers. Tracked separately."
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "ca_can",
+      "reason": "Row-level-security helper used in table policies; it answers only about the signed-in caller, so policies need authenticated to execute it."
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "ca_firm_has_all_client_access",
+      "reason": "Row-level-security helper used in table policies; it answers only about the signed-in caller, so policies need authenticated to execute it."
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "ca_firm_has_client_access",
+      "reason": "Row-level-security helper used in table policies; it answers only about the signed-in caller, so policies need authenticated to execute it."
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "ca_member_role",
+      "reason": "Row-level-security helper used in table policies; it answers only about the signed-in caller, so policies need authenticated to execute it."
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "client_portal_business_id",
+      "reason": "Row-level-security helper used in table policies; it answers only about the signed-in caller, so policies need authenticated to execute it."
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "get_user_business_id",
+      "reason": "Row-level-security helper used in table policies; it answers only about the signed-in caller, so policies need authenticated to execute it."
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "get_user_ca_firm_id",
+      "reason": "Row-level-security helper used in table policies; it answers only about the signed-in caller, so policies need authenticated to execute it."
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "has_role",
+      "reason": "Row-level-security helper used in table policies; it answers only about the signed-in caller, so policies need authenticated to execute it."
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "is_admin_user",
+      "reason": "Row-level-security helper used in table policies; it answers only about the signed-in caller, so policies need authenticated to execute it."
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "is_blog_admin",
+      "reason": "Row-level-security helper used in table policies; it answers only about the signed-in caller, so policies need authenticated to execute it."
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "is_blog_editor",
+      "reason": "Row-level-security helper used in table policies; it answers only about the signed-in caller, so policies need authenticated to execute it."
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "is_ca_firm_privileged",
+      "reason": "Row-level-security helper used in table policies; it answers only about the signed-in caller, so policies need authenticated to execute it."
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "is_demo_viewer",
+      "reason": "Row-level-security helper used in table policies; it answers only about the signed-in caller, so policies need authenticated to execute it."
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "is_senior_admin",
+      "reason": "Row-level-security helper used in table policies; it answers only about the signed-in caller, so policies need authenticated to execute it."
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "user_in_ca_firm",
+      "reason": "Row-level-security helper used in table policies; it answers only about the signed-in caller, so policies need authenticated to execute it."
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "accept_ca_invitation",
+      "reason": "Invite acceptance; the invitation token is the credential and it binds to the caller."
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "decline_ca_invitation",
+      "reason": "Invite decline; the invitation token is the credential."
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "get_ca_invitation",
+      "reason": "Shows an invitation to the person holding its token."
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "get_shared_mis_report",
+      "reason": "Public share link for an MIS report; the token is the credential."
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "increment_blog_views",
+      "reason": "Counts a view of a published blog post; changes nothing else."
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "admin_ai_usage_overview",
+      "reason": "Admin page; returns rows only when is_admin_user() is true."
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "clear_ca_demo_data",
+      "reason": "Admin page; raises unless the caller is an admin (20261012130000)."
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "generate_compliance_calendar",
+      "reason": "Raises unless the caller belongs to the firm (20261012130000)."
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "lookup_client_by_reference",
+      "reason": "Raises unless the caller belongs to the firm (20261012130000)."
     }
   ]
 }

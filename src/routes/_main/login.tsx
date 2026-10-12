@@ -1,8 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { noindexHead } from "@/lib/seo";
-import LoginPage from "@/pages/LoginPage";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
+// The old SME sign-in is retired; links already shared land on the workspace sign-in.
 export const Route = createFileRoute("/_main/login")({
-  head: () => noindexHead("Sign in — FynHelp"),
-  component: LoginPage,
+  beforeLoad: ({ location }) => {
+    const mode = new URLSearchParams(location.searchStr).get("mode") === "signup" ? "signup" : "signin";
+    throw redirect({ href: `/v2/onboarding?mode=${mode}` });
+  },
+  component: () => null,
 });

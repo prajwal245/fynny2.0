@@ -66,48 +66,31 @@ const STYLES = `
 @media (prefers-reduced-motion:reduce){ .fh-demo * { animation:none !important; opacity:1 !important; transform:none !important; } }
 `;
 
+const shot = (src: string, alt: string) => (
+  <a href={src} target="_blank" rel="noreferrer" style={{ display: "block", marginTop: 16 }}>
+    <img
+      src={src}
+      alt={alt}
+      loading="lazy"
+      width={1440}
+      height={900}
+      style={{ display: "block", width: "100%", height: "auto", borderRadius: 10, border: `1px solid ${C.line}` }}
+    />
+  </a>
+);
+
+// Real screenshots of the product, taken on the sample files at /samples.
 const STEP_DEMOS: Record<string, ReactElement> = {
-  extract: (
-    <div className="fh-demo" aria-hidden="true">
-      <div className="fh-doc">
-        <div className="ln w1" /><div className="ln w2" /><div className="ln w3" /><div className="ln w2" />
-      </div>
-      <div className="fh-field f1"><small>Amount</small>₹1,24,500</div>
-      <div className="fh-field f2"><small>GSTIN</small>27AAB…1Z5</div>
-      <div className="fh-field f3"><small>Counterparty</small>Shree Traders</div>
-      <div className="fh-conf">3 fields extracted · 98% confidence</div>
-    </div>
-  ),
-  recon: (
-    <div className="fh-demo" aria-hidden="true">
-      <div className="fh-rrow"><span className="fh-chip bank">BANK ₹41,200</span><span className="fh-link" /><span className="fh-chip inv">INV-2288</span></div>
-      <div className="fh-rrow"><span className="fh-chip bank">BANK ₹18,000</span><span className="fh-link" /><span className="fh-chip inv">INV-2290</span></div>
-      <div className="fh-rrow"><span className="fh-chip bank">BANK ₹4,120</span><span className="fh-link" /><span className="fh-chip nomatch">no match yet</span></div>
-      <div className="fh-demo-cap" style={{ marginTop: 16 }}><i />421 matched · 2 exceptions <span className="pill">this cycle</span></div>
-    </div>
-  ),
-  narrate: (
-    <div className="fh-demo" aria-hidden="true">
-      <div className="fh-narr">
-        <span className="typed">ITC reversed under Rule 42 — ₹12,480 moved to blocked credit for the August cycle.</span>
-        <span className="caret" />
-        <br />
-        <span className="fh-attach">Source attached · GSTR-2B_Aug.pdf</span>
-      </div>
-      <div className="fh-demo-cap" style={{ marginTop: 14 }}><i />Drafted · waiting for partner review</div>
-    </div>
-  ),
+  extract: shot("/guide/07-tds-register-checks.jpg", "A TDS register read and checked: rates by section and totals"),
+  recon: shot("/guide/09-recon-results.jpg", "Recon results: matched and unmatched bank and book lines for the month"),
+  narrate: shot("/guide/14-mis-report.jpg", "A monthly MIS: revenue, expenses and net, each opening its source transactions"),
   chaser: (
     <div className="fh-demo" aria-hidden="true">
       <div className="fh-msg">
-        <div className="who">FynHelp · to client</div>
-        Gentle reminder — the August bank statement for the current account is still pending. Sharing it today keeps your books on schedule.
+        <div className="who">Your firm · to client</div>
+        Reminder: we still need the July bank statement for your current account to close the month.
       </div>
-      <div className="fh-sent">Sent · will ask once more in 3 days if needed</div>
-      <div className="fh-msg2">
-        <div className="who">FynHelp · to client</div>
-        One more nudge — the August statement lets us close your recon. Reply with the file and we take it from there.
-      </div>
+      <div className="fh-sent">Default schedule: day 0, 3 and 7, then escalates to the partner</div>
     </div>
   ),
 };
@@ -116,22 +99,22 @@ const STEPS = [
   {
     no: "01",
     name: "Extract",
-    d: "Documents classified, read and lifted into structured lines — amount, date, GSTIN, counterparty. Any PDF, scan or email attachment, no templates, no manual keying.",
+    d: "Statements, Tally exports and registers read into structured lines: date, amount, counterparty, GSTIN. CSV, Excel, Tally XML, PDF or a photo. Unsure lines go to review.",
   },
   {
     no: "02",
     name: "Recon",
-    d: "Bank lines drift toward ledger lines and lock. What does not lock stays visible with a reason code — a step in the process, not a failure.",
+    d: "Bank lines are matched to book lines: exact, same-day, fuzzy, your rules, then splits. What does not match stays visible with a reason code.",
   },
   {
     no: "03",
     name: "Narrate",
-    d: "A narration writes itself out and clips its source document to the end. Deliberate, reviewable, and nothing ever sends itself — a partner always approves.",
+    d: "The monthly MIS is built from matched lines only, and every figure opens the transactions behind it. A partner always signs off.",
   },
   {
     no: "04",
     name: "Chaser",
-    d: "A quiet, polite nudge that sends and fades. If something is still missing, it asks once more. Your team stops chasing clients by phone.",
+    d: "A polite email reminder for missing documents, on a schedule, with a WhatsApp quick-send link. It stops when the document arrives.",
   },
 ];
 
@@ -231,11 +214,11 @@ export default function PipelinePage() {
         <div className="fh-grid fh-g3">
           {[
             { t: "Month-end close, minus the chase", d: "Chaser collects pending statements before the close starts, and Recon leaves only genuine exceptions for review." },
-            { t: "ITC that survives scrutiny", d: "Every claimed rupee of input credit carries its GSTR-2B line and the original invoice behind it." },
-            { t: "Client reporting in your brand", d: "White-label MIS outputs go out with your firm's name, drafted by Narrate and approved by a partner." },
-            { t: "Onboarding a new client in days", d: "Extract reads the backlog of PDFs and scans, so a new entity is current within the first week." },
-            { t: "Collections without awkward calls", d: "Chaser nudges overdue clients politely, asks once more if needed, and escalates to you with full history." },
-            { t: "Practice visibility", d: "Per-client match rates, open exceptions and pending documents in one view for the whole firm." },
+            { t: "Registers that are checked", d: "GST and TDS registers are read and checked for GSTIN check digits, TDS rates by section and totals before they reach the MIS." },
+            { t: "MIS a partner can sign", d: "Every figure in the MIS opens its source transactions, so sign-off takes minutes, not a re-check." },
+            { t: "Catching up a new client", d: "Upload several months of statements at once. Each line lands in its own month, and you are told when a file belongs to another one." },
+            { t: "Documents without awkward calls", d: "Chaser reminds clients about missing documents, follows up on a schedule, and escalates to the partner with the full history." },
+            { t: "Practice visibility", d: "Each client's close status, open exceptions and missing documents for the month in one view." },
           ].map((u, i) => (
             <Reveal key={u.t} delay={i * 60}>
               <div className="fh-card">
@@ -245,19 +228,12 @@ export default function PipelinePage() {
             </Reveal>
           ))}
         </div>
-        <Reveal delay={140}>
-          <p style={{ textAlign: "center", marginTop: 30, fontSize: 14 }}>
-            <Link to="/use-cases" style={{ color: C.maroon, fontWeight: 600, textDecoration: "none", borderBottom: `1px solid ${C.maroon}` }}>
-              Browse use cases by industry
-            </Link>
-          </p>
-        </Reveal>
       </Section>
 
       <CtaBand
         title="Watch the pipeline run"
         italic="on your own books."
-        lead="Thirty days free. Upload one client's documents and see Extract, Recon and Narrate work end to end."
+        lead="Free to start. Upload one client's documents, or our sample files, and see Extract, Recon and Narrate work end to end."
         location="pipeline-final"
       />
     </SiteShell>

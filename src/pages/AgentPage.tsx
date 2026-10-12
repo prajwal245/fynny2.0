@@ -137,7 +137,7 @@ export default function AgentPage({ slug }: { slug: string }) {
       <CtaBand
         title={`Put the ${agent.name.toLowerCase()}`}
         italic="on your books"
-        lead="Thirty minutes with your own data. You keep whatever it finds, whether or not you continue."
+        lead="Twenty minutes with your own data. You keep whatever it finds, whether or not you continue."
         location="agent-final"
       />
     </SiteShell>

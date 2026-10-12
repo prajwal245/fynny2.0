@@ -1,20 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-import UseCasesPage from "@/pages/UseCasesPage";
-import { breadcrumbLd, seo, webPageLd } from "@/lib/seo";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
-const description =
-  "Where FynHelp saves a CA firm time each month: collecting client statements, reconciling bank to books, clearing exceptions and producing MIS your clients can trace to source.";
-
+// Use cases now live on the pipeline page.
 export const Route = createFileRoute("/_main/use-cases")({
-  component: UseCasesPage,
-  head: () =>
-    seo({
-      title: "Use cases: month-end close for CA practices",
-      description,
-      path: "/use-cases",
-      jsonLd: [
-        webPageLd({ name: "FynHelp use cases", description, path: "/use-cases" }),
-        breadcrumbLd([{ name: "Use cases", path: "/use-cases" }]),
-      ],
-    }),
+  beforeLoad: () => {
+    throw redirect({ to: "/pipeline", statusCode: 301 });
+  },
+  component: () => null,
 });

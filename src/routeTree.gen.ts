@@ -23,6 +23,7 @@ import { Route as MainAboutRouteImport } from './routes/_main/about'
 import { Route as MainCaFirmsRouteImport } from './routes/_main/ca-firms'
 import { Route as MainCommunityRouteImport } from './routes/_main/community'
 import { Route as MainContactRouteImport } from './routes/_main/contact'
+import { Route as MainDashboardRouteImport } from './routes/_main/dashboard'
 import { Route as MainLoginRouteImport } from './routes/_main/login'
 import { Route as MainOnboardingRouteImport } from './routes/_main/onboarding'
 import { Route as MainPipelineRouteImport } from './routes/_main/pipeline'
@@ -270,6 +271,11 @@ const MainContactRoute = MainContactRouteImport.update({
   path: '/contact',
   getParentRoute: () => MainRoute,
 } as any)
+const MainDashboardRoute = MainDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => MainRoute,
+} as any)
 const MainLoginRoute = MainLoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -470,186 +476,186 @@ const MainBlogSlugRoute = MainBlogSlugRouteImport.update({
   getParentRoute: () => MainRoute,
 } as any)
 const MainDashboardIndexRoute = MainDashboardIndexRouteImport.update({
-  id: '/dashboard/',
-  path: '/dashboard/',
-  getParentRoute: () => MainRoute,
+  id: '/',
+  path: '/',
+  getParentRoute: () => MainDashboardRoute,
 } as any)
 const MainDashboard360Route = MainDashboard360RouteImport.update({
-  id: '/dashboard/360',
-  path: '/dashboard/360',
-  getParentRoute: () => MainRoute,
+  id: '/360',
+  path: '/360',
+  getParentRoute: () => MainDashboardRoute,
 } as any)
 const MainDashboardAuditReadinessRoute =
   MainDashboardAuditReadinessRouteImport.update({
-    id: '/dashboard/audit-readiness',
-    path: '/dashboard/audit-readiness',
-    getParentRoute: () => MainRoute,
+    id: '/audit-readiness',
+    path: '/audit-readiness',
+    getParentRoute: () => MainDashboardRoute,
   } as any)
 const MainDashboardBankingRoute = MainDashboardBankingRouteImport.update({
-  id: '/dashboard/banking',
-  path: '/dashboard/banking',
-  getParentRoute: () => MainRoute,
+  id: '/banking',
+  path: '/banking',
+  getParentRoute: () => MainDashboardRoute,
 } as any)
 const MainDashboardCaAccessRoute = MainDashboardCaAccessRouteImport.update({
-  id: '/dashboard/ca-access',
-  path: '/dashboard/ca-access',
-  getParentRoute: () => MainRoute,
+  id: '/ca-access',
+  path: '/ca-access',
+  getParentRoute: () => MainDashboardRoute,
 } as any)
 const MainDashboardCaPartnerRoute = MainDashboardCaPartnerRouteImport.update({
-  id: '/dashboard/ca-partner',
-  path: '/dashboard/ca-partner',
-  getParentRoute: () => MainRoute,
+  id: '/ca-partner',
+  path: '/ca-partner',
+  getParentRoute: () => MainDashboardRoute,
 } as any)
 const MainDashboardCashFlowRoute = MainDashboardCashFlowRouteImport.update({
-  id: '/dashboard/cash-flow',
-  path: '/dashboard/cash-flow',
-  getParentRoute: () => MainRoute,
+  id: '/cash-flow',
+  path: '/cash-flow',
+  getParentRoute: () => MainDashboardRoute,
 } as any)
 const MainDashboardCockpitRoute = MainDashboardCockpitRouteImport.update({
-  id: '/dashboard/cockpit',
-  path: '/dashboard/cockpit',
-  getParentRoute: () => MainRoute,
+  id: '/cockpit',
+  path: '/cockpit',
+  getParentRoute: () => MainDashboardRoute,
 } as any)
 const MainDashboardComplianceRoute = MainDashboardComplianceRouteImport.update({
-  id: '/dashboard/compliance',
-  path: '/dashboard/compliance',
-  getParentRoute: () => MainRoute,
+  id: '/compliance',
+  path: '/compliance',
+  getParentRoute: () => MainDashboardRoute,
 } as any)
 const MainDashboardCostRoute = MainDashboardCostRouteImport.update({
-  id: '/dashboard/cost',
-  path: '/dashboard/cost',
-  getParentRoute: () => MainRoute,
+  id: '/cost',
+  path: '/cost',
+  getParentRoute: () => MainDashboardRoute,
 } as any)
 const MainDashboardCustomersRoute = MainDashboardCustomersRouteImport.update({
-  id: '/dashboard/customers',
-  path: '/dashboard/customers',
-  getParentRoute: () => MainRoute,
+  id: '/customers',
+  path: '/customers',
+  getParentRoute: () => MainDashboardRoute,
 } as any)
 const MainDashboardDataImportRoute = MainDashboardDataImportRouteImport.update({
-  id: '/dashboard/data-import',
-  path: '/dashboard/data-import',
-  getParentRoute: () => MainRoute,
+  id: '/data-import',
+  path: '/data-import',
+  getParentRoute: () => MainDashboardRoute,
 } as any)
 const MainDashboardDecisionSimulatorRoute =
   MainDashboardDecisionSimulatorRouteImport.update({
-    id: '/dashboard/decision-simulator',
-    path: '/dashboard/decision-simulator',
-    getParentRoute: () => MainRoute,
+    id: '/decision-simulator',
+    path: '/decision-simulator',
+    getParentRoute: () => MainDashboardRoute,
   } as any)
 const MainDashboardEmployeesRoute = MainDashboardEmployeesRouteImport.update({
-  id: '/dashboard/employees',
-  path: '/dashboard/employees',
-  getParentRoute: () => MainRoute,
+  id: '/employees',
+  path: '/employees',
+  getParentRoute: () => MainDashboardRoute,
 } as any)
 const MainDashboardExpensesRoute = MainDashboardExpensesRouteImport.update({
-  id: '/dashboard/expenses',
-  path: '/dashboard/expenses',
-  getParentRoute: () => MainRoute,
+  id: '/expenses',
+  path: '/expenses',
+  getParentRoute: () => MainDashboardRoute,
 } as any)
 const MainDashboardFilingCalendarRoute =
   MainDashboardFilingCalendarRouteImport.update({
-    id: '/dashboard/filing-calendar',
-    path: '/dashboard/filing-calendar',
-    getParentRoute: () => MainRoute,
+    id: '/filing-calendar',
+    path: '/filing-calendar',
+    getParentRoute: () => MainDashboardRoute,
   } as any)
 const MainDashboardFynnyChatRoute = MainDashboardFynnyChatRouteImport.update({
-  id: '/dashboard/fynny-chat',
-  path: '/dashboard/fynny-chat',
-  getParentRoute: () => MainRoute,
+  id: '/fynny-chat',
+  path: '/fynny-chat',
+  getParentRoute: () => MainDashboardRoute,
 } as any)
 const MainDashboardGstRoute = MainDashboardGstRouteImport.update({
-  id: '/dashboard/gst',
-  path: '/dashboard/gst',
-  getParentRoute: () => MainRoute,
+  id: '/gst',
+  path: '/gst',
+  getParentRoute: () => MainDashboardRoute,
 } as any)
 const MainDashboardHrRoute = MainDashboardHrRouteImport.update({
-  id: '/dashboard/hr',
-  path: '/dashboard/hr',
-  getParentRoute: () => MainRoute,
+  id: '/hr',
+  path: '/hr',
+  getParentRoute: () => MainDashboardRoute,
 } as any)
 const MainDashboardImportRoute = MainDashboardImportRouteImport.update({
-  id: '/dashboard/import',
-  path: '/dashboard/import',
-  getParentRoute: () => MainRoute,
+  id: '/import',
+  path: '/import',
+  getParentRoute: () => MainDashboardRoute,
 } as any)
 const MainDashboardInvestorRoute = MainDashboardInvestorRouteImport.update({
-  id: '/dashboard/investor',
-  path: '/dashboard/investor',
-  getParentRoute: () => MainRoute,
+  id: '/investor',
+  path: '/investor',
+  getParentRoute: () => MainDashboardRoute,
 } as any)
 const MainDashboardInvoicesRoute = MainDashboardInvoicesRouteImport.update({
-  id: '/dashboard/invoices',
-  path: '/dashboard/invoices',
-  getParentRoute: () => MainRoute,
+  id: '/invoices',
+  path: '/invoices',
+  getParentRoute: () => MainDashboardRoute,
 } as any)
 const MainDashboardLiquidityRoute = MainDashboardLiquidityRouteImport.update({
-  id: '/dashboard/liquidity',
-  path: '/dashboard/liquidity',
-  getParentRoute: () => MainRoute,
+  id: '/liquidity',
+  path: '/liquidity',
+  getParentRoute: () => MainDashboardRoute,
 } as any)
 const MainDashboardMarketGrowthRoute =
   MainDashboardMarketGrowthRouteImport.update({
-    id: '/dashboard/market-growth',
-    path: '/dashboard/market-growth',
-    getParentRoute: () => MainRoute,
+    id: '/market-growth',
+    path: '/market-growth',
+    getParentRoute: () => MainDashboardRoute,
   } as any)
 const MainDashboardMyCaRoute = MainDashboardMyCaRouteImport.update({
-  id: '/dashboard/my-ca',
-  path: '/dashboard/my-ca',
-  getParentRoute: () => MainRoute,
+  id: '/my-ca',
+  path: '/my-ca',
+  getParentRoute: () => MainDashboardRoute,
 } as any)
 const MainDashboardPayablesRoute = MainDashboardPayablesRouteImport.update({
-  id: '/dashboard/payables',
-  path: '/dashboard/payables',
-  getParentRoute: () => MainRoute,
+  id: '/payables',
+  path: '/payables',
+  getParentRoute: () => MainDashboardRoute,
 } as any)
 const MainDashboardPayrollRoute = MainDashboardPayrollRouteImport.update({
-  id: '/dashboard/payroll',
-  path: '/dashboard/payroll',
-  getParentRoute: () => MainRoute,
+  id: '/payroll',
+  path: '/payroll',
+  getParentRoute: () => MainDashboardRoute,
 } as any)
 const MainDashboardReceivablesRoute =
   MainDashboardReceivablesRouteImport.update({
-    id: '/dashboard/receivables',
-    path: '/dashboard/receivables',
-    getParentRoute: () => MainRoute,
+    id: '/receivables',
+    path: '/receivables',
+    getParentRoute: () => MainDashboardRoute,
   } as any)
 const MainDashboardRevenueIntelligenceRoute =
   MainDashboardRevenueIntelligenceRouteImport.update({
-    id: '/dashboard/revenue-intelligence',
-    path: '/dashboard/revenue-intelligence',
-    getParentRoute: () => MainRoute,
+    id: '/revenue-intelligence',
+    path: '/revenue-intelligence',
+    getParentRoute: () => MainDashboardRoute,
   } as any)
 const MainDashboardRunwayRoute = MainDashboardRunwayRouteImport.update({
-  id: '/dashboard/runway',
-  path: '/dashboard/runway',
-  getParentRoute: () => MainRoute,
+  id: '/runway',
+  path: '/runway',
+  getParentRoute: () => MainDashboardRoute,
 } as any)
 const MainDashboardSettingsRoute = MainDashboardSettingsRouteImport.update({
-  id: '/dashboard/settings',
-  path: '/dashboard/settings',
-  getParentRoute: () => MainRoute,
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => MainDashboardRoute,
 } as any)
 const MainDashboardSimulatorRoute = MainDashboardSimulatorRouteImport.update({
-  id: '/dashboard/simulator',
-  path: '/dashboard/simulator',
-  getParentRoute: () => MainRoute,
+  id: '/simulator',
+  path: '/simulator',
+  getParentRoute: () => MainDashboardRoute,
 } as any)
 const MainDashboardTdsTaxRoute = MainDashboardTdsTaxRouteImport.update({
-  id: '/dashboard/tds-tax',
-  path: '/dashboard/tds-tax',
-  getParentRoute: () => MainRoute,
+  id: '/tds-tax',
+  path: '/tds-tax',
+  getParentRoute: () => MainDashboardRoute,
 } as any)
 const MainDashboardVendorsRoute = MainDashboardVendorsRouteImport.update({
-  id: '/dashboard/vendors',
-  path: '/dashboard/vendors',
-  getParentRoute: () => MainRoute,
+  id: '/vendors',
+  path: '/vendors',
+  getParentRoute: () => MainDashboardRoute,
 } as any)
 const MainDashboardWorkingCapitalRoute =
   MainDashboardWorkingCapitalRouteImport.update({
-    id: '/dashboard/working-capital',
-    path: '/dashboard/working-capital',
-    getParentRoute: () => MainRoute,
+    id: '/working-capital',
+    path: '/working-capital',
+    getParentRoute: () => MainDashboardRoute,
   } as any)
 const ApiPublicCaAutoEscalateChasersRoute =
   ApiPublicCaAutoEscalateChasersRouteImport.update({
@@ -1054,20 +1060,20 @@ const CaAuthCaInviteAcceptRoute = CaAuthCaInviteAcceptRouteImport.update({
 } as any)
 const MainDashboardReportsIndexRoute =
   MainDashboardReportsIndexRouteImport.update({
-    id: '/dashboard/reports/',
-    path: '/dashboard/reports/',
-    getParentRoute: () => MainRoute,
+    id: '/reports/',
+    path: '/reports/',
+    getParentRoute: () => MainDashboardRoute,
   } as any)
 const MainDashboardReportsIdRoute = MainDashboardReportsIdRouteImport.update({
-  id: '/dashboard/reports/$id',
-  path: '/dashboard/reports/$id',
-  getParentRoute: () => MainRoute,
+  id: '/reports/$id',
+  path: '/reports/$id',
+  getParentRoute: () => MainDashboardRoute,
 } as any)
 const MainDashboardReportsBooksRoute =
   MainDashboardReportsBooksRouteImport.update({
-    id: '/dashboard/reports/books',
-    path: '/dashboard/reports/books',
-    getParentRoute: () => MainRoute,
+    id: '/reports/books',
+    path: '/reports/books',
+    getParentRoute: () => MainDashboardRoute,
   } as any)
 const MainDashboardSettingsIndexRoute =
   MainDashboardSettingsIndexRouteImport.update({
@@ -1278,6 +1284,7 @@ export interface FileRoutesByFullPath {
   '/ca-firms': typeof MainCaFirmsRoute
   '/community': typeof MainCommunityRoute
   '/contact': typeof MainContactRoute
+  '/dashboard': typeof MainDashboardRouteWithChildren
   '/login': typeof MainLoginRoute
   '/onboarding': typeof MainOnboardingRoute
   '/pipeline': typeof MainPipelineRoute
@@ -1663,6 +1670,7 @@ export interface FileRoutesById {
   '/_main/ca-firms': typeof MainCaFirmsRoute
   '/_main/community': typeof MainCommunityRoute
   '/_main/contact': typeof MainContactRoute
+  '/_main/dashboard': typeof MainDashboardRouteWithChildren
   '/_main/login': typeof MainLoginRoute
   '/_main/onboarding': typeof MainOnboardingRoute
   '/_main/pipeline': typeof MainPipelineRoute
@@ -1858,6 +1866,7 @@ export interface FileRouteTypes {
     | '/ca-firms'
     | '/community'
     | '/contact'
+    | '/dashboard'
     | '/login'
     | '/onboarding'
     | '/pipeline'
@@ -2242,6 +2251,7 @@ export interface FileRouteTypes {
     | '/_main/ca-firms'
     | '/_main/community'
     | '/_main/contact'
+    | '/_main/dashboard'
     | '/_main/login'
     | '/_main/onboarding'
     | '/_main/pipeline'
@@ -2556,6 +2566,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MainContactRouteImport
       parentRoute: typeof MainRoute
     }
+    '/_main/dashboard': {
+      id: '/_main/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof MainDashboardRouteImport
+      parentRoute: typeof MainRoute
+    }
     '/_main/login': {
       id: '/_main/login'
       path: '/login'
@@ -2831,248 +2848,248 @@ declare module '@tanstack/react-router' {
     }
     '/_main/dashboard/': {
       id: '/_main/dashboard/'
-      path: '/dashboard'
+      path: '/'
       fullPath: '/dashboard/'
       preLoaderRoute: typeof MainDashboardIndexRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/360': {
       id: '/_main/dashboard/360'
-      path: '/dashboard/360'
+      path: '/360'
       fullPath: '/dashboard/360'
       preLoaderRoute: typeof MainDashboard360RouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/audit-readiness': {
       id: '/_main/dashboard/audit-readiness'
-      path: '/dashboard/audit-readiness'
+      path: '/audit-readiness'
       fullPath: '/dashboard/audit-readiness'
       preLoaderRoute: typeof MainDashboardAuditReadinessRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/banking': {
       id: '/_main/dashboard/banking'
-      path: '/dashboard/banking'
+      path: '/banking'
       fullPath: '/dashboard/banking'
       preLoaderRoute: typeof MainDashboardBankingRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/ca-access': {
       id: '/_main/dashboard/ca-access'
-      path: '/dashboard/ca-access'
+      path: '/ca-access'
       fullPath: '/dashboard/ca-access'
       preLoaderRoute: typeof MainDashboardCaAccessRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/ca-partner': {
       id: '/_main/dashboard/ca-partner'
-      path: '/dashboard/ca-partner'
+      path: '/ca-partner'
       fullPath: '/dashboard/ca-partner'
       preLoaderRoute: typeof MainDashboardCaPartnerRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/cash-flow': {
       id: '/_main/dashboard/cash-flow'
-      path: '/dashboard/cash-flow'
+      path: '/cash-flow'
       fullPath: '/dashboard/cash-flow'
       preLoaderRoute: typeof MainDashboardCashFlowRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/cockpit': {
       id: '/_main/dashboard/cockpit'
-      path: '/dashboard/cockpit'
+      path: '/cockpit'
       fullPath: '/dashboard/cockpit'
       preLoaderRoute: typeof MainDashboardCockpitRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/compliance': {
       id: '/_main/dashboard/compliance'
-      path: '/dashboard/compliance'
+      path: '/compliance'
       fullPath: '/dashboard/compliance'
       preLoaderRoute: typeof MainDashboardComplianceRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/cost': {
       id: '/_main/dashboard/cost'
-      path: '/dashboard/cost'
+      path: '/cost'
       fullPath: '/dashboard/cost'
       preLoaderRoute: typeof MainDashboardCostRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/customers': {
       id: '/_main/dashboard/customers'
-      path: '/dashboard/customers'
+      path: '/customers'
       fullPath: '/dashboard/customers'
       preLoaderRoute: typeof MainDashboardCustomersRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/data-import': {
       id: '/_main/dashboard/data-import'
-      path: '/dashboard/data-import'
+      path: '/data-import'
       fullPath: '/dashboard/data-import'
       preLoaderRoute: typeof MainDashboardDataImportRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/decision-simulator': {
       id: '/_main/dashboard/decision-simulator'
-      path: '/dashboard/decision-simulator'
+      path: '/decision-simulator'
       fullPath: '/dashboard/decision-simulator'
       preLoaderRoute: typeof MainDashboardDecisionSimulatorRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/employees': {
       id: '/_main/dashboard/employees'
-      path: '/dashboard/employees'
+      path: '/employees'
       fullPath: '/dashboard/employees'
       preLoaderRoute: typeof MainDashboardEmployeesRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/expenses': {
       id: '/_main/dashboard/expenses'
-      path: '/dashboard/expenses'
+      path: '/expenses'
       fullPath: '/dashboard/expenses'
       preLoaderRoute: typeof MainDashboardExpensesRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/filing-calendar': {
       id: '/_main/dashboard/filing-calendar'
-      path: '/dashboard/filing-calendar'
+      path: '/filing-calendar'
       fullPath: '/dashboard/filing-calendar'
       preLoaderRoute: typeof MainDashboardFilingCalendarRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/fynny-chat': {
       id: '/_main/dashboard/fynny-chat'
-      path: '/dashboard/fynny-chat'
+      path: '/fynny-chat'
       fullPath: '/dashboard/fynny-chat'
       preLoaderRoute: typeof MainDashboardFynnyChatRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/gst': {
       id: '/_main/dashboard/gst'
-      path: '/dashboard/gst'
+      path: '/gst'
       fullPath: '/dashboard/gst'
       preLoaderRoute: typeof MainDashboardGstRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/hr': {
       id: '/_main/dashboard/hr'
-      path: '/dashboard/hr'
+      path: '/hr'
       fullPath: '/dashboard/hr'
       preLoaderRoute: typeof MainDashboardHrRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/import': {
       id: '/_main/dashboard/import'
-      path: '/dashboard/import'
+      path: '/import'
       fullPath: '/dashboard/import'
       preLoaderRoute: typeof MainDashboardImportRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/investor': {
       id: '/_main/dashboard/investor'
-      path: '/dashboard/investor'
+      path: '/investor'
       fullPath: '/dashboard/investor'
       preLoaderRoute: typeof MainDashboardInvestorRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/invoices': {
       id: '/_main/dashboard/invoices'
-      path: '/dashboard/invoices'
+      path: '/invoices'
       fullPath: '/dashboard/invoices'
       preLoaderRoute: typeof MainDashboardInvoicesRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/liquidity': {
       id: '/_main/dashboard/liquidity'
-      path: '/dashboard/liquidity'
+      path: '/liquidity'
       fullPath: '/dashboard/liquidity'
       preLoaderRoute: typeof MainDashboardLiquidityRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/market-growth': {
       id: '/_main/dashboard/market-growth'
-      path: '/dashboard/market-growth'
+      path: '/market-growth'
       fullPath: '/dashboard/market-growth'
       preLoaderRoute: typeof MainDashboardMarketGrowthRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/my-ca': {
       id: '/_main/dashboard/my-ca'
-      path: '/dashboard/my-ca'
+      path: '/my-ca'
       fullPath: '/dashboard/my-ca'
       preLoaderRoute: typeof MainDashboardMyCaRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/payables': {
       id: '/_main/dashboard/payables'
-      path: '/dashboard/payables'
+      path: '/payables'
       fullPath: '/dashboard/payables'
       preLoaderRoute: typeof MainDashboardPayablesRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/payroll': {
       id: '/_main/dashboard/payroll'
-      path: '/dashboard/payroll'
+      path: '/payroll'
       fullPath: '/dashboard/payroll'
       preLoaderRoute: typeof MainDashboardPayrollRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/receivables': {
       id: '/_main/dashboard/receivables'
-      path: '/dashboard/receivables'
+      path: '/receivables'
       fullPath: '/dashboard/receivables'
       preLoaderRoute: typeof MainDashboardReceivablesRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/revenue-intelligence': {
       id: '/_main/dashboard/revenue-intelligence'
-      path: '/dashboard/revenue-intelligence'
+      path: '/revenue-intelligence'
       fullPath: '/dashboard/revenue-intelligence'
       preLoaderRoute: typeof MainDashboardRevenueIntelligenceRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/runway': {
       id: '/_main/dashboard/runway'
-      path: '/dashboard/runway'
+      path: '/runway'
       fullPath: '/dashboard/runway'
       preLoaderRoute: typeof MainDashboardRunwayRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/settings': {
       id: '/_main/dashboard/settings'
-      path: '/dashboard/settings'
+      path: '/settings'
       fullPath: '/dashboard/settings'
       preLoaderRoute: typeof MainDashboardSettingsRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/simulator': {
       id: '/_main/dashboard/simulator'
-      path: '/dashboard/simulator'
+      path: '/simulator'
       fullPath: '/dashboard/simulator'
       preLoaderRoute: typeof MainDashboardSimulatorRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/tds-tax': {
       id: '/_main/dashboard/tds-tax'
-      path: '/dashboard/tds-tax'
+      path: '/tds-tax'
       fullPath: '/dashboard/tds-tax'
       preLoaderRoute: typeof MainDashboardTdsTaxRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/vendors': {
       id: '/_main/dashboard/vendors'
-      path: '/dashboard/vendors'
+      path: '/vendors'
       fullPath: '/dashboard/vendors'
       preLoaderRoute: typeof MainDashboardVendorsRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/working-capital': {
       id: '/_main/dashboard/working-capital'
-      path: '/dashboard/working-capital'
+      path: '/working-capital'
       fullPath: '/dashboard/working-capital'
       preLoaderRoute: typeof MainDashboardWorkingCapitalRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/api/public/ca-auto-escalate-chasers': {
       id: '/api/public/ca-auto-escalate-chasers'
@@ -3573,24 +3590,24 @@ declare module '@tanstack/react-router' {
     }
     '/_main/dashboard/reports/': {
       id: '/_main/dashboard/reports/'
-      path: '/dashboard/reports'
+      path: '/reports'
       fullPath: '/dashboard/reports/'
       preLoaderRoute: typeof MainDashboardReportsIndexRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/reports/$id': {
       id: '/_main/dashboard/reports/$id'
-      path: '/dashboard/reports/$id'
+      path: '/reports/$id'
       fullPath: '/dashboard/reports/$id'
       preLoaderRoute: typeof MainDashboardReportsIdRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/reports/books': {
       id: '/_main/dashboard/reports/books'
-      path: '/dashboard/reports/books'
+      path: '/reports/books'
       fullPath: '/dashboard/reports/books'
       preLoaderRoute: typeof MainDashboardReportsBooksRouteImport
-      parentRoute: typeof MainRoute
+      parentRoute: typeof MainDashboardRoute
     }
     '/_main/dashboard/settings/': {
       id: '/_main/dashboard/settings/'
@@ -4115,26 +4132,7 @@ const MainDashboardSettingsRouteWithChildren =
     MainDashboardSettingsRouteChildren,
   )
 
-interface MainRouteChildren {
-  MainAboutRoute: typeof MainAboutRoute
-  MainCaFirmsRoute: typeof MainCaFirmsRoute
-  MainCommunityRoute: typeof MainCommunityRoute
-  MainContactRoute: typeof MainContactRoute
-  MainLoginRoute: typeof MainLoginRoute
-  MainOnboardingRoute: typeof MainOnboardingRoute
-  MainPipelineRoute: typeof MainPipelineRoute
-  MainPricingRoute: typeof MainPricingRoute
-  MainPrivacyRoute: typeof MainPrivacyRoute
-  MainResetPasswordRoute: typeof MainResetPasswordRoute
-  MainResourcesRoute: typeof MainResourcesRoute
-  MainSecurityRoute: typeof MainSecurityRoute
-  MainSignupRoute: typeof MainSignupRoute
-  MainTermsRoute: typeof MainTermsRoute
-  MainUseCasesRoute: typeof MainUseCasesRoute
-  MainWaitlistRoute: typeof MainWaitlistRoute
-  MainIndexRoute: typeof MainIndexRoute
-  MainAgentsSlugRoute: typeof MainAgentsSlugRoute
-  MainBlogSlugRoute: typeof MainBlogSlugRoute
+interface MainDashboardRouteChildren {
   MainDashboard360Route: typeof MainDashboard360Route
   MainDashboardAuditReadinessRoute: typeof MainDashboardAuditReadinessRoute
   MainDashboardBankingRoute: typeof MainDashboardBankingRoute
@@ -4169,33 +4167,13 @@ interface MainRouteChildren {
   MainDashboardTdsTaxRoute: typeof MainDashboardTdsTaxRoute
   MainDashboardVendorsRoute: typeof MainDashboardVendorsRoute
   MainDashboardWorkingCapitalRoute: typeof MainDashboardWorkingCapitalRoute
-  MainBlogIndexRoute: typeof MainBlogIndexRoute
   MainDashboardIndexRoute: typeof MainDashboardIndexRoute
   MainDashboardReportsIdRoute: typeof MainDashboardReportsIdRoute
   MainDashboardReportsBooksRoute: typeof MainDashboardReportsBooksRoute
   MainDashboardReportsIndexRoute: typeof MainDashboardReportsIndexRoute
 }
 
-const MainRouteChildren: MainRouteChildren = {
-  MainAboutRoute: MainAboutRoute,
-  MainCaFirmsRoute: MainCaFirmsRoute,
-  MainCommunityRoute: MainCommunityRoute,
-  MainContactRoute: MainContactRoute,
-  MainLoginRoute: MainLoginRoute,
-  MainOnboardingRoute: MainOnboardingRoute,
-  MainPipelineRoute: MainPipelineRoute,
-  MainPricingRoute: MainPricingRoute,
-  MainPrivacyRoute: MainPrivacyRoute,
-  MainResetPasswordRoute: MainResetPasswordRoute,
-  MainResourcesRoute: MainResourcesRoute,
-  MainSecurityRoute: MainSecurityRoute,
-  MainSignupRoute: MainSignupRoute,
-  MainTermsRoute: MainTermsRoute,
-  MainUseCasesRoute: MainUseCasesRoute,
-  MainWaitlistRoute: MainWaitlistRoute,
-  MainIndexRoute: MainIndexRoute,
-  MainAgentsSlugRoute: MainAgentsSlugRoute,
-  MainBlogSlugRoute: MainBlogSlugRoute,
+const MainDashboardRouteChildren: MainDashboardRouteChildren = {
   MainDashboard360Route: MainDashboard360Route,
   MainDashboardAuditReadinessRoute: MainDashboardAuditReadinessRoute,
   MainDashboardBankingRoute: MainDashboardBankingRoute,
@@ -4230,11 +4208,62 @@ const MainRouteChildren: MainRouteChildren = {
   MainDashboardTdsTaxRoute: MainDashboardTdsTaxRoute,
   MainDashboardVendorsRoute: MainDashboardVendorsRoute,
   MainDashboardWorkingCapitalRoute: MainDashboardWorkingCapitalRoute,
-  MainBlogIndexRoute: MainBlogIndexRoute,
   MainDashboardIndexRoute: MainDashboardIndexRoute,
   MainDashboardReportsIdRoute: MainDashboardReportsIdRoute,
   MainDashboardReportsBooksRoute: MainDashboardReportsBooksRoute,
   MainDashboardReportsIndexRoute: MainDashboardReportsIndexRoute,
+}
+
+const MainDashboardRouteWithChildren = MainDashboardRoute._addFileChildren(
+  MainDashboardRouteChildren,
+)
+
+interface MainRouteChildren {
+  MainAboutRoute: typeof MainAboutRoute
+  MainCaFirmsRoute: typeof MainCaFirmsRoute
+  MainCommunityRoute: typeof MainCommunityRoute
+  MainContactRoute: typeof MainContactRoute
+  MainDashboardRoute: typeof MainDashboardRouteWithChildren
+  MainLoginRoute: typeof MainLoginRoute
+  MainOnboardingRoute: typeof MainOnboardingRoute
+  MainPipelineRoute: typeof MainPipelineRoute
+  MainPricingRoute: typeof MainPricingRoute
+  MainPrivacyRoute: typeof MainPrivacyRoute
+  MainResetPasswordRoute: typeof MainResetPasswordRoute
+  MainResourcesRoute: typeof MainResourcesRoute
+  MainSecurityRoute: typeof MainSecurityRoute
+  MainSignupRoute: typeof MainSignupRoute
+  MainTermsRoute: typeof MainTermsRoute
+  MainUseCasesRoute: typeof MainUseCasesRoute
+  MainWaitlistRoute: typeof MainWaitlistRoute
+  MainIndexRoute: typeof MainIndexRoute
+  MainAgentsSlugRoute: typeof MainAgentsSlugRoute
+  MainBlogSlugRoute: typeof MainBlogSlugRoute
+  MainBlogIndexRoute: typeof MainBlogIndexRoute
+}
+
+const MainRouteChildren: MainRouteChildren = {
+  MainAboutRoute: MainAboutRoute,
+  MainCaFirmsRoute: MainCaFirmsRoute,
+  MainCommunityRoute: MainCommunityRoute,
+  MainContactRoute: MainContactRoute,
+  MainDashboardRoute: MainDashboardRouteWithChildren,
+  MainLoginRoute: MainLoginRoute,
+  MainOnboardingRoute: MainOnboardingRoute,
+  MainPipelineRoute: MainPipelineRoute,
+  MainPricingRoute: MainPricingRoute,
+  MainPrivacyRoute: MainPrivacyRoute,
+  MainResetPasswordRoute: MainResetPasswordRoute,
+  MainResourcesRoute: MainResourcesRoute,
+  MainSecurityRoute: MainSecurityRoute,
+  MainSignupRoute: MainSignupRoute,
+  MainTermsRoute: MainTermsRoute,
+  MainUseCasesRoute: MainUseCasesRoute,
+  MainWaitlistRoute: MainWaitlistRoute,
+  MainIndexRoute: MainIndexRoute,
+  MainAgentsSlugRoute: MainAgentsSlugRoute,
+  MainBlogSlugRoute: MainBlogSlugRoute,
+  MainBlogIndexRoute: MainBlogIndexRoute,
 }
 
 const MainRouteWithChildren = MainRoute._addFileChildren(MainRouteChildren)

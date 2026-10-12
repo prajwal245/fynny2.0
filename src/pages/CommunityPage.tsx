@@ -11,7 +11,7 @@ const PLANNED = [
   { t: "Practice circles", d: "Small, invite only rooms where CAs compare how they handle the same filing edge case." },
   { t: "Monthly GST clinic", d: "One hour, live, on the notices and mismatches that actually landed that month." },
   { t: "Owner office hours", d: "Founders and finance leads working through a real cash question with a CFO in the room." },
-  { t: "Playbook library", d: "The chaser scripts, close checklists and review templates our users already run." },
+  { t: "Playbook library", d: "The chaser scripts, close checklists and review templates that work in practice." },
 ];
 
 export default function CommunityPage() {

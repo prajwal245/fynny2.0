@@ -5,6 +5,7 @@ import SiteShell, { Section, Reveal, CtaBand } from "@/components/site/SiteShell
 import { C } from "@/components/site/siteTheme";
 import { SIGNUP_URL, trackCta } from "@/components/site/cta";
 import { openDemo } from "@/components/site/BookDemo";
+import { CurrencySwitch, INR_PER_USD, localize, money, useCurrency } from "@/lib/currency";
 
 /* ================================================================
    FynHelp — Pricing · Pay per active client (Finvora design system)
@@ -40,6 +41,7 @@ const STYLES = `
 
 .fh-cycle { display:inline-flex; background:#E4DCCB; border-radius:999px; padding:4px; gap:2px; }
 .fh-cycle button { border:0; background:transparent; font-family:inherit; font-size:14px; font-weight:600; color:${C.body}; padding:9px 24px; border-radius:999px; cursor:pointer; transition:.2s; display:flex; align-items:center; gap:8px; }
+.fh-cur { margin-left: 10px; }
 .fh-cycle button.on { background:${C.card}; color:${C.ink}; box-shadow:0 1px 5px rgba(23,18,8,.14); }
 .fh-savepill { font-size:10px; font-weight:700; background:${C.gold}; color:#F7F1E6; padding:2px 9px; border-radius:999px; letter-spacing:.04em; }
 
@@ -84,10 +86,11 @@ type Tier = {
   badge?: string;
   popular?: boolean;
   forLine: string;
-  monthly: string;
-  annual: string;
+  /** Rupees a month, GST included. */
+  monthly: number;
+  /** Rupees a year on annual billing, GST included. */
+  annualTotal: number;
   billM: string;
-  billA: string;
   quota: string;
   extra: string;
   eff: string;
@@ -100,10 +103,9 @@ const TIERS: Tier[] = [
   {
     name: "Starter",
     forLine: "Small firms automating their first book of clients",
-    monthly: "2,999",
-    annual: "2,549",
+    monthly: 2999,
+    annualTotal: 30590,
     billM: "Billed monthly · cancel anytime",
-    billA: "₹30,590 billed yearly · save ₹5,398",
     quota: "15",
     extra: "+ ₹149 per additional active client · cap 25",
     eff: "≈ ₹200 per client / month",
@@ -133,10 +135,9 @@ const TIERS: Tier[] = [
     badge: "Most popular",
     popular: true,
     forLine: "The core pick — mid-size firms running 15–40 clients on FynHelp",
-    monthly: "5,999",
-    annual: "5,099",
+    monthly: 5999,
+    annualTotal: 61190,
     billM: "Billed monthly · cancel anytime",
-    billA: "₹61,190 billed yearly · save ₹10,798",
     quota: "40",
     extra: "+ ₹119 per additional active client",
     eff: "≈ ₹150 per client / month",
@@ -157,10 +158,9 @@ const TIERS: Tier[] = [
   {
     name: "Scale",
     forLine: "Multi-partner firms running 40–100+ clients",
-    monthly: "12,999",
-    annual: "11,049",
+    monthly: 12999,
+    annualTotal: 132590,
     billM: "Billed monthly · cancel anytime",
-    billA: "₹1,32,590 billed yearly · save ₹23,398",
     quota: "100",
     extra: "+ ₹99 per additional client · no cap",
     eff: "≈ ₹130 per client / month",
@@ -201,6 +201,8 @@ const cell = (v: string) =>
 export default function PricingPage() {
   const [cycle, setCycle] = useState<"m" | "a">("m");
   const annual = cycle === "a";
+  const cur = useCurrency();
+  const L = (t: string) => localize(t, cur);
 
   return (
     <SiteShell>
@@ -252,9 +254,11 @@ export default function PricingPage() {
               Annual <span className="fh-savepill">Save 15%</span>
             </button>
           </div>
+          <CurrencySwitch className="fh-cycle fh-cur" value={cur} />
         </Reveal>
         <Reveal delay={60}>
           <p style={{ fontSize: 13.5, color: C.body, margin: 0 }}>
+            {cur === "USD" && <>Dollar prices are a guide at ₹{INR_PER_USD} to $1; you are billed in rupees through Razorpay. </>}
             Prefer one flat price for the whole firm?{" "}
             <Link to="/contact" style={{ color: C.maroon, fontWeight: 600, textDecoration: "none", borderBottom: `1px solid ${C.maroon}` }}>
               Talk to us
@@ -272,18 +276,20 @@ export default function PricingPage() {
                 {t.badge && <div className="fh-pbadge">{t.badge}</div>}
                 <div className="tier">{t.name}</div>
                 <div className="for">{t.forLine}</div>
-                <div className="price">
-                  <span className="cur">₹</span>
-                  <span className="amount num">{annual ? t.annual : t.monthly}</span>
+                <div className="fh-price">
+                  <span className="cur">{cur === "INR" ? "₹" : "$"}</span>
+                  <span className="amount num">{money(annual ? t.annualTotal / 12 : t.monthly, cur).slice(1)}</span>
                   <span className="per">/mo</span>
-                  {annual && <span className="was num">₹{t.monthly}</span>}
+                  {annual && <span className="was num">{money(t.monthly, cur)}</span>}
                 </div>
-                <div className="fh-pbill num">{annual ? t.billA : t.billM}</div>
+                <div className="fh-pbill num">
+                  {annual ? `${money(t.annualTotal, cur)} billed yearly · save ${money(t.monthly * 12 - t.annualTotal, cur)}` : t.billM}
+                </div>
                 <div className="fh-quota">
                   <span className="qn num">{t.quota}</span> <span className="ql">active clients included</span>
                 </div>
-                <div className="fh-extra">{t.extra}</div>
-                <div className="fh-eff">{t.eff}</div>
+                <div className="fh-extra">{L(t.extra)}</div>
+                <div className="fh-eff">{L(t.eff)}</div>
 
                 {t.groups.map((g) => (
                   <div key={g.head}>
@@ -293,7 +299,7 @@ export default function PricingPage() {
                         <span className="ck">✓</span>
                         <div>
                           <div className="ft">{f.t}</div>
-                          <div className="fd">{f.d}</div>
+                          <div className="fd">{L(f.d)}</div>
                         </div>
                       </div>
                     ))}
@@ -327,7 +333,7 @@ export default function PricingPage() {
             <span><b>Cancel anytime</b></span>
             <span><b>Unlimited users</b> on all tiers</span>
                         <span><b>Every number</b> source-traceable</span>
-            <span>All prices <b>exclude GST</b></span>
+            <span>All prices <b>include GST</b></span>
           </div>
         </Reveal>
       </section>
@@ -379,9 +385,9 @@ export default function PricingPage() {
               {COMPARE.map(([label, a, b, c]) => (
                 <tr key={label}>
                   <td>{label}</td>
-                  <td>{cell(a)}</td>
-                  <td className="hl">{cell(b)}</td>
-                  <td>{cell(c)}</td>
+                  <td>{cell(L(a))}</td>
+                  <td className="hl">{cell(L(b))}</td>
+                  <td>{cell(L(c))}</td>
                 </tr>
               ))}
             </tbody>
@@ -414,7 +420,7 @@ export default function PricingPage() {
           {PRICING_FAQS.map(([q, a]) => (
             <details key={q}>
               <summary>{q}</summary>
-              <p>{a}</p>
+              <p>{L(a)}</p>
             </details>
           ))}
         </div>

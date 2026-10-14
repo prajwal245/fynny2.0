@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SiteFooter } from "@/components/site/SiteShell";
 import { noindexHead } from "@/lib/seo";
 
 const FILES = [
@@ -24,6 +25,7 @@ const RETEST = [
 /** Made-up test files for pilots and user tests (Sundara Textiles, September 2026). */
 function SamplesPage() {
   return (
+    <>
     <main style={{ maxWidth: 720, margin: "0 auto", padding: "48px 18px 80px", fontFamily: "'Instrument Sans', system-ui, sans-serif", color: "#141414" }}>
       <p style={{ fontSize: 12, letterSpacing: ".14em", textTransform: "uppercase", color: "#7c7973", fontWeight: 600, margin: 0 }}>FynHelp · Sample pack</p>
       <h1 style={{ fontSize: 32, letterSpacing: "-0.02em", margin: "10px 0 8px" }}>Test files</h1>
@@ -58,6 +60,8 @@ function SamplesPage() {
         ))}
       </ol>
     </main>
+    <SiteFooter />
+    </>
   );
 }
 

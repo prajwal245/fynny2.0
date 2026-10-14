@@ -830,12 +830,41 @@ export const getPracticeBilling = createServerFn({ method: "GET" })
 export const startPracticeCheckout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) =>
-    z.object({ plan: z.enum(["starter", "professional", "scale"]), cycle: z.enum(["monthly", "annual"]) }).parse(d),
+    z
+      .object({
+        plan: z.enum(["starter", "professional", "scale"]),
+        cycle: z.enum(["monthly", "annual"]),
+        billingName: z.string().max(120).optional().nullable(),
+        gstin: z.string().max(20).optional().nullable(),
+      })
+      .parse(d),
   )
   .handler(async ({ data, context }) =>
     withFirm(context.userId, async (db, ctx) =>
-      (await import("./billing.server")).startCheckout(db, ctx, data.plan, data.cycle),
+      (await import("./billing.server")).startCheckout(db, ctx, data.plan, data.cycle, { billingName: data.billingName, gstin: data.gstin }),
     ),
+  );
+
+export const cancelPracticePlan = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ reason: z.string().max(500).default("") }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./billing.server")).cancelSubscription(db, ctx, data.reason)),
+  );
+
+export const changePracticePlan = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z.object({ plan: z.enum(["starter", "professional", "scale"]), cycle: z.enum(["monthly", "annual"]) }).parse(d),
+  )
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./billing.server")).changePlan(db, ctx, data.plan, data.cycle)),
+  );
+
+export const getPracticePayments = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./billing.server")).paymentHistory(db, ctx)),
   );
 
 export const confirmPracticeCheckout = createServerFn({ method: "POST" })

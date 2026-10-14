@@ -32,5 +32,8 @@ export async function practiceTick(
   const chaser = await runDueFollowups(now).catch((e) => ({
     error: (e as Error).message,
   }));
-  return { gmail, queue, autoChase, chaser, ms: Date.now() - started };
+  const renewals = await import("./billing.server")
+    .then(async (b) => b.sendRenewalReminders(await (await import("./db.server")).adminDb(), now))
+    .catch((e) => ({ sent: 0, error: (e as Error).message }));
+  return { gmail, queue, autoChase, chaser, renewals, ms: Date.now() - started };
 }

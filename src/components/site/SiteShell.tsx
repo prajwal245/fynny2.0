@@ -1,4 +1,5 @@
 import { ReactNode, useEffect } from "react";
+import { COMPANY } from "@/content/legal/company";
 import { Link } from "@/lib/router-compat";
 import FynLogo from "@/components/FynLogo";
 import Navbar from "@/components/Navbar";
@@ -75,6 +76,7 @@ export function SiteFooter() {
             <h4>Legal</h4>
             <Link to="/privacy">Privacy</Link>
             <Link to="/terms">Terms</Link>
+            <Link to="/refund-policy">Refunds and cancellation</Link>
           </nav>
           <div>
             <h4>Talk to us</h4>
@@ -86,7 +88,7 @@ export function SiteFooter() {
         </div>
 
         <div className="sf-bottom">
-          <span>&copy; {new Date().getFullYear()} FynHelp Technologies · Bengaluru, India</span>
+          <span>&copy; {new Date().getFullYear()} {COMPANY.entity || "FynHelp"} · Bengaluru, India</span>
           <span>Built for chartered accountants</span>
         </div>
       </div>

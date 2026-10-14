@@ -5,7 +5,7 @@
  *   RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET      API keys (Dashboard → Account & Settings → API keys)
  *   RAZORPAY_WEBHOOK_SECRET                   the secret typed when adding the webhook
  * Optional:
- *   FYNHELP_GST_PERCENT                       added on top of list prices (e.g. 18); default 0
+ *   FYNHELP_GST_PERCENT                       added on top of list prices; leave unset, list prices include GST
  *   RAZORPAY_PLAN_{STARTER|PROFESSIONAL|SCALE}_{MONTHLY|ANNUAL}
  *                                             use an existing plan id instead of the one FynHelp creates
  * The six Razorpay plans are created on first use and remembered in
@@ -14,15 +14,19 @@
  * screen says payments are being set up.
  */
 import type { Db, FirmContext } from "./db.server";
-import { canSignOff } from "./db.server";
+import { canSignOff, logActivity } from "./db.server";
+import { sendEmail } from "./email.server";
 import { PracticeError } from "./core";
 import {
   accessFor,
+  changeTiming,
   PLANS,
   planAmountPaise,
   planEnvKey,
+  refundWindowEnd,
   statusFromRazorpay,
   trialEndFrom,
+  validGstin,
   type Access,
   type BillingRow,
   type Cycle,
@@ -40,11 +44,31 @@ export interface BillingView extends BillingRow {
   /** Plans a partner can pick right now (their plan id is configured). */
   available: { plan: PlanKey; cycle: Cycle }[];
   hasSubscription: boolean;
+  /** Cancelled by the firm; the plan runs to current_period_end and stops. */
+  cancelAtPeriodEnd: boolean;
+  /** A downgrade or cycle change waiting for the next renewal. */
+  scheduled: { plan: PlanKey; cycle: Cycle } | null;
+  billingName: string | null;
+  billingGstin: string | null;
+  /** Until when cancelling refunds the first annual payment in full. */
+  refundUntil: string | null;
 }
 
-const COLS = "plan, cycle, status, trial_ends_at, current_period_end, razorpay_subscription_id";
+const COLS =
+  "plan, cycle, status, trial_ends_at, current_period_end, razorpay_subscription_id, cancel_at_period_end, scheduled_plan, scheduled_cycle, billing_name, billing_gstin, first_payment_id, first_paid_at, first_paid_cycle, refund_used";
 
-type Row = BillingRow & { razorpay_subscription_id: string | null };
+type Row = BillingRow & {
+  razorpay_subscription_id: string | null;
+  cancel_at_period_end?: boolean | null;
+  scheduled_plan?: PlanKey | null;
+  scheduled_cycle?: Cycle | null;
+  billing_name?: string | null;
+  billing_gstin?: string | null;
+  first_payment_id?: string | null;
+  first_paid_at?: string | null;
+  first_paid_cycle?: string | null;
+  refund_used?: boolean | null;
+};
 
 /** The firm's billing row, created on first use with a trial from the firm's sign-up. */
 export async function loadBilling(db: Db, firmId: string): Promise<Row> {
@@ -127,7 +151,20 @@ export async function billingView(db: Db, ctx: FirmContext): Promise<BillingView
     paymentsReady: available.length === 6,
     available,
     hasSubscription: !!row.razorpay_subscription_id,
+    cancelAtPeriodEnd: !!row.cancel_at_period_end,
+    scheduled: row.scheduled_plan && row.scheduled_cycle ? { plan: row.scheduled_plan, cycle: row.scheduled_cycle } : null,
+    billingName: row.billing_name ?? null,
+    billingGstin: row.billing_gstin ?? null,
+    refundUntil: row.status === "active" && !row.cancel_at_period_end ? (refundWindowEnd(row)?.toISOString() ?? null) : null,
   };
+}
+
+/** Which of our plans a Razorpay plan id is: env overrides first, then the plans FynHelp created. */
+async function planFromPlanId(db: Db, planId: string | null | undefined): Promise<{ plan: PlanKey; cycle: Cycle } | null> {
+  if (!planId) return null;
+  for (const { plan, cycle } of allPlans()) if (env(planEnvKey(plan, cycle)) === planId) return { plan, cycle };
+  const { data } = await db.from("ca_billing_plans").select("plan, cycle").eq("razorpay_plan_id", planId).limit(1).maybeSingle();
+  return data ? { plan: data.plan as PlanKey, cycle: data.cycle as Cycle } : null;
 }
 
 /** Throws when the trial or plan has ended. Call before any new work. */
@@ -166,7 +203,12 @@ function auth(): string {
   return "Basic " + btoa(`${id}:${secret}`);
 }
 
-async function rzp<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
+async function rzp<T>(
+  method: "GET" | "POST" | "PATCH",
+  path: string,
+  body?: unknown,
+  failMessage = "Razorpay could not start the payment. Try again in a minute, or email support@fynhelp.com.",
+): Promise<T> {
   const res = await fetch(`${API}${path}`, {
     method,
     headers: { authorization: auth(), "content-type": "application/json" },
@@ -175,7 +217,7 @@ async function rzp<T>(method: "GET" | "POST", path: string, body?: unknown): Pro
   const json = (await res.json().catch(() => ({}))) as { error?: { description?: string } } & T;
   if (!res.ok) {
     console.error(`[billing] razorpay ${method} ${path} ${res.status}: ${json.error?.description ?? ""}`);
-    throw new PracticeError("razorpay_error", "Razorpay could not start the payment. Try again in a minute, or email support@fynhelp.com.");
+    throw new PracticeError("razorpay_error", failMessage);
   }
   return json;
 }
@@ -193,23 +235,52 @@ interface RzpSubscription {
  * Creates a Razorpay subscription for the chosen plan and returns what
  * Razorpay Checkout needs. The plan only changes once the payment is verified.
  */
-export async function startCheckout(db: Db, ctx: FirmContext, plan: PlanKey, cycle: Cycle) {
+export async function startCheckout(
+  db: Db,
+  ctx: FirmContext,
+  plan: PlanKey,
+  cycle: Cycle,
+  details: { billingName?: string | null; gstin?: string | null } = {},
+) {
   if (!canSignOff(ctx)) throw new PracticeError("forbidden", "Only a partner can choose the firm's plan.");
   auth(); // says "payments are being set up" when the keys are missing
   const row = await loadBilling(db, ctx.firmId);
   if (row.razorpay_subscription_id && ["pending", "active", "past_due"].includes(row.status))
-    throw new PracticeError("has_plan", "This firm already has a plan. To change it, email support@fynhelp.com and we will switch it for you.");
+    throw new PracticeError("has_plan", "This firm already has a plan. Use Change plan below to switch it.");
+  const gstin = details.gstin?.trim().toUpperCase() || null;
+  if (gstin && !validGstin(gstin)) throw new PracticeError("bad_gstin", "That GSTIN does not look right. It has 15 characters, like 29ABCDE1234F1Z5. Leave it blank if the firm is not registered.");
+  const billingName = details.billingName?.trim().slice(0, 120) || row.billing_name || ctx.firmName;
   const planId = await planIdFor(db, plan, cycle);
+  // A Razorpay customer carries the GSTIN and name onto every invoice Razorpay sends.
+  let customerId: string | undefined;
+  if (ctx.firmEmail) {
+    const customer = await rzp<{ id: string }>("POST", "/customers", {
+      name: billingName,
+      email: ctx.firmEmail,
+      fail_existing: 0,
+      ...(gstin ? { gstin } : {}),
+      notes: { firm_id: ctx.firmId },
+    }).catch(() => null);
+    customerId = customer?.id;
+  }
   const sub = await rzp<RzpSubscription & { short_url?: string }>("POST", "/subscriptions", {
     plan_id: planId,
     // Razorpay needs a number of billing cycles: ten years either way.
     total_count: cycle === "annual" ? 10 : 120,
     customer_notify: 1,
-    notes: { firm_id: ctx.firmId, plan, cycle },
+    ...(customerId ? { customer_id: customerId } : {}),
+    notes: { firm_id: ctx.firmId, plan, cycle, billing_name: billingName, ...(gstin ? { gstin } : {}) },
   });
   await db
     .from("ca_billing")
-    .update({ razorpay_subscription_id: sub.id, pending_plan: plan, pending_cycle: cycle, updated_at: new Date().toISOString() })
+    .update({
+      razorpay_subscription_id: sub.id,
+      pending_plan: plan,
+      pending_cycle: cycle,
+      billing_name: billingName,
+      billing_gstin: gstin,
+      updated_at: new Date().toISOString(),
+    })
     .eq("ca_firm_id", ctx.firmId);
   return {
     keyId: env("RAZORPAY_KEY_ID")!,
@@ -246,10 +317,17 @@ export async function webhookSignatureValid(rawBody: string, signature: string |
 async function applySubscription(db: Db, firmId: string, sub: RzpSubscription) {
   const status = statusFromRazorpay(sub.status);
   if (!status) return;
-  const { data: row } = await db.from("ca_billing").select("pending_plan, pending_cycle, plan, cycle").eq("ca_firm_id", firmId).maybeSingle();
+  const { data: row } = await db
+    .from("ca_billing")
+    .select("pending_plan, pending_cycle, plan, cycle, scheduled_plan, scheduled_cycle, current_period_end")
+    .eq("ca_firm_id", firmId)
+    .maybeSingle();
   const notes = sub.notes ?? {};
-  const plan = (notes.plan as PlanKey) || row?.pending_plan || row?.plan || "starter";
-  const cycle = (notes.cycle as Cycle) || row?.pending_cycle || row?.cycle || "monthly";
+  // The plan id is the truth after a switch; the checkout notes never change.
+  const fromId = await planFromPlanId(db, sub.plan_id);
+  const plan = fromId?.plan || (notes.plan as PlanKey) || row?.pending_plan || row?.plan || "starter";
+  const cycle = fromId?.cycle || (notes.cycle as Cycle) || row?.pending_cycle || row?.cycle || "monthly";
+  const switched = row?.scheduled_plan === plan && row?.scheduled_cycle === cycle;
   await db
     .from("ca_billing")
     .update({
@@ -257,8 +335,10 @@ async function applySubscription(db: Db, firmId: string, sub: RzpSubscription) {
       plan,
       cycle,
       razorpay_subscription_id: sub.id,
-      razorpay_customer_id: sub.customer_id ?? null,
-      current_period_end: sub.current_end ? new Date(sub.current_end * 1000).toISOString() : null,
+      ...(sub.customer_id ? { razorpay_customer_id: sub.customer_id } : {}),
+      // A cancelled subscription may come back without an end date: keep the one we had.
+      current_period_end: sub.current_end ? new Date(sub.current_end * 1000).toISOString() : (row?.current_period_end ?? null),
+      ...(switched ? { scheduled_plan: null, scheduled_cycle: null } : {}),
       updated_at: new Date().toISOString(),
     })
     .eq("ca_firm_id", firmId);
@@ -280,6 +360,22 @@ export async function confirmCheckout(
     throw new PracticeError("bad_signature", "The payment could not be verified. If money was taken, email support@fynhelp.com and we will sort it out.");
   const sub = await rzp<RzpSubscription>("GET", `/subscriptions/${encodeURIComponent(p.razorpay_subscription_id)}`);
   await applySubscription(db, ctx.firmId, { ...sub, status: statusFromRazorpay(sub.status) ? sub.status : "authenticated" });
+  // A fresh plan starts clean; the first payment opens the 7-day annual refund window once.
+  const fresh = await loadBilling(db, ctx.firmId);
+  await db
+    .from("ca_billing")
+    .update({
+      cancel_at_period_end: false,
+      cancel_requested_at: null,
+      scheduled_plan: null,
+      scheduled_cycle: null,
+      renewal_reminded_for: null,
+      ...(fresh.first_payment_id
+        ? {}
+        : { first_payment_id: p.razorpay_payment_id, first_paid_at: new Date().toISOString(), first_paid_cycle: fresh.cycle }),
+    })
+    .eq("ca_firm_id", ctx.firmId);
+  await logActivity(db, ctx.firmId, null, "system", `Plan started: ${PLANS[fresh.plan].name}, ${fresh.cycle === "annual" ? "yearly" : "monthly"} (payment ${p.razorpay_payment_id}).`);
   return billingView(db, ctx);
 }
 
@@ -305,4 +401,179 @@ export async function handleRazorpayWebhook(
     if (!row?.razorpay_subscription_id || row.razorpay_subscription_id === sub.id) await applySubscription(db, firmId, sub);
   }
   return { duplicate: false, firmId };
+}
+
+/* ── changes after checkout ─────────────────────────────────── */
+
+const fmtDate = (iso: string | null | undefined) =>
+  iso ? new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" }) : "the end of the period";
+const planLabel = (plan: PlanKey, cycle: Cycle) => `${PLANS[plan].name}, ${cycle === "annual" ? "yearly" : "monthly"}`;
+
+async function billingMail(ctx: FirmContext, subject: string, lines: string[]) {
+  if (!ctx.firmEmail) return;
+  const text = [...lines, "", "Questions about billing: billing@fynhelp.com", "Refund and Cancellation Policy: https://fynhelp.com/refund-policy"].join("\n");
+  const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  const html = `<div style="font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;font-size:15px;line-height:1.6;color:#141414">${lines.map((l) => `<p>${esc(l)}</p>`).join("")}<p style="color:#666;font-size:13px">Questions about billing: <a href="mailto:billing@fynhelp.com">billing@fynhelp.com</a> · <a href="https://fynhelp.com/refund-policy">Refund and Cancellation Policy</a></p></div>`;
+  await sendEmail({ to: ctx.firmEmail, subject, text, html }).catch((e) => console.error(`[billing] email failed: ${(e as Error).message}`));
+}
+
+function requireLivePlan(row: Row) {
+  if (!row.razorpay_subscription_id || !["pending", "active", "past_due"].includes(row.status))
+    throw new PracticeError("no_plan", "This firm is not on a paid plan.");
+}
+
+/**
+ * Cancels the firm's plan (Refund and Cancellation Policy, clause 6). Within
+ * seven days of a first annual payment the plan stops now and the payment is
+ * refunded in full (clause 4.2); otherwise it runs to the end of the period
+ * already paid for and does not renew.
+ */
+export async function cancelSubscription(db: Db, ctx: FirmContext, reason: string) {
+  if (!canSignOff(ctx)) throw new PracticeError("forbidden", "Only a partner can cancel the firm's plan.");
+  const row = await loadBilling(db, ctx.firmId);
+  requireLivePlan(row);
+  if (row.cancel_at_period_end) throw new PracticeError("already_cancelled", `The plan is already cancelled and ends on ${fmtDate(row.current_period_end)}.`);
+  const subId = encodeURIComponent(row.razorpay_subscription_id!);
+  const fail = "Razorpay could not cancel the plan just now. Try again in a minute, or email billing@fynhelp.com and we will cancel it for you.";
+  const now = new Date().toISOString();
+  const note = reason.trim().slice(0, 500);
+  const refundable = row.status === "active" && refundWindowEnd(row) !== null;
+
+  if (refundable || row.status === "pending") {
+    await rzp("POST", `/subscriptions/${subId}/cancel`, { cancel_at_cycle_end: 0 }, fail);
+    let refundId: string | null = null;
+    if (refundable) {
+      const refund = await rzp<{ id: string }>(
+        "POST",
+        `/payments/${encodeURIComponent(row.first_payment_id!)}/refund`,
+        { speed: "normal", notes: { firm_id: ctx.firmId, reason: "Cancelled within 7 days of the first annual payment" } },
+        "The plan is cancelled, but Razorpay could not start the refund. We have been told and will refund you in full within 3 business days.",
+      ).catch(async (e) => {
+        await db.from("ca_billing").update({ status: "cancelled", current_period_end: now, cancel_requested_at: now, updated_at: now }).eq("ca_firm_id", ctx.firmId);
+        await sendEmail({ to: "billing@fynhelp.com", subject: `Refund needed: ${ctx.firmName}`, text: `Razorpay refund failed for payment ${row.first_payment_id} (firm ${ctx.firmId}). Refund it by hand.`, html: `<p>Razorpay refund failed for payment ${row.first_payment_id} (firm ${ctx.firmId}). Refund it by hand.</p>` }).catch(() => null);
+        throw e;
+      });
+      refundId = refund.id;
+    }
+    await db
+      .from("ca_billing")
+      .update({ status: "cancelled", current_period_end: now, cancel_requested_at: now, cancel_at_period_end: false, refund_used: refundable ? true : row.refund_used ?? false, updated_at: now })
+      .eq("ca_firm_id", ctx.firmId);
+    await db.from("ca_billing_events").insert({ id: `cancel:${row.razorpay_subscription_id}:${Date.now()}`, event: refundable ? "app.cancelled_refunded" : "app.cancelled", ca_firm_id: ctx.firmId, payload: { by: ctx.userId, reason: note, refund_id: refundId } });
+    await logActivity(db, ctx.firmId, null, "system", `Plan cancelled${refundable ? " with a full refund of the first annual payment" : ""}.${note ? ` Reason: ${note}` : ""}`);
+    await billingMail(ctx, "Your FynHelp plan is cancelled", [
+      `Hello ${ctx.firmName},`,
+      refundable
+        ? `Your ${planLabel(row.plan, row.cycle)} plan is cancelled and your first annual payment is being refunded in full to the card or account you paid from${refundId ? ` (Razorpay refund ${refundId})` : ""}. Banks usually credit it within 5 to 7 business days. A GST credit note follows separately.`
+        : `Your ${planLabel(row.plan, row.cycle)} plan is cancelled. No payment was taken for it.`,
+      "Your data stays available to view and export for 30 days.",
+    ]);
+    return { view: await billingView(db, ctx), refunded: refundable, refundId };
+  }
+
+  await rzp("POST", `/subscriptions/${subId}/cancel`, { cancel_at_cycle_end: 1 }, fail);
+  await db
+    .from("ca_billing")
+    .update({ cancel_at_period_end: true, cancel_requested_at: now, scheduled_plan: null, scheduled_cycle: null, updated_at: now })
+    .eq("ca_firm_id", ctx.firmId);
+  await db.from("ca_billing_events").insert({ id: `cancel:${row.razorpay_subscription_id}:${Date.now()}`, event: "app.cancel_at_period_end", ca_firm_id: ctx.firmId, payload: { by: ctx.userId, reason: note } });
+  await logActivity(db, ctx.firmId, null, "system", `Plan cancelled; it runs until ${fmtDate(row.current_period_end)} and will not renew.${note ? ` Reason: ${note}` : ""}`);
+  await billingMail(ctx, "Your FynHelp plan will not renew", [
+    `Hello ${ctx.firmName},`,
+    `Your ${planLabel(row.plan, row.cycle)} plan is cancelled. You keep full access until ${fmtDate(row.current_period_end)}, and you will not be charged again.`,
+    "After that, your data stays available to view and export for 30 days.",
+  ]);
+  return { view: await billingView(db, ctx), refunded: false, refundId: null };
+}
+
+/**
+ * Switches plan (clause 5): a higher plan at once, with Razorpay charging the
+ * pro-rated difference; a lower plan or another cycle from the next renewal.
+ */
+export async function changePlan(db: Db, ctx: FirmContext, plan: PlanKey, cycle: Cycle) {
+  if (!canSignOff(ctx)) throw new PracticeError("forbidden", "Only a partner can change the firm's plan.");
+  const row = await loadBilling(db, ctx.firmId);
+  requireLivePlan(row);
+  if (row.cancel_at_period_end) throw new PracticeError("cancelled", `The plan is cancelled and ends on ${fmtDate(row.current_period_end)}. Choose a new plan after that date, or email billing@fynhelp.com to keep the current one.`);
+  const timing = changeTiming({ plan: row.plan, cycle: row.cycle }, { plan, cycle });
+  if (timing === "same") throw new PracticeError("same_plan", "The firm is already on this plan.");
+  const planId = await planIdFor(db, plan, cycle);
+  const sub = await rzp<RzpSubscription>(
+    "PATCH",
+    `/subscriptions/${encodeURIComponent(row.razorpay_subscription_id!)}`,
+    { plan_id: planId, schedule_change_at: timing === "now" ? "now" : "cycle_end", customer_notify: 1 },
+    "Razorpay could not switch this plan online. This happens with UPI and some bank mandates. Email billing@fynhelp.com and we will switch it for you.",
+  );
+  const now = new Date().toISOString();
+  if (timing === "now") {
+    await db.from("ca_billing").update({ scheduled_plan: null, scheduled_cycle: null, updated_at: now }).eq("ca_firm_id", ctx.firmId);
+    await applySubscription(db, ctx.firmId, { ...sub, plan_id: sub.plan_id || planId });
+  } else {
+    await db.from("ca_billing").update({ scheduled_plan: plan, scheduled_cycle: cycle, updated_at: now }).eq("ca_firm_id", ctx.firmId);
+  }
+  const what =
+    timing === "now"
+      ? `Your plan is now ${planLabel(plan, cycle)}. Razorpay charges only the pro-rated difference for the rest of the current period.`
+      : `Your plan changes to ${planLabel(plan, cycle)} from ${fmtDate(row.current_period_end)}. Until then you stay on ${planLabel(row.plan, row.cycle)}, and nothing is refunded for the switch.`;
+  await logActivity(db, ctx.firmId, null, "system", what);
+  await billingMail(ctx, "Your FynHelp plan change", [`Hello ${ctx.firmName},`, what]);
+  return { view: await billingView(db, ctx), timing };
+}
+
+export interface PaymentRow {
+  id: string;
+  date: string | null;
+  amount: number;
+  status: string;
+  url: string | null;
+}
+
+/** Razorpay invoices for the firm's plan, newest first. Empty when there is no plan or Razorpay is unreachable. */
+export async function paymentHistory(db: Db, ctx: FirmContext): Promise<PaymentRow[]> {
+  if (!canSignOff(ctx)) return [];
+  const row = await loadBilling(db, ctx.firmId);
+  if (!row.razorpay_subscription_id || !env("RAZORPAY_KEY_ID")) return [];
+  const list = await rzp<{ items?: { id: string; status: string; amount: number; amount_paid?: number; paid_at?: number | null; issued_at?: number | null; date?: number | null; short_url?: string | null }[] }>(
+    "GET",
+    `/invoices?subscription_id=${encodeURIComponent(row.razorpay_subscription_id)}&count=24`,
+  ).catch(() => ({ items: [] }));
+  return (list.items ?? [])
+    .map((i) => {
+      const at = i.paid_at || i.issued_at || i.date;
+      return { id: i.id, date: at ? new Date(at * 1000).toISOString() : null, amount: (i.amount_paid || i.amount || 0) / 100, status: i.status, url: i.short_url ?? null };
+    })
+    .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+}
+
+/**
+ * Annual renewal reminders (clause 4.4): one email at least seven days before
+ * each yearly renewal. Runs from the practice heartbeat.
+ */
+export async function sendRenewalReminders(db: Db, now: Date = new Date()) {
+  const soon = new Date(now.getTime() + 8 * 86_400_000).toISOString();
+  const { data } = await db
+    .from("ca_billing")
+    .select("ca_firm_id, plan, cycle, current_period_end, renewal_reminded_for, ca_firms(firm_name, email)")
+    .eq("status", "active")
+    .eq("cycle", "annual")
+    .eq("cancel_at_period_end", false)
+    .gt("current_period_end", now.toISOString())
+    .lte("current_period_end", soon)
+    .limit(200);
+  let sent = 0;
+  for (const r of (data ?? []) as unknown as { ca_firm_id: string; plan: PlanKey; cycle: Cycle; current_period_end: string; renewal_reminded_for: string | null; ca_firms: { firm_name: string; email: string | null } | null }[]) {
+    if (r.renewal_reminded_for && new Date(r.renewal_reminded_for).getTime() === new Date(r.current_period_end).getTime()) continue;
+    const firm = r.ca_firms;
+    if (firm?.email) {
+      const amount = planAmountPaise(r.plan, r.cycle, Number(env("FYNHELP_GST_PERCENT") ?? 0)) / 100;
+      await billingMail({ firmId: r.ca_firm_id, firmName: firm.firm_name, firmEmail: firm.email, userId: "", role: "owner" }, "Your FynHelp plan renews soon", [
+        `Hello ${firm.firm_name},`,
+        `Your ${planLabel(r.plan, r.cycle)} plan renews on ${fmtDate(r.current_period_end)} for ₹${amount.toLocaleString("en-IN")} including GST.`,
+        "Nothing to do if you want to continue. To stop the renewal, a partner can cancel in Settings, Billing before that date.",
+      ]);
+      sent++;
+    }
+    await db.from("ca_billing").update({ renewal_reminded_for: r.current_period_end }).eq("ca_firm_id", r.ca_firm_id);
+  }
+  return { sent };
 }

@@ -67,7 +67,7 @@ function Hero() {
             className="mt-6 font-bold leading-[1.05] tracking-tight"
             style={{ ...serif, color: DARK, fontSize: "clamp(40px, 5.6vw, 72px)" }}
           >
-            You built your firm on expertise.
+            Practice software for CA firms, built on expertise.{" "}
             <span
               className="block mt-2"
               style={{ ...serif, color: RED, fontSize: "clamp(48px, 6.8vw, 88px)" }}

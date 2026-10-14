@@ -2,9 +2,9 @@ import { createContext, useContext, useEffect, useState, ReactNode, useCallback 
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
-export type AdminRole = "super_admin" | "admin" | "ops_admin" | "support_agent" | "analyst" | "user";
+export type AdminRole = "super_admin" | "admin" | "ops_admin" | "support_agent" | "finance_manager" | "analyst" | "user";
 
-const ADMIN_ROLES: AdminRole[] = ["super_admin", "admin", "ops_admin", "support_agent", "analyst"];
+const ADMIN_ROLES: AdminRole[] = ["super_admin", "admin", "ops_admin", "support_agent", "finance_manager", "analyst"];
 
 interface AdminAuthContextType {
   user: User | null;
@@ -18,7 +18,7 @@ interface AdminAuthContextType {
 }
 
 const ROLE_RANK: Record<AdminRole, number> = {
-  super_admin: 6, admin: 5, ops_admin: 4, support_agent: 3, analyst: 2, user: 1,
+  super_admin: 6, admin: 5, ops_admin: 4, finance_manager: 4, support_agent: 3, analyst: 2, user: 1,
 };
 
 const AdminAuthContext = createContext<AdminAuthContextType>({

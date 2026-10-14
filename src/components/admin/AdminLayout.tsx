@@ -9,12 +9,23 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAdminAuth, type AdminRole } from "@/contexts/AdminAuthContext";
 import FynLogo from "@/components/FynLogo";
+import AdminSessionGate, { useAdminSession } from "./AdminSessionGate";
+import type { Permission } from "@/lib/admin/rbac";
+import { Building2, Cpu, Receipt, TicketPercent, UserCog, ScrollText } from "lucide-react";
 
 type NavItem =
   | { divider: true }
-  | { divider?: false; to: string; label: string; icon: typeof BarChart3; roles: AdminRole[]; badgeKey?: string };
+  | { divider?: false; to: string; label: string; icon: typeof BarChart3; roles: AdminRole[]; badgeKey?: string; perm?: Permission };
 
 const NAV_ITEMS: NavItem[] = [
+  { to: "/admin/control", label: "Control Center", icon: Gauge, roles: [], perm: "dashboard.view" },
+  { to: "/admin/firms", label: "Firms", icon: Building2, roles: [], perm: "firms.view" },
+  { to: "/admin/operations", label: "Operations", icon: Cpu, roles: [], perm: "ops.view" },
+  { to: "/admin/billing", label: "Billing & Ledger", icon: Receipt, roles: [], perm: "billing.view" },
+  { to: "/admin/coupons", label: "Coupons", icon: TicketPercent, roles: [], perm: "coupons.manage" },
+  { to: "/admin/team", label: "Admin Team", icon: UserCog, roles: [], perm: "team.manage" },
+  { to: "/admin/security-log", label: "Security Log", icon: ScrollText, roles: [], perm: "audit.view" },
+  { divider: true },
   { to: "/admin/dashboard", label: "Dashboard", icon: BarChart3, roles: ["super_admin","ops_admin","support_agent","analyst"] },
   { to: "/admin/ceo-view", label: "CEO View", icon: LayoutDashboard, roles: ["super_admin"] },
   { to: "/admin/users", label: "Users", icon: Users, roles: ["super_admin","ops_admin","support_agent"] },
@@ -46,7 +57,7 @@ const SUPPORT_ALLOWED_PATHS = ["/admin/content", "/admin/media", "/admin/communi
 
 const ROLE_LABEL: Record<AdminRole, string> = {
   super_admin: "Super Admin", admin: "Admin", ops_admin: "Ops Admin",
-  support_agent: "Support Agent", analyst: "Analyst", user: "User",
+  support_agent: "Support Agent", finance_manager: "Finance Manager", analyst: "Analyst", user: "User",
 };
 
 export function AdminProtected({ children, allowed }: { children?: ReactNode; allowed?: AdminRole[] }) {
@@ -61,9 +72,10 @@ export function AdminProtected({ children, allowed }: { children?: ReactNode; al
   if (!user) return <Navigate to="/admin/login" replace />;
   if (!isAdmin) return <Navigate to="/admin/login" replace />;
   if (allowed && allowed.length && !hasRole(...allowed)) {
-    return <Navigate to="/admin/dashboard" replace />;
+    return <Navigate to="/admin/control" replace />;
   }
-  return <>{children ?? <Outlet />}</>;
+  // The server has the final say: network, MFA, session cookie and idle time.
+  return <AdminSessionGate>{children ?? <Outlet />}</AdminSessionGate>;
 }
 
 const SIDEBAR_W = 260;
@@ -71,7 +83,12 @@ const MOBILE_W = 280;
 const TOP_H = 70;
 
 export default function AdminLayout() {
-  const { user, signOut, primaryRole, hasRole, loading, roles } = useAdminAuth();
+  const { user, primaryRole, hasRole: hasRoleRaw, loading, roles } = useAdminAuth();
+  const session = useAdminSession();
+  const signOut = () => session.signOut();
+  // New sections are gated by permission (checked again on the server); older ones by role.
+  const allowedItem = (it: { roles: AdminRole[]; perm?: Permission }) => (it.perm ? session.can(it.perm) : hasRoleRaw(...it.roles));
+  const hasRole = hasRoleRaw;
   const isSuperAdmin = hasRole("super_admin");
   const isSupport = user?.email === SUPPORT_EMAIL;
   const location = useLocation();
@@ -98,9 +115,9 @@ export default function AdminLayout() {
     const match = NAV_ITEMS.filter((i): i is Extract<NavItem, { to: string }> => !("divider" in i && i.divider))
       .filter((i) => location.pathname === i.to || location.pathname.startsWith(i.to + "/"))
       .sort((a, b) => b.to.length - a.to.length)[0];
-    if (match && !hasRole(...match.roles) && location.pathname !== "/admin/dashboard") {
+    if (match && !allowedItem(match) && location.pathname !== "/admin/control") {
       toast.error("You do not have access to that section.");
-      nav("/admin/dashboard", { replace: true });
+      nav("/admin/control", { replace: true });
     }
   }, [rolesReady, isSupport, location.pathname, hasRole, nav]);
 
@@ -157,8 +174,8 @@ export default function AdminLayout() {
   const visible = NAV_ITEMS.filter((i) => {
     if ("divider" in i && i.divider) return !isSupport;
     const it = i as Extract<NavItem, { to: string }>;
-    if (isSupport) return SUPPORT_ALLOWED_PATHS.includes(it.to) && hasRole(...it.roles);
-    return hasRole(...it.roles);
+    if (isSupport) return SUPPORT_ALLOWED_PATHS.includes(it.to) && allowedItem(it);
+    return allowedItem(it);
   });
 
 
@@ -411,7 +428,7 @@ export default function AdminLayout() {
                     </button>
                   )}
                   <button
-                    onClick={async () => { await signOut(); nav("/admin/login"); }}
+                    onClick={() => void signOut()}
                     className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[hsl(var(--fyn-ink)/0.05)] text-left"
                     style={{ fontFamily: "Roboto, sans-serif", fontSize: 14, color: "hsl(var(--fyn-ink))" }}
                   >

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge, Card, Modal, V, formatDate, type Tone } from "../ui";
 import { useV2 } from "../store";
-import { cancelPracticePlan, changePracticePlan, confirmPracticeCheckout, getPracticePayments, startPracticeCheckout } from "@/lib/practice/practice.functions";
+import { cancelPracticePlan, changePracticePlan, confirmPracticeCheckout, getPracticePayments, previewPracticeCoupon, redeemPracticeTrialCode, startPracticeCheckout } from "@/lib/practice/practice.functions";
 import { PLANS, changeTiming, validGstin, type Cycle, type PlanKey } from "@/lib/practice/billing/plans";
 import { loadRazorpay, refreshBilling, setBilling, useBilling } from "../lib/billing";
 
@@ -29,6 +29,9 @@ export function BillingSection() {
   const [gstin, setGstin] = useState("");
   const [cancelOpen, setCancelOpen] = useState(false);
   const [reason, setReason] = useState("");
+  const [code, setCode] = useState("");
+  const [applied, setApplied] = useState<{ code: string; description: string } | null>(null);
+  const [codeBusy, setCodeBusy] = useState(false);
   const [payments, setPayments] = useState<Awaited<ReturnType<typeof getPracticePayments>> | null>(null);
 
   const hasPlan = !!b && b.hasSubscription && (b.status === "active" || b.status === "pending" || b.status === "past_due");
@@ -54,7 +57,7 @@ export function BillingSection() {
     if (gstinBad) { toast.error("Check the GSTIN, or leave it blank."); return; }
     setBusy(plan);
     try {
-      const [co] = await Promise.all([startPracticeCheckout({ data: { plan, cycle, billingName: billingName.trim() || null, gstin: gstin.trim() || null } }), loadRazorpay()]);
+      const [co] = await Promise.all([startPracticeCheckout({ data: { plan, cycle, billingName: billingName.trim() || null, gstin: gstin.trim() || null, coupon: applied?.code ?? null } }), loadRazorpay()]);
       const Razorpay = (window as unknown as { Razorpay: RzpCtor }).Razorpay;
       const rzp = new Razorpay({
         key: co.keyId,
@@ -85,6 +88,26 @@ export function BillingSection() {
     } catch (e) {
       toast.error(errMsg(e));
       setBusy(null);
+    }
+  };
+
+  const applyCode = async () => {
+    if (code.trim().length < 3) return;
+    setCodeBusy(true);
+    try {
+      const c = await previewPracticeCoupon({ data: { code: code.trim() } });
+      if (c.kind === "trial_days") {
+        setBilling(await redeemPracticeTrialCode({ data: { code: c.code } }));
+        toast.success(`Code applied: ${c.description}.`);
+        setCode("");
+      } else {
+        setApplied({ code: c.code, description: c.description });
+        toast.success(`${c.code}: ${c.description} on the plan you choose.`);
+      }
+    } catch (e) {
+      toast.error(errMsg(e));
+    } finally {
+      setCodeBusy(false);
     }
   };
 
@@ -198,6 +221,21 @@ export function BillingSection() {
                 <input className="v2-input" value={gstin} onChange={(e) => setGstin(e.target.value.toUpperCase())} placeholder="29ABCDE1234F1Z5" maxLength={15} aria-invalid={gstinBad} data-testid="billing-gstin" />
                 {gstinBad && <span style={{ color: V.maroon }}>15 characters, like 29ABCDE1234F1Z5.</span>}
               </label>
+            </div>
+          )}
+          {!current && (
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 12, fontSize: 13 }} data-testid="coupon-box">
+              <span style={{ color: V.muted }}>Have a code?</span>
+              <input className="v2-input" style={{ width: 160, textTransform: "uppercase" }} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="CODE" maxLength={32} data-testid="coupon-input" />
+              <button type="button" className="v2-btn v2-btn-ghost v2-btn-sm" disabled={codeBusy || code.trim().length < 3} onClick={() => void applyCode()} data-testid="coupon-apply">
+                {codeBusy ? "Checking…" : "Apply"}
+              </button>
+              {applied && (
+                <span style={{ color: V.ink }} data-testid="coupon-applied">
+                  {applied.code}: {applied.description}.{" "}
+                  <button type="button" className="v2-link" style={{ background: "none", border: 0, padding: 0, cursor: "pointer", font: "inherit" }} onClick={() => setApplied(null)}>Remove</button>
+                </span>
+              )}
             </div>
           )}
           {current && (

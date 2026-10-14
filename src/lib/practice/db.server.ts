@@ -57,6 +57,14 @@ async function ensureOwnerMembership(
     );
 }
 
+function assertNotSuspended(status: string | null | undefined) {
+  if (status === "suspended")
+    throw new PracticeError(
+      "firm_suspended",
+      "This firm's FynHelp account is suspended. Email support@fynhelp.com and we will help.",
+    );
+}
+
 /** The caller's firm: the one they own, else an active membership. */
 export async function firmContext(
   db: Db,
@@ -64,12 +72,13 @@ export async function firmContext(
 ): Promise<FirmContext> {
   const { data: owned } = await db
     .from("ca_firms")
-    .select("id, firm_name, email")
+    .select("id, firm_name, email, admin_status")
     .eq("user_id", userId)
     .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
   if (owned) {
+    assertNotSuspended(owned.admin_status);
     await ensureOwnerMembership(db, owned.id, userId, owned.email ?? null);
     return {
       firmId: owned.id,
@@ -82,7 +91,7 @@ export async function firmContext(
   const findMember = () =>
     db
       .from("ca_firm_members")
-      .select("ca_firm_id, role, ca_firms(firm_name, email)")
+      .select("ca_firm_id, role, ca_firms(firm_name, email, admin_status)")
       .eq("user_id", userId)
       .eq("status", "active")
       .limit(1)
@@ -97,8 +106,9 @@ export async function firmContext(
   if (!member)
     throw new PracticeError("no_firm", "Create your practice first.");
   const firm =
-    (member as { ca_firms?: { firm_name?: string; email?: string } })
+    (member as { ca_firms?: { firm_name?: string; email?: string; admin_status?: string } })
       .ca_firms ?? {};
+  assertNotSuspended(firm.admin_status);
   const role = String(member.role ?? "member").toLowerCase();
   return {
     firmId: member.ca_firm_id,

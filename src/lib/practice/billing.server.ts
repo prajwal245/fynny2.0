@@ -240,7 +240,7 @@ export async function startCheckout(
   ctx: FirmContext,
   plan: PlanKey,
   cycle: Cycle,
-  details: { billingName?: string | null; gstin?: string | null } = {},
+  details: { billingName?: string | null; gstin?: string | null; coupon?: string | null } = {},
 ) {
   if (!canSignOff(ctx)) throw new PracticeError("forbidden", "Only a partner can choose the firm's plan.");
   auth(); // says "payments are being set up" when the keys are missing
@@ -250,6 +250,8 @@ export async function startCheckout(
   const gstin = details.gstin?.trim().toUpperCase() || null;
   if (gstin && !validGstin(gstin)) throw new PracticeError("bad_gstin", "That GSTIN does not look right. It has 15 characters, like 29ABCDE1234F1Z5. Leave it blank if the firm is not registered.");
   const billingName = details.billingName?.trim().slice(0, 120) || row.billing_name || ctx.firmName;
+  const coupon = details.coupon?.trim() ? await checkCoupon(db, ctx.firmId, details.coupon, plan, cycle) : null;
+  if (coupon?.kind === "trial_days") throw new PracticeError("trial_code", "That code adds free trial days. Apply it on its own, before choosing a plan.");
   const planId = await planIdFor(db, plan, cycle);
   // A Razorpay customer carries the GSTIN and name onto every invoice Razorpay sends.
   let customerId: string | undefined;
@@ -269,7 +271,8 @@ export async function startCheckout(
     total_count: cycle === "annual" ? 10 : 120,
     customer_notify: 1,
     ...(customerId ? { customer_id: customerId } : {}),
-    notes: { firm_id: ctx.firmId, plan, cycle, billing_name: billingName, ...(gstin ? { gstin } : {}) },
+    ...(coupon?.razorpay_offer_id ? { offer_id: coupon.razorpay_offer_id } : {}),
+    notes: { firm_id: ctx.firmId, plan, cycle, billing_name: billingName, ...(gstin ? { gstin } : {}), ...(coupon ? { coupon: coupon.code } : {}) },
   });
   await db
     .from("ca_billing")
@@ -279,6 +282,7 @@ export async function startCheckout(
       pending_cycle: cycle,
       billing_name: billingName,
       billing_gstin: gstin,
+      coupon_code: coupon?.code ?? null,
       updated_at: new Date().toISOString(),
     })
     .eq("ca_firm_id", ctx.firmId);
@@ -375,6 +379,9 @@ export async function confirmCheckout(
         : { first_payment_id: p.razorpay_payment_id, first_paid_at: new Date().toISOString(), first_paid_cycle: fresh.cycle }),
     })
     .eq("ca_firm_id", ctx.firmId);
+  const { data: withCode } = await db.from("ca_billing").select("coupon_code").eq("ca_firm_id", ctx.firmId).maybeSingle();
+  if (withCode?.coupon_code)
+    await db.from("ca_coupon_redemptions").insert({ code: withCode.coupon_code, ca_firm_id: ctx.firmId, subscription_id: p.razorpay_subscription_id, plan: fresh.plan, cycle: fresh.cycle });
   await logActivity(db, ctx.firmId, null, "system", `Plan started: ${PLANS[fresh.plan].name}, ${fresh.cycle === "annual" ? "yearly" : "monthly"} (payment ${p.razorpay_payment_id}).`);
   return billingView(db, ctx);
 }
@@ -577,3 +584,64 @@ export async function sendRenewalReminders(db: Db, now: Date = new Date()) {
   }
   return { sent };
 }
+
+/* ── coupons ─────────────────────────────────────────────────── */
+
+export interface CouponRow {
+  code: string;
+  kind: "percent" | "flat" | "trial_days";
+  value: number;
+  razorpay_offer_id: string | null;
+  plans: string[] | null;
+  cycles: string[] | null;
+  expires_at: string | null;
+  max_redemptions: number | null;
+  per_firm_limit: number;
+  active: boolean;
+}
+
+/** A code this firm may use now, for this plan and cycle (if given). */
+export async function checkCoupon(db: Db, firmId: string, raw: string, plan?: PlanKey, cycle?: Cycle): Promise<CouponRow> {
+  const code = raw.trim().toUpperCase();
+  const { data } = await db.from("ca_coupons").select("*").eq("code", code).maybeSingle();
+  const c = data as CouponRow | null;
+  const bad = (m: string) => new PracticeError("bad_coupon", m);
+  if (!c || !c.active) throw bad("That code is not valid.");
+  if (c.expires_at && new Date(c.expires_at).getTime() < Date.now()) throw bad("That code has expired.");
+  if (plan && c.plans?.length && !c.plans.includes(plan)) throw bad(`That code does not apply to ${PLANS[plan].name}.`);
+  if (cycle && c.cycles?.length && !c.cycles.includes(cycle)) throw bad(`That code applies only to ${c.cycles.includes("annual") ? "yearly" : "monthly"} billing.`);
+  const { count: total } = await db.from("ca_coupon_redemptions").select("id", { count: "exact", head: true }).eq("code", code);
+  if (c.max_redemptions && (total ?? 0) >= c.max_redemptions) throw bad("That code has been fully used.");
+  const { count: mine } = await db.from("ca_coupon_redemptions").select("id", { count: "exact", head: true }).eq("code", code).eq("ca_firm_id", firmId);
+  if ((mine ?? 0) >= c.per_firm_limit) throw bad("Your firm has already used that code.");
+  return c;
+}
+
+export function describeCoupon(c: CouponRow): string {
+  if (c.kind === "trial_days") return `${c.value} more days of free trial`;
+  if (c.kind === "percent") return `${c.value}% off`;
+  return `₹${Number(c.value).toLocaleString("en-IN")} off`;
+}
+
+export async function previewCoupon(db: Db, ctx: FirmContext, code: string, plan?: PlanKey, cycle?: Cycle) {
+  const c = await checkCoupon(db, ctx.firmId, code, plan, cycle);
+  return { code: c.code, kind: c.kind, description: describeCoupon(c), plans: c.plans, cycles: c.cycles };
+}
+
+/** A trial-days code: adds days to a running or ended trial, no payment. */
+export async function redeemTrialCoupon(db: Db, ctx: FirmContext, code: string) {
+  if (!canSignOff(ctx)) throw new PracticeError("forbidden", "Only a partner can apply a code.");
+  const c = await checkCoupon(db, ctx.firmId, code);
+  if (c.kind !== "trial_days") throw new PracticeError("bad_coupon", "That code is a discount. Enter it when you choose a plan.");
+  const row = await loadBilling(db, ctx.firmId);
+  if (row.status !== "trialing") throw new PracticeError("bad_coupon", "Trial codes apply only during or right after the free trial.");
+  const from = Math.max(Date.now(), new Date(row.trial_ends_at).getTime());
+  const ends = new Date(from + Number(c.value) * 86_400_000).toISOString();
+  await db.from("ca_billing").update({ trial_ends_at: ends, updated_at: new Date().toISOString() }).eq("ca_firm_id", ctx.firmId);
+  await db.from("ca_coupon_redemptions").insert({ code: c.code, ca_firm_id: ctx.firmId });
+  await logActivity(db, ctx.firmId, null, "system", `Code ${c.code} applied: free trial extended to ${fmtDate(ends)}.`);
+  return billingView(db, ctx);
+}
+
+/** Razorpay API for the admin panel (refunds, lookups). */
+export const razorpayApi = rzp;

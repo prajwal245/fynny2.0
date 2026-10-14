@@ -836,13 +836,30 @@ export const startPracticeCheckout = createServerFn({ method: "POST" })
         cycle: z.enum(["monthly", "annual"]),
         billingName: z.string().max(120).optional().nullable(),
         gstin: z.string().max(20).optional().nullable(),
+        coupon: z.string().max(32).optional().nullable(),
       })
       .parse(d),
   )
   .handler(async ({ data, context }) =>
     withFirm(context.userId, async (db, ctx) =>
-      (await import("./billing.server")).startCheckout(db, ctx, data.plan, data.cycle, { billingName: data.billingName, gstin: data.gstin }),
+      (await import("./billing.server")).startCheckout(db, ctx, data.plan, data.cycle, { billingName: data.billingName, gstin: data.gstin, coupon: data.coupon }),
     ),
+  );
+
+export const previewPracticeCoupon = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z.object({ code: z.string().min(3).max(32), plan: z.enum(["starter", "professional", "scale"]).optional(), cycle: z.enum(["monthly", "annual"]).optional() }).parse(d),
+  )
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./billing.server")).previewCoupon(db, ctx, data.code, data.plan, data.cycle)),
+  );
+
+export const redeemPracticeTrialCode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ code: z.string().min(3).max(32) }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./billing.server")).redeemTrialCoupon(db, ctx, data.code)),
   );
 
 export const cancelPracticePlan = createServerFn({ method: "POST" })

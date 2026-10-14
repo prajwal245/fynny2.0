@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import CookieConsent from "@/components/CookieConsent";
+import { GA_MEASUREMENT_ID } from "@/lib/consent";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   HeadContent,
@@ -84,6 +85,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "stylesheet", href: appCss },
     ],
     scripts: [
+      // Google tag (gtag.js), one per page. Consent Mode keeps analytics storage
+      // denied until the visitor accepts in the cookie banner; a returning
+      // visitor who already accepted is granted before the first hit. Only the
+      // live site reports, so previews and local runs never touch the property.
+      { src: `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`, async: true },
+      {
+        children: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',wait_for_update:500});try{var c=JSON.parse(localStorage.getItem('fynhelp.consent')||'null');if(c&&c.analytics===true)gtag('consent','update',{analytics_storage:'granted'});}catch(e){}gtag('js',new Date());if(/(^|\\.)fynhelp\\.com$/.test(location.hostname))gtag('config','${GA_MEASUREMENT_ID}');`,
+      },
       // ported from main.tsx — force light theme before first paint (dark mode removed)
       {
         children:

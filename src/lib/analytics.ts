@@ -1,11 +1,11 @@
 import posthog from "posthog-js";
-import { analyticsAllowed, onConsentChange } from "./consent";
+import { analyticsAllowed, GA_MEASUREMENT_ID, onConsentChange } from "./consent";
 
 // PostHog project keys are public (they ship in every browser bundle); env overrides.
 const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY || "phc_nLJ4KcJAWuV43cBi43Bqez9YBo2zB6RvC4SvVFXyuDSR";
 const POSTHOG_HOST = import.meta.env.VITE_POSTHOG_HOST || "https://us.i.posthog.com";
 /** GA4 measurement ID (G-XXXXXXX). Unset = GA4 off. */
-const GA_ID = (import.meta.env.VITE_GA_MEASUREMENT_ID as string | undefined) || "G-GEZMCK8JYS";
+const GA_ID = (import.meta.env.VITE_GA_MEASUREMENT_ID as string | undefined) || GA_MEASUREMENT_ID;
 
 type Gtag = (...args: unknown[]) => void;
 declare global {
@@ -23,27 +23,12 @@ const GA_EVENT: Partial<Record<string, string>> = {
 };
 
 /**
- * GA4, loaded after the page has finished loading so it never competes with
- * first paint. Page views are sent by trackPageView on every route change.
+ * GA4: the Google tag itself is in every page's <head> (see __root.tsx) with
+ * Consent Mode set to denied. Consent only switches analytics storage on.
  */
 function initGA() {
-  // Local development never reports to the live property.
-  if (!GA_ID || import.meta.env.DEV || typeof window === "undefined" || window.gtag) return;
-  window.dataLayer = window.dataLayer || [];
-  window.gtag = function gtag() {
-    // eslint-disable-next-line prefer-rest-params
-    window.dataLayer!.push(arguments);
-  };
-  window.gtag("js", new Date());
-  window.gtag("config", GA_ID, { send_page_view: false });
-  const load = () => {
-    const sc = document.createElement("script");
-    sc.async = true;
-    sc.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(GA_ID)}`;
-    document.head.appendChild(sc);
-  };
-  if (document.readyState === "complete") setTimeout(load, 1200);
-  else window.addEventListener("load", () => setTimeout(load, 1200), { once: true });
+  if (typeof window === "undefined" || !window.gtag) return;
+  window.gtag("consent", "update", { analytics_storage: "granted" });
 }
 
 /** Only campaign tags are kept: emails and other personal data never leave in URLs. */
@@ -69,7 +54,6 @@ export function initAnalytics() {
   }
   if (!analyticsAllowed() || started) return;
   started = true;
-  if (GA_ID) (window as unknown as Record<string, boolean>)[`ga-disable-${GA_ID}`] = false;
   initGA();
   if (!POSTHOG_KEY) return;
   if (posthog.__loaded) {
@@ -117,13 +101,7 @@ export function resetAnalytics() {
 
 export function trackPageView(path: string, properties?: Record<string, unknown>) {
   const search = safeSearch(properties?.search as string | undefined);
-  if (window.gtag && GA_ID) {
-    window.gtag("event", "page_view", {
-      page_location: window.location.origin + path + search,
-      page_path: path,
-      page_title: document.title,
-    });
-  }
+  // GA4 counts route changes itself (enhanced measurement, browser history), so only PostHog is told here.
   if (!POSTHOG_KEY) return;
   posthog.capture("$pageview", { $current_url: window.location.origin + path + search, ...properties, search });
 }
@@ -170,7 +148,7 @@ export function trackTiming(event: string, durationMs: number, properties?: Reco
 export function stopAnalytics() {
   started = false;
   if (typeof window === "undefined") return;
-  if (GA_ID) (window as unknown as Record<string, boolean>)[`ga-disable-${GA_ID}`] = true;
+  if (window.gtag) window.gtag("consent", "update", { analytics_storage: "denied" });
   if (posthog.__loaded) posthog.opt_out_capturing();
   const host = window.location.hostname;
   const domains = ["", host, `.${host}`, `.${host.split(".").slice(-2).join(".")}`];

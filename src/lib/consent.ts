@@ -9,6 +9,9 @@ export interface Consent {
   at: string;
 }
 
+/** Google Analytics 4 property for www.fynhelp.com (public, appears in every page). */
+export const GA_MEASUREMENT_ID = "G-GEZMCK8JYS";
+
 const KEY = "fynhelp.consent";
 export const OPEN_SETTINGS_EVENT = "fh-open-cookie-settings";
 const CHANGED_EVENT = "fh-consent-changed";

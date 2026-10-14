@@ -1,9 +1,10 @@
 import posthog from "posthog-js";
+import { analyticsAllowed, onConsentChange } from "./consent";
 
 const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY;
 const POSTHOG_HOST = import.meta.env.VITE_POSTHOG_HOST || "https://app.posthog.com";
 /** GA4 measurement ID (G-XXXXXXX). Unset = GA4 off. */
-const GA_ID = import.meta.env.VITE_GA_MEASUREMENT_ID as string | undefined;
+const GA_ID = (import.meta.env.VITE_GA_MEASUREMENT_ID as string | undefined) || "G-GEZMCK8JYS";
 
 type Gtag = (...args: unknown[]) => void;
 declare global {
@@ -25,7 +26,8 @@ const GA_EVENT: Partial<Record<string, string>> = {
  * first paint. Page views are sent by trackPageView on every route change.
  */
 function initGA() {
-  if (!GA_ID || typeof window === "undefined" || window.gtag) return;
+  // Local development never reports to the live property.
+  if (!GA_ID || import.meta.env.DEV || typeof window === "undefined" || window.gtag) return;
   window.dataLayer = window.dataLayer || [];
   window.gtag = function gtag() {
     // eslint-disable-next-line prefer-rest-params
@@ -55,9 +57,24 @@ function safeSearch(search: string | undefined): string {
   return out ? `?${out}` : "";
 }
 
+let started = false;
+let watching = false;
+
+/** Starts analytics only with the visitor's consent, and follows later changes of mind. */
 export function initAnalytics() {
+  if (!watching && typeof window !== "undefined") {
+    watching = true;
+    onConsentChange((c) => (c.analytics ? initAnalytics() : stopAnalytics()));
+  }
+  if (!analyticsAllowed() || started) return;
+  started = true;
+  if (GA_ID) (window as unknown as Record<string, boolean>)[`ga-disable-${GA_ID}`] = false;
   initGA();
   if (!POSTHOG_KEY) return;
+  if (posthog.__loaded) {
+    posthog.opt_in_capturing();
+    return;
+  }
   posthog.init(POSTHOG_KEY, {
     api_host: POSTHOG_HOST,
     capture_pageview: false,
@@ -146,4 +163,19 @@ export function track(event: FynHelpEvent, properties?: Record<string, unknown>)
 export function trackTiming(event: string, durationMs: number, properties?: Record<string, unknown>) {
   if (!POSTHOG_KEY) return;
   posthog.capture(event, { duration_ms: durationMs, ...properties });
+}
+
+/** Consent withdrawn: stop sending, and clear the analytics cookies already set. */
+export function stopAnalytics() {
+  started = false;
+  if (typeof window === "undefined") return;
+  if (GA_ID) (window as unknown as Record<string, boolean>)[`ga-disable-${GA_ID}`] = true;
+  if (posthog.__loaded) posthog.opt_out_capturing();
+  const host = window.location.hostname;
+  const domains = ["", host, `.${host}`, `.${host.split(".").slice(-2).join(".")}`];
+  for (const c of document.cookie.split(";")) {
+    const name = c.split("=")[0]?.trim();
+    if (!name || !/^(_ga|_gid|_gat|ph_)/.test(name)) continue;
+    for (const d of domains) document.cookie = `${name}=; Max-Age=0; path=/${d ? `; domain=${d}` : ""}`;
+  }
 }

@@ -1,5 +1,6 @@
 import { ReactNode, useEffect } from "react";
 import { COMPANY } from "@/content/legal/company";
+import { openCookieSettings } from "@/lib/consent";
 import { Link } from "@/lib/router-compat";
 import FynLogo from "@/components/FynLogo";
 import Navbar from "@/components/Navbar";
@@ -33,6 +34,8 @@ const FOOT_STYLES = `
 .sf-wrap { max-width:1200px; margin:0 auto; padding:0 22px; }
 .sf-cols { display:grid; grid-template-columns:1.4fr repeat(4, minmax(0,1fr)); gap:32px; padding:64px 0 48px; }
 .sf-cols h4 { color:${C.onDark}; font-size:13px; font-weight:600; margin:0 0 14px; letter-spacing:0; text-transform:none; }
+.sf-cols .sf-cookie { display:block; background:none; border:0; padding:5px 0; font:inherit; font-size:14px; color:rgba(247,241,230,.62); cursor:pointer; text-align:left; }
+.sf-cols .sf-cookie:hover { color:#F7F1E6; }
 .sf-cols a { display:block; color:rgba(247,241,230,.62); text-decoration:none; font-size:14px; padding:5px 0; transition:color .15s; }
 .sf-cols a:hover { color:${C.onDark}; }
 .sf-about { font-size:14px; line-height:1.6; max-width:30ch; margin:14px 0 0; }
@@ -77,6 +80,9 @@ export function SiteFooter() {
             <Link to="/privacy">Privacy</Link>
             <Link to="/terms">Terms</Link>
             <Link to="/refund-policy">Refunds and cancellation</Link>
+            <button type="button" className="sf-cookie" onClick={() => openCookieSettings()} data-testid="footer-cookie-settings">
+              Cookie settings
+            </button>
           </nav>
           <div>
             <h4>Talk to us</h4>

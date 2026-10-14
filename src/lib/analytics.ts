@@ -1,8 +1,9 @@
 import posthog from "posthog-js";
 import { analyticsAllowed, onConsentChange } from "./consent";
 
-const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY;
-const POSTHOG_HOST = import.meta.env.VITE_POSTHOG_HOST || "https://app.posthog.com";
+// PostHog project keys are public (they ship in every browser bundle); env overrides.
+const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY || "phc_nLJ4KcJAWuV43cBi43Bqez9YBo2zB6RvC4SvVFXyuDSR";
+const POSTHOG_HOST = import.meta.env.VITE_POSTHOG_HOST || "https://us.i.posthog.com";
 /** GA4 measurement ID (G-XXXXXXX). Unset = GA4 off. */
 const GA_ID = (import.meta.env.VITE_GA_MEASUREMENT_ID as string | undefined) || "G-GEZMCK8JYS";
 

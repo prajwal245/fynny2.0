@@ -11,6 +11,15 @@ const ink = "#171208";
 const maroon = "#8A1E18";
 const line = "rgba(23,18,8,.12)";
 
+/** Frosted glass: the page shows through, blurred; solid enough to read on any background. */
+const glass = {
+  background: "linear-gradient(135deg, rgba(255,253,249,.72) 0%, rgba(255,247,240,.56) 100%)",
+  backdropFilter: "blur(20px) saturate(170%)",
+  WebkitBackdropFilter: "blur(20px) saturate(170%)",
+  border: "1px solid rgba(255,255,255,.6)",
+  boxShadow: "0 1px 0 rgba(255,255,255,.7) inset, 0 24px 60px -24px rgba(23,18,8,.45), 0 0 0 1px rgba(23,18,8,.06)",
+} as const;
+
 export default function CookieConsent() {
   const { pathname } = useLocation();
   const [mounted, setMounted] = useState(false);
@@ -53,7 +62,7 @@ export default function CookieConsent() {
   const btn = (kind: "primary" | "ghost") =>
     ({
       border: kind === "primary" ? `1px solid ${maroon}` : `1px solid ${line}`,
-      background: kind === "primary" ? maroon : "#fff",
+      background: kind === "primary" ? maroon : "rgba(255,255,255,.55)",
       color: kind === "primary" ? "#fff" : ink,
       borderRadius: 999,
       padding: "10px 18px",
@@ -79,11 +88,9 @@ export default function CookieConsent() {
             zIndex: 2147483000,
             margin: "0 auto",
             maxWidth: 980,
-            background: "#FFFDF9",
+            ...glass,
             color: ink,
-            border: `1px solid ${line}`,
-            borderRadius: 16,
-            boxShadow: "0 18px 50px -20px rgba(23,18,8,.45)",
+            borderRadius: 20,
             padding: "16px 18px",
             display: "flex",
             flexWrap: "wrap",
@@ -107,14 +114,14 @@ export default function CookieConsent() {
 
       {settings && (
         <div style={{ position: "fixed", inset: 0, zIndex: 2147483001, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-          <div style={{ position: "absolute", inset: 0, background: "rgba(23,18,8,.4)" }} onClick={() => setSettings(false)} />
+          <div style={{ position: "absolute", inset: 0, background: "rgba(23,18,8,.28)", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)" }} onClick={() => setSettings(false)} />
           <div
             ref={dialog}
             role="dialog"
             aria-modal="true"
             aria-labelledby="cookie-settings-title"
             data-testid="cookie-dialog"
-            style={{ position: "relative", width: "100%", maxWidth: 520, background: "#FFFDF9", color: ink, borderRadius: 18, padding: 22, boxShadow: "0 30px 80px -30px rgba(0,0,0,.5)", fontFamily: "inherit", maxHeight: "calc(100vh - 32px)", overflowY: "auto" }}
+            style={{ position: "relative", width: "100%", maxWidth: 520, ...glass, color: ink, borderRadius: 22, padding: 22, fontFamily: "inherit", maxHeight: "calc(100vh - 32px)", overflowY: "auto" }}
           >
             <h2 id="cookie-settings-title" style={{ margin: "0 0 6px", fontSize: 19 }}>Cookie settings</h2>
             <p style={{ margin: "0 0 16px", fontSize: 13.5, lineHeight: 1.55, opacity: 0.8 }}>

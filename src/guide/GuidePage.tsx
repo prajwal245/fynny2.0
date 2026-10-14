@@ -3,6 +3,7 @@
  * reconciliation pipelines work, as scannable cards and clickable diagrams.
  * Content lives in ./workflows.ts and mirrors the running product.
  */
+import { SiteFooter } from "@/components/site/SiteShell";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent } from "react";
 import { ArrowRight, Minus, Plus, RotateCcw, Search, X } from "lucide-react";
 import { CATEGORIES, KIND_LABEL, WORKFLOWS, type Category, type FlowNode, type NodeKind, type Workflow } from "./workflows";
@@ -229,6 +230,7 @@ export default function GuidePage() {
           Timings marked measured come from FynHelp's own retest packs. Rules follow Indian GST, TDS (Income-tax Act, 2025, read with the familiar 1961 section codes) and EPF/ESI practice; checks flag issues for a person and never change your data.
         </p>
       </main>
+      <SiteFooter />
 
       {open && <Detail w={open} onClose={() => setOpenId(null)} />}
     </div>

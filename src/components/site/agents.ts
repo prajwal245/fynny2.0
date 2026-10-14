@@ -121,7 +121,7 @@ export const AGENT_SEO: Record<string, { title: string; description: string; key
     h1Italic: "for CA firms",
     title: "Bank statement & Tally export extraction for CA firms",
     description:
-      "Turn client bank statements (PDF, Excel, CSV, scans and photos) and Tally or Zoho exports into clean, dated transactions. Unsure lines go to review, never into the books.",
+      "Convert client bank statements (PDF, Excel, scans) and Tally or Zoho exports into dated transactions. Lines below 75% confidence go to review first.",
     keyword: "Bank statement extraction",
   },
   recon: {
@@ -129,7 +129,7 @@ export const AGENT_SEO: Record<string, { title: string; description: string; key
     h1Italic: "for CA firms",
     title: "Bank reconciliation software for CA firms",
     description:
-      "Reconcile every client's bank statement to their Tally or Zoho books: exact matches, close matches within ₹1 (or 0.1%) and 3 days, then your firm's rules. Only real exceptions reach your team.",
+      "Bank reconciliation software for CA firms in India: exact, same-day, close and split-payment matches to Tally or Zoho. Only real exceptions reach you.",
     keyword: "Bank reconciliation",
   },
   narrate: {
@@ -137,7 +137,7 @@ export const AGENT_SEO: Record<string, { title: string; description: string; key
     h1Italic: "can trace to source",
     title: "Source-traceable MIS reports for chartered accountants",
     description:
-      "Monthly MIS, bank reconciliation summaries and variance reports drafted from matched transactions only. Every number opens its source lines, and nothing goes out before partner sign-off.",
+      "MIS reporting software for CA firms in India: monthly MIS drafted from matched transactions, every figure linked to its source lines, partner sign-off.",
     keyword: "MIS reports",
   },
   chaser: {

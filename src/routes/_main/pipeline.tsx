@@ -3,7 +3,7 @@ import PipelinePage from "@/pages/PipelinePage";
 import { breadcrumbLd, seo, softwareLd, webPageLd } from "@/lib/seo";
 
 const description =
-  "How FynHelp automates a CA firm's month-end close: Extract reads statements and Tally exports, Recon matches bank to books, Narrate drafts the MIS, and Chaser collects missing documents.";
+  "Automated bank reconciliation for Tally and Zoho: Extract reads statements, Recon matches bank to books, Narrate drafts MIS, Chaser collects documents.";
 
 export const Route = createFileRoute("/_main/pipeline")({
   component: PipelinePage,

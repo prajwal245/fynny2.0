@@ -43,10 +43,20 @@ export default function BlogArticlePage({ post, related }: { post: BlogPost; rel
               {post.category}
             </span>
             <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 12, color: "rgba(23,18,8,0.5)" }}><time dateTime={post.published_at ?? undefined}>{formatDate(post.published_at)}</time></span>
+            {post.updated_at && post.published_at && formatDate(post.updated_at) !== formatDate(post.published_at) && (
+              <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 12, color: "rgba(23,18,8,0.5)" }}>Updated <time dateTime={post.updated_at}>{formatDate(post.updated_at)}</time></span>
+            )}
             <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 12, color: "rgba(23,18,8,0.5)" }}>{post.reading_time_minutes} min read</span>
           </div>
 
           <h1 style={{ fontFamily: "'Clash Display', Georgia, serif", fontWeight: 700, fontSize: 40, letterSpacing: "-0.02em", color: INK, lineHeight: 1.14, margin: "0 0 16px 0" }}>{post.title}</h1>
+
+          {post.author_name && (
+            <p style={{ fontFamily: "Inter, sans-serif", fontSize: 14, color: "rgba(23,18,8,0.7)", margin: "0 0 18px 0" }} data-testid="byline">
+              By <span style={{ color: INK, fontWeight: 600 }}>{post.author_name}</span>
+              {post.author_role ? <>, {post.author_role}</> : null}
+            </p>
+          )}
 
           {excerpt && (
             <p style={{ fontFamily: "Inter, sans-serif", fontSize: 17, color: "rgba(23,18,8,0.65)", lineHeight: 1.6, margin: "0 0 28px 0" }}>{excerpt}</p>
@@ -91,6 +101,9 @@ export default function BlogArticlePage({ post, related }: { post: BlogPost; rel
             .fyn-article li { margin-bottom: 10px; }
             .fyn-article a { color: ${RED}; text-decoration: underline; }
             .fyn-article strong { color: ${INK}; }
+            .fyn-article .answer { margin: 0 0 28px; padding: 18px 20px; border-radius: 14px; background: rgba(196,30,30,0.05); border: 1px solid rgba(196,30,30,0.16); font-size: 17px; line-height: 1.6; color: ${INK}; font-style: normal; }
+            .fyn-article .answer strong:first-child { display: block; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: ${RED}; margin-bottom: 6px; }
+            .fyn-article .table-wrap { overflow-x: auto; margin: 0 0 24px; }
             .fyn-article blockquote { margin: 28px 0; padding: 4px 0 4px 20px; border-left: 3px solid ${RED}; font-style: italic; color: rgba(23,18,8,0.7); }
             .fyn-article img, .fyn-article iframe, .fyn-article video { max-width: 100%; border-radius: 10px; margin: 12px 0 24px; display: block; }
             .fyn-article figure { margin: 0 0 24px 0; }

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import PricingPage from "@/pages/PricingPage";
 import { PRICING_FAQS } from "@/content/faqs";
-import { breadcrumbLd, faqLd, seo, softwareLd } from "@/lib/seo";
+import { breadcrumbLd, faqLd, productLd, seo, softwareLd } from "@/lib/seo";
 
 export const Route = createFileRoute("/_main/pricing")({
   component: PricingPage,
@@ -13,6 +13,6 @@ export const Route = createFileRoute("/_main/pricing")({
       path: "/pricing",
       image: "/og/pricing.png",
       imageAlt: "FynHelp pricing for CA firms",
-      jsonLd: [softwareLd(), faqLd(PRICING_FAQS), breadcrumbLd([{ name: "Pricing", path: "/pricing" }])],
+      jsonLd: [softwareLd(), productLd(), faqLd(PRICING_FAQS), breadcrumbLd([{ name: "Pricing", path: "/pricing" }])],
     }),
 });

@@ -1,7 +1,7 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import BlogArticlePage from "@/pages/BlogArticlePage";
-import { fetchPost, fetchRelated, postDescription } from "@/lib/blog";
-import { articleLd, breadcrumbLd, seo } from "@/lib/seo";
+import { faqFromHtml, fetchPost, fetchRelated, postDescription } from "@/lib/blog";
+import { articleLd, breadcrumbLd, faqLd, seo } from "@/lib/seo";
 
 export const Route = createFileRoute("/_main/blog/$slug")({
   // Loaded on the server: the article, its title and schema are in the first HTML.
@@ -17,6 +17,7 @@ export const Route = createFileRoute("/_main/blog/$slug")({
     const description = postDescription(post);
     const title = (post.seo_title || post.title).trim();
     const image = post.og_image || post.cover_image_url || undefined;
+    const faqs = faqFromHtml(post.content);
     return seo({
       // Long headlines stand alone; short ones get the brand.
       title,
@@ -43,6 +44,7 @@ export const Route = createFileRoute("/_main/blog/$slug")({
           { name: "Blog", path: "/blog" },
           { name: post.title, path },
         ]),
+        ...(faqs.length ? [faqLd(faqs)] : []),
       ],
     });
   },

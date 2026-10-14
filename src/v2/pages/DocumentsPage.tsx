@@ -80,7 +80,7 @@ function DocStatus({ d }: { d: Doc }) {
     );
   return <Badge tone={TONE[d.status]}>{d.status}</Badge>;
 }
-const SOURCES = ["All sources", "Manual", "Gmail", "WhatsApp"] as const;
+const SOURCES = ["All sources", "Manual", "Gmail", "WhatsApp", "Zoho Books"] as const;
 const ACCEPT = ".csv,.tsv,.txt,.xml,.pdf,.xlsx,.xls,.jpg,.jpeg,.png,.webp";
 
 /**

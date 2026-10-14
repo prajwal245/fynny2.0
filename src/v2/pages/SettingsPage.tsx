@@ -22,6 +22,7 @@ import { AgentSettings } from "../components/AgentSettings";
 import { BillingSection } from "../components/BillingSection";
 import { GmailHealth } from "../components/GmailHealth";
 import { GmailIcon, WhatsAppIcon } from "../components/BrandIcons";
+import { ZohoBooksSection } from "../components/ZohoBooks";
 
 type Team = Awaited<ReturnType<typeof listPracticeTeam>>;
 type Integrations = Awaited<ReturnType<typeof getPracticeIntegrations>>;
@@ -524,6 +525,8 @@ export default function SettingsPage() {
             {intg.gmail.available && firmId && (
               <GmailHealth firmId={firmId} lastResult={gmailResult} autoRun={justConnected} />
             )}
+
+            <ZohoBooksSection />
 
             <Row>
               <div style={{ minWidth: 0 }}>

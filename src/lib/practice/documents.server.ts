@@ -50,7 +50,7 @@ export const BUCKET = "ca-client-documents";
 const MAX_BYTES = 25 * 1024 * 1024;
 const STALE_PROCESSING_MS = 10 * 60 * 1000;
 
-export type Channel = "Manual" | "Gmail" | "WhatsApp";
+export type Channel = "Manual" | "Gmail" | "WhatsApp" | "Zoho Books";
 
 interface ExtractionRow {
   id: string;

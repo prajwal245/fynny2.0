@@ -21,6 +21,11 @@ export const adminPasswordLogin = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ email: z.string().email().max(200), password: z.string().min(1).max(200) }).parse(d))
   .handler(async ({ data }) => (await import("./security.server")).passwordSignIn(data.email, data.password));
 
+/** First-time set-up: emails a link to set a password, for founder-list emails only. */
+export const adminRequestSetup = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ email: z.string().email().max(200) }).parse(d))
+  .handler(async ({ data }) => (await import("./security.server")).requestAdminSetup(data.email));
+
 /** Step 3 (after the TOTP code): opens the admin session. */
 export const adminStartSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

@@ -400,8 +400,17 @@ const ResetPasswordPage = () => {
       toast.error(updateErr.message || "Could not update password.", { id: updateToastId });
       return;
     }
+    // Admins finish at the admin sign-in (password, then authenticator); everyone else in the practice app.
+    const { data: u } = await supabase.auth.getUser();
+    const { data: roles } = u.user ? await supabase.from("user_roles").select("role").eq("user_id", u.user.id) : { data: [] };
+    if ((roles ?? []).some((r: { role: string }) => ["super_admin", "admin", "ops_admin", "support_agent", "finance_manager", "analyst"].includes(r.role))) {
+      toast.success("Password set. Sign in to the admin panel.", { id: updateToastId });
+      await supabase.auth.signOut();
+      window.location.assign("/admin/login");
+      return;
+    }
     toast.success("Password updated. You're signed in.", { id: updateToastId });
-    navigate("/dashboard/cockpit", { replace: true });
+    navigate("/v2", { replace: true });
   };
 
   const inputClass =

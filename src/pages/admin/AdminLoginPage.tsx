@@ -168,7 +168,10 @@ export default function AdminLoginPage() {
               <button className="rounded-lg py-2.5 text-white font-semibold disabled:opacity-60" style={{ background: maroon }} disabled={busy} data-testid="admin-continue">
                 {busy ? "Checking…" : "Continue"}
               </button>
-              <p className="text-xs opacity-60">After 5 wrong passwords, sign-in is locked for 15 minutes. Forgot it? Ask a Super Admin to reset your access.</p>
+              <p className="text-xs opacity-60">
+                After 5 wrong passwords, sign-in is locked for 15 minutes. First time, or forgot your password?{" "}
+                <a href="/admin/setup" className="underline" data-testid="admin-setup-link">Set up your password</a>
+              </p>
             </form>
           )}
 

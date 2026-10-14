@@ -1,4 +1,5 @@
 import { startGmailConnect } from "@/lib/caGmail.functions";
+import PasswordInput from "../components/PasswordInput";
 import { track } from "@/lib/analytics";
 /**
  * FynHelp — first run journey, value first and short:
@@ -314,7 +315,7 @@ export default function OnboardingPage() {
                     label="Password"
                     aside={mode === "signin" ? <button type="button" className="v2-link" style={{ fontSize: 12 }} onClick={() => setMode("forgot")}>Forgot password?</button> : undefined}
                   >
-                    <input className="v2-input" type="password" required minLength={6} autoComplete={mode === "signin" ? "current-password" : "new-password"} value={account.password} onChange={(e) => setAccount({ ...account, password: e.target.value })} placeholder="At least six characters" />
+                    <PasswordInput className="v2-input" required minLength={6} autoComplete={mode === "signin" ? "current-password" : "new-password"} value={account.password} onChange={(e) => setAccount({ ...account, password: e.target.value })} placeholder="At least six characters" />
                   </Field>
                 )}
                 <button className="v2-btn v2-btn-primary v2-btn-lg v2-btn-block" type="submit" data-busy={busy} disabled={busy}>

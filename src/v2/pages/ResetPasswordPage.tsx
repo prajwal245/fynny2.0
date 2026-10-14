@@ -2,6 +2,7 @@
  * Set a new password from the emailed reset link. Supabase signs the user in
  * from the link (a recovery session); we then only ask for the new password.
  */
+import PasswordInput from "../components/PasswordInput";
 import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -48,6 +49,15 @@ export default function ResetPasswordPage() {
     const { error } = await supabase.auth.updateUser({ password });
     setBusy(false);
     if (error) return toast.error(error.message);
+    // Admins finish at the admin sign-in (password, then authenticator), not in the practice app.
+    const { data: u } = await supabase.auth.getUser();
+    const { data: roles } = u.user ? await supabase.from("user_roles").select("role").eq("user_id", u.user.id) : { data: [] };
+    if ((roles ?? []).some((r: { role: string }) => ["super_admin", "admin", "ops_admin", "support_agent", "finance_manager", "analyst"].includes(r.role))) {
+      toast.success("Password set. Sign in to the admin panel.");
+      await supabase.auth.signOut();
+      window.location.assign("/admin/login");
+      return;
+    }
     toast.success("Password updated. You are signed in.");
     navigate({ to: "/v2" });
   };
@@ -79,11 +89,11 @@ export default function ResetPasswordPage() {
           <form onSubmit={submit} style={{ display: "grid", gap: 14 }}>
             <div>
               <label className="v2-label" htmlFor="reset-new-password">New password</label>
-              <input id="reset-new-password" className="v2-input" type="password" autoComplete="new-password" minLength={6} required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least six characters" />
+              <PasswordInput id="reset-new-password" className="v2-input" autoComplete="new-password" minLength={6} required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least six characters" />
             </div>
             <div>
               <label className="v2-label" htmlFor="reset-confirm-new-password">Confirm new password</label>
-              <input id="reset-confirm-new-password" className="v2-input" type="password" autoComplete="new-password" minLength={6} required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+              <PasswordInput id="reset-confirm-new-password" className="v2-input" autoComplete="new-password" minLength={6} required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
             </div>
             <button className="v2-btn v2-btn-primary" type="submit" disabled={busy} style={{ justifySelf: "start" }}>
               {busy ? "Saving" : "Save password"}

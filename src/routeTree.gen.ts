@@ -49,6 +49,7 @@ import { Route as V2ReviewRouteImport } from './routes/v2/review'
 import { Route as V2SettingsRouteImport } from './routes/v2/settings'
 import { Route as AdminAuthAdminProtectedRouteImport } from './routes/_adminAuth/admin/_protected'
 import { Route as AdminAuthAdminLoginRouteImport } from './routes/_adminAuth/admin/login'
+import { Route as AdminAuthAdminSetupRouteImport } from './routes/_adminAuth/admin/setup'
 import { Route as BlogAdminBlogAdminIndexRouteImport } from './routes/_blogAdmin/blog-admin/index'
 import { Route as BlogAdminBlogAdminEditorRouteImport } from './routes/_blogAdmin/blog-admin/editor'
 import { Route as BlogAdminBlogAdminLoginRouteImport } from './routes/_blogAdmin/blog-admin/login'
@@ -408,6 +409,11 @@ const AdminAuthAdminProtectedRoute = AdminAuthAdminProtectedRouteImport.update({
 const AdminAuthAdminLoginRoute = AdminAuthAdminLoginRouteImport.update({
   id: '/admin/login',
   path: '/admin/login',
+  getParentRoute: () => AdminAuthRoute,
+} as any)
+const AdminAuthAdminSetupRoute = AdminAuthAdminSetupRouteImport.update({
+  id: '/admin/setup',
+  path: '/admin/setup',
   getParentRoute: () => AdminAuthRoute,
 } as any)
 const BlogAdminBlogAdminIndexRoute = BlogAdminBlogAdminIndexRouteImport.update({
@@ -1372,6 +1378,7 @@ export interface FileRoutesByFullPath {
   '/v2/': typeof V2IndexRoute
   '/admin': typeof AdminAuthAdminProtectedRouteWithChildren
   '/admin/login': typeof AdminAuthAdminLoginRoute
+  '/admin/setup': typeof AdminAuthAdminSetupRoute
   '/blog-admin/editor': typeof BlogAdminBlogAdminEditorRoute
   '/blog-admin/login': typeof BlogAdminBlogAdminLoginRoute
   '/intern/login': typeof BlogAdminInternLoginRoute
@@ -1571,6 +1578,7 @@ export interface FileRoutesByTo {
   '/demo': typeof DemoIndexRoute
   '/v2': typeof V2IndexRoute
   '/admin/login': typeof AdminAuthAdminLoginRoute
+  '/admin/setup': typeof AdminAuthAdminSetupRoute
   '/blog-admin/editor': typeof BlogAdminBlogAdminEditorRoute
   '/blog-admin/login': typeof BlogAdminBlogAdminLoginRoute
   '/intern/login': typeof BlogAdminInternLoginRoute
@@ -1777,6 +1785,7 @@ export interface FileRoutesById {
   '/v2/': typeof V2IndexRoute
   '/_adminAuth/admin/_protected': typeof AdminAuthAdminProtectedRouteWithChildren
   '/_adminAuth/admin/login': typeof AdminAuthAdminLoginRoute
+  '/_adminAuth/admin/setup': typeof AdminAuthAdminSetupRoute
   '/_blogAdmin/blog-admin/editor': typeof BlogAdminBlogAdminEditorRoute
   '/_blogAdmin/blog-admin/login': typeof BlogAdminBlogAdminLoginRoute
   '/_blogAdmin/intern/login': typeof BlogAdminInternLoginRoute
@@ -1981,6 +1990,7 @@ export interface FileRouteTypes {
     | '/v2/'
     | '/admin'
     | '/admin/login'
+    | '/admin/setup'
     | '/blog-admin/editor'
     | '/blog-admin/login'
     | '/intern/login'
@@ -2180,6 +2190,7 @@ export interface FileRouteTypes {
     | '/demo'
     | '/v2'
     | '/admin/login'
+    | '/admin/setup'
     | '/blog-admin/editor'
     | '/blog-admin/login'
     | '/intern/login'
@@ -2385,6 +2396,7 @@ export interface FileRouteTypes {
     | '/v2/'
     | '/_adminAuth/admin/_protected'
     | '/_adminAuth/admin/login'
+    | '/_adminAuth/admin/setup'
     | '/_blogAdmin/blog-admin/editor'
     | '/_blogAdmin/blog-admin/login'
     | '/_blogAdmin/intern/login'
@@ -2863,6 +2875,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/login'
       fullPath: '/admin/login'
       preLoaderRoute: typeof AdminAuthAdminLoginRouteImport
+      parentRoute: typeof AdminAuthRoute
+    }
+    '/_adminAuth/admin/setup': {
+      id: '/_adminAuth/admin/setup'
+      path: '/admin/setup'
+      fullPath: '/admin/setup'
+      preLoaderRoute: typeof AdminAuthAdminSetupRouteImport
       parentRoute: typeof AdminAuthRoute
     }
     '/_blogAdmin/blog-admin/': {
@@ -4123,11 +4142,13 @@ const AdminAuthAdminProtectedRouteWithChildren =
 interface AdminAuthRouteChildren {
   AdminAuthAdminProtectedRoute: typeof AdminAuthAdminProtectedRouteWithChildren
   AdminAuthAdminLoginRoute: typeof AdminAuthAdminLoginRoute
+  AdminAuthAdminSetupRoute: typeof AdminAuthAdminSetupRoute
 }
 
 const AdminAuthRouteChildren: AdminAuthRouteChildren = {
   AdminAuthAdminProtectedRoute: AdminAuthAdminProtectedRouteWithChildren,
   AdminAuthAdminLoginRoute: AdminAuthAdminLoginRoute,
+  AdminAuthAdminSetupRoute: AdminAuthAdminSetupRoute,
 }
 
 const AdminAuthRouteWithChildren = AdminAuthRoute._addFileChildren(

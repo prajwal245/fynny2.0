@@ -285,3 +285,46 @@ export async function audit(ctx: AdminCtx, action: string, targetType: string, t
   });
   if (error) console.error(`[admin audit] ${error.message}`);
 }
+
+/**
+ * First-time admin set-up. For an email on the founder list, sends an invite
+ * (no account yet) or a password-reset email (account exists); both links need
+ * the inbox, and the Super Admin role is granted only once the email is
+ * confirmed. Every caller gets the same answer, so the list cannot be probed.
+ */
+export async function requestAdminSetup(rawEmail: string) {
+  const ip = clientIp();
+  if (!networkAllowed(ip)) throw new AdminDenied("ip_blocked", "The admin panel cannot be reached from this network.");
+  const db = await adminDb();
+  const email = rawEmail.trim().toLowerCase();
+  const since = new Date(Date.now() - LOGIN_LOCK_MS).toISOString();
+  const { count, error } = await db
+    .from("admin_login_attempts")
+    .select("id", { count: "exact", head: true })
+    .eq("ip", ip)
+    .like("email", "setup:%")
+    .gte("at", since);
+  if (error || (count ?? 0) >= 5) throw new AdminDenied("locked", "Too many requests from this network. Try again in 15 minutes.");
+  await db.from("admin_login_attempts").insert({ email: `setup:${email}`, ip, success: true });
+
+  const { data: listed } = await db.from("admin_bootstrap_emails").select("email").eq("email", email).maybeSingle();
+  if (listed) {
+    // The link returns to the site the request came from (production, a preview or local).
+    const req = getRequest();
+    const host = req?.headers.get("x-forwarded-host") ?? (req ? new URL(req.url).host : "");
+    const proto = req?.headers.get("x-forwarded-proto") ?? (req ? new URL(req.url).protocol.replace(":", "") : "https");
+    const site = host ? `${proto}://${host}` : (process.env["SITE_URL"] || "https://www.fynhelp.com").replace(/\/$/, "");
+    const redirectTo = `${site}/reset-password`;
+    const invited = await db.auth.admin.inviteUserByEmail(email, { redirectTo });
+    if (invited.error) {
+      // Already has an account: send a link to set a new password instead.
+      const { url, key } = supabaseAuthEnv();
+      await fetch(`${url}/auth/v1/recover?redirect_to=${encodeURIComponent(redirectTo)}`, {
+        method: "POST",
+        headers: { apikey: key, "content-type": "application/json" },
+        body: JSON.stringify({ email }),
+      }).catch(() => null);
+    }
+  }
+  return { ok: true };
+}

@@ -143,3 +143,24 @@ export function articleBodyHtml(post: Pick<BlogPost, "content" | "title" | "cove
 export function postDescription(post: BlogPost): string {
   return toDescription(post.seo_description || cleanExcerpt(post.excerpt) || articleBodyHtml(post));
 }
+
+/**
+ * The FAQ at the end of an article, for FAQPage schema: an <h2> whose text is
+ * "FAQ" or "Frequently asked questions", then <h3> questions each followed by
+ * their answer paragraphs, until the next <h2>.
+ */
+export function faqFromHtml(html: string | null | undefined): [string, string][] {
+  if (!html) return [];
+  const start = html.search(/<h2[^>]*>\s*(frequently asked questions|faqs?)\b[^<]*<\/h2>/i);
+  if (start < 0) return [];
+  const rest = html.slice(start).replace(/^<h2[^>]*>.*?<\/h2>/is, "");
+  const section = rest.split(/<h2[\s>]/i)[0];
+  const text = (s: string) => s.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&#8377;|&#x20b9;/gi, "₹").replace(/\s+/g, " ").trim();
+  const out: [string, string][] = [];
+  for (const part of section.split(/<h3[^>]*>/i).slice(1)) {
+    const [q, ...a] = part.split(/<\/h3>/i);
+    const answer = text(a.join(" "));
+    if (text(q) && answer) out.push([text(q), answer]);
+  }
+  return out;
+}

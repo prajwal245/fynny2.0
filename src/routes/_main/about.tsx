@@ -3,7 +3,7 @@ import AboutPage from "@/pages/AboutPage";
 import { breadcrumbLd, seo, webPageLd } from "@/lib/seo";
 
 const description =
-  "FynHelp is a Bengaluru team building practice software for Indian CA firms: the layer between client documents and the Tally or Zoho ledger that makes month-end close a review.";
+  "FynHelp is a Bengaluru team building month-end close software for Indian CA firms: the layer between client documents and the Tally or Zoho ledger.";
 
 export const Route = createFileRoute("/_main/about")({
   component: AboutPage,

@@ -16,7 +16,19 @@ export const SITE_URL = (
   (import.meta.env.VITE_SITE_URL as string | undefined) || "https://www.fynhelp.com"
 ).replace(/\/+$/, "");
 export const SITE_NAME = "FynHelp";
-export const ORG_NAME = "FynHelp Technologies";
+/** One entity name everywhere (search engines and AI answers): always "FynHelp". */
+export const ORG_NAME = "FynHelp";
+
+/**
+ * Official profiles, for Organization.sameAs. Add each URL once the profile
+ * exists and describes FynHelp the same way (month-end close for CA firms).
+ */
+export const SAME_AS: string[] = [
+  // "https://www.linkedin.com/company/<your-page>",
+  // "https://www.g2.com/products/fynhelp",
+  // "https://www.capterra.in/software/<id>/fynhelp",
+  // "https://www.crunchbase.com/organization/fynhelp",
+];
 export const SUPPORT_EMAIL = "support@fynhelp.com";
 export const DEFAULT_OG = { path: "/og/default.png", alt: "FynHelp: month-end close software for CA firms in India" };
 
@@ -113,8 +125,8 @@ export function organizationLd(): JsonLd {
     "@type": "Organization",
     "@id": ORG_ID,
     name: ORG_NAME,
-    alternateName: SITE_NAME,
     url: `${SITE_URL}/`,
+    ...(SAME_AS.length ? { sameAs: SAME_AS } : {}),
     logo: { "@type": "ImageObject", url: absoluteUrl("/logo.png") },
     description:
       "FynHelp builds practice software for chartered accountant firms in India: document collection, bank reconciliation and source-traceable MIS on top of Tally and Zoho.",
@@ -156,8 +168,8 @@ export function softwareLd(): JsonLd {
     "@id": SOFTWARE_ID,
     name: SITE_NAME,
     url: `${SITE_URL}/`,
-    applicationCategory: "BusinessApplication",
-    applicationSubCategory: "Accounting practice management",
+    applicationCategory: "FinanceApplication",
+    applicationSubCategory: "Month-end close and bank reconciliation for CA firms",
     operatingSystem: "Web browser",
     inLanguage: "en-IN",
     description:
@@ -180,9 +192,42 @@ export function softwareLd(): JsonLd {
       url: absoluteUrl("/pricing"),
       availability: "https://schema.org/InStock",
       ...(p.price !== "0"
-        ? { priceSpecification: { "@type": "UnitPriceSpecification", price: p.price, priceCurrency: "INR", unitText: "MONTH", valueAddedTaxIncluded: false } }
+        ? { priceSpecification: { "@type": "UnitPriceSpecification", price: p.price, priceCurrency: "INR", unitText: "MONTH", valueAddedTaxIncluded: true } }
         : {}),
     })),
+  };
+}
+
+/** Product + Offer, for /pricing and /ca-firms: the three plans, GST included, per month. */
+export function productLd(): JsonLd {
+  const paid = PLANS.filter((p) => p.price !== "0");
+  return {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    "@id": `${SITE_URL}/#product`,
+    name: "FynHelp month-end close software for CA firms",
+    brand: { "@type": "Brand", name: SITE_NAME },
+    description:
+      "Month-end close software for CA firms in India: client document collection, bank-to-Tally reconciliation and source-traceable MIS, priced per client entity with unlimited users.",
+    image: absoluteUrl("/og/pricing.png"),
+    url: absoluteUrl("/pricing"),
+    category: "Accounting software",
+    offers: {
+      "@type": "AggregateOffer",
+      priceCurrency: "INR",
+      lowPrice: Math.min(...paid.map((p) => Number(p.price))),
+      highPrice: Math.max(...paid.map((p) => Number(p.price))),
+      offerCount: paid.length,
+      offers: paid.map((p) => ({
+        "@type": "Offer",
+        name: p.name,
+        price: p.price,
+        priceCurrency: "INR",
+        url: absoluteUrl("/pricing"),
+        availability: "https://schema.org/InStock",
+        priceSpecification: { "@type": "UnitPriceSpecification", price: p.price, priceCurrency: "INR", unitText: "MONTH", valueAddedTaxIncluded: true },
+      })),
+    },
   };
 }
 

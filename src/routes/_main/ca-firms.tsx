@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import CAFirmsPage from "@/pages/CAFirmsPage";
-import { breadcrumbLd, seo, webPageLd } from "@/lib/seo";
+import { breadcrumbLd, productLd, seo, webPageLd } from "@/lib/seo";
 
 const description =
-  "Workflow automation for CA firms managing 30 to 150 clients: collect documents, reconcile bank to Tally and Zoho, and deliver monthly MIS without the month-end scramble.";
+  "Practice software for CA firms with 30 to 150 clients: document collection, bank-to-Tally reconciliation and monthly MIS, priced per client entity.";
 
 export const Route = createFileRoute("/_main/ca-firms")({
   component: CAFirmsPage,
@@ -13,6 +13,7 @@ export const Route = createFileRoute("/_main/ca-firms")({
       description,
       path: "/ca-firms",
       jsonLd: [
+        productLd(),
         webPageLd({ name: "FynHelp for CA firms", description, path: "/ca-firms" }),
         breadcrumbLd([{ name: "For CA firms", path: "/ca-firms" }]),
       ],

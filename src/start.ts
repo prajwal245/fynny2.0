@@ -18,6 +18,25 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
   }
 });
 
+// One host for search engines: fynhelp.com → https://www.fynhelp.com (www is the
+// host already indexed and named in every canonical tag). Removed pages answer
+// 410 Gone so they drop out of the index quickly.
+const GONE = new Set(["/blog/budgetvsforecast", "/blog/ca-vs-cfo-for-indian-sme", "/blog/5-signs-you-need-ai-cfo"]);
+const hostMiddleware = createMiddleware().server(async ({ next, request }) => {
+  const url = new URL(request.url);
+  const host = (request.headers.get("x-forwarded-host") ?? url.host).toLowerCase();
+  if (host === "fynhelp.com") {
+    return new Response(null, { status: 301, headers: { location: `https://www.fynhelp.com${url.pathname}${url.search}`, "cache-control": "public, max-age=86400" } });
+  }
+  if (GONE.has(url.pathname.replace(/\/$/, ""))) {
+    return new Response(
+      '<!doctype html><meta name="robots" content="noindex"><title>Gone — FynHelp</title><p style="font-family:system-ui;padding:40px">This article was removed. <a href="/blog">Read the FynHelp blog</a>.</p>',
+      { status: 410, headers: { "content-type": "text/html; charset=utf-8", "x-robots-tag": "noindex" } },
+    );
+  }
+  return next();
+});
+
 // The admin panel is reachable only from ADMIN_IP_ALLOWLIST when it is set.
 // Admin server functions check the same list (and much more) on every call.
 const adminNetworkMiddleware = createMiddleware().server(async ({ next, request }) => {
@@ -41,6 +60,6 @@ const csrfMiddleware = createCsrfMiddleware({
 });
 
 export const startInstance = createStart(() => ({
-  requestMiddleware: [errorMiddleware, adminNetworkMiddleware, csrfMiddleware],
+  requestMiddleware: [errorMiddleware, hostMiddleware, adminNetworkMiddleware, csrfMiddleware],
   functionMiddleware: [attachSupabaseAuth],
 }));

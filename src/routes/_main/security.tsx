@@ -3,7 +3,7 @@ import PublicSecurityPage from "@/pages/SecurityPage";
 import { breadcrumbLd, seo, webPageLd } from "@/lib/seo";
 
 const description =
-  "How FynHelp protects your clients' financial data: firm-level isolation, private file storage, short-lived links, read-only Gmail access and a full audit trail on every action.";
+  "How FynHelp protects client data: firm-level isolation, private storage, short-lived signed links, read-only Gmail access and an audit trail on every action.";
 
 export const Route = createFileRoute("/_main/security")({
   component: PublicSecurityPage,

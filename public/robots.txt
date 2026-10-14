@@ -15,4 +15,27 @@ Disallow: /samples/
 # The practice app (/v2), sign-in and sign-up stay crawlable on purpose:
 # they answer with "noindex", which search engines can only see if allowed in.
 
+# AI assistants and answer engines: welcome, for training and for answers.
+# The same disallows as above apply.
+User-agent: GPTBot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: ClaudeBot
+User-agent: Claude-SearchBot
+User-agent: Claude-User
+User-agent: anthropic-ai
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+User-agent: CCBot
+User-agent: Bingbot
+Allow: /
+Disallow: /admin
+Disallow: /intern
+Disallow: /blog-admin
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /samples/
+
 Sitemap: https://www.fynhelp.com/sitemap.xml

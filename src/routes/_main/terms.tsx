@@ -7,7 +7,7 @@ export const Route = createFileRoute("/_main/terms")({
     seo({
       title: "Terms and conditions",
       description:
-        "The terms between your CA firm and FynHelp: the service, the free trial, data ownership and confidentiality, fees and GST, liability, termination and grievance redressal. Governed by the laws of India.",
+        "Terms between your CA firm and FynHelp: the service, free trial, data ownership, fees and GST, liability, termination and grievance redressal, under Indian law.",
       path: "/terms",
       jsonLd: [breadcrumbLd([{ name: "Terms and conditions", path: "/terms" }])],
     }),

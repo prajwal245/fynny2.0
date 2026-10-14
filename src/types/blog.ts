@@ -22,6 +22,10 @@ export interface BlogPost {
 }
 
 export const BLOG_CATEGORIES = [
+  "Reconciliation",
+  "Month-end close",
+  "MIS",
+  "Comparisons",
   "Playbooks",
   "Cash flow",
   "GST",

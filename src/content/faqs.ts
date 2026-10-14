@@ -21,11 +21,11 @@ export const PRICING_FAQS: [string, string][] = [
   ],
   [
     "What happens if we exceed our included clients?",
-    "Extra active clients are billed at your tier's rate (₹149 / ₹119 / ₹99). Starter caps at 25 total; Professional and Scale have no cap. You can also upgrade anytime — monthly switches are instant, annual switches are pro-rated.",
+    "Extra active clients are billed at your tier's rate (₹149 / ₹119 / ₹99). Starter caps at 25 total; Professional and Scale have no cap. You can upgrade anytime: a higher plan starts at once and you pay only the pro-rated difference. A lower plan starts from your next renewal.",
   ],
   [
     "Is GST included in these prices?",
-    "No — all prices are exclusive of GST. You will be invoiced as a SaaS subscription with GST added at the applicable rate.",
+    "Yes. Every price shown includes GST at 18%, so what you see is what you pay. Add your GSTIN when you choose a plan and it appears on your invoice so you can claim input tax credit.",
   ],
   [
     "How does the annual discount work?",

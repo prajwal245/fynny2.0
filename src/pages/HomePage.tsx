@@ -28,6 +28,7 @@ import FynLogo from "@/components/FynLogo";
 
 import { SiteFooter } from "@/components/site/SiteShell";
 import ProductShot from "@/components/site/ProductShot";
+import { CurrencySwitch, localize, money, useCurrency } from "@/lib/currency";
 
 /* ─────────────────────────────────────────────────────────
    FynHelp homepage — editorial fintech layout
@@ -244,6 +245,7 @@ const STYLES = `
 .fh-step p { font-size:13px; color:${C.body}; line-height:1.6; margin-top:7px; }
 
 /* pricing */
+.fh-cur { margin-left:10px; }
 .fh-billing { display:inline-flex; gap:4px; margin-top:26px; padding:4px; border-radius:999px; background:${C.card}; border:1px solid ${C.line}; }
 .fh-billing button { border:0; cursor:pointer; background:transparent; color:${C.body}; font:inherit; font-size:13.5px; font-weight:500; padding:9px 20px; border-radius:999px; display:inline-flex; align-items:center; gap:8px; transition:background .25s ease, color .25s ease; }
 .fh-billing button:hover { color:${C.ink}; }
@@ -358,12 +360,11 @@ const TRUST = [
 ];
 
 const PLANS = [
-  { name: "Starter", monthly: 2999, clients: "15 client entities included", extra: "Extra client \u20B9149 (cap 25)", adds: ["Extract, Recon and MIS reports", "Full audit trail", "Unlimited users"], cta: "Start free trial" },
-  { name: "Professional", monthly: 5999, clients: "40 client entities included", extra: "Extra client \u20B9119", adds: ["Everything in Starter", "Chaser follow-ups by email and WhatsApp", "Gmail intake for client documents", "Shareable MIS links for clients"], cta: "Choose Professional", popular: true },
-  { name: "Scale", monthly: 12999, clients: "100 client entities included", extra: "Extra client \u20B999 (no cap)", adds: ["Everything in Professional", "Set-up with a founder on a call", "Volume pricing for larger books"], cta: "Talk to us" },
+  { name: "Starter", monthly: 2999, annual: 30590, clients: "15 client entities included", extra: "Extra client \u20B9149 (cap 25)", adds: ["Extract, Recon and MIS reports", "Full audit trail", "Unlimited users"], cta: "Start free trial" },
+  { name: "Professional", monthly: 5999, annual: 61190, clients: "40 client entities included", extra: "Extra client \u20B9119", adds: ["Everything in Starter", "Chaser follow-ups by email and WhatsApp", "Gmail intake for client documents", "Shareable MIS links for clients"], cta: "Choose Professional", popular: true },
+  { name: "Scale", monthly: 12999, annual: 132590, clients: "100 client entities included", extra: "Extra client \u20B999 (no cap)", adds: ["Everything in Professional", "Set-up with a founder on a call", "Volume pricing for larger books"], cta: "Talk to us" },
 ];
 
-const inr = (n: number) => `\u20B9${n.toLocaleString("en-IN")}`;
 
 
 
@@ -380,6 +381,7 @@ function Reveal({ children, delay = 0 }: { children: React.ReactNode; delay?: nu
 
 export default function HomePage() {
   const [billing, setBilling] = useState<"monthly" | "annual">("monthly");
+  const cur = useCurrency();
 
   useEffect(() => {
     const nodes = Array.from(document.querySelectorAll<HTMLElement>(".fh-rv"));
@@ -542,7 +544,7 @@ export default function HomePage() {
                 </div>
                 <div className="fh-maroon-card">
                   <div className="lbl">Starter plan</div>
-                  <div className="v num">{inr(2999)}<small style={{ fontSize: 16 }}>/mo</small></div>
+                  <div className="v num">{money(2999, cur)}<small style={{ fontSize: 16 }}>/mo</small></div>
                   <div className="fh-uptick">14-day free trial, no card needed</div>
                   <div className="fh-line">
                     <span>Client entities included</span>
@@ -554,7 +556,7 @@ export default function HomePage() {
                   </div>
                   <div className="fh-line">
                     <span>Prices</span>
-                    <b>Excl. GST</b>
+                    <b>Incl. GST</b>
                   </div>
                 </div>
               </div>
@@ -734,22 +736,23 @@ export default function HomePage() {
                 Annual <i>Save 15%</i>
               </button>
             </div>
+            <CurrencySwitch className="fh-billing fh-cur" value={cur} />
           </Reveal>
           <div className="fh-price-grid">
             {PLANS.map((p, i) => {
-              const annualPerMonth = Math.round((p.monthly * 0.85) / 10) * 10;
+              const annualPerMonth = p.annual / 12;
               return (
               <Reveal key={p.name} delay={i * 80}>
                 <div className={`fh-plan ${p.popular ? "pop" : ""}`} style={{ height: "100%" }}>
                   {p.popular && <span className="badge">Most popular</span>}
                   <div className="pn">{p.name}</div>
                   <div className="pp num">
-                    {inr(billing === "annual" ? annualPerMonth : p.monthly)}
+                    {money(billing === "annual" ? annualPerMonth : p.monthly, cur)}
                     <small>/mo</small>
                   </div>
                   <div className="fh-annual">
                     {billing === "annual"
-                      ? `${inr(annualPerMonth * 12)} billed yearly · save ${inr(p.monthly * 12 - annualPerMonth * 12)}`
+                      ? `${money(p.annual, cur)} billed yearly · save ${money(p.monthly * 12 - p.annual, cur)}`
                       : "Billed monthly · switch to annual and save 15%"}
                   </div>
 
@@ -760,7 +763,7 @@ export default function HomePage() {
                     </li>
                     <li>
                       <Check size={15} style={{ color: C.coral, flex: "0 0 auto" }} />
-                      {p.extra}
+                      {localize(p.extra, cur)}
                     </li>
                     {p.adds.map((a) => (
                       <li key={a}>

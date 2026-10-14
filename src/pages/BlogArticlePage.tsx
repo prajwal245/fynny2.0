@@ -98,6 +98,11 @@ export default function BlogArticlePage({ post, related }: { post: BlogPost; rel
             .fyn-article h3 { font-weight: 700; font-size: 20px; color: ${INK}; margin: 30px 0 14px 0; }
             .fyn-article h4, .fyn-article h5, .fyn-article h6 { font-weight: 700; font-size: 17px; color: ${INK}; margin: 26px 0 12px 0; }
             .fyn-article ul, .fyn-article ol { margin: 0 0 24px 0; padding-left: 26px; }
+            .fyn-article ul { list-style: disc; } .fyn-article ol { list-style: decimal; }
+            .fyn-article li::marker { color: ${RED}; font-weight: 600; }
+            .fyn-article figure.diagram { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+            .fyn-article figure.diagram img { min-width: 720px; }
+            @media (min-width: 760px) { .fyn-article figure.diagram img { min-width: 0; } }
             .fyn-article li { margin-bottom: 10px; }
             .fyn-article a { color: ${RED}; text-decoration: underline; }
             .fyn-article strong { color: ${INK}; }
@@ -107,6 +112,9 @@ export default function BlogArticlePage({ post, related }: { post: BlogPost; rel
             .fyn-article blockquote { margin: 28px 0; padding: 4px 0 4px 20px; border-left: 3px solid ${RED}; font-style: italic; color: rgba(23,18,8,0.7); }
             .fyn-article img, .fyn-article iframe, .fyn-article video { max-width: 100%; border-radius: 10px; margin: 12px 0 24px; display: block; }
             .fyn-article figure { margin: 0 0 24px 0; }
+            .fyn-article figure img { margin: 0 0 8px; border: 1px solid rgba(23,18,8,0.10); background: #fff; }
+            .fyn-article figcaption { font-size: 13.5px; line-height: 1.5; color: rgba(23,18,8,0.6); }
+            .fyn-article kbd { font-family: "JetBrains Mono", monospace; font-size: 0.85em; padding: 1px 6px; border-radius: 6px; border: 1px solid rgba(23,18,8,0.2); background: #fff; }
             .fyn-article figcaption { font-family: Inter, sans-serif; font-size: 12.5px; color: rgba(23,18,8,0.5); margin-top: 8px; text-align: center; }
             .fyn-article pre { background: rgba(23,18,8,0.05); border-radius: 10px; padding: 16px; overflow-x: auto; font-family: 'JetBrains Mono', monospace; font-size: 13.5px; margin: 0 0 24px 0; }
             .fyn-article code { font-family: 'JetBrains Mono', monospace; font-size: 13.5px; background: rgba(23,18,8,0.06); padding: 2px 5px; border-radius: 4px; }

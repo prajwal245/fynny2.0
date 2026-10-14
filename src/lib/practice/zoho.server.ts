@@ -379,7 +379,8 @@ export async function sync(db: Db, ctx: FirmContext, linkId: string, month: stri
   lines.sort((a, b) => a.date.localeCompare(b.date));
   const totalIn = lines.reduce((s, x) => s + x.moneyIn, 0);
   const totalOut = lines.reduce((s, x) => s + x.moneyOut, 0);
-  const note = `${label}: ${lines.length} entr${lines.length === 1 ? "y" : "ies"}, in ₹${totalIn.toLocaleString("en-IN")}, out ₹${totalOut.toLocaleString("en-IN")}`;
+  const rupees = (n: number) => `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const note = `${label}: ${lines.length} entr${lines.length === 1 ? "y" : "ies"}, in ${rupees(totalIn)}, out ${rupees(totalOut)}`;
   const touch = (n: string) =>
     db.from("ca_zoho_links").update({ last_synced_at: new Date().toISOString(), last_sync_note: n }).eq("id", l.id);
 

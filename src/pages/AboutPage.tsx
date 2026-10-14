@@ -34,8 +34,8 @@ export default function AboutPage() {
     <SiteShell>
       <PageHero
         kicker="About FynHelp"
-        title="We are building the intelligence layer"
-        italic="between documents and the ledger"
+        title="We build month-end close software"
+        italic="for Indian CA firms"
         sub="FynHelp reads what a CA firm's clients already send, statements, Tally exports, invoices and registers, matches it to the books and leaves your team only the lines that need a decision."
         actions={
           <>

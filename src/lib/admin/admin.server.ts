@@ -500,3 +500,72 @@ export async function auditLog(ctx: AdminCtx) {
   const email = new Map(((people ?? []) as { user_id: string; email: string }[]).map((p) => [p.user_id, p.email]));
   return (data ?? []).map((r) => ({ ...r, admin: email.get(r.admin_user_id) ?? r.admin_user_id }));
 }
+
+/* ── system health ───────────────────────────────────────── */
+
+type Check = { key: string; name: string; status: "ok" | "warn" | "down"; detail: string; ms?: number };
+
+const has = (...keys: string[]) => keys.every((k) => !!process.env[k]);
+
+/** Live checks of the services FynHelp depends on. Reports whether settings exist, never their values. */
+export async function systemHealth(ctx: AdminCtx) {
+  const checks: Check[] = [];
+  const timed = async (key: string, name: string, fn: () => Promise<string | null>) => {
+    const t = Date.now();
+    try {
+      const err = await fn();
+      const ms = Date.now() - t;
+      checks.push({ key, name, ms, status: err ? "down" : ms > 1500 ? "warn" : "ok", detail: err ?? (ms > 1500 ? "Slow response" : "Responding") });
+    } catch (e) {
+      checks.push({ key, name, ms: Date.now() - t, status: "down", detail: (e as Error).message });
+    }
+  };
+  await timed("db", "Database", async () => (await ctx.db.from("ca_firms").select("id", { count: "exact", head: true })).error?.message ?? null);
+  await timed("auth", "Sign-in service", async () => (await ctx.db.auth.admin.listUsers({ page: 1, perPage: 1 })).error?.message ?? null);
+
+  const keyId = process.env["RAZORPAY_KEY_ID"] ?? "";
+  const config = (key: string, name: string, ok: boolean, okText: string, missing: string, warn = false): Check => ({
+    key, name, status: ok ? "ok" : warn ? "warn" : "down", detail: ok ? okText : missing,
+  });
+  checks.push(
+    config("razorpay", "Razorpay payments", has("RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET"),
+      keyId.startsWith("rzp_live_") ? "Live keys set" : "Test keys set", "RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET is not set"),
+    config("razorpay_webhook", "Razorpay webhook", has("RAZORPAY_WEBHOOK_SECRET"), "Signing secret set", "RAZORPAY_WEBHOOK_SECRET is not set; payments will not update plans"),
+    config("email", "Outgoing email", has("RESEND_API_KEY"), "Resend key set", "RESEND_API_KEY is not set; reminders and chasers will not send"),
+    config("gmail", "Gmail intake", has("GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_ENCRYPTION_KEY"), "Google sign-in and encryption key set", "Gmail settings are incomplete; firms cannot connect Gmail", true),
+    config("ocr", "Scanned document reading", has("OCR_SPACE_API_KEY"), "OCR key set", "OCR_SPACE_API_KEY is not set; scans and photos cannot be read", true),
+    config("cron", "Scheduled jobs", has("CRON_SECRET") || has("CA_CRON_SECRET"), "Cron secret set", "No cron secret; scheduled chasers and reminders will not run", true),
+  );
+
+  const since = new Date(Date.now() - DAY).toISOString();
+  const stuckBefore = new Date(Date.now() - 10 * 60_000).toISOString();
+  const [runs, stuck, failedRuns, queue, lastWebhook, lastSchedule] = await Promise.all([
+    ctx.db.from("ca_agent_runs").select("status").gte("started_at", since).limit(5000),
+    ctx.db.from("ca_agent_runs").select("id", { count: "exact", head: true }).eq("status", "running").lt("started_at", stuckBefore),
+    ctx.db.from("ca_agent_runs").select("id, ca_firm_id, agent, error, started_at").eq("status", "failed").gte("started_at", since).order("started_at", { ascending: false }).limit(8),
+    ctx.db.from("ca_document_extractions").select("extract_status").in("extract_status", ["queued", "retry", "processing", "failed"]).limit(5000),
+    ctx.db.from("ca_billing_events").select("event, received_at").order("received_at", { ascending: false }).limit(1).maybeSingle(),
+    ctx.db.from("ca_agent_runs").select("started_at").eq("trigger", "schedule").order("started_at", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  const byStatus: Record<string, number> = {};
+  for (const r of runs.data ?? []) byStatus[r.status] = (byStatus[r.status] ?? 0) + 1;
+  const docs: Record<string, number> = {};
+  for (const r of queue.data ?? []) docs[r.extract_status] = (docs[r.extract_status] ?? 0) + 1;
+  const total = (runs.data ?? []).length;
+  const failRate = total ? (byStatus["failed"] ?? 0) / total : 0;
+  checks.push({
+    key: "agents", name: "Agents (last 24 hours)",
+    status: (stuck.count ?? 0) > 0 || failRate > 0.25 ? "warn" : "ok",
+    detail: total ? `${total} runs, ${byStatus["failed"] ?? 0} failed, ${stuck.count ?? 0} stuck` : "No runs in the last 24 hours",
+  });
+  const names = await firmNames(ctx, (failedRuns.data ?? []).map((r) => r.ca_firm_id));
+  return {
+    checkedAt: new Date().toISOString(),
+    checks,
+    runs: { total, byStatus, stuck: stuck.count ?? 0 },
+    documents: docs,
+    lastWebhook: lastWebhook.data ?? null,
+    lastScheduledRun: lastSchedule.data?.started_at ?? null,
+    recentFailures: (failedRuns.data ?? []).map((r) => ({ ...r, firm: names.get(r.ca_firm_id) ?? "—" })),
+  };
+}

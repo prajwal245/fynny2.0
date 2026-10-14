@@ -1,11 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
-import ProtectedCeoRoute from "@/components/admin/ProtectedCeoRoute";
-import AdminRolesPage from "@/pages/admin/AdminRolesPage";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
+// Replaced by the FynHelp admin control pages; old links land on the page that took over.
 export const Route = createFileRoute("/_adminAuth/admin/_protected/roles")({
-  component: () => (
-    <ProtectedCeoRoute>
-      <AdminRolesPage />
-    </ProtectedCeoRoute>
-  ),
+  beforeLoad: () => {
+    throw redirect({ href: "/admin/team", replace: true });
+  },
 });

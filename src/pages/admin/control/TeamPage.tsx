@@ -28,14 +28,14 @@ export default function TeamPage() {
 
   return (
     <div>
-      <PageHead title="Admin Team" sub="Who can open this panel, with what role. Every admin must use an authenticator app; changing a role signs that person out." />
+      <PageHead title="Admin Team" sub="Who can open this panel, with what role. Changing a role or deactivating someone signs them out at once." />
       <Panel title="Add an admin">
         <div className="flex flex-wrap gap-2 text-sm">
           <input className="rounded-lg border px-3 py-2 flex-1 min-w-[220px]" type="email" placeholder="name@fynhelp.com" value={email} onChange={(e) => setEmail(e.target.value)} data-testid="invite-email" />
           <select className="rounded-lg border px-3 py-2" value={role} onChange={(e) => setRole(e.target.value as AdminRole)} aria-label="Role" data-testid="invite-role">
             {ASSIGNABLE_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
           </select>
-          <Btn kind="primary" disabled={busy === "invite" || !email.includes("@")} testId="invite-send" onClick={() => void act("invite", () => adminInvite({ data: { email, role } }), `Invite sent to ${email}. They set a password, then an authenticator, on first sign-in.`).then(() => setEmail(""))}>
+          <Btn kind="primary" disabled={busy === "invite" || !email.includes("@")} testId="invite-send" onClick={() => void act("invite", () => adminInvite({ data: { email, role } }), `Invite sent to ${email}. They set a password from the email, then sign in at /admin/login.`).then(() => setEmail(""))}>
             Send invite
           </Btn>
         </div>

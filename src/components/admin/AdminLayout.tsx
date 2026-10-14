@@ -25,31 +25,14 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/admin/coupons", label: "Coupons", icon: TicketPercent, roles: [], perm: "coupons.manage" },
   { to: "/admin/team", label: "Admin Team", icon: UserCog, roles: [], perm: "team.manage" },
   { to: "/admin/security-log", label: "Security Log", icon: ScrollText, roles: [], perm: "audit.view" },
+  { to: "/admin/system-health", label: "System Health", icon: Activity, roles: [], perm: "ops.view" },
   { divider: true },
-  { to: "/admin/dashboard", label: "Dashboard", icon: BarChart3, roles: ["super_admin","ops_admin","support_agent","analyst"] },
-  { to: "/admin/ceo-view", label: "CEO View", icon: LayoutDashboard, roles: ["super_admin"] },
-  { to: "/admin/users", label: "Users", icon: Users, roles: ["super_admin","ops_admin","support_agent"] },
-  { to: "/admin/ca-approvals", label: "CA Approvals", icon: ShieldCheck, roles: ["super_admin","ops_admin","admin"] },
-  { to: "/admin/ca-verification", label: "CA Verification", icon: ShieldCheck, roles: ["super_admin","ops_admin"], badgeKey: "ca_pending" },
-
-  { to: "/admin/waitlist", label: "Waitlist", icon: UserPlus, roles: ["super_admin","ops_admin","support_agent","analyst"] },
-  { to: "/admin/subscriptions", label: "Subscriptions & Billing", icon: CreditCard, roles: ["super_admin","ops_admin"] },
-  { to: "/admin/content", label: "Content Management", icon: FileText, roles: ["super_admin","ops_admin","support_agent"] },
-  { to: "/admin/blog", label: "Blog", icon: Newspaper, roles: ["super_admin","ops_admin","admin","support_agent"] },
-  { to: "/admin/media", label: "Media Library", icon: ImageIcon, roles: ["super_admin","admin","support_agent"] },
-  { to: "/admin/support", label: "Support Tickets", icon: MessageCircle, roles: ["super_admin","ops_admin","support_agent"] },
-  { to: "/admin/analytics", label: "Analytics", icon: TrendingUp, roles: ["super_admin","ops_admin","analyst"] },
-  { to: "/admin/ai-monitoring", label: "AI Monitoring", icon: Bot, roles: ["super_admin","ops_admin","analyst"] },
-  { to: "/admin/ai-credits", label: "AI Credits & Usage", icon: Gauge, roles: ["super_admin","ops_admin","analyst"] },
-  { to: "/admin/ca-invites", label: "CA Portal Invites", icon: UserPlus, roles: ["super_admin","admin","ops_admin"] },
-  { to: "/admin/communications", label: "Communications Hub", icon: Send, roles: ["super_admin","ops_admin","support_agent"] },
-  { to: "/admin/feature-flags", label: "Feature Flags", icon: Flag, roles: ["super_admin","ops_admin"] },
-  { to: "/admin/roles", label: "Roles & Permissions", icon: ShieldCheck, roles: ["super_admin"] },
-  { to: "/admin/settings", label: "Settings", icon: Settings, roles: ["super_admin"] },
-  { to: "/admin/system-health", label: "System Health", icon: Activity, roles: ["super_admin","ops_admin"] },
-  { to: "/admin/internal-access", label: "Internal Access", icon: Lock, roles: ["super_admin","ops_admin"] },
+  { to: "/admin/blog", label: "Blog", icon: Newspaper, roles: ["super_admin","admin","ops_admin","support_agent"] },
+  { to: "/admin/content", label: "Resources & Glossary", icon: FileText, roles: ["super_admin","admin","ops_admin","support_agent"] },
+  { to: "/admin/media", label: "Media Library", icon: ImageIcon, roles: ["super_admin","admin","ops_admin","support_agent"] },
+  { to: "/admin/waitlist", label: "Waitlist", icon: UserPlus, roles: ["super_admin","admin","ops_admin","support_agent","analyst"] },
   { divider: true },
-  { to: "/admin/audit-logs", label: "Audit Logs", icon: ClipboardList, roles: ["super_admin","ops_admin","support_agent","analyst"] },
+  { to: "/admin/settings", label: "Settings", icon: Settings, roles: ["super_admin","admin","ops_admin","support_agent","finance_manager","analyst"] },
 ];
 
 const SUPPORT_EMAIL = "support@fynhelp.com";
@@ -153,21 +136,7 @@ export default function AdminLayout() {
     return () => window.removeEventListener("keydown", onEsc);
   }, [sidebarOpen, isDesktop]);
 
-  const [caPending, setCaPending] = useState(0);
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      const { count } = await supabase
-        .from("ca_firms")
-        .select("id", { count: "exact", head: true })
-        .eq("verification_status", "pending");
-      if (!cancelled) setCaPending(count ?? 0);
-    };
-    load();
-    const t = setInterval(load, 60000);
-    return () => { cancelled = true; clearInterval(t); };
-  }, [location.pathname]);
-  const badges: Record<string, number> = { ca_pending: caPending };
+  const badges: Record<string, number> = {};
 
   // Least-privilege: a nav item is visible only when the signed-in admin holds
   // one of its declared roles. Support agent is additionally path-restricted.

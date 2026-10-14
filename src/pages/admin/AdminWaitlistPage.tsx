@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Users, UserPlus, Calendar, CalendarRange, Search, Download, RefreshCw,
   CheckCircle2, RotateCcw, Trash2, ChevronUp, ChevronDown, X,
-  ShieldCheck, ShieldAlert, ShieldX, Beaker,
+  ShieldCheck, ShieldAlert, ShieldX,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -95,7 +95,6 @@ function applyFilters<T extends { ilike: any; or: any; eq: any }>(q: T, f: Filte
 
 export default function AdminWaitlistPage() {
   const { user, isAdmin, roles, loading: authLoading } = useAdminAuth();
-  const [testing, setTesting] = useState(false);
 
   const [rows, setRows] = useState<WaitlistRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -215,35 +214,6 @@ export default function AdminWaitlistPage() {
     return () => { supabase.removeChannel(ch); };
   }, []);
 
-  async function runTestSignup() {
-    setTesting(true);
-    const stamp = Date.now();
-    // Get current max position from server to avoid stale local state.
-    const { data: maxRow } = await supabase
-      .from("waitlist")
-      .select("position")
-      .order("position", { ascending: false, nullsFirst: false })
-      .limit(1)
-      .maybeSingle();
-    const nextPos = ((maxRow?.position as number | null) ?? 0) + 1;
-    const payload = {
-      email: `test+${stamp}@fynhelp.test`,
-      name: "Admin Test Signup",
-      company_name: "FynHelp QA",
-      phone: `9${String(stamp).slice(-9)}`,
-      company_type: "SaaS & Technology",
-      company_size: "1-10",
-      location: "Bengaluru",
-      position: nextPos,
-    };
-    const { error } = await supabase.from("waitlist").insert(payload);
-    setTesting(false);
-    if (error) { toast.error(`Test signup failed: ${error.message}`); return; }
-    toast.success(`Test entry created (${payload.email})`);
-    // realtime will refresh; trigger an immediate reload too in case the channel is slow.
-    reloadAllRef.current();
-  }
-
   // Pagination math
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -357,13 +327,10 @@ export default function AdminWaitlistPage() {
             Waitlist
           </h1>
           <p style={{ fontFamily: "Roboto, sans-serif", fontSize: 14, color: "hsl(var(--fyn-ink) / 0.6)", marginTop: 4 }}>
-            Manage early-access signups from the public waitlist form.
+            Early-access signups collected before launch. Export them or mark people as contacted.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={runTestSignup} disabled={testing} style={btnGhost} title="Insert a fake waitlist row to verify the live pipeline">
-            <Beaker size={16} className={testing ? "animate-pulse" : ""} /> {testing ? "Testing…" : "Test signup"}
-          </button>
           <button onClick={() => reloadAllRef.current()} disabled={loading} style={btnGhost} aria-label="Refresh">
             <RefreshCw size={16} className={loading ? "animate-spin" : ""} /> Refresh
           </button>
@@ -692,11 +659,11 @@ function AuthStatusBanner({
   } else if (!loading && rowCount === 0) {
     tone = "warn"; Icon = ShieldAlert;
     title = `Authorized as ${user.email ?? user.id} (${roles.join(", ") || "admin"}), but the table is empty`;
-    detail = "The query succeeded with 0 rows. Click \"Test signup\" to insert a row and confirm the live pipeline end-to-end.";
+    detail = "No one has joined the waitlist yet.";
   } else {
     tone = "ok"; Icon = ShieldCheck;
     title = `Authorized as ${user.email ?? user.id} (${roles.join(", ") || "admin"})`;
-    detail = `Reading from Lovable Cloud · ${rowCount} ${rowCount === 1 ? "row" : "rows"} loaded · realtime subscription active.`;
+    detail = `${rowCount} ${rowCount === 1 ? "row" : "rows"} loaded · realtime subscription active.`;
   }
 
   const palette =

@@ -1,8 +1,8 @@
 /**
  * Admin sign-in: password (checked and counted on the server, 5 failures lock
- * the account for 15 minutes), then a 6-digit code from an authenticator app.
- * The first sign-in sets the authenticator up with a QR code. Only after the
- * code does the server open an admin session.
+ * the account for 15 minutes). An admin who has an authenticator set up also
+ * enters its 6-digit code. With ADMIN_REQUIRE_MFA=true every admin must set
+ * one up first. Only then does the server open an admin session.
  */
 import { FormEvent, useEffect, useState } from "react";
 import { Eye, EyeOff, ShieldCheck, Lock } from "lucide-react";
@@ -30,6 +30,7 @@ export default function AdminLoginPage() {
   const [factorId, setFactorId] = useState<string | null>(null);
   const [qr, setQr] = useState<string | null>(null);
   const [secret, setSecret] = useState<string | null>(null);
+  const [mfaRequired, setMfaRequired] = useState(false);
 
   const { pathname } = useLocation();
   useEffect(() => {
@@ -47,7 +48,10 @@ export default function AdminLoginPage() {
 
   useEffect(() => {
     adminNetworkCheck()
-      .then((r) => !r.allowed && setStep("blocked"))
+      .then((r) => {
+        if (!r.allowed) setStep("blocked");
+        setMfaRequired(!!r.mfaRequired);
+      })
       .catch(() => null);
     // Already fully signed in (password, code and a live admin session)? Go straight in.
     adminWhoAmI()
@@ -62,6 +66,13 @@ export default function AdminLoginPage() {
     if (verified) {
       setFactorId(verified.id);
       setStep("verify");
+      return;
+    }
+    if (!mfaRequired) {
+      // Two-step sign-in is optional: no authenticator set up, so the password is enough.
+      for (const f of data.all.filter((f) => f.status !== "verified")) await supabase.auth.mfa.unenroll({ factorId: f.id });
+      await adminStartSession();
+      nav("/admin/control", { replace: true });
       return;
     }
     // Clear a half-finished setup from an earlier attempt, then start a fresh one.

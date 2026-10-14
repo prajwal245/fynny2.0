@@ -29,6 +29,7 @@ import FynLogo from "@/components/FynLogo";
 import { SiteFooter } from "@/components/site/SiteShell";
 import ProductShot from "@/components/site/ProductShot";
 import { CurrencySwitch, localize, money, useCurrency } from "@/lib/currency";
+import { PLANS as BILLING_PLANS } from "@/lib/practice/billing/plans";
 
 /* ─────────────────────────────────────────────────────────
    FynHelp homepage — editorial fintech layout
@@ -320,11 +321,15 @@ const FEATURES = [
   { icon: Link2, t: "Source-linked numbers", d: "Every figure traces back to source, so even small practices can deliver records clients trust." },
 ];
 
+// Every figure here is measured or computed, not estimated. Speed: the public
+// sample files through the real extract → recon → MIS code, no AI
+// (tests/unit/practice/sample-benchmark.test.ts). Price: the Scale plan.
+const PER_CLIENT_FROM = Math.min(...Object.values(BILLING_PLANS).map((p) => p.monthly / p.clientsIncluded));
 const TILES = [
-  { cls: "m", badge: "Pricing", fig: "Per entity", cap: "Never per seat. Add your whole team, every role, at no extra cost." },
-  { cls: "d", badge: "Matching", fig: "5 passes", cap: "Exact, same-day, fuzzy, your firm\u2019s rules, then split payments. Only the rest reach a person." },
-  { cls: "c", badge: "Traceability", fig: "Every figure", cap: "Open any MIS number to see the bank and book lines behind it." },
-  { cls: "g", badge: "Indian rules", fig: "GST \u00b7 TDS", cap: "GSTIN check digits, TDS rates and statutory due dates checked on the registers you upload." },
+  { cls: "m", badge: "Time saved", fig: "< 1 sec", cap: "To reconcile a client-month and draft its MIS figures, from file to numbers. Measured on our sample files: under 0.4 s each." },
+  { cls: "d", badge: "Automation", fig: "4 agents", cap: "Collect, read, reconcile and draft the MIS on their own, in 5 matching passes. Your team only sees the exceptions, each with a reason." },
+  { cls: "c", badge: "AI-native", fig: "100%", cap: "of MIS figures computed in code and linked to the bank and book lines behind them. AI reads the documents and writes the commentary." },
+  { cls: "g", badge: "More revenue", fig: "PRICE", cap: "a client a month on Scale, GST included. Offer a monthly MIS to every client and grow fees without adding staff." },
 ];
 
 const PROBLEMS = [
@@ -455,10 +460,10 @@ export default function HomePage() {
         <div className="fh-wrap">
           <Reveal>
             <div className="fh-statement">
-              <span className="fh-kicker">Our promise</span>
+              <span className="fh-kicker">What it does for your firm</span>
               <p>
-                Connect the dots between the documents your clients send{" "}
-                <em>and the close your firm signs off on.</em>
+                Less time on matching, less effort chasing,{" "}
+                <em>and more clients closed by the same team.</em>
               </p>
             </div>
           </Reveal>
@@ -469,7 +474,7 @@ export default function HomePage() {
                 <div className={`fh-tile ${t.cls}`}>
                   <span className="badge">{t.badge}</span>
                   <div>
-                    <div className="fig num">{t.fig}</div>
+                    <div className="fig num">{t.fig === "PRICE" ? money(PER_CLIENT_FROM, cur) : t.fig}</div>
                     <div className="cap" style={{ marginTop: 8 }}>{t.cap}</div>
                   </div>
                 </div>

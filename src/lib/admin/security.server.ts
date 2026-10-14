@@ -55,6 +55,11 @@ export function clientIp(req: Request | undefined = getRequest()): string {
   return ip.replace(/^::ffff:/, "");
 }
 
+/** Two-step sign-in for every admin, only when ADMIN_REQUIRE_MFA=true. Off by default. */
+export function mfaRequired(): boolean {
+  return (process.env["ADMIN_REQUIRE_MFA"] ?? "").toLowerCase() === "true";
+}
+
 export function networkAllowed(ip: string): boolean {
   const list = process.env["ADMIN_IP_ALLOWLIST"]?.trim();
   if (!list) return true;
@@ -207,7 +212,7 @@ export async function startAdminSession(userId: string, claims: Claims) {
   const db = await adminDb();
   const roles = await rolesOf(db, userId);
   if (!roles.length) throw new AdminDenied("not_admin", "This account is not an admin.");
-  if (claims.aal !== "aal2") throw new AdminDenied("mfa_required", "Enter the code from your authenticator app to continue.");
+  if (mfaRequired() && claims.aal !== "aal2") throw new AdminDenied("mfa_required", "Enter the code from your authenticator app to continue.");
   const ua = getRequest()?.headers.get("user-agent")?.slice(0, 300) ?? null;
   const { data, error } = await db
     .from("admin_sessions")
@@ -237,7 +242,7 @@ export async function requireAdmin(userId: string, claims: Claims, perm: Permiss
   const db = await adminDb();
   const roles = await rolesOf(db, userId);
   if (!roles.length) throw new AdminDenied("not_admin", "This account is not an admin.");
-  if (claims.aal !== "aal2") throw new AdminDenied("mfa_required", "Enter the code from your authenticator app to continue.");
+  if (mfaRequired() && claims.aal !== "aal2") throw new AdminDenied("mfa_required", "Enter the code from your authenticator app to continue.");
   const sessionId = await verify(getCookie(COOKIE));
   if (!sessionId) throw new AdminDenied("session", "Your admin session has ended. Sign in again.");
   const { data: s } = await db

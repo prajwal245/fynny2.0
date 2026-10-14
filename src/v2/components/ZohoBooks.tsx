@@ -184,7 +184,7 @@ export function ZohoBooksSection() {
                 />
                 <button
                   className="v2-btn v2-btn-primary"
-                  style={{ padding: "6px 12px", fontSize: 12.5 }}
+                  style={{ padding: "6px 12px", fontSize: 12.5, whiteSpace: "nowrap" }}
                   disabled={busy === `sync:${l.id}`}
                   data-testid="zoho-sync"
                   onClick={() =>

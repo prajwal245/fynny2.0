@@ -29,6 +29,7 @@ import { Route as MainOnboardingRouteImport } from './routes/_main/onboarding'
 import { Route as MainPipelineRouteImport } from './routes/_main/pipeline'
 import { Route as MainPricingRouteImport } from './routes/_main/pricing'
 import { Route as MainPrivacyRouteImport } from './routes/_main/privacy'
+import { Route as MainRefundPolicyRouteImport } from './routes/_main/refund-policy'
 import { Route as MainResetPasswordRouteImport } from './routes/_main/reset-password'
 import { Route as MainResourcesRouteImport } from './routes/_main/resources'
 import { Route as MainSecurityRouteImport } from './routes/_main/security'
@@ -300,6 +301,11 @@ const MainPricingRoute = MainPricingRouteImport.update({
 const MainPrivacyRoute = MainPrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => MainRoute,
+} as any)
+const MainRefundPolicyRoute = MainRefundPolicyRouteImport.update({
+  id: '/refund-policy',
+  path: '/refund-policy',
   getParentRoute: () => MainRoute,
 } as any)
 const MainResetPasswordRoute = MainResetPasswordRouteImport.update({
@@ -1297,6 +1303,7 @@ export interface FileRoutesByFullPath {
   '/pipeline': typeof MainPipelineRoute
   '/pricing': typeof MainPricingRoute
   '/privacy': typeof MainPrivacyRoute
+  '/refund-policy': typeof MainRefundPolicyRoute
   '/reset-password': typeof MainResetPasswordRoute
   '/resources': typeof MainResourcesRoute
   '/security': typeof MainSecurityRoute
@@ -1489,6 +1496,7 @@ export interface FileRoutesByTo {
   '/pipeline': typeof MainPipelineRoute
   '/pricing': typeof MainPricingRoute
   '/privacy': typeof MainPrivacyRoute
+  '/refund-policy': typeof MainRefundPolicyRoute
   '/reset-password': typeof MainResetPasswordRoute
   '/resources': typeof MainResourcesRoute
   '/security': typeof MainSecurityRoute
@@ -1685,6 +1693,7 @@ export interface FileRoutesById {
   '/_main/pipeline': typeof MainPipelineRoute
   '/_main/pricing': typeof MainPricingRoute
   '/_main/privacy': typeof MainPrivacyRoute
+  '/_main/refund-policy': typeof MainRefundPolicyRoute
   '/_main/reset-password': typeof MainResetPasswordRoute
   '/_main/resources': typeof MainResourcesRoute
   '/_main/security': typeof MainSecurityRoute
@@ -1882,6 +1891,7 @@ export interface FileRouteTypes {
     | '/pipeline'
     | '/pricing'
     | '/privacy'
+    | '/refund-policy'
     | '/reset-password'
     | '/resources'
     | '/security'
@@ -2074,6 +2084,7 @@ export interface FileRouteTypes {
     | '/pipeline'
     | '/pricing'
     | '/privacy'
+    | '/refund-policy'
     | '/reset-password'
     | '/resources'
     | '/security'
@@ -2269,6 +2280,7 @@ export interface FileRouteTypes {
     | '/_main/pipeline'
     | '/_main/pricing'
     | '/_main/privacy'
+    | '/_main/refund-policy'
     | '/_main/reset-password'
     | '/_main/resources'
     | '/_main/security'
@@ -2620,6 +2632,13 @@ declare module '@tanstack/react-router' {
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof MainPrivacyRouteImport
+      parentRoute: typeof MainRoute
+    }
+    '/_main/refund-policy': {
+      id: '/_main/refund-policy'
+      path: '/refund-policy'
+      fullPath: '/refund-policy'
+      preLoaderRoute: typeof MainRefundPolicyRouteImport
       parentRoute: typeof MainRoute
     }
     '/_main/reset-password': {
@@ -4250,6 +4269,7 @@ interface MainRouteChildren {
   MainPipelineRoute: typeof MainPipelineRoute
   MainPricingRoute: typeof MainPricingRoute
   MainPrivacyRoute: typeof MainPrivacyRoute
+  MainRefundPolicyRoute: typeof MainRefundPolicyRoute
   MainResetPasswordRoute: typeof MainResetPasswordRoute
   MainResourcesRoute: typeof MainResourcesRoute
   MainSecurityRoute: typeof MainSecurityRoute
@@ -4274,6 +4294,7 @@ const MainRouteChildren: MainRouteChildren = {
   MainPipelineRoute: MainPipelineRoute,
   MainPricingRoute: MainPricingRoute,
   MainPrivacyRoute: MainPrivacyRoute,
+  MainRefundPolicyRoute: MainRefundPolicyRoute,
   MainResetPasswordRoute: MainResetPasswordRoute,
   MainResourcesRoute: MainResourcesRoute,
   MainSecurityRoute: MainSecurityRoute,

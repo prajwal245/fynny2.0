@@ -132,3 +132,35 @@ export function planAmountPaise(plan: PlanKey, cycle: Cycle, gstPercent = 0): nu
   const gst = Number.isFinite(gstPercent) && gstPercent > 0 ? gstPercent : 0;
   return Math.round(rupees * 100 * (1 + gst / 100));
 }
+
+const RANK: Record<PlanKey, number> = { starter: 0, professional: 1, scale: 2 };
+
+/**
+ * When a plan change takes effect (Refund and Cancellation Policy, clause 5):
+ * a higher plan at once, with Razorpay charging the pro-rated difference; a
+ * lower plan, or the same plan on another cycle, from the next renewal.
+ */
+export function changeTiming(from: { plan: PlanKey; cycle: Cycle }, to: { plan: PlanKey; cycle: Cycle }): "same" | "now" | "renewal" {
+  if (from.plan === to.plan && from.cycle === to.cycle) return "same";
+  return RANK[to.plan] > RANK[from.plan] ? "now" : "renewal";
+}
+
+export const REFUND_WINDOW_DAYS = 7;
+
+/**
+ * The once-only full refund on a first annual payment cancelled within seven
+ * days (clause 4.2). Returns when the window closes, or null when it does not apply.
+ */
+export function refundWindowEnd(
+  b: { first_paid_at?: string | null; first_paid_cycle?: string | null; first_payment_id?: string | null; refund_used?: boolean | null },
+  now: Date = new Date(),
+): Date | null {
+  if (b.refund_used || b.first_paid_cycle !== "annual" || !b.first_paid_at || !b.first_payment_id) return null;
+  const end = new Date(new Date(b.first_paid_at).getTime() + REFUND_WINDOW_DAYS * DAY);
+  return end.getTime() > now.getTime() ? end : null;
+}
+
+/** GSTIN: 2-digit state code, PAN, entity number, Z, check character. */
+export function validGstin(s: string): boolean {
+  return /^[0-3][0-9][A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(s.trim().toUpperCase());
+}

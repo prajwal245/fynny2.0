@@ -21,6 +21,7 @@ export const INDEXABLE_PAGES: { path: string; changefreq: "weekly" | "monthly" |
   { path: "/blog", changefreq: "weekly", priority: "0.7" },
   { path: "/privacy", changefreq: "yearly", priority: "0.2" },
   { path: "/terms", changefreq: "yearly", priority: "0.2" },
+  { path: "/refund-policy", changefreq: "yearly", priority: "0.2" },
 ];
 
 export type PublishedPost = { slug: string; updated_at: string | null; published_at: string | null };

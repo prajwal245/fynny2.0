@@ -1,295 +1,181 @@
 /**
- * Terms of Service and Privacy Policy. Written to match what the product
- * actually does: which data it reads, where it goes, and what a firm can
- * ask us to delete. Review with counsel before changing the substance.
+ * Terms and Conditions, Privacy Policy, and Refund and Cancellation Policy.
+ * The text comes from the signed-off Word documents (src/content/legal); this
+ * file only lays it out. Change the substance in the documents, not here.
  */
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { Link } from "@/lib/router-compat";
 import SiteShell, { PageHero } from "@/components/site/SiteShell";
 import { C } from "@/components/site/siteTheme";
+import type { LegalBlock, LegalDoc } from "@/content/legal/types";
+import { fillCompany } from "@/content/legal/company";
+import { TERMS } from "@/content/legal/terms";
+import { PRIVACY } from "@/content/legal/privacy";
+import { REFUND } from "@/content/legal/refund";
 
-const UPDATED = "1 October 2026";
+const DOC_LINKS: Record<string, string> = {
+  "Terms and Conditions of Service": "/terms",
+  "Privacy Policy": "/privacy",
+  "Refund and Cancellation Policy": "/refund-policy",
+};
 
-function Prose({ children }: { children: ReactNode }) {
+/** Plain text with emails and the other policies turned into links. */
+function Rich({ text, self }: { text: string; self: string }) {
+  const filled = fillCompany(text);
+  const parts = filled.split(/([\w.+-]+@fynhelp\.com|Terms and Conditions of Service|Privacy Policy|Refund and Cancellation Policy)/g);
   return (
-    <section className="fh-sec" style={{ paddingTop: 0 }}>
-      <div className="fh-wrap">
-        <article
-          className="fh-legal"
-          style={{
-            maxWidth: 760,
-            color: C.body,
-            fontSize: 15.5,
-            lineHeight: 1.75,
-          }}
-        >
-          <style>{`
-            .fh-legal h2 { font-size: 21px; margin: 36px 0 10px !important; color: ${C.ink}; letter-spacing: -0.01em; }
-            .fh-legal p, .fh-legal li { margin: 0 0 12px; }
-            .fh-legal ul { padding-left: 20px; list-style: disc; }
-            .fh-legal a { color: ${C.ink}; text-decoration: underline; }
-            .fh-legal table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 8px 0 16px; }
-            .fh-legal th, .fh-legal td { text-align: left; padding: 8px 10px; border-bottom: 1px solid rgba(0,0,0,.08); vertical-align: top; }
-          `}</style>
-          <p style={{ fontSize: 13, opacity: 0.75 }}>Last updated {UPDATED}</p>
-          {children}
-        </article>
-      </div>
-    </section>
+    <>
+      {parts.map((p, i) => {
+        if (/@fynhelp\.com$/.test(p)) return <a key={i} href={`mailto:${p}`}>{p}</a>;
+        const href = DOC_LINKS[p];
+        if (href && href !== self) return <Link key={i} to={href}>{p}</Link>;
+        return <Fragment key={i}>{p}</Fragment>;
+      })}
+    </>
   );
 }
 
-export function PrivacyPage() {
+/** A definition such as “Client” means … : the defined term in bold. */
+function Defined({ text, self }: { text: string; self: string }) {
+  const m = /^(“[^”]+”)(.*)$/s.exec(text);
+  if (!m) return <Rich text={text} self={self} />;
   return (
-    <SiteShell>
-      <PageHero
-        kicker="Legal"
-        title="Privacy"
-        italic="policy"
-        sub="What FynHelp reads, why, where it is stored and how to have it deleted."
-      />
-      <Prose>
-        <p>
-          FynHelp Technologies (“FynHelp”, “we”) provides a practice workspace
-          for chartered accountancy firms. This policy explains how we handle
-          personal data when a firm (“you”) uses FynHelp, in line with the
-          Digital Personal Data Protection Act, 2023. For the documents a firm
-          uploads about its own clients, the firm decides why and how that data
-          is processed and FynHelp processes it only on the firm’s instructions.
-        </p>
+    <>
+      <strong>{m[1]}</strong>
+      <Rich text={m[2]} self={self} />
+    </>
+  );
+}
 
-        <h2>What we collect</h2>
-        <ul>
-          <li>
-            <b>Account data:</b> name, work email, firm name, membership number
-            (optional) and team roles.
-          </li>
-          <li>
-            <b>Client records you create:</b> client names, contacts, GSTIN/PAN
-            and other details you enter.
-          </li>
-          <li>
-            <b>Documents you send us:</b> bank statements, ledger exports,
-            invoices and photos uploaded by your team, forwarded through a
-            connected Gmail inbox, or sent on WhatsApp, and the transactions we
-            extract from them.
-          </li>
-          <li>
-            <b>Usage data:</b> sign-in events, agent runs and actions taken in
-            the product, kept as an audit trail.
-          </li>
-        </ul>
+function Block({ b, self }: { b: LegalBlock; self: string }) {
+  switch (b.t) {
+    case "h":
+      return (
+        <h2 id={`s${b.n}`}>
+          <span className="fh-legal-n">{b.n}.</span> {fillCompany(b.text)}
+        </h2>
+      );
+    case "c":
+      return (
+        <div className={b.sub ? "fh-legal-c fh-legal-sub" : "fh-legal-c"}>
+          <span className="fh-legal-n">{b.n}</span>
+          <p>
+            {b.lead && <strong>{fillCompany(b.lead)} </strong>}
+            {b.sub ? <Defined text={b.text} self={self} /> : <Rich text={b.text} self={self} />}
+          </p>
+        </div>
+      );
+    case "p":
+      return <p className={b.strong ? "fh-legal-lede" : undefined}><Rich text={b.text} self={self} /></p>;
+    case "table":
+      return (
+        <div className="fh-legal-table">
+          <table>
+            <thead><tr>{b.head.map((h, i) => <th key={i}>{fillCompany(h)}</th>)}</tr></thead>
+            <tbody>
+              {b.rows.map((r, i) => (
+                <tr key={i}>{r.map((c, j) => <td key={j}><Rich text={c} self={self} /></td>)}</tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    case "kv":
+      return (
+        <dl className="fh-legal-kv">
+          {b.rows.map(([k, v], i) => (
+            <Fragment key={i}>
+              <dt>{k}</dt>
+              <dd><Rich text={v} self={self} /></dd>
+            </Fragment>
+          ))}
+        </dl>
+      );
+  }
+}
 
-        <h2>How we use it</h2>
-        <ul>
-          <li>
-            To read documents into transactions, match bank to books, draft MIS
-            reports and send the follow-ups you set up.
-          </li>
-          <li>
-            To keep an audit trail so every number can be traced to its source.
-          </li>
-          <li>
-            To operate, secure and support the service. We do not sell personal
-            data and we do not use your documents to train AI models.
-          </li>
-        </ul>
-
-        <h2>Gmail</h2>
-        <p>
-          If you connect Gmail, FynHelp requests read-only access (
-          <code>gmail.readonly</code>) to find emails from your clients that
-          carry attachments, and stores those attachments as documents in your
-          workspace. We do not send, delete or modify email. FynHelp’s use and
-          transfer of information received from Google APIs adheres to the{" "}
-          <a
-            href="https://developers.google.com/terms/api-services-user-data-policy"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Google API Services User Data Policy
-          </a>
-          , including the Limited Use requirements. Gmail data is not used for
-          advertising, is not sold, and is not read by people except with your
-          permission, for security, or where the law requires it. You can
-          disconnect Gmail at any time from Settings, and revoke access from
-          your Google account.
-        </p>
-
-        <h2>Service providers</h2>
-        <p>
-          We use these providers to run FynHelp. Each receives only what it
-          needs for its task.
-        </p>
-        <table>
-          <thead>
-            <tr>
-              <th>Provider</th>
-              <th>Purpose</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>Supabase</td>
-              <td>Database, authentication and file storage</td>
-            </tr>
-            <tr>
-              <td>Vercel</td>
-              <td>Application hosting</td>
-            </tr>
-            <tr>
-              <td>Google (Gemini), Groq</td>
-              <td>Reading document text that cannot be parsed directly</td>
-            </tr>
-            <tr>
-              <td>OCR.space</td>
-              <td>Text recognition for scanned PDFs and photos</td>
-            </tr>
-            <tr>
-              <td>Resend</td>
-              <td>Sending account and follow-up emails</td>
-            </tr>
-            <tr>
-              <td>Meta (WhatsApp Business), if enabled</td>
-              <td>Receiving documents and sending follow-ups on WhatsApp</td>
-            </tr>
-          </tbody>
-        </table>
-        <p>
-          Some of these providers process data outside India. We rely on their
-          contractual commitments to protect it.
-        </p>
-
-        <h2>Security</h2>
-        <p>
-          Data is encrypted in transit and at rest. Every firm’s data is
-          isolated at the database level, files are stored in private buckets
-          and shared only through short-lived links, and team members see only
-          their own firm. See <Link to="/security">Security</Link> for more.
-        </p>
-
-        <h2>Retention and deletion</h2>
-        <p>
-          We keep your data while your firm’s account is active. A partner can
-          ask us to export or delete the firm’s data by writing to{" "}
-          <a href="mailto:support@fynhelp.com">support@fynhelp.com</a>; we
-          complete deletion within 30 days, except for records the law requires
-          us to keep.
-        </p>
-
-        <h2>Your rights</h2>
-        <p>
-          You can ask to access, correct or erase your personal data, or
-          withdraw consent, by writing to{" "}
-          <a href="mailto:support@fynhelp.com">support@fynhelp.com</a>. If your
-          firm’s client asks about their data, we will help the firm respond.
-          You may also complain to the Data Protection Board of India.
-        </p>
-
-        <h2>Contact</h2>
-        <p>
-          Grievance officer, FynHelp Technologies, Bengaluru, India ·{" "}
-          <a href="mailto:support@fynhelp.com">support@fynhelp.com</a>
-        </p>
-      </Prose>
-    </SiteShell>
+function LegalDocument({ doc, self, children }: { doc: LegalDoc; self: string; children?: ReactNode }) {
+  const heads = doc.blocks.filter((b): b is Extract<LegalBlock, { t: "h" }> => b.t === "h");
+  return (
+    <section className="fh-sec" style={{ paddingTop: 0 }}>
+      <div className="fh-wrap">
+        <style>{`
+          .fh-legal-grid { display: grid; grid-template-columns: 220px minmax(0, 760px); gap: 48px; align-items: start; }
+          .fh-legal-toc { position: sticky; top: 96px; font-size: 13.5px; line-height: 1.5; }
+          .fh-legal-toc p { font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase; color: ${C.body}; opacity: .7; margin: 0 0 10px; font-weight: 600; }
+          .fh-legal-toc ol { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+          .fh-legal-toc a { color: ${C.body}; text-decoration: none; }
+          .fh-legal-toc a:hover { color: ${C.ink}; text-decoration: underline; }
+          .fh-legal { color: ${C.body}; font-size: 15.5px; line-height: 1.75; }
+          .fh-legal h2 { font-size: 20px; margin: 40px 0 12px !important; color: ${C.ink}; letter-spacing: -0.01em; scroll-margin-top: 90px; }
+          .fh-legal p { margin: 0 0 12px; }
+          .fh-legal a { color: ${C.ink}; text-decoration: underline; text-underline-offset: 2px; }
+          .fh-legal strong { color: ${C.ink}; }
+          .fh-legal-n { color: ${C.ink}; font-variant-numeric: tabular-nums; font-weight: 600; }
+          .fh-legal-c { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 4px; }
+          .fh-legal-c > .fh-legal-n { font-size: 14px; padding-top: 2px; }
+          .fh-legal-sub { margin-left: 44px; grid-template-columns: 34px minmax(0, 1fr); }
+          .fh-legal-sub > .fh-legal-n { font-weight: 500; }
+          .fh-legal-lede { color: ${C.ink}; }
+          .fh-legal-table { overflow-x: auto; margin: 8px 0 18px; }
+          .fh-legal table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 520px; }
+          .fh-legal th { text-align: left; padding: 10px 12px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: ${C.ink}; border-bottom: 1.5px solid rgba(0,0,0,.18); }
+          .fh-legal td { text-align: left; padding: 10px 12px; border-bottom: 1px solid rgba(0,0,0,.08); vertical-align: top; }
+          .fh-legal-kv { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 6px 16px; margin: 8px 0 18px 44px; padding: 16px 18px; border: 1px solid rgba(0,0,0,.08); border-radius: 12px; font-size: 14.5px; }
+          .fh-legal-kv dt { color: ${C.body}; opacity: .75; }
+          .fh-legal-kv dd { margin: 0; color: ${C.ink}; }
+          .fh-legal-meta { font-size: 13px; opacity: .75; margin-bottom: 20px !important; }
+          @media (max-width: 900px) {
+            .fh-legal-grid { grid-template-columns: minmax(0, 1fr); gap: 0; }
+            .fh-legal-toc { display: none; }
+            .fh-legal-sub { margin-left: 16px; }
+            .fh-legal-kv { margin-left: 0; grid-template-columns: minmax(0, 1fr); }
+            .fh-legal-kv dd { margin-bottom: 8px; }
+          }
+        `}</style>
+        <div className="fh-legal-grid">
+          <nav className="fh-legal-toc" aria-label="Sections">
+            <p>Contents</p>
+            <ol>
+              {heads.map((h) => (
+                <li key={h.n}><a href={`#s${h.n}`}>{h.n}. {h.text}</a></li>
+              ))}
+            </ol>
+          </nav>
+          <article className="fh-legal">
+            <p className="fh-legal-meta">Last updated {doc.updated} · Version {doc.version}</p>
+            {doc.blocks.map((b, i) => <Block key={i} b={b} self={self} />)}
+            {children}
+          </article>
+        </div>
+      </div>
+    </section>
   );
 }
 
 export function TermsPage() {
   return (
     <SiteShell>
-      <PageHero
-        kicker="Legal"
-        title="Terms of"
-        italic="service"
-        sub="The agreement between your firm and FynHelp."
-      />
-      <Prose>
-        <p>
-          These terms govern your firm’s use of FynHelp. By creating an account
-          you accept them on behalf of your firm and confirm you are authorised
-          to do so.
-        </p>
+      <PageHero kicker="Legal" title="Terms and" italic="conditions" sub="The agreement between your firm and FynHelp for using the service." />
+      <LegalDocument doc={TERMS} self="/terms" />
+    </SiteShell>
+  );
+}
 
-        <h2>The service</h2>
-        <p>
-          FynHelp reads financial documents, matches transactions, drafts
-          reports and sends follow-ups for your firm. Its agents are tools that
-          assist your team: they do not provide accounting, audit, tax or legal
-          advice, and they do not replace professional judgement. Unsure lines
-          and exceptions are sent to your team for review, and a report is final
-          only after a partner signs it off.
-        </p>
+export function PrivacyPage() {
+  return (
+    <SiteShell>
+      <PageHero kicker="Legal" title="Privacy" italic="policy" sub="What FynHelp collects, why, who processes it, how long it is kept and your rights over it." />
+      <LegalDocument doc={PRIVACY} self="/privacy" />
+    </SiteShell>
+  );
+}
 
-        <h2>Your responsibilities</h2>
-        <ul>
-          <li>
-            Keep sign-in details secure and give access only to your team.
-          </li>
-          <li>
-            Upload or connect only data you are entitled to process, with any
-            consent your clients need to give.
-          </li>
-          <li>
-            Review extracted figures, matches and reports before relying on them
-            or sharing them.
-          </li>
-          <li>
-            Do not misuse the service, attempt to reach other firms’ data, or
-            overload or reverse-engineer it.
-          </li>
-        </ul>
-
-        <h2>Your data</h2>
-        <p>
-          Your firm owns the data it puts into FynHelp. You give us permission
-          to process it only to provide the service, as described in our{" "}
-          <Link to="/privacy">Privacy policy</Link>. You can export it or ask us
-          to delete it at any time.
-        </p>
-
-        <h2>Plans and fees</h2>
-        <p>
-          Paid plans are billed per client entity as shown on our pricing page
-          or in your order. Fees exclude taxes. We will give 30 days’ notice of
-          any price change for an existing plan.
-        </p>
-
-        <h2>Availability and changes</h2>
-        <p>
-          We work to keep FynHelp available and to fix problems promptly, but
-          the service is provided “as is” and may occasionally be interrupted
-          for maintenance. We may improve or change features; we will tell you
-          in advance about any change that materially reduces what you rely on.
-        </p>
-
-        <h2>Liability</h2>
-        <p>
-          To the extent the law allows, FynHelp is not liable for indirect or
-          consequential losses, and our total liability for any claim is limited
-          to the fees your firm paid in the 12 months before the claim.
-        </p>
-
-        <h2>Ending the agreement</h2>
-        <p>
-          You can stop using FynHelp at any time. We may suspend an account that
-          breaches these terms after notice, or immediately where needed to
-          protect other users. On closure you can export your data for 30 days
-          before it is deleted.
-        </p>
-
-        <h2>Law</h2>
-        <p>
-          These terms are governed by the laws of India, and the courts of
-          Bengaluru have jurisdiction.
-        </p>
-
-        <h2>Contact</h2>
-        <p>
-          <a href="mailto:support@fynhelp.com">support@fynhelp.com</a>
-        </p>
-      </Prose>
+export function RefundPage() {
+  return (
+    <SiteShell>
+      <PageHero kicker="Legal" title="Refund and" italic="cancellation" sub="How to cancel a FynHelp subscription, and when and how money is refunded." />
+      <LegalDocument doc={REFUND} self="/refund-policy" />
     </SiteShell>
   );
 }

@@ -7,7 +7,7 @@ export const Route = createFileRoute("/_main/privacy")({
     seo({
       title: "Privacy policy",
       description:
-        "What FynHelp collects from CA firms, why, which providers process it, how Gmail data is used under Google's Limited Use rules, and how to have it deleted.",
+        "How FynHelp handles personal data under the DPDP Act and IT Act: what we collect, why, our sub-processors, Google API Limited Use, retention, security, breaches and your rights.",
       path: "/privacy",
       jsonLd: [breadcrumbLd([{ name: "Privacy policy", path: "/privacy" }])],
     }),

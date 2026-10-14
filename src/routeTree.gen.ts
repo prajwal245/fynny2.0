@@ -124,19 +124,26 @@ import { Route as AdminAuthAdminProtectedAiCreditsRouteImport } from './routes/_
 import { Route as AdminAuthAdminProtectedAiMonitoringRouteImport } from './routes/_adminAuth/admin/_protected/ai-monitoring'
 import { Route as AdminAuthAdminProtectedAnalyticsRouteImport } from './routes/_adminAuth/admin/_protected/analytics'
 import { Route as AdminAuthAdminProtectedAuditLogsRouteImport } from './routes/_adminAuth/admin/_protected/audit-logs'
+import { Route as AdminAuthAdminProtectedBillingRouteImport } from './routes/_adminAuth/admin/_protected/billing'
 import { Route as AdminAuthAdminProtectedCaInvitesRouteImport } from './routes/_adminAuth/admin/_protected/ca-invites'
 import { Route as AdminAuthAdminProtectedCaVerificationRouteImport } from './routes/_adminAuth/admin/_protected/ca-verification'
 import { Route as AdminAuthAdminProtectedCeoViewRouteImport } from './routes/_adminAuth/admin/_protected/ceo-view'
 import { Route as AdminAuthAdminProtectedCommunicationsRouteImport } from './routes/_adminAuth/admin/_protected/communications'
 import { Route as AdminAuthAdminProtectedContentRouteImport } from './routes/_adminAuth/admin/_protected/content'
+import { Route as AdminAuthAdminProtectedControlRouteImport } from './routes/_adminAuth/admin/_protected/control'
+import { Route as AdminAuthAdminProtectedCouponsRouteImport } from './routes/_adminAuth/admin/_protected/coupons'
 import { Route as AdminAuthAdminProtectedDashboardRouteImport } from './routes/_adminAuth/admin/_protected/dashboard'
 import { Route as AdminAuthAdminProtectedFeatureFlagsRouteImport } from './routes/_adminAuth/admin/_protected/feature-flags'
+import { Route as AdminAuthAdminProtectedFirmsRouteImport } from './routes/_adminAuth/admin/_protected/firms'
 import { Route as AdminAuthAdminProtectedInternalAccessRouteImport } from './routes/_adminAuth/admin/_protected/internal-access'
 import { Route as AdminAuthAdminProtectedMediaRouteImport } from './routes/_adminAuth/admin/_protected/media'
+import { Route as AdminAuthAdminProtectedOperationsRouteImport } from './routes/_adminAuth/admin/_protected/operations'
 import { Route as AdminAuthAdminProtectedRolesRouteImport } from './routes/_adminAuth/admin/_protected/roles'
+import { Route as AdminAuthAdminProtectedSecurityLogRouteImport } from './routes/_adminAuth/admin/_protected/security-log'
 import { Route as AdminAuthAdminProtectedSettingsRouteImport } from './routes/_adminAuth/admin/_protected/settings'
 import { Route as AdminAuthAdminProtectedSubscriptionsRouteImport } from './routes/_adminAuth/admin/_protected/subscriptions'
 import { Route as AdminAuthAdminProtectedSystemHealthRouteImport } from './routes/_adminAuth/admin/_protected/system-health'
+import { Route as AdminAuthAdminProtectedTeamRouteImport } from './routes/_adminAuth/admin/_protected/team'
 import { Route as AdminAuthAdminProtectedWaitlistRouteImport } from './routes/_adminAuth/admin/_protected/waitlist'
 import { Route as CaAuthCaPortalIndexRouteImport } from './routes/_caAuth/ca/_portal/index'
 import { Route as CaAuthCaPortalAuditTrailRouteImport } from './routes/_caAuth/ca/_portal/audit-trail'
@@ -805,6 +812,12 @@ const AdminAuthAdminProtectedAuditLogsRoute =
     path: '/audit-logs',
     getParentRoute: () => AdminAuthAdminProtectedRoute,
   } as any)
+const AdminAuthAdminProtectedBillingRoute =
+  AdminAuthAdminProtectedBillingRouteImport.update({
+    id: '/billing',
+    path: '/billing',
+    getParentRoute: () => AdminAuthAdminProtectedRoute,
+  } as any)
 const AdminAuthAdminProtectedCaInvitesRoute =
   AdminAuthAdminProtectedCaInvitesRouteImport.update({
     id: '/ca-invites',
@@ -835,6 +848,18 @@ const AdminAuthAdminProtectedContentRoute =
     path: '/content',
     getParentRoute: () => AdminAuthAdminProtectedRoute,
   } as any)
+const AdminAuthAdminProtectedControlRoute =
+  AdminAuthAdminProtectedControlRouteImport.update({
+    id: '/control',
+    path: '/control',
+    getParentRoute: () => AdminAuthAdminProtectedRoute,
+  } as any)
+const AdminAuthAdminProtectedCouponsRoute =
+  AdminAuthAdminProtectedCouponsRouteImport.update({
+    id: '/coupons',
+    path: '/coupons',
+    getParentRoute: () => AdminAuthAdminProtectedRoute,
+  } as any)
 const AdminAuthAdminProtectedDashboardRoute =
   AdminAuthAdminProtectedDashboardRouteImport.update({
     id: '/dashboard',
@@ -845,6 +870,12 @@ const AdminAuthAdminProtectedFeatureFlagsRoute =
   AdminAuthAdminProtectedFeatureFlagsRouteImport.update({
     id: '/feature-flags',
     path: '/feature-flags',
+    getParentRoute: () => AdminAuthAdminProtectedRoute,
+  } as any)
+const AdminAuthAdminProtectedFirmsRoute =
+  AdminAuthAdminProtectedFirmsRouteImport.update({
+    id: '/firms',
+    path: '/firms',
     getParentRoute: () => AdminAuthAdminProtectedRoute,
   } as any)
 const AdminAuthAdminProtectedInternalAccessRoute =
@@ -859,10 +890,22 @@ const AdminAuthAdminProtectedMediaRoute =
     path: '/media',
     getParentRoute: () => AdminAuthAdminProtectedRoute,
   } as any)
+const AdminAuthAdminProtectedOperationsRoute =
+  AdminAuthAdminProtectedOperationsRouteImport.update({
+    id: '/operations',
+    path: '/operations',
+    getParentRoute: () => AdminAuthAdminProtectedRoute,
+  } as any)
 const AdminAuthAdminProtectedRolesRoute =
   AdminAuthAdminProtectedRolesRouteImport.update({
     id: '/roles',
     path: '/roles',
+    getParentRoute: () => AdminAuthAdminProtectedRoute,
+  } as any)
+const AdminAuthAdminProtectedSecurityLogRoute =
+  AdminAuthAdminProtectedSecurityLogRouteImport.update({
+    id: '/security-log',
+    path: '/security-log',
     getParentRoute: () => AdminAuthAdminProtectedRoute,
   } as any)
 const AdminAuthAdminProtectedSettingsRoute =
@@ -881,6 +924,12 @@ const AdminAuthAdminProtectedSystemHealthRoute =
   AdminAuthAdminProtectedSystemHealthRouteImport.update({
     id: '/system-health',
     path: '/system-health',
+    getParentRoute: () => AdminAuthAdminProtectedRoute,
+  } as any)
+const AdminAuthAdminProtectedTeamRoute =
+  AdminAuthAdminProtectedTeamRouteImport.update({
+    id: '/team',
+    path: '/team',
     getParentRoute: () => AdminAuthAdminProtectedRoute,
   } as any)
 const AdminAuthAdminProtectedWaitlistRoute =
@@ -1397,19 +1446,26 @@ export interface FileRoutesByFullPath {
   '/admin/ai-monitoring': typeof AdminAuthAdminProtectedAiMonitoringRoute
   '/admin/analytics': typeof AdminAuthAdminProtectedAnalyticsRoute
   '/admin/audit-logs': typeof AdminAuthAdminProtectedAuditLogsRoute
+  '/admin/billing': typeof AdminAuthAdminProtectedBillingRoute
   '/admin/ca-invites': typeof AdminAuthAdminProtectedCaInvitesRoute
   '/admin/ca-verification': typeof AdminAuthAdminProtectedCaVerificationRoute
   '/admin/ceo-view': typeof AdminAuthAdminProtectedCeoViewRoute
   '/admin/communications': typeof AdminAuthAdminProtectedCommunicationsRoute
   '/admin/content': typeof AdminAuthAdminProtectedContentRoute
+  '/admin/control': typeof AdminAuthAdminProtectedControlRoute
+  '/admin/coupons': typeof AdminAuthAdminProtectedCouponsRoute
   '/admin/dashboard': typeof AdminAuthAdminProtectedDashboardRoute
   '/admin/feature-flags': typeof AdminAuthAdminProtectedFeatureFlagsRoute
+  '/admin/firms': typeof AdminAuthAdminProtectedFirmsRoute
   '/admin/internal-access': typeof AdminAuthAdminProtectedInternalAccessRoute
   '/admin/media': typeof AdminAuthAdminProtectedMediaRoute
+  '/admin/operations': typeof AdminAuthAdminProtectedOperationsRoute
   '/admin/roles': typeof AdminAuthAdminProtectedRolesRoute
+  '/admin/security-log': typeof AdminAuthAdminProtectedSecurityLogRoute
   '/admin/settings': typeof AdminAuthAdminProtectedSettingsRoute
   '/admin/subscriptions': typeof AdminAuthAdminProtectedSubscriptionsRoute
   '/admin/system-health': typeof AdminAuthAdminProtectedSystemHealthRoute
+  '/admin/team': typeof AdminAuthAdminProtectedTeamRoute
   '/admin/waitlist': typeof AdminAuthAdminProtectedWaitlistRoute
   '/ca/audit-trail': typeof CaAuthCaPortalAuditTrailRoute
   '/ca/billing': typeof CaAuthCaPortalBillingRoute
@@ -1587,19 +1643,26 @@ export interface FileRoutesByTo {
   '/admin/ai-monitoring': typeof AdminAuthAdminProtectedAiMonitoringRoute
   '/admin/analytics': typeof AdminAuthAdminProtectedAnalyticsRoute
   '/admin/audit-logs': typeof AdminAuthAdminProtectedAuditLogsRoute
+  '/admin/billing': typeof AdminAuthAdminProtectedBillingRoute
   '/admin/ca-invites': typeof AdminAuthAdminProtectedCaInvitesRoute
   '/admin/ca-verification': typeof AdminAuthAdminProtectedCaVerificationRoute
   '/admin/ceo-view': typeof AdminAuthAdminProtectedCeoViewRoute
   '/admin/communications': typeof AdminAuthAdminProtectedCommunicationsRoute
   '/admin/content': typeof AdminAuthAdminProtectedContentRoute
+  '/admin/control': typeof AdminAuthAdminProtectedControlRoute
+  '/admin/coupons': typeof AdminAuthAdminProtectedCouponsRoute
   '/admin/dashboard': typeof AdminAuthAdminProtectedDashboardRoute
   '/admin/feature-flags': typeof AdminAuthAdminProtectedFeatureFlagsRoute
+  '/admin/firms': typeof AdminAuthAdminProtectedFirmsRoute
   '/admin/internal-access': typeof AdminAuthAdminProtectedInternalAccessRoute
   '/admin/media': typeof AdminAuthAdminProtectedMediaRoute
+  '/admin/operations': typeof AdminAuthAdminProtectedOperationsRoute
   '/admin/roles': typeof AdminAuthAdminProtectedRolesRoute
+  '/admin/security-log': typeof AdminAuthAdminProtectedSecurityLogRoute
   '/admin/settings': typeof AdminAuthAdminProtectedSettingsRoute
   '/admin/subscriptions': typeof AdminAuthAdminProtectedSubscriptionsRoute
   '/admin/system-health': typeof AdminAuthAdminProtectedSystemHealthRoute
+  '/admin/team': typeof AdminAuthAdminProtectedTeamRoute
   '/admin/waitlist': typeof AdminAuthAdminProtectedWaitlistRoute
   '/ca/audit-trail': typeof CaAuthCaPortalAuditTrailRoute
   '/ca/billing': typeof CaAuthCaPortalBillingRoute
@@ -1788,19 +1851,26 @@ export interface FileRoutesById {
   '/_adminAuth/admin/_protected/ai-monitoring': typeof AdminAuthAdminProtectedAiMonitoringRoute
   '/_adminAuth/admin/_protected/analytics': typeof AdminAuthAdminProtectedAnalyticsRoute
   '/_adminAuth/admin/_protected/audit-logs': typeof AdminAuthAdminProtectedAuditLogsRoute
+  '/_adminAuth/admin/_protected/billing': typeof AdminAuthAdminProtectedBillingRoute
   '/_adminAuth/admin/_protected/ca-invites': typeof AdminAuthAdminProtectedCaInvitesRoute
   '/_adminAuth/admin/_protected/ca-verification': typeof AdminAuthAdminProtectedCaVerificationRoute
   '/_adminAuth/admin/_protected/ceo-view': typeof AdminAuthAdminProtectedCeoViewRoute
   '/_adminAuth/admin/_protected/communications': typeof AdminAuthAdminProtectedCommunicationsRoute
   '/_adminAuth/admin/_protected/content': typeof AdminAuthAdminProtectedContentRoute
+  '/_adminAuth/admin/_protected/control': typeof AdminAuthAdminProtectedControlRoute
+  '/_adminAuth/admin/_protected/coupons': typeof AdminAuthAdminProtectedCouponsRoute
   '/_adminAuth/admin/_protected/dashboard': typeof AdminAuthAdminProtectedDashboardRoute
   '/_adminAuth/admin/_protected/feature-flags': typeof AdminAuthAdminProtectedFeatureFlagsRoute
+  '/_adminAuth/admin/_protected/firms': typeof AdminAuthAdminProtectedFirmsRoute
   '/_adminAuth/admin/_protected/internal-access': typeof AdminAuthAdminProtectedInternalAccessRoute
   '/_adminAuth/admin/_protected/media': typeof AdminAuthAdminProtectedMediaRoute
+  '/_adminAuth/admin/_protected/operations': typeof AdminAuthAdminProtectedOperationsRoute
   '/_adminAuth/admin/_protected/roles': typeof AdminAuthAdminProtectedRolesRoute
+  '/_adminAuth/admin/_protected/security-log': typeof AdminAuthAdminProtectedSecurityLogRoute
   '/_adminAuth/admin/_protected/settings': typeof AdminAuthAdminProtectedSettingsRoute
   '/_adminAuth/admin/_protected/subscriptions': typeof AdminAuthAdminProtectedSubscriptionsRoute
   '/_adminAuth/admin/_protected/system-health': typeof AdminAuthAdminProtectedSystemHealthRoute
+  '/_adminAuth/admin/_protected/team': typeof AdminAuthAdminProtectedTeamRoute
   '/_adminAuth/admin/_protected/waitlist': typeof AdminAuthAdminProtectedWaitlistRoute
   '/_caAuth/ca/_portal/audit-trail': typeof CaAuthCaPortalAuditTrailRoute
   '/_caAuth/ca/_portal/billing': typeof CaAuthCaPortalBillingRoute
@@ -1985,19 +2055,26 @@ export interface FileRouteTypes {
     | '/admin/ai-monitoring'
     | '/admin/analytics'
     | '/admin/audit-logs'
+    | '/admin/billing'
     | '/admin/ca-invites'
     | '/admin/ca-verification'
     | '/admin/ceo-view'
     | '/admin/communications'
     | '/admin/content'
+    | '/admin/control'
+    | '/admin/coupons'
     | '/admin/dashboard'
     | '/admin/feature-flags'
+    | '/admin/firms'
     | '/admin/internal-access'
     | '/admin/media'
+    | '/admin/operations'
     | '/admin/roles'
+    | '/admin/security-log'
     | '/admin/settings'
     | '/admin/subscriptions'
     | '/admin/system-health'
+    | '/admin/team'
     | '/admin/waitlist'
     | '/ca/audit-trail'
     | '/ca/billing'
@@ -2175,19 +2252,26 @@ export interface FileRouteTypes {
     | '/admin/ai-monitoring'
     | '/admin/analytics'
     | '/admin/audit-logs'
+    | '/admin/billing'
     | '/admin/ca-invites'
     | '/admin/ca-verification'
     | '/admin/ceo-view'
     | '/admin/communications'
     | '/admin/content'
+    | '/admin/control'
+    | '/admin/coupons'
     | '/admin/dashboard'
     | '/admin/feature-flags'
+    | '/admin/firms'
     | '/admin/internal-access'
     | '/admin/media'
+    | '/admin/operations'
     | '/admin/roles'
+    | '/admin/security-log'
     | '/admin/settings'
     | '/admin/subscriptions'
     | '/admin/system-health'
+    | '/admin/team'
     | '/admin/waitlist'
     | '/ca/audit-trail'
     | '/ca/billing'
@@ -2375,19 +2459,26 @@ export interface FileRouteTypes {
     | '/_adminAuth/admin/_protected/ai-monitoring'
     | '/_adminAuth/admin/_protected/analytics'
     | '/_adminAuth/admin/_protected/audit-logs'
+    | '/_adminAuth/admin/_protected/billing'
     | '/_adminAuth/admin/_protected/ca-invites'
     | '/_adminAuth/admin/_protected/ca-verification'
     | '/_adminAuth/admin/_protected/ceo-view'
     | '/_adminAuth/admin/_protected/communications'
     | '/_adminAuth/admin/_protected/content'
+    | '/_adminAuth/admin/_protected/control'
+    | '/_adminAuth/admin/_protected/coupons'
     | '/_adminAuth/admin/_protected/dashboard'
     | '/_adminAuth/admin/_protected/feature-flags'
+    | '/_adminAuth/admin/_protected/firms'
     | '/_adminAuth/admin/_protected/internal-access'
     | '/_adminAuth/admin/_protected/media'
+    | '/_adminAuth/admin/_protected/operations'
     | '/_adminAuth/admin/_protected/roles'
+    | '/_adminAuth/admin/_protected/security-log'
     | '/_adminAuth/admin/_protected/settings'
     | '/_adminAuth/admin/_protected/subscriptions'
     | '/_adminAuth/admin/_protected/system-health'
+    | '/_adminAuth/admin/_protected/team'
     | '/_adminAuth/admin/_protected/waitlist'
     | '/_caAuth/ca/_portal/audit-trail'
     | '/_caAuth/ca/_portal/billing'
@@ -3299,6 +3390,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAuthAdminProtectedAuditLogsRouteImport
       parentRoute: typeof AdminAuthAdminProtectedRoute
     }
+    '/_adminAuth/admin/_protected/billing': {
+      id: '/_adminAuth/admin/_protected/billing'
+      path: '/billing'
+      fullPath: '/admin/billing'
+      preLoaderRoute: typeof AdminAuthAdminProtectedBillingRouteImport
+      parentRoute: typeof AdminAuthAdminProtectedRoute
+    }
     '/_adminAuth/admin/_protected/ca-invites': {
       id: '/_adminAuth/admin/_protected/ca-invites'
       path: '/ca-invites'
@@ -3334,6 +3432,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAuthAdminProtectedContentRouteImport
       parentRoute: typeof AdminAuthAdminProtectedRoute
     }
+    '/_adminAuth/admin/_protected/control': {
+      id: '/_adminAuth/admin/_protected/control'
+      path: '/control'
+      fullPath: '/admin/control'
+      preLoaderRoute: typeof AdminAuthAdminProtectedControlRouteImport
+      parentRoute: typeof AdminAuthAdminProtectedRoute
+    }
+    '/_adminAuth/admin/_protected/coupons': {
+      id: '/_adminAuth/admin/_protected/coupons'
+      path: '/coupons'
+      fullPath: '/admin/coupons'
+      preLoaderRoute: typeof AdminAuthAdminProtectedCouponsRouteImport
+      parentRoute: typeof AdminAuthAdminProtectedRoute
+    }
     '/_adminAuth/admin/_protected/dashboard': {
       id: '/_adminAuth/admin/_protected/dashboard'
       path: '/dashboard'
@@ -3346,6 +3458,13 @@ declare module '@tanstack/react-router' {
       path: '/feature-flags'
       fullPath: '/admin/feature-flags'
       preLoaderRoute: typeof AdminAuthAdminProtectedFeatureFlagsRouteImport
+      parentRoute: typeof AdminAuthAdminProtectedRoute
+    }
+    '/_adminAuth/admin/_protected/firms': {
+      id: '/_adminAuth/admin/_protected/firms'
+      path: '/firms'
+      fullPath: '/admin/firms'
+      preLoaderRoute: typeof AdminAuthAdminProtectedFirmsRouteImport
       parentRoute: typeof AdminAuthAdminProtectedRoute
     }
     '/_adminAuth/admin/_protected/internal-access': {
@@ -3362,11 +3481,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAuthAdminProtectedMediaRouteImport
       parentRoute: typeof AdminAuthAdminProtectedRoute
     }
+    '/_adminAuth/admin/_protected/operations': {
+      id: '/_adminAuth/admin/_protected/operations'
+      path: '/operations'
+      fullPath: '/admin/operations'
+      preLoaderRoute: typeof AdminAuthAdminProtectedOperationsRouteImport
+      parentRoute: typeof AdminAuthAdminProtectedRoute
+    }
     '/_adminAuth/admin/_protected/roles': {
       id: '/_adminAuth/admin/_protected/roles'
       path: '/roles'
       fullPath: '/admin/roles'
       preLoaderRoute: typeof AdminAuthAdminProtectedRolesRouteImport
+      parentRoute: typeof AdminAuthAdminProtectedRoute
+    }
+    '/_adminAuth/admin/_protected/security-log': {
+      id: '/_adminAuth/admin/_protected/security-log'
+      path: '/security-log'
+      fullPath: '/admin/security-log'
+      preLoaderRoute: typeof AdminAuthAdminProtectedSecurityLogRouteImport
       parentRoute: typeof AdminAuthAdminProtectedRoute
     }
     '/_adminAuth/admin/_protected/settings': {
@@ -3388,6 +3521,13 @@ declare module '@tanstack/react-router' {
       path: '/system-health'
       fullPath: '/admin/system-health'
       preLoaderRoute: typeof AdminAuthAdminProtectedSystemHealthRouteImport
+      parentRoute: typeof AdminAuthAdminProtectedRoute
+    }
+    '/_adminAuth/admin/_protected/team': {
+      id: '/_adminAuth/admin/_protected/team'
+      path: '/team'
+      fullPath: '/admin/team'
+      preLoaderRoute: typeof AdminAuthAdminProtectedTeamRouteImport
       parentRoute: typeof AdminAuthAdminProtectedRoute
     }
     '/_adminAuth/admin/_protected/waitlist': {
@@ -3888,19 +4028,26 @@ interface AdminAuthAdminProtectedRouteChildren {
   AdminAuthAdminProtectedAiMonitoringRoute: typeof AdminAuthAdminProtectedAiMonitoringRoute
   AdminAuthAdminProtectedAnalyticsRoute: typeof AdminAuthAdminProtectedAnalyticsRoute
   AdminAuthAdminProtectedAuditLogsRoute: typeof AdminAuthAdminProtectedAuditLogsRoute
+  AdminAuthAdminProtectedBillingRoute: typeof AdminAuthAdminProtectedBillingRoute
   AdminAuthAdminProtectedCaInvitesRoute: typeof AdminAuthAdminProtectedCaInvitesRoute
   AdminAuthAdminProtectedCaVerificationRoute: typeof AdminAuthAdminProtectedCaVerificationRoute
   AdminAuthAdminProtectedCeoViewRoute: typeof AdminAuthAdminProtectedCeoViewRoute
   AdminAuthAdminProtectedCommunicationsRoute: typeof AdminAuthAdminProtectedCommunicationsRoute
   AdminAuthAdminProtectedContentRoute: typeof AdminAuthAdminProtectedContentRoute
+  AdminAuthAdminProtectedControlRoute: typeof AdminAuthAdminProtectedControlRoute
+  AdminAuthAdminProtectedCouponsRoute: typeof AdminAuthAdminProtectedCouponsRoute
   AdminAuthAdminProtectedDashboardRoute: typeof AdminAuthAdminProtectedDashboardRoute
   AdminAuthAdminProtectedFeatureFlagsRoute: typeof AdminAuthAdminProtectedFeatureFlagsRoute
+  AdminAuthAdminProtectedFirmsRoute: typeof AdminAuthAdminProtectedFirmsRoute
   AdminAuthAdminProtectedInternalAccessRoute: typeof AdminAuthAdminProtectedInternalAccessRoute
   AdminAuthAdminProtectedMediaRoute: typeof AdminAuthAdminProtectedMediaRoute
+  AdminAuthAdminProtectedOperationsRoute: typeof AdminAuthAdminProtectedOperationsRoute
   AdminAuthAdminProtectedRolesRoute: typeof AdminAuthAdminProtectedRolesRoute
+  AdminAuthAdminProtectedSecurityLogRoute: typeof AdminAuthAdminProtectedSecurityLogRoute
   AdminAuthAdminProtectedSettingsRoute: typeof AdminAuthAdminProtectedSettingsRoute
   AdminAuthAdminProtectedSubscriptionsRoute: typeof AdminAuthAdminProtectedSubscriptionsRoute
   AdminAuthAdminProtectedSystemHealthRoute: typeof AdminAuthAdminProtectedSystemHealthRoute
+  AdminAuthAdminProtectedTeamRoute: typeof AdminAuthAdminProtectedTeamRoute
   AdminAuthAdminProtectedWaitlistRoute: typeof AdminAuthAdminProtectedWaitlistRoute
   AdminAuthAdminProtectedIndexRoute: typeof AdminAuthAdminProtectedIndexRoute
   AdminAuthAdminProtectedBlogNewRoute: typeof AdminAuthAdminProtectedBlogNewRoute
@@ -3922,6 +4069,7 @@ const AdminAuthAdminProtectedRouteChildren: AdminAuthAdminProtectedRouteChildren
       AdminAuthAdminProtectedAnalyticsRoute,
     AdminAuthAdminProtectedAuditLogsRoute:
       AdminAuthAdminProtectedAuditLogsRoute,
+    AdminAuthAdminProtectedBillingRoute: AdminAuthAdminProtectedBillingRoute,
     AdminAuthAdminProtectedCaInvitesRoute:
       AdminAuthAdminProtectedCaInvitesRoute,
     AdminAuthAdminProtectedCaVerificationRoute:
@@ -3930,19 +4078,27 @@ const AdminAuthAdminProtectedRouteChildren: AdminAuthAdminProtectedRouteChildren
     AdminAuthAdminProtectedCommunicationsRoute:
       AdminAuthAdminProtectedCommunicationsRoute,
     AdminAuthAdminProtectedContentRoute: AdminAuthAdminProtectedContentRoute,
+    AdminAuthAdminProtectedControlRoute: AdminAuthAdminProtectedControlRoute,
+    AdminAuthAdminProtectedCouponsRoute: AdminAuthAdminProtectedCouponsRoute,
     AdminAuthAdminProtectedDashboardRoute:
       AdminAuthAdminProtectedDashboardRoute,
     AdminAuthAdminProtectedFeatureFlagsRoute:
       AdminAuthAdminProtectedFeatureFlagsRoute,
+    AdminAuthAdminProtectedFirmsRoute: AdminAuthAdminProtectedFirmsRoute,
     AdminAuthAdminProtectedInternalAccessRoute:
       AdminAuthAdminProtectedInternalAccessRoute,
     AdminAuthAdminProtectedMediaRoute: AdminAuthAdminProtectedMediaRoute,
+    AdminAuthAdminProtectedOperationsRoute:
+      AdminAuthAdminProtectedOperationsRoute,
     AdminAuthAdminProtectedRolesRoute: AdminAuthAdminProtectedRolesRoute,
+    AdminAuthAdminProtectedSecurityLogRoute:
+      AdminAuthAdminProtectedSecurityLogRoute,
     AdminAuthAdminProtectedSettingsRoute: AdminAuthAdminProtectedSettingsRoute,
     AdminAuthAdminProtectedSubscriptionsRoute:
       AdminAuthAdminProtectedSubscriptionsRoute,
     AdminAuthAdminProtectedSystemHealthRoute:
       AdminAuthAdminProtectedSystemHealthRoute,
+    AdminAuthAdminProtectedTeamRoute: AdminAuthAdminProtectedTeamRoute,
     AdminAuthAdminProtectedWaitlistRoute: AdminAuthAdminProtectedWaitlistRoute,
     AdminAuthAdminProtectedIndexRoute: AdminAuthAdminProtectedIndexRoute,
     AdminAuthAdminProtectedBlogNewRoute: AdminAuthAdminProtectedBlogNewRoute,

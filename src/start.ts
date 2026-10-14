@@ -18,6 +18,21 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
   }
 });
 
+// The admin panel is reachable only from ADMIN_IP_ALLOWLIST when it is set.
+// Admin server functions check the same list (and much more) on every call.
+const adminNetworkMiddleware = createMiddleware().server(async ({ next, request }) => {
+  const path = new URL(request.url).pathname;
+  if (path === "/admin" || path.startsWith("/admin/")) {
+    const { clientIp, networkAllowed } = await import("./lib/admin/security.server");
+    if (!networkAllowed(clientIp(request)))
+      return new Response("<!doctype html><title>Not available</title><p style=\"font-family:system-ui;padding:40px\">The FynHelp admin panel is not available from this network.</p>", {
+        status: 403,
+        headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
+      });
+  }
+  return next();
+});
+
 // Start installs this automatically when src/start.ts is absent; defining the
 // file opts out, so re-add it explicitly to keep server functions protected
 // from cross-site requests.
@@ -26,6 +41,6 @@ const csrfMiddleware = createCsrfMiddleware({
 });
 
 export const startInstance = createStart(() => ({
-  requestMiddleware: [errorMiddleware, csrfMiddleware],
+  requestMiddleware: [errorMiddleware, adminNetworkMiddleware, csrfMiddleware],
   functionMiddleware: [attachSupabaseAuth],
 }));

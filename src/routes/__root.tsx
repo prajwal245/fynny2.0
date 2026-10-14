@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import CookieConsent from "@/components/CookieConsent";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   HeadContent,
@@ -160,6 +161,7 @@ function RootComponent() {
             <RouteTracker />
             <SkipToContent />
             <ScrollManager />
+            <CookieConsent />
             <SiteOnly>
               <SearchPalette />
               <FloatingContact />

@@ -898,3 +898,88 @@ export const confirmPracticeCheckout = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) =>
     withFirm(context.userId, async (db, ctx) => (await import("./billing.server")).confirmCheckout(db, ctx, data)),
   );
+
+/* ── Zoho Books (read-only) ────────────────────────────── */
+
+async function asPartner(ctx: FirmContext, what: string) {
+  const { canSignOff } = await import("./db.server");
+  if (!canSignOff(ctx)) throw new Error(`Only a partner can ${what}.`);
+}
+
+export const zohoBooksStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => withFirm(context.userId, async (db, ctx) => (await import("./zoho.server")).status(db, ctx)));
+
+/** Starts Zoho consent. A cookie ties the callback to this browser. */
+export const zohoBooksConnect = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) =>
+    withFirm(context.userId, async (_db, ctx) => {
+      await asPartner(ctx, "connect Zoho Books");
+      const zoho = await import("./zoho.server");
+      if (!zoho.zohoConfigured()) throw new Error("Zoho Books isn't switched on for FynHelp yet.");
+      const nonce = zoho.newNonce();
+      const { setCookie } = await import("@tanstack/react-start/server");
+      setCookie(zoho.NONCE_COOKIE, nonce, { httpOnly: true, secure: process.env["NODE_ENV"] === "production", sameSite: "lax", path: "/api/integrations/zoho", maxAge: 900 });
+      return { url: await zoho.consentUrl(ctx.firmId, ctx.userId, nonce) };
+    }),
+  );
+
+export const zohoBooksOrganizations = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => withFirm(context.userId, async (db, ctx) => (await import("./zoho.server")).organizations(db, ctx)));
+
+export const zohoBooksBankAccounts = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ organizationId: z.string().regex(/^\d{1,30}$/) }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./zoho.server")).bankAccounts(db, ctx, data.organizationId)),
+  );
+
+export const zohoBooksLink = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z
+      .object({
+        businessId: uuid,
+        organizationId: z.string().regex(/^\d{1,30}$/),
+        organizationName: z.string().min(1).max(200),
+        accountId: z.string().regex(/^\d{1,30}$/),
+        accountName: z.string().min(1).max(200),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      await asPartner(ctx, "link a client to Zoho Books");
+      const { assertClient } = await import("./db.server");
+      await assertClient(db, ctx, data.businessId);
+      return (await import("./zoho.server")).link(db, ctx, data);
+    }),
+  );
+
+export const zohoBooksUnlink = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ linkId: uuid }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      await asPartner(ctx, "unlink a Zoho Books account");
+      return (await import("./zoho.server")).unlink(db, ctx, data.linkId);
+    }),
+  );
+
+export const zohoBooksDisconnect = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      await asPartner(ctx, "disconnect Zoho Books");
+      return (await import("./zoho.server")).disconnect(db, ctx);
+    }),
+  );
+
+export const zohoBooksSync = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ linkId: uuid, month: z.string().regex(/^\d{4}-\d{2}$/) }).parse(d))
+  .handler(async ({ data, context }) =>
+    withWork(context.userId, async (db, ctx) => (await import("./zoho.server")).sync(db, ctx, data.linkId, data.month)),
+  );

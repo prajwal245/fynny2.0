@@ -194,6 +194,7 @@ import { Route as MainDashboardSettingsPreferencesRouteImport } from './routes/_
 import { Route as MainDashboardSettingsProfileRouteImport } from './routes/_main/dashboard/settings/profile'
 import { Route as MainDashboardSettingsSecurityRouteImport } from './routes/_main/dashboard/settings/security'
 import { Route as MainDashboardSettingsTeamRouteImport } from './routes/_main/dashboard/settings/team'
+import { Route as ApiIntegrationsZohoCallbackRouteImport } from './routes/api/integrations/zoho/callback'
 import { Route as CaIntegrationsGmailCallbackRouteImport } from './routes/ca.integrations.gmail.callback'
 import { Route as AdminAuthAdminProtectedBlogIndexRouteImport } from './routes/_adminAuth/admin/_protected/blog/index'
 import { Route as AdminAuthAdminProtectedBlogNewRouteImport } from './routes/_adminAuth/admin/_protected/blog/new'
@@ -1215,6 +1216,12 @@ const MainDashboardSettingsTeamRoute =
     path: '/team',
     getParentRoute: () => MainDashboardSettingsRoute,
   } as any)
+const ApiIntegrationsZohoCallbackRoute =
+  ApiIntegrationsZohoCallbackRouteImport.update({
+    id: '/api/integrations/zoho/callback',
+    path: '/api/integrations/zoho/callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const CaIntegrationsGmailCallbackRoute =
   CaIntegrationsGmailCallbackRouteImport.update({
     id: '/ca/integrations/gmail/callback',
@@ -1519,6 +1526,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/settings/profile': typeof MainDashboardSettingsProfileRoute
   '/dashboard/settings/security': typeof MainDashboardSettingsSecurityRoute
   '/dashboard/settings/team': typeof MainDashboardSettingsTeamRoute
+  '/api/integrations/zoho/callback': typeof ApiIntegrationsZohoCallbackRoute
   '/ca/integrations/gmail/callback': typeof CaIntegrationsGmailCallbackRoute
   '/admin/': typeof AdminAuthAdminProtectedIndexRoute
   '/ca/': typeof CaAuthCaPortalIndexRoute
@@ -1717,6 +1725,7 @@ export interface FileRoutesByTo {
   '/dashboard/settings/profile': typeof MainDashboardSettingsProfileRoute
   '/dashboard/settings/security': typeof MainDashboardSettingsSecurityRoute
   '/dashboard/settings/team': typeof MainDashboardSettingsTeamRoute
+  '/api/integrations/zoho/callback': typeof ApiIntegrationsZohoCallbackRoute
   '/ca/integrations/gmail/callback': typeof CaIntegrationsGmailCallbackRoute
   '/admin': typeof AdminAuthAdminProtectedIndexRoute
   '/ca': typeof CaAuthCaPortalIndexRoute
@@ -1926,6 +1935,7 @@ export interface FileRoutesById {
   '/_main/dashboard/settings/profile': typeof MainDashboardSettingsProfileRoute
   '/_main/dashboard/settings/security': typeof MainDashboardSettingsSecurityRoute
   '/_main/dashboard/settings/team': typeof MainDashboardSettingsTeamRoute
+  '/api/integrations/zoho/callback': typeof ApiIntegrationsZohoCallbackRoute
   '/ca/integrations/gmail/callback': typeof CaIntegrationsGmailCallbackRoute
   '/_adminAuth/admin/_protected/': typeof AdminAuthAdminProtectedIndexRoute
   '/_caAuth/ca/_portal/': typeof CaAuthCaPortalIndexRoute
@@ -2131,6 +2141,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/profile'
     | '/dashboard/settings/security'
     | '/dashboard/settings/team'
+    | '/api/integrations/zoho/callback'
     | '/ca/integrations/gmail/callback'
     | '/admin/'
     | '/ca/'
@@ -2329,6 +2340,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/profile'
     | '/dashboard/settings/security'
     | '/dashboard/settings/team'
+    | '/api/integrations/zoho/callback'
     | '/ca/integrations/gmail/callback'
     | '/admin'
     | '/ca'
@@ -2537,6 +2549,7 @@ export interface FileRouteTypes {
     | '/_main/dashboard/settings/profile'
     | '/_main/dashboard/settings/security'
     | '/_main/dashboard/settings/team'
+    | '/api/integrations/zoho/callback'
     | '/ca/integrations/gmail/callback'
     | '/_adminAuth/admin/_protected/'
     | '/_caAuth/ca/_portal/'
@@ -2592,6 +2605,7 @@ export interface RootRouteChildren {
   ApiPublicRazorpayWebhookRoute: typeof ApiPublicRazorpayWebhookRoute
   ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
   SharedMisTokenRoute: typeof SharedMisTokenRoute
+  ApiIntegrationsZohoCallbackRoute: typeof ApiIntegrationsZohoCallbackRoute
   CaIntegrationsGmailCallbackRoute: typeof CaIntegrationsGmailCallbackRoute
 }
 
@@ -3892,6 +3906,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MainDashboardSettingsTeamRouteImport
       parentRoute: typeof MainDashboardSettingsRoute
     }
+    '/api/integrations/zoho/callback': {
+      id: '/api/integrations/zoho/callback'
+      path: '/api/integrations/zoho/callback'
+      fullPath: '/api/integrations/zoho/callback'
+      preLoaderRoute: typeof ApiIntegrationsZohoCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/ca/integrations/gmail/callback': {
       id: '/ca/integrations/gmail/callback'
       path: '/ca/integrations/gmail/callback'
@@ -4548,6 +4569,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicRazorpayWebhookRoute: ApiPublicRazorpayWebhookRoute,
   ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,
   SharedMisTokenRoute: SharedMisTokenRoute,
+  ApiIntegrationsZohoCallbackRoute: ApiIntegrationsZohoCallbackRoute,
   CaIntegrationsGmailCallbackRoute: CaIntegrationsGmailCallbackRoute,
 }
 export const routeTree = rootRouteImport

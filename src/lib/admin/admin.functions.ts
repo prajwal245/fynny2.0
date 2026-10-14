@@ -1,6 +1,6 @@
 /**
  * Server functions for the admin panel. Each one checks network, admin role,
- * MFA, the admin session cookie and its permission before doing anything.
+ * MFA (when required), the admin session cookie and its permission before doing anything.
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -26,7 +26,7 @@ export const adminRequestSetup = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ email: z.string().email().max(200) }).parse(d))
   .handler(async ({ data }) => (await import("./security.server")).requestAdminSetup(data.email));
 
-/** Step 3 (after the TOTP code): opens the admin session. */
+/** Opens the admin session once the password (and code, if any) has been checked. */
 export const adminStartSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -54,8 +54,8 @@ export const adminLogout = createServerFn({ method: "POST" })
 
 /** Lets the admin login page say "not from this network" before anyone types a password. */
 export const adminNetworkCheck = createServerFn({ method: "GET" }).handler(async () => {
-  const { clientIp, networkAllowed } = await import("./security.server");
-  return { allowed: networkAllowed(clientIp()) };
+  const { clientIp, mfaRequired, networkAllowed } = await import("./security.server");
+  return { allowed: networkAllowed(clientIp()), mfaRequired: mfaRequired() };
 });
 
 /* ── dashboard ───────────────────────────────────────────── */
@@ -201,3 +201,7 @@ export const adminDeactivate = createServerFn({ method: "POST" })
 export const adminAudit = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => (await import("./admin.server")).auditLog(await gate(context, "audit.view")));
+
+export const adminSystemHealth = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => (await import("./admin.server")).systemHealth(await gate(context, "ops.view")));

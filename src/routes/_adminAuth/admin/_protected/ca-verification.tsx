@@ -1,6 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
-import CAVerificationPage from "@/pages/admin/CAVerificationPage";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
+// Replaced by the FynHelp admin control pages; old links land on the page that took over.
 export const Route = createFileRoute("/_adminAuth/admin/_protected/ca-verification")({
-  component: CAVerificationPage,
+  beforeLoad: () => {
+    throw redirect({ href: "/admin/firms", replace: true });
+  },
 });

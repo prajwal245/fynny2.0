@@ -1,6 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
-import AdminCAInvitesPage from "@/pages/admin/AdminCAInvitesPage";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
+// Replaced by the FynHelp admin control pages; old links land on the page that took over.
 export const Route = createFileRoute("/_adminAuth/admin/_protected/ca-invites")({
-  component: AdminCAInvitesPage,
+  beforeLoad: () => {
+    throw redirect({ href: "/admin/firms", replace: true });
+  },
 });

@@ -93,7 +93,7 @@
     "next-themes": "^0.3.0",
     "number-flow": "^0.6.0",
     "papaparse": "^5.5.3",
-    "posthog-js": "^1.396.4",
+    "posthog-js": "^1.438.7",
     "react": "^19.2.0",
     "react-countup": "^6.5.3",
     "react-day-picker": "^9.14.0",

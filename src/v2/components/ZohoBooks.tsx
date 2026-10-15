@@ -1,10 +1,11 @@
 /**
  * Settings → Zoho Books. Read-only: a partner connects Zoho once, links each
- * client to one of its Zoho bank accounts, and anyone can pull a month's
- * ledger in as the books side for Recon.
+ * client to one of its Zoho bank accounts in three short steps, and anyone can
+ * pull a month's ledger in as the books side for Recon.
  */
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { Check, Link2, RefreshCw, Unlink } from "lucide-react";
 import {
   zohoBooksBankAccounts,
   zohoBooksConnect,
@@ -15,8 +16,10 @@ import {
   zohoBooksSync,
   zohoBooksUnlink,
 } from "@/lib/practice/practice.functions";
-import { Badge, V, formatDate } from "../ui";
+import { V, formatDate } from "../ui";
 import { useV2 } from "../store";
+import { ZohoIcon } from "./BrandIcons";
+import { IntegrationCard } from "./IntegrationCard";
 
 type Status = Awaited<ReturnType<typeof zohoBooksStatus>>;
 type Org = Awaited<ReturnType<typeof zohoBooksOrganizations>>[number];
@@ -31,23 +34,17 @@ function lastMonth(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-export function ZohoBooksMark({ size = 18 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>
-      <rect x="2" y="2" width="20" height="20" rx="5" fill="#E42527" />
-      <path d="M7 8h10l-7 8h7" stroke="#fff" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-export function ZohoBooksSection() {
+export function ZohoBooksSection({ index = 0 }: { index?: number }) {
   const { clients, canSignOff } = useV2();
   const [st, setSt] = useState<Status | null>(null);
   const [orgs, setOrgs] = useState<Org[] | null>(null);
   const [accounts, setAccounts] = useState<Account[] | null>(null);
+  const [picking, setPicking] = useState(false);
   const [pick, setPick] = useState({ client: "", org: "", account: "" });
   const [months, setMonths] = useState<Record<string, string>>({});
+  const [done, setDone] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
+  const [justConnected, setJustConnected] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -60,8 +57,10 @@ export function ZohoBooksSection() {
     void load();
     const q = new URLSearchParams(window.location.search);
     const outcome = q.get("zoho");
-    if (outcome === "connected") toast.success("Zoho Books connected. Link each client to its bank account below.");
-    else if (outcome) toast.error(q.get("zoho_msg") ?? "Zoho Books could not be connected.");
+    if (outcome === "connected") {
+      setJustConnected(true);
+      toast.success("Zoho Books connected. Link each client to its bank account.");
+    } else if (outcome) toast.error(q.get("zoho_msg") ?? "Zoho Books could not be connected.");
     if (outcome) {
       q.delete("zoho");
       q.delete("zoho_msg");
@@ -82,12 +81,17 @@ export function ZohoBooksSection() {
     }
   };
 
-  const openPicker = async () => {
+  const startPicking = async () => {
+    setPicking(true);
+    setPick({ client: "", org: "", account: "" });
+    setAccounts(null);
+    if (orgs) return;
     setBusy("orgs");
     try {
       setOrgs(await zohoBooksOrganizations());
     } catch (e) {
       toast.error(errMsg(e));
+      setPicking(false);
     } finally {
       setBusy(null);
     }
@@ -107,30 +111,56 @@ export function ZohoBooksSection() {
     }
   };
 
+  const pull = async (linkId: string) => {
+    setBusy(`sync:${linkId}`);
+    setDone((d) => ({ ...d, [linkId]: "" }));
+    try {
+      const r = await zohoBooksSync({ data: { linkId, month: months[linkId] ?? lastMonth() } });
+      setDone((d) => ({ ...d, [linkId]: r.status === "synced" ? "Pulled. Extract is reading it now." : r.note }));
+      await load();
+    } catch (e) {
+      toast.error(errMsg(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const clientName = (id: string) => clients.find((c) => c.id === id)?.name ?? "Client removed";
 
-  if (!st) return null;
+  if (!st) return <div className="ic-skel" aria-label="Loading Zoho Books" />;
+
+  const status = st.connected
+    ? { tone: "good" as const, label: st.links.length ? `Connected · ${st.links.length} linked` : "Connected", live: true }
+    : st.error
+      ? { tone: "bad" as const, label: "Needs reconnecting" }
+      : st.available
+        ? { tone: "neutral" as const, label: "Not connected" }
+        : { tone: "warn" as const, label: "Not switched on yet" };
+
+  const step = !pick.client ? 0 : !pick.org ? 1 : !pick.account ? 2 : 3;
+
   return (
-    <div style={{ background: V.gray, borderRadius: 14, padding: "12px 14px" }} data-testid="zoho-section">
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 12, alignItems: "center" }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 14.5, fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
-            <ZohoBooksMark /> Zoho Books
-          </div>
-          <div style={{ fontSize: 12.5, color: V.body, marginTop: 3 }}>
-            Pulls each client's bank ledger from Zoho Books as the books side for Recon. Read-only: FynHelp never changes anything in Zoho.
-          </div>
-          {!st.available && (
-            <div style={{ fontSize: 12, color: V.muted, marginTop: 3 }}>Zoho Books isn't switched on for FynHelp yet.</div>
-          )}
-          {st.error && <div style={{ fontSize: 12.5, color: V.maroon, marginTop: 3 }}>{st.error}</div>}
-        </div>
-        <div style={{ display: "grid", gap: 8, justifyItems: "end" }}>
-          <Badge tone={st.connected ? "good" : st.error ? "bad" : "neutral"}>{st.connected ? "Connected" : st.error ? "Needs reconnecting" : "Not connected"}</Badge>
-          {st.available && canSignOff && (!st.connected ? (
+    <IntegrationCard
+      index={index}
+      testId="zoho-section"
+      icon={<ZohoIcon size={36} />}
+      tint="rgba(228,37,39,.08)"
+      name="Zoho Books"
+      tag={<span style={{ fontSize: 11, color: V.muted, fontWeight: 600 }}>READ-ONLY</span>}
+      description={
+        st.error ??
+        (st.available
+          ? "Pull each client's bank ledger from Zoho Books as the books side for Recon. FynHelp never changes anything in Zoho."
+          : "Zoho Books isn't switched on for FynHelp yet.")
+      }
+      status={status}
+      defaultOpen={st.connected && (justConnected || st.links.length > 0)}
+      actions={
+        st.available && canSignOff ? (
+          !st.connected ? (
             <button
               className="v2-btn v2-btn-primary"
-              style={{ padding: "7px 14px", fontSize: 13 }}
+              style={{ padding: "8px 16px", fontSize: 13 }}
               disabled={busy === "connect"}
               data-testid="zoho-connect"
               onClick={() =>
@@ -140,12 +170,11 @@ export function ZohoBooksSection() {
                 })
               }
             >
-              {busy === "connect" ? "Opening Zoho…" : "Connect Zoho Books"}
+              {busy === "connect" ? <><span className="ic-spin" /> Opening Zoho…</> : "Connect"}
             </button>
           ) : (
             <button
-              className="v2-btn v2-btn-ghost"
-              style={{ padding: "6px 12px", fontSize: 12.5 }}
+              className="v2-btn v2-btn-quiet"
               disabled={busy === "disconnect"}
               onClick={() => {
                 if (window.confirm("Disconnect Zoho Books? Client links are removed; documents already pulled stay."))
@@ -154,116 +183,161 @@ export function ZohoBooksSection() {
             >
               Disconnect
             </button>
-          ))}
-        </div>
-      </div>
-
-      {st.connected && (
-        <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
-          {st.links.length === 0 && <div style={{ fontSize: 12.5, color: V.body }}>No client is linked yet.</div>}
-          {st.links.map((l) => (
-            <div key={l.id} style={{ background: "#fff", borderRadius: 12, padding: "10px 12px", display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", justifyContent: "space-between" }} data-testid="zoho-link">
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 600 }}>{clientName(l.business_id)}</div>
-                <div style={{ fontSize: 12, color: V.body }}>
-                  {l.organization_name} · {l.account_name}
+          )
+        ) : undefined
+      }
+    >
+      {st.connected ? (
+        <div style={{ display: "grid", gap: 10 }}>
+          {st.links.length === 0 && !picking && (
+            <div style={{ fontSize: 13, color: V.body }}>No client is linked yet. Link one to start pulling its ledger.</div>
+          )}
+          {st.links.map((l) => {
+            const pulling = busy === `sync:${l.id}`;
+            return (
+              <div
+                key={l.id}
+                className="ic-row"
+                data-testid="zoho-link"
+                style={{ background: V.gray, borderRadius: 14, padding: "12px 14px", display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}
+              >
+                <div style={{ minWidth: 0, flex: "1 1 240px" }}>
+                  <div style={{ fontSize: 14, fontWeight: 650 }}>{clientName(l.business_id)}</div>
+                  <div style={{ fontSize: 12.5, color: V.body, display: "flex", alignItems: "center", gap: 6 }}>
+                    <ZohoIcon size={18} /> {l.organization_name} · {l.account_name}
+                  </div>
+                  <div style={{ fontSize: 12, color: V.muted, marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
+                    {done[l.id] ? (
+                      <>
+                        <span className="ic-check"><Check size={12} strokeWidth={3} /></span>
+                        <span style={{ color: "#1F6B45", fontWeight: 600 }}>{done[l.id]}</span>
+                      </>
+                    ) : l.last_synced_at ? (
+                      `Last pulled ${formatDate(l.last_synced_at)}: ${l.last_sync_note ?? ""}`
+                    ) : (
+                      "Not pulled yet"
+                    )}
+                  </div>
                 </div>
-                <div style={{ fontSize: 12, color: V.muted }}>
-                  {l.last_synced_at ? `Last pulled ${formatDate(l.last_synced_at)}: ${l.last_sync_note ?? ""}` : "Not pulled yet"}
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <input
-                  type="month"
-                  className="v2-input"
-                  aria-label="Month to pull"
-                  style={{ padding: "6px 10px", fontSize: 13 }}
-                  value={months[l.id] ?? lastMonth()}
-                  max={new Date().toISOString().slice(0, 7)}
-                  onChange={(e) => setMonths({ ...months, [l.id]: e.target.value })}
-                />
-                <button
-                  className="v2-btn v2-btn-primary"
-                  style={{ padding: "6px 12px", fontSize: 12.5, whiteSpace: "nowrap" }}
-                  disabled={busy === `sync:${l.id}`}
-                  data-testid="zoho-sync"
-                  onClick={() =>
-                    void act(`sync:${l.id}`, async () => {
-                      const r = await zohoBooksSync({ data: { linkId: l.id, month: months[l.id] ?? lastMonth() } });
-                      toast.success(r.status === "synced" ? `Pulled from Zoho. ${r.note}. Extract is reading it now.` : r.note);
-                    })
-                  }
-                >
-                  {busy === `sync:${l.id}` ? "Pulling…" : "Pull month"}
-                </button>
-                {canSignOff && (
-                  <button className="v2-btn v2-btn-ghost" style={{ padding: "6px 10px", fontSize: 12.5 }} onClick={() => void act(`unlink:${l.id}`, () => zohoBooksUnlink({ data: { linkId: l.id } }), "Link removed")}>
-                    Unlink
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-
-          {canSignOff &&
-            (orgs === null ? (
-              <button className="v2-btn v2-btn-ghost" style={{ justifySelf: "start", padding: "7px 14px", fontSize: 13 }} disabled={busy === "orgs"} onClick={() => void openPicker()} data-testid="zoho-add-link">
-                {busy === "orgs" ? "Reading your Zoho organisations…" : "Link a client to a Zoho bank account"}
-              </button>
-            ) : (
-              <div style={{ background: "#fff", borderRadius: 12, padding: 12, display: "grid", gap: 8 }}>
-                {orgs.length === 0 && <div style={{ fontSize: 12.5, color: V.body }}>This Zoho login can't see any Zoho Books organisation. Ask the client to invite it as an accountant.</div>}
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  <select className="v2-input" aria-label="Client" value={pick.client} onChange={(e) => setPick({ ...pick, client: e.target.value })} data-testid="zoho-client">
-                    <option value="">Client…</option>
-                    {clients.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                  <select className="v2-input" aria-label="Zoho organisation" value={pick.org} onChange={(e) => void chooseOrg(e.target.value)} data-testid="zoho-org">
-                    <option value="">Zoho organisation…</option>
-                    {orgs.map((o) => (
-                      <option key={o.id} value={o.id}>{o.name}{o.gstin ? ` · ${o.gstin}` : ""}</option>
-                    ))}
-                  </select>
-                  <select className="v2-input" aria-label="Bank account" value={pick.account} disabled={!accounts} onChange={(e) => setPick({ ...pick, account: e.target.value })} data-testid="zoho-account">
-                    <option value="">{busy === "accounts" ? "Loading accounts…" : "Bank account…"}</option>
-                    {(accounts ?? []).map((a) => (
-                      <option key={a.id} value={a.id}>{a.name}{a.number ? ` · ${a.number}` : ""}</option>
-                    ))}
-                  </select>
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <input
+                    type="month"
+                    className="v2-input"
+                    aria-label="Month to pull"
+                    style={{ padding: "7px 10px", fontSize: 13, width: 150 }}
+                    value={months[l.id] ?? lastMonth()}
+                    max={new Date().toISOString().slice(0, 7)}
+                    onChange={(e) => setMonths({ ...months, [l.id]: e.target.value })}
+                  />
                   <button
                     className="v2-btn v2-btn-primary"
-                    style={{ padding: "7px 14px", fontSize: 13 }}
-                    disabled={!pick.client || !pick.org || !pick.account || busy === "link"}
-                    data-testid="zoho-save-link"
-                    onClick={() =>
-                      void act(
-                        "link",
-                        async () => {
-                          const org = orgs.find((o) => o.id === pick.org)!;
-                          const acc = (accounts ?? []).find((a) => a.id === pick.account)!;
-                          await zohoBooksLink({ data: { businessId: pick.client, organizationId: org.id, organizationName: org.name, accountId: acc.id, accountName: acc.name } });
-                          setPick({ client: "", org: "", account: "" });
-                          setOrgs(null);
-                          setAccounts(null);
-                        },
-                        "Client linked to Zoho Books",
-                      )
-                    }
+                    style={{ padding: "8px 14px", fontSize: 13, whiteSpace: "nowrap" }}
+                    disabled={pulling}
+                    data-testid="zoho-sync"
+                    onClick={() => void pull(l.id)}
                   >
-                    Save link
+                    {pulling ? <><span className="ic-spin" /> Pulling…</> : <><RefreshCw size={14} /> Pull month</>}
                   </button>
-                  <button className="v2-btn v2-btn-ghost" style={{ padding: "7px 14px", fontSize: 13 }} onClick={() => { setOrgs(null); setAccounts(null); }}>
-                    Cancel
-                  </button>
+                  {canSignOff && (
+                    <button
+                      className="v2-btn v2-btn-quiet"
+                      aria-label={`Unlink ${clientName(l.business_id)}`}
+                      title="Unlink"
+                      style={{ padding: "8px 10px" }}
+                      onClick={() => void act(`unlink:${l.id}`, () => zohoBooksUnlink({ data: { linkId: l.id } }), "Link removed")}
+                    >
+                      <Unlink size={14} />
+                    </button>
+                  )}
                 </div>
               </div>
-            ))}
+            );
+          })}
+
+          {canSignOff && !picking && (
+            <button
+              className="v2-btn v2-btn-ghost"
+              style={{ justifySelf: "start", padding: "8px 16px", fontSize: 13 }}
+              onClick={() => void startPicking()}
+              data-testid="zoho-add-link"
+            >
+              <Link2 size={14} /> Link a client to a Zoho bank account
+            </button>
+          )}
+
+          {picking && (
+            <div className="ic-row" style={{ border: `1px solid ${V.line}`, borderRadius: 14, padding: 14 }}>
+              <div className="ic-steps" aria-hidden>
+                {[0, 1, 2].map((i) => <span key={i} data-done={step > i} />)}
+              </div>
+              {busy === "orgs" || !orgs ? (
+                <div style={{ display: "grid", gap: 8 }}>
+                  <div style={{ fontSize: 12.5, color: V.body }}>Reading the Zoho organisations this login can see…</div>
+                  <div className="ic-skel" />
+                </div>
+              ) : (
+                <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
+                  <label>
+                    <div className="ic-step-label">1 · Client</div>
+                    <select className="v2-input" style={{ width: "100%" }} aria-label="Client" value={pick.client} onChange={(e) => setPick({ ...pick, client: e.target.value })} data-testid="zoho-client">
+                      <option value="">Choose a client…</option>
+                      {clients.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label style={{ opacity: pick.client ? 1 : 0.5, transition: "opacity .25s" }}>
+                    <div className="ic-step-label">2 · Zoho organisation</div>
+                    <select className="v2-input" style={{ width: "100%" }} aria-label="Zoho organisation" disabled={!pick.client} value={pick.org} onChange={(e) => void chooseOrg(e.target.value)} data-testid="zoho-org">
+                      <option value="">{orgs.length ? "Choose an organisation…" : "No organisations visible"}</option>
+                      {orgs.map((o) => (
+                        <option key={o.id} value={o.id}>{o.name}{o.gstin ? ` · ${o.gstin}` : ""}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label style={{ opacity: pick.org ? 1 : 0.5, transition: "opacity .25s" }}>
+                    <div className="ic-step-label">3 · Bank account</div>
+                    <select className="v2-input" style={{ width: "100%" }} aria-label="Bank account" disabled={!accounts} value={pick.account} onChange={(e) => setPick({ ...pick, account: e.target.value })} data-testid="zoho-account">
+                      <option value="">{busy === "accounts" ? "Loading accounts…" : "Choose a bank account…"}</option>
+                      {(accounts ?? []).map((a) => (
+                        <option key={a.id} value={a.id}>{a.name}{a.number ? ` · ${a.number}` : ""}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              )}
+              {orgs && orgs.length === 0 && (
+                <div style={{ fontSize: 12.5, color: V.body, marginTop: 10 }}>
+                  This Zoho login can't see any Zoho Books organisation. Ask the client to add it as a user (Zoho Books → Settings → Users &amp; Roles).
+                </div>
+              )}
+              <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+                <button
+                  className="v2-btn v2-btn-primary"
+                  style={{ padding: "8px 16px", fontSize: 13 }}
+                  disabled={step < 3 || busy === "link"}
+                  data-testid="zoho-save-link"
+                  onClick={() =>
+                    void act(
+                      "link",
+                      async () => {
+                        const org = orgs!.find((o) => o.id === pick.org)!;
+                        const acc = (accounts ?? []).find((a) => a.id === pick.account)!;
+                        await zohoBooksLink({ data: { businessId: pick.client, organizationId: org.id, organizationName: org.name, accountId: acc.id, accountName: acc.name } });
+                        setPicking(false);
+                      },
+                      "Client linked to Zoho Books",
+                    )
+                  }
+                >
+                  {busy === "link" ? <><span className="ic-spin" /> Saving…</> : <><Check size={14} /> Save link</>}
+                </button>
+                <button className="v2-btn v2-btn-quiet" onClick={() => setPicking(false)}>Cancel</button>
+              </div>
+            </div>
+          )}
         </div>
-      )}
-    </div>
+      ) : undefined}
+    </IntegrationCard>
   );
 }

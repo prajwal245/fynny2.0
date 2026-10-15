@@ -23,6 +23,9 @@ import { BillingSection } from "../components/BillingSection";
 import { GmailHealth } from "../components/GmailHealth";
 import { GmailIcon, WhatsAppIcon } from "../components/BrandIcons";
 import { ZohoBooksSection } from "../components/ZohoBooks";
+import { INTEGRATION_STYLES, IntegrationCard } from "../components/IntegrationCard";
+import { Link } from "@tanstack/react-router";
+import { FileSpreadsheet, UploadCloud } from "lucide-react";
 
 type Team = Awaited<ReturnType<typeof listPracticeTeam>>;
 type Integrations = Awaited<ReturnType<typeof getPracticeIntegrations>>;
@@ -407,53 +410,38 @@ export default function SettingsPage() {
           <RowSkeleton rows={2} />
         ) : (
           <div style={{ display: "grid", gap: 12 }}>
-            <Row>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 14.5, fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}><GmailIcon size={18} /> Gmail</div>
-                {intg.gmail.connections.length === 0 ? (
-                  <div style={{ fontSize: 12.5, color: V.body, marginTop: 3 }}>
-                    Statements and bills your clients email to the firm inbox
-                    come in on their own, every few minutes.
-                  </div>
-                ) : (
-                  intg.gmail.connections.map((c) => (
-                    <div
-                      key={c.id}
-                      style={{ fontSize: 12.5, color: V.body, marginTop: 3 }}
-                    >
-                      {c.gmail_address} ·{" "}
-                      {c.is_active ? "active" : "disconnected"}
-                      {c.last_polled_at
-                        ? ` · last checked ${formatDate(c.last_polled_at)}`
-                        : " · first check covers the last 7 days"}
-                      {c.error_message ? (
-                        <span style={{ color: V.maroon }}>
-                          {" "}
-                          · {c.error_message}
-                        </span>
-                      ) : null}
-                    </div>
-                  ))
-                )}
-                {!intg.gmail.available && (
-                  <div style={{ fontSize: 12, color: V.muted, marginTop: 3 }}>
-                    Gmail isn't switched on for FynHelp yet. Until it is,
-                    upload files on the Documents page.
-                  </div>
-                )}
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  gap: 8,
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                  justifyContent: "flex-end",
-                }}
-              >
+            <style>{INTEGRATION_STYLES}</style>
+            <div className="ic-list" data-testid="integrations">
+            <IntegrationCard
+              index={0}
+              testId="gmail-card"
+              icon={<GmailIcon size={26} />}
+              tint="rgba(66,133,244,.08)"
+              name="Gmail"
+              description={
+                !intg.gmail.available
+                  ? "Gmail isn't switched on for FynHelp yet. Until it is, upload files on the Documents page."
+                  : intg.gmail.connections.some((c) => c.is_active)
+                    ? intg.gmail.connections
+                        .filter((c) => c.is_active)
+                        .map((c) => `${c.gmail_address}${c.last_polled_at ? ` · checked ${formatDate(c.last_polled_at)}` : " · first check covers the last 7 days"}`)
+                        .join(" · ")
+                    : "Statements and bills your clients email to the firm inbox come in on their own, every few minutes."
+              }
+              status={
+                intg.gmail.connections.some((c) => c.is_active)
+                  ? { tone: "good", label: "Connected", live: true }
+                  : intg.gmail.connections.some((c) => c.error_message)
+                    ? { tone: "bad", label: "Needs reconnecting" }
+                    : intg.gmail.available
+                      ? { tone: "neutral", label: "Not connected" }
+                      : { tone: "warn", label: "Not switched on yet" }
+              }
+              defaultOpen={justConnected}
+              actions={
+                <>
                 {intg.gmail.connections.some((c) => c.is_active) ? (
                   <>
-                    <Badge tone="good">Connected</Badge>
                     <button
                       className="v2-btn v2-btn-ghost"
                       disabled={busy === "poll"}
@@ -509,73 +497,62 @@ export default function SettingsPage() {
                   </>
                 ) : (
                   <>
-                    <Badge>Not connected</Badge>
-                    <button
-                      className="v2-btn v2-btn-primary"
-                      disabled={!intg.gmail.available || busy === "gmail"}
-                      onClick={connectGmail}
-                    >
-                      Connect Gmail
-                    </button>
+                    {intg.gmail.available && (
+                      <button
+                        className="v2-btn v2-btn-primary"
+                        style={{ padding: "8px 16px", fontSize: 13 }}
+                        disabled={busy === "gmail"}
+                        onClick={connectGmail}
+                      >
+                        {busy === "gmail" ? <><span className="ic-spin" /> Opening Google…</> : "Connect"}
+                      </button>
+                    )}
                   </>
                 )}
-              </div>
-            </Row>
-
-            {intg.gmail.available && firmId && (
-              <GmailHealth firmId={firmId} lastResult={gmailResult} autoRun={justConnected} />
-            )}
-
-            <ZohoBooksSection />
-
-            <Row>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 14.5, fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
-                  <WhatsAppIcon size={18} /> WhatsApp Business
+                </>
+              }
+            >
+              {intg.gmail.available && firmId ? (
+                <div style={{ display: "grid", gap: 10 }}>
+                  {intg.gmail.connections
+                    .filter((c) => c.error_message)
+                    .map((c) => (
+                      <div key={c.id} style={{ fontSize: 12.5, color: V.maroon }}>
+                        {c.gmail_address}: {c.error_message}
+                      </div>
+                    ))}
+                  <GmailHealth firmId={firmId} lastResult={gmailResult} autoRun={justConnected} />
                 </div>
-                <div style={{ fontSize: 12.5, color: V.body, marginTop: 3 }}>
-                  Clients send documents to your official WhatsApp Business
-                  number; they are matched to the client by phone number.
-                </div>
-                {intg.whatsapp.channels.map((c) => (
-                  <div
-                    key={c.phone_number_id}
-                    style={{ fontSize: 12.5, color: V.body, marginTop: 3 }}
-                  >
-                    {c.display_phone ?? c.phone_number_id} ·{" "}
-                    {c.is_active ? "active" : "off"}
-                    {c.last_message_at
-                      ? ` · last document ${formatDate(c.last_message_at)}`
-                      : ""}
-                  </div>
-                ))}
-                {!intg.whatsapp.available && (
-                  <div style={{ fontSize: 12, color: V.muted, marginTop: 3 }}>
-                    WhatsApp isn't switched on for FynHelp yet. Write to
-                    support@fynhelp.com and we will set it up with you.
-                  </div>
-                )}
-              </div>
-              <div style={{ display: "grid", gap: 8, justifyItems: "end" }}>
-                <Badge
-                  tone={
-                    intg.whatsapp.channels.some((c) => c.is_active)
-                      ? "good"
-                      : "neutral"
-                  }
-                >
-                  {intg.whatsapp.channels.some((c) => c.is_active)
-                    ? "Connected"
-                    : "Not connected"}
-                </Badge>
-              </div>
-            </Row>
-            {intg.whatsapp.available && (
-              <details>
-                <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
-                  Link your WhatsApp Business number
-                </summary>
-                <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
+              ) : undefined}
+            </IntegrationCard>
+
+            <ZohoBooksSection index={1} />
+
+            <IntegrationCard
+              index={2}
+              testId="whatsapp-card"
+              icon={<WhatsAppIcon size={26} />}
+              tint="rgba(37,211,102,.1)"
+              name="WhatsApp Business"
+              description={
+                intg.whatsapp.available
+                  ? intg.whatsapp.channels.length
+                    ? intg.whatsapp.channels
+                        .map((c) => `${c.display_phone ?? c.phone_number_id}${c.last_message_at ? ` · last document ${formatDate(c.last_message_at)}` : ""}`)
+                        .join(" · ")
+                    : "Clients send documents to your official WhatsApp Business number; they are matched to the client by phone number."
+                  : "WhatsApp isn't switched on for FynHelp yet. Write to support@fynhelp.com and we will set it up with you."
+              }
+              status={
+                intg.whatsapp.channels.some((c) => c.is_active)
+                  ? { tone: "good", label: "Connected", live: true }
+                  : intg.whatsapp.available
+                    ? { tone: "neutral", label: "Not connected" }
+                    : { tone: "warn", label: "Not switched on yet" }
+              }
+            >
+              {intg.whatsapp.available ? (
+                <div style={{ display: "grid", gap: 10 }}>
                   <div style={{ fontSize: 12.5, color: V.body }}>
                     In Meta's WhatsApp Manager, open your number and copy its
                     "Phone number ID". Paste it here with the number your
@@ -620,8 +597,40 @@ export default function SettingsPage() {
                   </button>
                 </div>
                 </div>
-              </details>
-            )}
+              ) : undefined}
+            </IntegrationCard>
+
+            <IntegrationCard
+              index={3}
+              testId="tally-card"
+              icon={<FileSpreadsheet size={24} color="#1F4E8C" strokeWidth={1.8} />}
+              tint="rgba(31,78,140,.08)"
+              name="TallyPrime"
+              tag={<span style={{ fontSize: 11, color: V.muted, fontWeight: 600 }}>VIA EXPORT</span>}
+              description="Export the client's bank ledger from Tally as XML and drop it on Documents. Works with Tally on office PCs and Tally on Cloud. Nothing to install."
+              status={{ tone: "good", label: "Ready" }}
+              actions={
+                <Link to="/v2/documents" className="v2-btn v2-btn-ghost" style={{ padding: "8px 14px", fontSize: 13 }}>
+                  <UploadCloud size={14} /> Upload export
+                </Link>
+              }
+            >
+              <div style={{ display: "grid", gap: 8, fontSize: 13, color: V.body }}>
+                <div>
+                  In TallyPrime: Display More Reports → Account Books → Ledger → the bank ledger, <span className="num">Alt+F2</span> for the month, then{" "}
+                  <span className="num">Alt+E</span> → Current → XML (Data Interchange).
+                </div>
+                <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+                  <a href="/blog/tally-export-to-fynhelp" target="_blank" rel="noreferrer" style={{ color: V.maroon, fontWeight: 600 }}>
+                    Step-by-step guide (office PCs) →
+                  </a>
+                  <a href="/blog/tally-on-cloud-to-fynhelp" target="_blank" rel="noreferrer" style={{ color: V.maroon, fontWeight: 600 }}>
+                    Tally on Cloud / Remote Desktop →
+                  </a>
+                </div>
+              </div>
+            </IntegrationCard>
+            </div>
 
             <Row>
               <div style={{ minWidth: 0 }}>

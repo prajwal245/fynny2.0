@@ -1,6 +1,7 @@
 import { startGmailConnect } from "@/lib/caGmail.functions";
 import PasswordInput from "../components/PasswordInput";
 import { PASSWORD_HINT, PASSWORD_MIN } from "@/lib/passwordPolicy";
+import { GoogleSignIn } from "../components/GoogleSignIn";
 import { track } from "@/lib/analytics";
 /**
  * FynHelp — first run journey, value first and short:
@@ -307,6 +308,7 @@ export default function OnboardingPage() {
                     Your session ended. Sign in again to pick up where you left off.
                   </div>
                 )}
+                {mode !== "forgot" && <div><GoogleSignIn label={mode === "signup" ? "Sign up with Google" : "Continue with Google"} /></div>}
                 {mode === "signup" && (
                   <Field label="Full name"><input className="v2-input" required autoFocus autoComplete="name" value={account.name} onChange={(e) => setAccount({ ...account, name: e.target.value })} placeholder="Priya Rao" /></Field>
                 )}

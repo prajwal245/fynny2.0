@@ -186,32 +186,6 @@ export const completeGmailConnect = createServerFn({ method: "POST" })
     return { ok: true, gmailAddress };
   });
 
-/** Temporary diagnostic — reports which Gmail env vars are present (values never returned). */
-export const debugGmailEnv = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<{ vars: Record<string, string> }> => {
-    const rateKey = `debug-${context.userId}`;
-    const now = Date.now();
-    // Simple in-memory rate limit: once per 60 seconds per user (best effort per worker)
-    const store = globalThis as unknown as Record<string, unknown>;
-    const lastCall = store[rateKey] as number | undefined;
-    if (lastCall && now - lastCall < 60000) {
-      throw new Error("Rate limit: wait 60 seconds between debug calls");
-    }
-    store[rateKey] = now;
-    return {
-      vars: {
-        GMAIL_CLIENT_ID: process.env["GMAIL_CLIENT_ID"] ? "SET" : "MISSING",
-        GOOGLE_OAUTH_CLIENT_ID: process.env["GOOGLE_OAUTH_CLIENT_ID"] ? "SET" : "MISSING",
-        GMAIL_CLIENT_SECRET: process.env["GMAIL_CLIENT_SECRET"] ? "SET" : "MISSING",
-        GOOGLE_OAUTH_CLIENT_SECRET: process.env["GOOGLE_OAUTH_CLIENT_SECRET"] ? "SET" : "MISSING",
-        GMAIL_ENCRYPTION_KEY: process.env["GMAIL_ENCRYPTION_KEY"] ? "SET" : "MISSING",
-        SUPABASE_SERVICE_ROLE_KEY: process.env["SUPABASE_SERVICE_ROLE_KEY"] ? "SET" : "MISSING",
-        SUPABASE_URL: process.env["SUPABASE_URL"] ? "SET" : "MISSING",
-      },
-    };
-  });
-
 /** Revoke the Google grant and mark the connection inactive. */
 export const disconnectGmail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

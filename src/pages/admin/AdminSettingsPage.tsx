@@ -3,6 +3,7 @@ import { Card, PageHeader } from "./AdminDashboardPage";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import PasswordInput from "@/v2/components/PasswordInput";
+import { checkPassword } from "@/lib/passwordPolicy";
 
 export default function AdminSettingsPage() {
   return (
@@ -50,7 +51,8 @@ function ProfileTab() {
   };
 
   const changePassword = async () => {
-    if (pwd.length < 8) { toast.error("Password must be at least 8 characters"); return; }
+    const weak = await checkPassword(pwd, email);
+    if (weak) { toast.error(weak); return; }
     if (pwd !== pwd2) { toast.error("Passwords do not match"); return; }
     setSavingPwd(true);
     const { error } = await supabase.auth.updateUser({ password: pwd });
@@ -87,7 +89,7 @@ function ProfileTab() {
       </section>
 
       <section>
-        <SectionHeading title="Change Password" subtitle="Choose a strong password (8+ characters)." />
+        <SectionHeading title="Change Password" subtitle="At least 10 characters, not a common password, and not one seen in a data breach." />
         <div className="grid gap-4 max-w-md">
           <label style={{ display: "block" }}>
             <span style={{ display: "block", fontFamily: "Roboto, sans-serif", fontSize: 13, color: "hsl(var(--fyn-ink) / 0.7)", marginBottom: 6 }}>New Password</span>

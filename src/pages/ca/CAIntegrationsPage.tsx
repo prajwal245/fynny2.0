@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCAPortal } from "@/hooks/useCAPortal";
 import { getFirmIntegrations, syncZohoBooks, syncRazorpay } from "@/lib/caSync.functions";
-import { startGmailConnect, disconnectGmail, pollGmailNow, debugGmailEnv } from "@/lib/caGmail.functions";
+import { startGmailConnect, disconnectGmail, pollGmailNow } from "@/lib/caGmail.functions";
 import {
   CA, CACard, CAHeading, CABadge, CAButton, dateIN, caTh, caTd, CAEmpty,
 } from "@/components/ca/portalUi";
@@ -76,7 +76,6 @@ export default function CAIntegrationsPage() {
   const beginGmailConnect = useServerFn(startGmailConnect);
   const endGmailConnection = useServerFn(disconnectGmail);
   const runGmailPoll = useServerFn(pollGmailNow);
-  const debugEnv = useServerFn(debugGmailEnv);
 
   const load = useCallback(async () => {
     if (!firmId) return;
@@ -288,22 +287,6 @@ export default function CAIntegrationsPage() {
           <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
             {typeof window !== "undefined" && /lovable\.app|localhost/.test(window.location.hostname) && (
               <CAButton variant="ghost" onClick={testPollGmail}>Test poll now</CAButton>
-            )}
-            {typeof window !== "undefined" && /lovable\.app|localhost/.test(window.location.hostname) && (
-              <button
-                onClick={async () => {
-                  try {
-                    const result = await debugEnv();
-                    console.log("[fyn:debug] env vars:", result.vars);
-                    alert(JSON.stringify(result.vars, null, 2));
-                  } catch (e) {
-                    alert("Debug failed: " + (e instanceof Error ? e.message : String(e)));
-                  }
-                }}
-                style={{ fontSize: 11, color: "rgba(23,18,8,0.4)", background: "none", border: "1px dashed rgba(23,18,8,0.2)", borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontFamily: "monospace" }}
-              >
-                Debug env (dev only)
-              </button>
             )}
             {gmailConnections.filter((c) => c.is_active).length === 0 && (
               <CAButton onClick={connectGmail} disabled={gmailConnecting}>

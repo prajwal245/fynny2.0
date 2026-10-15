@@ -1,8 +1,7 @@
 /**
- * Admin sign-in: password (checked and counted on the server, 5 failures lock
- * the account for 15 minutes). An admin who has an authenticator set up also
- * enters its 6-digit code. With ADMIN_REQUIRE_MFA=true every admin must set
- * one up first. Only then does the server open an admin session.
+ * Admin sign-in: password only (checked and counted on the server, 5 failures
+ * lock the account for 15 minutes). Authenticator codes are off unless
+ * ADMIN_REQUIRE_MFA=true, which makes every admin set one up and enter it.
  */
 import { FormEvent, useEffect, useState } from "react";
 import { Eye, EyeOff, ShieldCheck, Lock } from "lucide-react";
@@ -60,19 +59,19 @@ export default function AdminLoginPage() {
   }, [nav]);
 
   const afterPassword = async () => {
+    if (!mfaRequired) {
+      // No authenticator code for admins: the password (with lockout, network
+      // check and the 15-minute session) is enough. ADMIN_REQUIRE_MFA=true turns codes on.
+      await adminStartSession();
+      nav("/admin/control", { replace: true });
+      return;
+    }
     const { data, error } = await supabase.auth.mfa.listFactors();
     if (error) throw error;
     const verified = data.totp.find((f) => f.status === "verified");
     if (verified) {
       setFactorId(verified.id);
       setStep("verify");
-      return;
-    }
-    if (!mfaRequired) {
-      // Two-step sign-in is optional: no authenticator set up, so the password is enough.
-      for (const f of data.all.filter((f) => f.status !== "verified")) await supabase.auth.mfa.unenroll({ factorId: f.id });
-      await adminStartSession();
-      nav("/admin/control", { replace: true });
       return;
     }
     // Clear a half-finished setup from an earlier attempt, then start a fresh one.

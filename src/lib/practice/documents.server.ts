@@ -27,7 +27,7 @@ import {
   type AiCallRecord,
 } from "./extract/pipeline";
 import { loadSheetReader, pdfText } from "./files.server";
-import { practiceLlm } from "./llm.server";
+import { practiceLlm, withinAiCap } from "./llm.server";
 import { practiceOcr } from "./ocr.server";
 import { applyMemory } from "./memory";
 import {
@@ -350,7 +350,7 @@ export async function processExtraction(
       clientGstin: (clientRow as { gstin?: string | null } | null)?.gstin ?? null,
     },
     {
-      llm: practiceLlm(),
+      llm: (await withinAiCap(db, doc.ca_firm_id)) ? practiceLlm() : null,
       ocr: practiceOcr(),
       pdfText,
       sheetRows: kind === "xlsx" ? await loadSheetReader() : undefined,

@@ -250,3 +250,23 @@ export function practiceLlm(
     },
   };
 }
+
+/**
+ * Spend cap: a firm's AI calls in the last 24 hours (PRACTICE_AI_DAILY_CAP,
+ * default 1500). Past it, reading and the MIS carry on with the rule-based
+ * path, so one runaway account cannot run up the AI bill.
+ */
+export async function withinAiCap(
+  db: { from: (t: string) => any }, // eslint-disable-line @typescript-eslint/no-explicit-any
+  firmId: string,
+): Promise<boolean> {
+  const cap = Number(env("PRACTICE_AI_DAILY_CAP") ?? "") || 1500;
+  const since = new Date(Date.now() - 86_400_000).toISOString();
+  const { count, error } = await db.from("ca_ai_calls").select("id", { count: "exact", head: true }).eq("ca_firm_id", firmId).gte("created_at", since);
+  if (error) return true;
+  if ((count ?? 0) >= cap) {
+    console.warn(`[ai] firm ${firmId} reached the daily AI cap (${cap}); using rules only`);
+    return false;
+  }
+  return true;
+}

@@ -23,7 +23,7 @@ import {
   type Db,
   type FirmContext,
 } from "./db.server";
-import { practiceLlm } from "./llm.server";
+import { practiceLlm, withinAiCap } from "./llm.server";
 import { statutoryDueDates } from "./india";
 import { BUCKET_LABELS, cleanParty, gatewayGrossUp, misBucket, returnedChequePairs, settlementsFromRegister, type MisBucket, type Settlement } from "./narrate/flows";
 import {
@@ -211,7 +211,7 @@ export async function generateReport(
   let aiCall: Record<string, unknown> | null = null;
   // Insights are a bonus on top of figures computed in code: never let the AI
   // hold the report up. One short attempt, then the rule-based insights stand.
-  const llm = matched.length >= 3 ? practiceLlm({ timeoutMs: 9_000 }) : null;
+  const llm = matched.length >= 3 && (await withinAiCap(db, ctx.firmId)) ? practiceLlm({ timeoutMs: 9_000 }) : null;
   if (llm) {
     const user = JSON.stringify(
       insightsPayload(figures, matched, client.client_name, period.label),

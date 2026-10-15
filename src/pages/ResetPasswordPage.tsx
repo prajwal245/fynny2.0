@@ -389,6 +389,15 @@ const ResetPasswordPage = () => {
       return;
     }
 
+    {
+      const { breachCount } = await import("@/lib/passwordPolicy");
+      if ((await breachCount(password)) > 0) {
+        const msg = "That password has appeared in a data breach. Choose a different one.";
+        setError(msg);
+        toast.error(msg);
+        return;
+      }
+    }
     const updateToastId = "reset-update";
     toast.loading("Updating your password…", { id: updateToastId });
     setSubmitting(true);

@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { KeyRound } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { V } from "../ui";
+import { PASSWORD_HINT, PASSWORD_MIN, checkPassword } from "@/lib/passwordPolicy";
 
 export default function ResetPasswordPage() {
   const navigate = useNavigate();
@@ -43,9 +44,13 @@ export default function ResetPasswordPage() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length < 6) return toast.error("Use a password of at least six characters.");
     if (password !== confirm) return toast.error("The two passwords do not match.");
     setBusy(true);
+    const weak = await checkPassword(password);
+    if (weak) {
+      setBusy(false);
+      return toast.error(weak);
+    }
     const { error } = await supabase.auth.updateUser({ password });
     setBusy(false);
     if (error) return toast.error(error.message);
@@ -89,11 +94,11 @@ export default function ResetPasswordPage() {
           <form onSubmit={submit} style={{ display: "grid", gap: 14 }}>
             <div>
               <label className="v2-label" htmlFor="reset-new-password">New password</label>
-              <PasswordInput id="reset-new-password" className="v2-input" autoComplete="new-password" minLength={6} required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least six characters" />
+              <PasswordInput id="reset-new-password" className="v2-input" autoComplete="new-password" minLength={PASSWORD_MIN} required value={password} onChange={(e) => setPassword(e.target.value)} placeholder={PASSWORD_HINT} />
             </div>
             <div>
               <label className="v2-label" htmlFor="reset-confirm-new-password">Confirm new password</label>
-              <PasswordInput id="reset-confirm-new-password" className="v2-input" autoComplete="new-password" minLength={6} required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+              <PasswordInput id="reset-confirm-new-password" className="v2-input" autoComplete="new-password" minLength={PASSWORD_MIN} required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
             </div>
             <button className="v2-btn v2-btn-primary" type="submit" disabled={busy} style={{ justifySelf: "start" }}>
               {busy ? "Saving" : "Save password"}

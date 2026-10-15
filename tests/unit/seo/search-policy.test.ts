@@ -10,7 +10,7 @@ describe("search policy", () => {
   });
 
   it("keeps the app, sign-in and admin out of search, even on the real domain", () => {
-    for (const p of ["/v2", "/v2/clients/1", "/login", "/signup", "/dashboard/cash", "/admin/blog", "/ca/login", "/api/public/x", "/shared/mis/t", "/waitlist", "/demo/gst"]) {
+    for (const p of ["/app", "/app/clients/1", "/v2", "/v2/clients/1", "/login", "/signup", "/dashboard/cash", "/admin/blog", "/ca/login", "/api/public/x", "/shared/mis/t", "/waitlist", "/demo/gst"]) {
       expect(robotsHeaderFor("www.fynhelp.com", p)).toBe("noindex, nofollow");
     }
   });
@@ -32,5 +32,17 @@ describe("search policy", () => {
     expect(r?.headers.get("location")).toBe("/pricing?utm_source=x");
     expect(normalizeUrl(new Request("https://www.fynhelp.com/"))).toBeNull();
     expect(normalizeUrl(new Request("https://www.fynhelp.com/pricing"))).toBeNull();
+  });
+});
+
+describe("old /v2 addresses", () => {
+  it("redirect permanently to the same page under /app, keeping the query", async () => {
+    const { normalizeUrl } = await import("@/lib/searchPolicy");
+    for (const [from, to] of [["/v2", "/app"], ["/v2/settings", "/app/settings"], ["/v2/onboarding?mode=signin", "/app/onboarding?mode=signin"]]) {
+      const res = normalizeUrl(new Request(`https://www.fynhelp.com${from}`))!;
+      expect(res.status).toBe(308);
+      expect(res.headers.get("location")).toBe(to);
+    }
+    expect(normalizeUrl(new Request("https://www.fynhelp.com/v2x"))).toBeNull();
   });
 });

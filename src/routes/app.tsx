@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import V2Shell from "@/v2/Shell";
 
-export const Route = createFileRoute("/v2")({
+export const Route = createFileRoute("/app")({
   head: () => ({
     meta: [
       { title: "FynHelp — Practice OS for CA firms" },

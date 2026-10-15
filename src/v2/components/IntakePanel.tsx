@@ -112,7 +112,7 @@ export function IntakePanel({ upload, unassignedEmail, unassignedWhatsApp, onSho
     setBusy("connect");
     try {
       try {
-        window.sessionStorage.setItem("fynhelp.gmail.return", "/v2/settings");
+        window.sessionStorage.setItem("fynhelp.gmail.return", "/app/settings");
       } catch {
         /* private mode */
       }

@@ -152,7 +152,7 @@ export default function GuidePage() {
             FynHelp
             <span style={{ fontWeight: 500, color: C.muted }}>/ Resource &amp; Product Guide</span>
           </a>
-          <a href="/v2" style={{ fontSize: 14, fontWeight: 600, textDecoration: "none", color: C.deep }}>Open the app →</a>
+          <a href="/app" style={{ fontSize: 14, fontWeight: 600, textDecoration: "none", color: C.deep }}>Open the app →</a>
         </div>
       </header>
 

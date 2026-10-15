@@ -104,7 +104,7 @@ export default function PortfolioPage() {
                     exit={{ opacity: 0, scale: 0.97 }}
                     transition={{ duration: 0.32, delay: Math.min(i, 6) * 0.04 }}
                   >
-                    <Link to="/v2/clients/$clientId" params={{ clientId: c.id }} style={{ textDecoration: "none" }}>
+                    <Link to="/app/clients/$clientId" params={{ clientId: c.id }} style={{ textDecoration: "none" }}>
                       <Card hover style={{ height: "100%" }}>
                         <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 10, alignItems: "start" }}>
                           <h3 style={{ fontSize: 15.5, minWidth: 0 }}>{c.name}</h3>

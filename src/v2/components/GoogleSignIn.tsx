@@ -36,7 +36,7 @@ export function GoogleMark({ size = 18 }: { size?: number }) {
   );
 }
 
-export function GoogleSignIn({ label = "Continue with Google", next = "/v2/onboarding" }: { label?: string; next?: string }) {
+export function GoogleSignIn({ label = "Continue with Google", next = "/app/onboarding" }: { label?: string; next?: string }) {
   const [enabled, setEnabled] = useState(false);
   const [busy, setBusy] = useState(false);
   useEffect(() => {

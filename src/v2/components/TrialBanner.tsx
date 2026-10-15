@@ -8,7 +8,7 @@ export function TrialBanner({ partnerView }: { partnerView: boolean }) {
   if (!b) return null;
   const a = b.access;
   const action = partnerView ? (
-    <Link to="/v2/settings" hash="billing" className="v2-btn v2-btn-sm v2-btn-primary" style={{ flexShrink: 0 }}>
+    <Link to="/app/settings" hash="billing" className="v2-btn v2-btn-sm v2-btn-primary" style={{ flexShrink: 0 }}>
       Choose a plan
     </Link>
   ) : (

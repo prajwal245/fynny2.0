@@ -18,25 +18,25 @@ import { FirstCloseLauncher, FirstRunWelcome } from "./components/FirstCloseGuid
 
 
 const NAV = [
-  { to: "/v2", label: "Portfolio", icon: LayoutGrid, exact: true },
-  { to: "/v2/clients", label: "Clients", icon: Users },
-  { to: "/v2/documents", label: "Documents", icon: FileText },
-  { to: "/v2/review", label: "Review Queue", icon: ListChecks },
-  { to: "/v2/exceptions", label: "Exception Queue", icon: AlertTriangle },
-  { to: "/v2/chaser", label: "Chaser", icon: Send },
-  { to: "/v2/reports", label: "MIS and Reports", icon: BarChart3 },
-  { to: "/v2/settings", label: "Settings", icon: Settings, partnerOnly: true },
+  { to: "/app", label: "Portfolio", icon: LayoutGrid, exact: true },
+  { to: "/app/clients", label: "Clients", icon: Users },
+  { to: "/app/documents", label: "Documents", icon: FileText },
+  { to: "/app/review", label: "Review Queue", icon: ListChecks },
+  { to: "/app/exceptions", label: "Exception Queue", icon: AlertTriangle },
+  { to: "/app/chaser", label: "Chaser", icon: Send },
+  { to: "/app/reports", label: "MIS and Reports", icon: BarChart3 },
+  { to: "/app/settings", label: "Settings", icon: Settings, partnerOnly: true },
 ] as const;
 
 const TITLES: Record<string, string> = {
-  "/v2": "Portfolio",
-  "/v2/clients": "Clients",
-  "/v2/documents": "Documents",
-  "/v2/review": "Review Queue",
-  "/v2/exceptions": "Exception Queue",
-  "/v2/chaser": "Chaser",
-  "/v2/reports": "MIS and Reports",
-  "/v2/settings": "Settings",
+  "/app": "Portfolio",
+  "/app/clients": "Clients",
+  "/app/documents": "Documents",
+  "/app/review": "Review Queue",
+  "/app/exceptions": "Exception Queue",
+  "/app/chaser": "Chaser",
+  "/app/reports": "MIS and Reports",
+  "/app/settings": "Settings",
 };
 
 export default function V2Shell() {
@@ -83,30 +83,30 @@ function ShellBody() {
   }, [pathname]);
   const title =
     TITLES[pathname] ??
-    (pathname.startsWith("/v2/clients/") ? "Client workspace" : pathname.startsWith("/v2/reports/") ? "MIS report" : "FynHelp");
+    (pathname.startsWith("/app/clients/") ? "Client workspace" : pathname.startsWith("/app/reports/") ? "MIS report" : "FynHelp");
 
-  const onboarding = pathname === "/v2/onboarding";
+  const onboarding = pathname === "/app/onboarding";
   const command = useCommandMenu();
   // The reset link signs the user in only to set a password: no redirects there.
-  const resetting = pathname === "/v2/reset-password";
+  const resetting = pathname === "/app/reset-password";
 
   // Working as Partner: reviewer and approver, plus firm settings. Working as Junior: the preparer's tabs.
   const partnerView = canSignOff && role === "Partner";
   const nav = NAV.filter((n) => !("partnerOnly" in n) || partnerView);
   const COUNTS: Record<string, number> = {
     // Partner: reports waiting for sign-off. Junior: reports sent back for correction.
-    "/v2/reports": partnerView
+    "/app/reports": partnerView
       ? reports.filter((r) => !r.signedOff && !r.correction).length
       : reports.filter((r) => r.correction && !r.signedOff).length,
-    "/v2/review": review.filter((r) => r.status === "open").length,
+    "/app/review": review.filter((r) => r.status === "open").length,
     // Same count the Exception Queue opens with: the month selected at the top.
-    "/v2/exceptions": openExceptionsIn(exceptions, monthOf, period).length,
-    "/v2/chaser": chases.filter((c) => c.status !== "Resolved").length,
+    "/app/exceptions": openExceptionsIn(exceptions, monthOf, period).length,
+    "/app/chaser": chases.filter((c) => c.status !== "Resolved").length,
   };
 
   useEffect(() => {
     if (!hydrated || resetting) return;
-    if ((!session || !onboarded) && !onboarding) navigate({ to: "/v2/onboarding" });
+    if ((!session || !onboarded) && !onboarding) navigate({ to: "/app/onboarding" });
     // Leaving onboarding for the portfolio is decided by the onboarding page, so a
     // new partner is not pulled out halfway (the firm exists after step two).
   }, [hydrated, session, onboarded, onboarding, resetting, navigate]);
@@ -207,7 +207,7 @@ function ShellBody() {
             <a className="v2-btn v2-btn-quiet" href="/guide" target="_blank" rel="noreferrer" data-testid="guide-link">
               <BookOpen size={14} /> Resource &amp; Product Guide
             </a>
-            <button className="v2-btn v2-btn-quiet" onClick={() => { signOut(); navigate({ to: "/v2/onboarding" }); }}>
+            <button className="v2-btn v2-btn-quiet" onClick={() => { signOut(); navigate({ to: "/app/onboarding" }); }}>
               <LogOut size={14} /> Sign out
             </button>
           </div>

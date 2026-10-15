@@ -64,7 +64,7 @@ export default function ResetPasswordPage() {
       return;
     }
     toast.success("Password updated. You are signed in.");
-    navigate({ to: "/v2" });
+    navigate({ to: "/app" });
   };
 
   return (
@@ -85,7 +85,7 @@ export default function ResetPasswordPage() {
             <p style={{ fontSize: 13.5, color: V.body, margin: 0 }}>
               This reset link has expired or was already used. Request a new one.
             </p>
-            <a className="v2-btn v2-btn-primary" style={{ justifySelf: "start" }} href="/v2/onboarding?mode=forgot">
+            <a className="v2-btn v2-btn-primary" style={{ justifySelf: "start" }} href="/app/onboarding?mode=forgot">
               Send a new link
             </a>
           </div>
@@ -105,7 +105,7 @@ export default function ResetPasswordPage() {
             </button>
           </form>
         )}
-        <a className="v2-link" href="/v2/onboarding?mode=signin" style={{ fontSize: 13, justifySelf: "start" }}>Back to sign in</a>
+        <a className="v2-link" href="/app/onboarding?mode=signin" style={{ fontSize: 13, justifySelf: "start" }}>Back to sign in</a>
       </div>
     </div>
   );

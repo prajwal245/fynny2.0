@@ -1037,7 +1037,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
         await waitForClient(clientId);
         const fid = firmId.current ?? (await firmReady.current);
         if (!fid) throw new Error("Create your practice first.");
-        const path = `${fid}/${clientId}/v2/${Date.now()}_${safeName(name)}`;
+        const path = `${fid}/${clientId}/app/${Date.now()}_${safeName(name)}`;
         setStage("Uploading securely");
         const { error: upErr } = await sb.storage
           .from("ca-client-documents")
@@ -1088,8 +1088,8 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
           if (res.duplicate) {
             const ex = res.existing;
             const open = () => {
-              if (ex?.clientId) void router.navigate({ to: "/v2/clients/$clientId", params: { clientId: ex.clientId }, search: { tab: "documents", doc: ex.id } as never });
-              else void router.navigate({ to: "/v2/documents" });
+              if (ex?.clientId) void router.navigate({ to: "/app/clients/$clientId", params: { clientId: ex.clientId }, search: { tab: "documents", doc: ex.id } as never });
+              else void router.navigate({ to: "/app/documents" });
             };
             if (ex && !ex.sameClient && clientId)
               toast.info(

@@ -24,7 +24,7 @@ import { closeStage } from "../lib/closeStage";
 const STATUS_LABEL: Record<string, string> = { matched: "Matched", exception: "Exception", unmatched: "Not run", ignored: "Ignored" };
 
 export default function ClientWorkspacePage() {
-  const { clientId } = useParams({ from: "/v2/clients/$clientId" });
+  const { clientId } = useParams({ from: "/app/clients/$clientId" });
   const [viewMatch, setViewMatch] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [archiving, setArchiving] = useState(false);
@@ -47,7 +47,7 @@ export default function ClientWorkspacePage() {
       <EmptyState
         title="Client not found"
         description="This client may have been removed. Go back to the client list to pick another one."
-        action={<Link className="v2-btn v2-btn-primary" to="/v2/clients">Back to clients</Link>}
+        action={<Link className="v2-btn v2-btn-primary" to="/app/clients">Back to clients</Link>}
       />
     );
   }
@@ -120,7 +120,7 @@ export default function ClientWorkspacePage() {
 
   return (
     <>
-      <Link to="/v2/clients" style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12.5, color: V.body, textDecoration: "none", marginBottom: 12 }}>
+      <Link to="/app/clients" style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12.5, color: V.body, textDecoration: "none", marginBottom: 12 }}>
         <ChevronLeft size={14} /> Clients
       </Link>
       <PageHeader
@@ -144,7 +144,7 @@ export default function ClientWorkspacePage() {
         <label className="v2-label" htmlFor="archive-reason">Reason (kept on the audit trail)</label>
         <input id="archive-reason" className="v2-input" placeholder="e.g. added by mistake, duplicate of another client" value={archiveReason} onChange={(e) => setArchiveReason(e.target.value)} />
         <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-          <button className="v2-btn v2-btn-primary" disabled={!archiveReason.trim()} onClick={() => void archiveClient(client.id, archiveReason.trim()).then((ok) => { if (ok) navigate({ to: "/v2/clients" }); })}>Archive client</button>
+          <button className="v2-btn v2-btn-primary" disabled={!archiveReason.trim()} onClick={() => void archiveClient(client.id, archiveReason.trim()).then((ok) => { if (ok) navigate({ to: "/app/clients" }); })}>Archive client</button>
           <button className="v2-btn v2-btn-quiet" onClick={() => setArchiving(false)}>Cancel</button>
         </div>
       </Modal>
@@ -203,7 +203,7 @@ export default function ClientWorkspacePage() {
               <button className="v2-btn v2-btn-ghost" disabled={narrateRunning} data-working={narrateRunning} onClick={() => { generateReport(client.id, period, "Monthly MIS", () => toast.success(`${period} MIS ready`)); }}>
                 {narrateRunning ? <><AgentGlyph agent="narrate" state="running" size={20} /><ShimmerText text="Narrate is preparing…" agent="narrate" /></> : "Generate MIS"}
               </button>
-              <Link className="v2-btn v2-btn-ghost" to="/v2/documents">Upload documents</Link>
+              <Link className="v2-btn v2-btn-ghost" to="/app/documents">Upload documents</Link>
             </div>
             <div style={{ fontSize: 12.5, color: V.muted, marginTop: 14 }}>
               Last MIS: {client.lastMis ? formatDate(client.lastMis) : "Not generated yet"}

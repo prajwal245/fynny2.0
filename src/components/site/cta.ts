@@ -7,7 +7,7 @@
  */
 import { track } from "@/lib/analytics";
 
-export const SIGNUP_URL = "/v2/onboarding?mode=signup";
+export const SIGNUP_URL = "/app/onboarding?mode=signup";
 export const CALENDLY_URL = "https://calendly.com/nidhi-fynhelp/nidhi-meetings";
 
 export const CTA_START = "Start free trial";

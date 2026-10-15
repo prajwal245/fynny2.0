@@ -87,7 +87,7 @@ export function SiteFooter() {
           <div>
             <h4>Talk to us</h4>
             <span className="sf-mail">support@fynhelp.com</span>
-            <Link to="/v2/onboarding?mode=signin" style={{ marginTop: 8 }}>
+            <Link to="/app/onboarding?mode=signin" style={{ marginTop: 8 }}>
               Sign in
             </Link>
           </div>

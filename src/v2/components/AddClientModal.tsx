@@ -85,7 +85,7 @@ export default function AddClientModal({ open, onClose, editing }: { open: boole
             {twin && (id === "name" || id === "gstin") && /already/.test(errors[id] ?? "") && (
               <>
                 {" "}
-                <Link to="/v2/clients/$clientId" params={{ clientId: twin.id }} onClick={onClose} style={{ color: V.maroon, fontWeight: 600 }}>
+                <Link to="/app/clients/$clientId" params={{ clientId: twin.id }} onClick={onClose} style={{ color: V.maroon, fontWeight: 600 }}>
                   Open {twin.name}
                 </Link>
               </>

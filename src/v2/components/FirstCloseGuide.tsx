@@ -51,7 +51,7 @@ export function useFirstCloseSteps() {
       return rows.length + reports.filter((r) => r.clientId === id).length * 1000;
     };
     const client = [...clients].sort((a, b) => progress(b.id) - progress(a.id))[0];
-    const base = client ? `/v2/clients/${client.id}` : "/v2/clients";
+    const base = client ? `/app/clients/${client.id}` : "/app/clients";
     const rows = client ? docs.filter((d) => d.clientId === client.id).flatMap((d) => d.rows).filter((r) => r.date && monthOf(r.date) === period) : [];
     const bank = rows.filter((r) => r.side === "bank");
     const books = rows.filter((r) => r.side === "books");
@@ -70,7 +70,7 @@ export function useFirstCloseSteps() {
         why: "The agents work client by client. Their email lets statements they send file themselves.",
         how: "Name and email are enough. The GSTIN is checked against its last character.",
         done: clients.length > 0,
-        action: { label: "Add a client", to: "/v2/clients?add=1" },
+        action: { label: "Add a client", to: "/app/clients?add=1" },
       },
       {
         key: "bank",
@@ -110,7 +110,7 @@ export function useFirstCloseSteps() {
         why: "Narrate builds revenue, expenses and insights from matched lines only, each figure linked to its source.",
         how: "Choose Monthly MIS. Lines still open are left out and the report says so at the top.",
         done: Boolean(report),
-        action: { label: "Generate MIS", to: report ? `/v2/reports/${report.id}` : `${base}?tab=mis` },
+        action: { label: "Generate MIS", to: report ? `/app/reports/${report.id}` : `${base}?tab=mis` },
       },
       {
         key: "signoff",
@@ -120,7 +120,7 @@ export function useFirstCloseSteps() {
           ? "Click Revenue to check its lines, then Sign off. Download the PDF or Excel to send to the client."
           : "Ask a partner to sign it off. Until then it stays a draft.",
         done: Boolean(report?.signedOff),
-        action: { label: report ? "Open the MIS" : "MIS and Reports", to: report ? `/v2/reports/${report.id}` : "/v2/reports" },
+        action: { label: report ? "Open the MIS" : "MIS and Reports", to: report ? `/app/reports/${report.id}` : "/app/reports" },
         partnerOnly: true,
       },
     ];

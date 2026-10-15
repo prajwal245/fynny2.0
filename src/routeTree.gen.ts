@@ -14,10 +14,10 @@ import { Route as BlogAdminRouteImport } from './routes/_blogAdmin'
 import { Route as CaAuthRouteImport } from './routes/_caAuth'
 import { Route as InternalAdminRouteImport } from './routes/_internalAdmin'
 import { Route as MainRouteImport } from './routes/_main'
+import { Route as AppRouteImport } from './routes/app'
 import { Route as GuideRouteImport } from './routes/guide'
 import { Route as SamplesRouteImport } from './routes/samples'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
-import { Route as V2RouteImport } from './routes/v2'
 import { Route as MainIndexRouteImport } from './routes/_main/index'
 import { Route as MainAboutRouteImport } from './routes/_main/about'
 import { Route as MainCaFirmsRouteImport } from './routes/_main/ca-firms'
@@ -37,16 +37,16 @@ import { Route as MainSignupRouteImport } from './routes/_main/signup'
 import { Route as MainTermsRouteImport } from './routes/_main/terms'
 import { Route as MainUseCasesRouteImport } from './routes/_main/use-cases'
 import { Route as MainWaitlistRouteImport } from './routes/_main/waitlist'
+import { Route as AppIndexRouteImport } from './routes/app/index'
+import { Route as AppChaserRouteImport } from './routes/app/chaser'
+import { Route as AppDocumentsRouteImport } from './routes/app/documents'
+import { Route as AppExceptionsRouteImport } from './routes/app/exceptions'
+import { Route as AppOnboardingRouteImport } from './routes/app/onboarding'
+import { Route as AppResetPasswordRouteImport } from './routes/app/reset-password'
+import { Route as AppReviewRouteImport } from './routes/app/review'
+import { Route as AppSettingsRouteImport } from './routes/app/settings'
 import { Route as DemoIndexRouteImport } from './routes/demo.index'
 import { Route as DemoSplatRouteImport } from './routes/demo.$'
-import { Route as V2IndexRouteImport } from './routes/v2/index'
-import { Route as V2ChaserRouteImport } from './routes/v2/chaser'
-import { Route as V2DocumentsRouteImport } from './routes/v2/documents'
-import { Route as V2ExceptionsRouteImport } from './routes/v2/exceptions'
-import { Route as V2OnboardingRouteImport } from './routes/v2/onboarding'
-import { Route as V2ResetPasswordRouteImport } from './routes/v2/reset-password'
-import { Route as V2ReviewRouteImport } from './routes/v2/review'
-import { Route as V2SettingsRouteImport } from './routes/v2/settings'
 import { Route as AdminAuthAdminProtectedRouteImport } from './routes/_adminAuth/admin/_protected'
 import { Route as AdminAuthAdminLoginRouteImport } from './routes/_adminAuth/admin/login'
 import { Route as AdminAuthAdminSetupRouteImport } from './routes/_adminAuth/admin/setup'
@@ -115,11 +115,11 @@ import { Route as ApiPublicCaPollGmailRouteImport } from './routes/api/public/ca
 import { Route as ApiPublicPracticeTickRouteImport } from './routes/api/public/practice-tick'
 import { Route as ApiPublicRazorpayWebhookRouteImport } from './routes/api/public/razorpay-webhook'
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp-webhook'
+import { Route as AppClientsIndexRouteImport } from './routes/app/clients.index'
+import { Route as AppClientsClientIdRouteImport } from './routes/app/clients.$clientId'
+import { Route as AppReportsIndexRouteImport } from './routes/app/reports.index'
+import { Route as AppReportsReportIdRouteImport } from './routes/app/reports.$reportId'
 import { Route as SharedMisTokenRouteImport } from './routes/shared.mis.$token'
-import { Route as V2ClientsIndexRouteImport } from './routes/v2/clients.index'
-import { Route as V2ClientsClientIdRouteImport } from './routes/v2/clients.$clientId'
-import { Route as V2ReportsIndexRouteImport } from './routes/v2/reports.index'
-import { Route as V2ReportsReportIdRouteImport } from './routes/v2/reports.$reportId'
 import { Route as AdminAuthAdminProtectedIndexRouteImport } from './routes/_adminAuth/admin/_protected/index'
 import { Route as AdminAuthAdminProtectedAiCreditsRouteImport } from './routes/_adminAuth/admin/_protected/ai-credits'
 import { Route as AdminAuthAdminProtectedAiMonitoringRouteImport } from './routes/_adminAuth/admin/_protected/ai-monitoring'
@@ -237,6 +237,11 @@ const MainRoute = MainRouteImport.update({
   id: '/_main',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppRoute = AppRouteImport.update({
+  id: '/app',
+  path: '/app',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GuideRoute = GuideRouteImport.update({
   id: '/guide',
   path: '/guide',
@@ -250,11 +255,6 @@ const SamplesRoute = SamplesRouteImport.update({
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
   path: '/sitemap.xml',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const V2Route = V2RouteImport.update({
-  id: '/v2',
-  path: '/v2',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MainIndexRoute = MainIndexRouteImport.update({
@@ -352,6 +352,46 @@ const MainWaitlistRoute = MainWaitlistRouteImport.update({
   path: '/waitlist',
   getParentRoute: () => MainRoute,
 } as any)
+const AppIndexRoute = AppIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppChaserRoute = AppChaserRouteImport.update({
+  id: '/chaser',
+  path: '/chaser',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDocumentsRoute = AppDocumentsRouteImport.update({
+  id: '/documents',
+  path: '/documents',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppExceptionsRoute = AppExceptionsRouteImport.update({
+  id: '/exceptions',
+  path: '/exceptions',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppOnboardingRoute = AppOnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppResetPasswordRoute = AppResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppReviewRoute = AppReviewRouteImport.update({
+  id: '/review',
+  path: '/review',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
 const DemoIndexRoute = DemoIndexRouteImport.update({
   id: '/demo/',
   path: '/demo/',
@@ -361,46 +401,6 @@ const DemoSplatRoute = DemoSplatRouteImport.update({
   id: '/demo/$',
   path: '/demo/$',
   getParentRoute: () => rootRouteImport,
-} as any)
-const V2IndexRoute = V2IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => V2Route,
-} as any)
-const V2ChaserRoute = V2ChaserRouteImport.update({
-  id: '/chaser',
-  path: '/chaser',
-  getParentRoute: () => V2Route,
-} as any)
-const V2DocumentsRoute = V2DocumentsRouteImport.update({
-  id: '/documents',
-  path: '/documents',
-  getParentRoute: () => V2Route,
-} as any)
-const V2ExceptionsRoute = V2ExceptionsRouteImport.update({
-  id: '/exceptions',
-  path: '/exceptions',
-  getParentRoute: () => V2Route,
-} as any)
-const V2OnboardingRoute = V2OnboardingRouteImport.update({
-  id: '/onboarding',
-  path: '/onboarding',
-  getParentRoute: () => V2Route,
-} as any)
-const V2ResetPasswordRoute = V2ResetPasswordRouteImport.update({
-  id: '/reset-password',
-  path: '/reset-password',
-  getParentRoute: () => V2Route,
-} as any)
-const V2ReviewRoute = V2ReviewRouteImport.update({
-  id: '/review',
-  path: '/review',
-  getParentRoute: () => V2Route,
-} as any)
-const V2SettingsRoute = V2SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => V2Route,
 } as any)
 const AdminAuthAdminProtectedRoute = AdminAuthAdminProtectedRouteImport.update({
   id: '/admin/_protected',
@@ -764,30 +764,30 @@ const ApiPublicWhatsappWebhookRoute =
     path: '/api/public/whatsapp-webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AppClientsIndexRoute = AppClientsIndexRouteImport.update({
+  id: '/clients/',
+  path: '/clients/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppClientsClientIdRoute = AppClientsClientIdRouteImport.update({
+  id: '/clients/$clientId',
+  path: '/clients/$clientId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppReportsIndexRoute = AppReportsIndexRouteImport.update({
+  id: '/reports/',
+  path: '/reports/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppReportsReportIdRoute = AppReportsReportIdRouteImport.update({
+  id: '/reports/$reportId',
+  path: '/reports/$reportId',
+  getParentRoute: () => AppRoute,
+} as any)
 const SharedMisTokenRoute = SharedMisTokenRouteImport.update({
   id: '/shared/mis/$token',
   path: '/shared/mis/$token',
   getParentRoute: () => rootRouteImport,
-} as any)
-const V2ClientsIndexRoute = V2ClientsIndexRouteImport.update({
-  id: '/clients/',
-  path: '/clients/',
-  getParentRoute: () => V2Route,
-} as any)
-const V2ClientsClientIdRoute = V2ClientsClientIdRouteImport.update({
-  id: '/clients/$clientId',
-  path: '/clients/$clientId',
-  getParentRoute: () => V2Route,
-} as any)
-const V2ReportsIndexRoute = V2ReportsIndexRouteImport.update({
-  id: '/reports/',
-  path: '/reports/',
-  getParentRoute: () => V2Route,
-} as any)
-const V2ReportsReportIdRoute = V2ReportsReportIdRouteImport.update({
-  id: '/reports/$reportId',
-  path: '/reports/$reportId',
-  getParentRoute: () => V2Route,
 } as any)
 const AdminAuthAdminProtectedIndexRoute =
   AdminAuthAdminProtectedIndexRouteImport.update({
@@ -1351,10 +1351,10 @@ const AdminAuthAdminProtectedBlogPostIdEditRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof MainIndexRoute
+  '/app': typeof AppRouteWithChildren
   '/guide': typeof GuideRoute
   '/samples': typeof SamplesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/v2': typeof V2RouteWithChildren
   '/about': typeof MainAboutRoute
   '/ca-firms': typeof MainCaFirmsRoute
   '/community': typeof MainCommunityRoute
@@ -1373,16 +1373,16 @@ export interface FileRoutesByFullPath {
   '/terms': typeof MainTermsRoute
   '/use-cases': typeof MainUseCasesRoute
   '/waitlist': typeof MainWaitlistRoute
+  '/app/chaser': typeof AppChaserRoute
+  '/app/documents': typeof AppDocumentsRoute
+  '/app/exceptions': typeof AppExceptionsRoute
+  '/app/onboarding': typeof AppOnboardingRoute
+  '/app/reset-password': typeof AppResetPasswordRoute
+  '/app/review': typeof AppReviewRoute
+  '/app/settings': typeof AppSettingsRoute
   '/demo/$': typeof DemoSplatRoute
-  '/v2/chaser': typeof V2ChaserRoute
-  '/v2/documents': typeof V2DocumentsRoute
-  '/v2/exceptions': typeof V2ExceptionsRoute
-  '/v2/onboarding': typeof V2OnboardingRoute
-  '/v2/reset-password': typeof V2ResetPasswordRoute
-  '/v2/review': typeof V2ReviewRoute
-  '/v2/settings': typeof V2SettingsRoute
+  '/app/': typeof AppIndexRoute
   '/demo/': typeof DemoIndexRoute
-  '/v2/': typeof V2IndexRoute
   '/admin': typeof AdminAuthAdminProtectedRouteWithChildren
   '/admin/login': typeof AdminAuthAdminLoginRoute
   '/admin/setup': typeof AdminAuthAdminSetupRoute
@@ -1447,15 +1447,15 @@ export interface FileRoutesByFullPath {
   '/api/public/practice-tick': typeof ApiPublicPracticeTickRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/whatsapp-webhook': typeof ApiPublicWhatsappWebhookRoute
+  '/app/clients/$clientId': typeof AppClientsClientIdRoute
+  '/app/reports/$reportId': typeof AppReportsReportIdRoute
   '/shared/mis/$token': typeof SharedMisTokenRoute
-  '/v2/clients/$clientId': typeof V2ClientsClientIdRoute
-  '/v2/reports/$reportId': typeof V2ReportsReportIdRoute
   '/blog-admin/': typeof BlogAdminBlogAdminIndexRoute
   '/intern/': typeof BlogAdminInternIndexRoute
   '/blog/': typeof MainBlogIndexRoute
   '/dashboard/': typeof MainDashboardIndexRoute
-  '/v2/clients/': typeof V2ClientsIndexRoute
-  '/v2/reports/': typeof V2ReportsIndexRoute
+  '/app/clients/': typeof AppClientsIndexRoute
+  '/app/reports/': typeof AppReportsIndexRoute
   '/admin/ai-credits': typeof AdminAuthAdminProtectedAiCreditsRoute
   '/admin/ai-monitoring': typeof AdminAuthAdminProtectedAiMonitoringRoute
   '/admin/analytics': typeof AdminAuthAdminProtectedAnalyticsRoute
@@ -1575,16 +1575,16 @@ export interface FileRoutesByTo {
   '/terms': typeof MainTermsRoute
   '/use-cases': typeof MainUseCasesRoute
   '/waitlist': typeof MainWaitlistRoute
+  '/app/chaser': typeof AppChaserRoute
+  '/app/documents': typeof AppDocumentsRoute
+  '/app/exceptions': typeof AppExceptionsRoute
+  '/app/onboarding': typeof AppOnboardingRoute
+  '/app/reset-password': typeof AppResetPasswordRoute
+  '/app/review': typeof AppReviewRoute
+  '/app/settings': typeof AppSettingsRoute
   '/demo/$': typeof DemoSplatRoute
-  '/v2/chaser': typeof V2ChaserRoute
-  '/v2/documents': typeof V2DocumentsRoute
-  '/v2/exceptions': typeof V2ExceptionsRoute
-  '/v2/onboarding': typeof V2OnboardingRoute
-  '/v2/reset-password': typeof V2ResetPasswordRoute
-  '/v2/review': typeof V2ReviewRoute
-  '/v2/settings': typeof V2SettingsRoute
+  '/app': typeof AppIndexRoute
   '/demo': typeof DemoIndexRoute
-  '/v2': typeof V2IndexRoute
   '/admin/login': typeof AdminAuthAdminLoginRoute
   '/admin/setup': typeof AdminAuthAdminSetupRoute
   '/blog-admin/editor': typeof BlogAdminBlogAdminEditorRoute
@@ -1646,15 +1646,15 @@ export interface FileRoutesByTo {
   '/api/public/practice-tick': typeof ApiPublicPracticeTickRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/whatsapp-webhook': typeof ApiPublicWhatsappWebhookRoute
+  '/app/clients/$clientId': typeof AppClientsClientIdRoute
+  '/app/reports/$reportId': typeof AppReportsReportIdRoute
   '/shared/mis/$token': typeof SharedMisTokenRoute
-  '/v2/clients/$clientId': typeof V2ClientsClientIdRoute
-  '/v2/reports/$reportId': typeof V2ReportsReportIdRoute
   '/blog-admin': typeof BlogAdminBlogAdminIndexRoute
   '/intern': typeof BlogAdminInternIndexRoute
   '/blog': typeof MainBlogIndexRoute
   '/dashboard': typeof MainDashboardIndexRoute
-  '/v2/clients': typeof V2ClientsIndexRoute
-  '/v2/reports': typeof V2ReportsIndexRoute
+  '/app/clients': typeof AppClientsIndexRoute
+  '/app/reports': typeof AppReportsIndexRoute
   '/admin/ai-credits': typeof AdminAuthAdminProtectedAiCreditsRoute
   '/admin/ai-monitoring': typeof AdminAuthAdminProtectedAiMonitoringRoute
   '/admin/analytics': typeof AdminAuthAdminProtectedAnalyticsRoute
@@ -1759,10 +1759,10 @@ export interface FileRoutesById {
   '/_caAuth': typeof CaAuthRouteWithChildren
   '/_internalAdmin': typeof InternalAdminRouteWithChildren
   '/_main': typeof MainRouteWithChildren
+  '/app': typeof AppRouteWithChildren
   '/guide': typeof GuideRoute
   '/samples': typeof SamplesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/v2': typeof V2RouteWithChildren
   '/_main/about': typeof MainAboutRoute
   '/_main/ca-firms': typeof MainCaFirmsRoute
   '/_main/community': typeof MainCommunityRoute
@@ -1781,17 +1781,17 @@ export interface FileRoutesById {
   '/_main/terms': typeof MainTermsRoute
   '/_main/use-cases': typeof MainUseCasesRoute
   '/_main/waitlist': typeof MainWaitlistRoute
+  '/app/chaser': typeof AppChaserRoute
+  '/app/documents': typeof AppDocumentsRoute
+  '/app/exceptions': typeof AppExceptionsRoute
+  '/app/onboarding': typeof AppOnboardingRoute
+  '/app/reset-password': typeof AppResetPasswordRoute
+  '/app/review': typeof AppReviewRoute
+  '/app/settings': typeof AppSettingsRoute
   '/demo/$': typeof DemoSplatRoute
-  '/v2/chaser': typeof V2ChaserRoute
-  '/v2/documents': typeof V2DocumentsRoute
-  '/v2/exceptions': typeof V2ExceptionsRoute
-  '/v2/onboarding': typeof V2OnboardingRoute
-  '/v2/reset-password': typeof V2ResetPasswordRoute
-  '/v2/review': typeof V2ReviewRoute
-  '/v2/settings': typeof V2SettingsRoute
   '/_main/': typeof MainIndexRoute
+  '/app/': typeof AppIndexRoute
   '/demo/': typeof DemoIndexRoute
-  '/v2/': typeof V2IndexRoute
   '/_adminAuth/admin/_protected': typeof AdminAuthAdminProtectedRouteWithChildren
   '/_adminAuth/admin/login': typeof AdminAuthAdminLoginRoute
   '/_adminAuth/admin/setup': typeof AdminAuthAdminSetupRoute
@@ -1856,15 +1856,15 @@ export interface FileRoutesById {
   '/api/public/practice-tick': typeof ApiPublicPracticeTickRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/whatsapp-webhook': typeof ApiPublicWhatsappWebhookRoute
+  '/app/clients/$clientId': typeof AppClientsClientIdRoute
+  '/app/reports/$reportId': typeof AppReportsReportIdRoute
   '/shared/mis/$token': typeof SharedMisTokenRoute
-  '/v2/clients/$clientId': typeof V2ClientsClientIdRoute
-  '/v2/reports/$reportId': typeof V2ReportsReportIdRoute
   '/_blogAdmin/blog-admin/': typeof BlogAdminBlogAdminIndexRoute
   '/_blogAdmin/intern/': typeof BlogAdminInternIndexRoute
   '/_main/blog/': typeof MainBlogIndexRoute
   '/_main/dashboard/': typeof MainDashboardIndexRoute
-  '/v2/clients/': typeof V2ClientsIndexRoute
-  '/v2/reports/': typeof V2ReportsIndexRoute
+  '/app/clients/': typeof AppClientsIndexRoute
+  '/app/reports/': typeof AppReportsIndexRoute
   '/_adminAuth/admin/_protected/ai-credits': typeof AdminAuthAdminProtectedAiCreditsRoute
   '/_adminAuth/admin/_protected/ai-monitoring': typeof AdminAuthAdminProtectedAiMonitoringRoute
   '/_adminAuth/admin/_protected/analytics': typeof AdminAuthAdminProtectedAnalyticsRoute
@@ -1966,10 +1966,10 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/app'
     | '/guide'
     | '/samples'
     | '/sitemap.xml'
-    | '/v2'
     | '/about'
     | '/ca-firms'
     | '/community'
@@ -1988,16 +1988,16 @@ export interface FileRouteTypes {
     | '/terms'
     | '/use-cases'
     | '/waitlist'
+    | '/app/chaser'
+    | '/app/documents'
+    | '/app/exceptions'
+    | '/app/onboarding'
+    | '/app/reset-password'
+    | '/app/review'
+    | '/app/settings'
     | '/demo/$'
-    | '/v2/chaser'
-    | '/v2/documents'
-    | '/v2/exceptions'
-    | '/v2/onboarding'
-    | '/v2/reset-password'
-    | '/v2/review'
-    | '/v2/settings'
+    | '/app/'
     | '/demo/'
-    | '/v2/'
     | '/admin'
     | '/admin/login'
     | '/admin/setup'
@@ -2062,15 +2062,15 @@ export interface FileRouteTypes {
     | '/api/public/practice-tick'
     | '/api/public/razorpay-webhook'
     | '/api/public/whatsapp-webhook'
+    | '/app/clients/$clientId'
+    | '/app/reports/$reportId'
     | '/shared/mis/$token'
-    | '/v2/clients/$clientId'
-    | '/v2/reports/$reportId'
     | '/blog-admin/'
     | '/intern/'
     | '/blog/'
     | '/dashboard/'
-    | '/v2/clients/'
-    | '/v2/reports/'
+    | '/app/clients/'
+    | '/app/reports/'
     | '/admin/ai-credits'
     | '/admin/ai-monitoring'
     | '/admin/analytics'
@@ -2190,16 +2190,16 @@ export interface FileRouteTypes {
     | '/terms'
     | '/use-cases'
     | '/waitlist'
+    | '/app/chaser'
+    | '/app/documents'
+    | '/app/exceptions'
+    | '/app/onboarding'
+    | '/app/reset-password'
+    | '/app/review'
+    | '/app/settings'
     | '/demo/$'
-    | '/v2/chaser'
-    | '/v2/documents'
-    | '/v2/exceptions'
-    | '/v2/onboarding'
-    | '/v2/reset-password'
-    | '/v2/review'
-    | '/v2/settings'
+    | '/app'
     | '/demo'
-    | '/v2'
     | '/admin/login'
     | '/admin/setup'
     | '/blog-admin/editor'
@@ -2261,15 +2261,15 @@ export interface FileRouteTypes {
     | '/api/public/practice-tick'
     | '/api/public/razorpay-webhook'
     | '/api/public/whatsapp-webhook'
+    | '/app/clients/$clientId'
+    | '/app/reports/$reportId'
     | '/shared/mis/$token'
-    | '/v2/clients/$clientId'
-    | '/v2/reports/$reportId'
     | '/blog-admin'
     | '/intern'
     | '/blog'
     | '/dashboard'
-    | '/v2/clients'
-    | '/v2/reports'
+    | '/app/clients'
+    | '/app/reports'
     | '/admin/ai-credits'
     | '/admin/ai-monitoring'
     | '/admin/analytics'
@@ -2373,10 +2373,10 @@ export interface FileRouteTypes {
     | '/_caAuth'
     | '/_internalAdmin'
     | '/_main'
+    | '/app'
     | '/guide'
     | '/samples'
     | '/sitemap.xml'
-    | '/v2'
     | '/_main/about'
     | '/_main/ca-firms'
     | '/_main/community'
@@ -2395,17 +2395,17 @@ export interface FileRouteTypes {
     | '/_main/terms'
     | '/_main/use-cases'
     | '/_main/waitlist'
+    | '/app/chaser'
+    | '/app/documents'
+    | '/app/exceptions'
+    | '/app/onboarding'
+    | '/app/reset-password'
+    | '/app/review'
+    | '/app/settings'
     | '/demo/$'
-    | '/v2/chaser'
-    | '/v2/documents'
-    | '/v2/exceptions'
-    | '/v2/onboarding'
-    | '/v2/reset-password'
-    | '/v2/review'
-    | '/v2/settings'
     | '/_main/'
+    | '/app/'
     | '/demo/'
-    | '/v2/'
     | '/_adminAuth/admin/_protected'
     | '/_adminAuth/admin/login'
     | '/_adminAuth/admin/setup'
@@ -2470,15 +2470,15 @@ export interface FileRouteTypes {
     | '/api/public/practice-tick'
     | '/api/public/razorpay-webhook'
     | '/api/public/whatsapp-webhook'
+    | '/app/clients/$clientId'
+    | '/app/reports/$reportId'
     | '/shared/mis/$token'
-    | '/v2/clients/$clientId'
-    | '/v2/reports/$reportId'
     | '/_blogAdmin/blog-admin/'
     | '/_blogAdmin/intern/'
     | '/_main/blog/'
     | '/_main/dashboard/'
-    | '/v2/clients/'
-    | '/v2/reports/'
+    | '/app/clients/'
+    | '/app/reports/'
     | '/_adminAuth/admin/_protected/ai-credits'
     | '/_adminAuth/admin/_protected/ai-monitoring'
     | '/_adminAuth/admin/_protected/analytics'
@@ -2583,10 +2583,10 @@ export interface RootRouteChildren {
   CaAuthRoute: typeof CaAuthRouteWithChildren
   InternalAdminRoute: typeof InternalAdminRouteWithChildren
   MainRoute: typeof MainRouteWithChildren
+  AppRoute: typeof AppRouteWithChildren
   GuideRoute: typeof GuideRoute
   SamplesRoute: typeof SamplesRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
-  V2Route: typeof V2RouteWithChildren
   DemoSplatRoute: typeof DemoSplatRoute
   DemoIndexRoute: typeof DemoIndexRoute
   ApiPublicCaAutoEscalateChasersRoute: typeof ApiPublicCaAutoEscalateChasersRoute
@@ -2646,6 +2646,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MainRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app': {
+      id: '/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/guide': {
       id: '/guide'
       path: '/guide'
@@ -2665,13 +2672,6 @@ declare module '@tanstack/react-router' {
       path: '/sitemap.xml'
       fullPath: '/sitemap.xml'
       preLoaderRoute: typeof SitemapDotxmlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/v2': {
-      id: '/v2'
-      path: '/v2'
-      fullPath: '/v2'
-      preLoaderRoute: typeof V2RouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_main/': {
@@ -2807,6 +2807,62 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MainWaitlistRouteImport
       parentRoute: typeof MainRoute
     }
+    '/app/': {
+      id: '/app/'
+      path: '/'
+      fullPath: '/app/'
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/chaser': {
+      id: '/app/chaser'
+      path: '/chaser'
+      fullPath: '/app/chaser'
+      preLoaderRoute: typeof AppChaserRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/documents': {
+      id: '/app/documents'
+      path: '/documents'
+      fullPath: '/app/documents'
+      preLoaderRoute: typeof AppDocumentsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/exceptions': {
+      id: '/app/exceptions'
+      path: '/exceptions'
+      fullPath: '/app/exceptions'
+      preLoaderRoute: typeof AppExceptionsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/onboarding': {
+      id: '/app/onboarding'
+      path: '/onboarding'
+      fullPath: '/app/onboarding'
+      preLoaderRoute: typeof AppOnboardingRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/reset-password': {
+      id: '/app/reset-password'
+      path: '/reset-password'
+      fullPath: '/app/reset-password'
+      preLoaderRoute: typeof AppResetPasswordRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/review': {
+      id: '/app/review'
+      path: '/review'
+      fullPath: '/app/review'
+      preLoaderRoute: typeof AppReviewRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/settings': {
+      id: '/app/settings'
+      path: '/settings'
+      fullPath: '/app/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/demo/': {
       id: '/demo/'
       path: '/demo'
@@ -2820,62 +2876,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/demo/$'
       preLoaderRoute: typeof DemoSplatRouteImport
       parentRoute: typeof rootRouteImport
-    }
-    '/v2/': {
-      id: '/v2/'
-      path: '/'
-      fullPath: '/v2/'
-      preLoaderRoute: typeof V2IndexRouteImport
-      parentRoute: typeof V2Route
-    }
-    '/v2/chaser': {
-      id: '/v2/chaser'
-      path: '/chaser'
-      fullPath: '/v2/chaser'
-      preLoaderRoute: typeof V2ChaserRouteImport
-      parentRoute: typeof V2Route
-    }
-    '/v2/documents': {
-      id: '/v2/documents'
-      path: '/documents'
-      fullPath: '/v2/documents'
-      preLoaderRoute: typeof V2DocumentsRouteImport
-      parentRoute: typeof V2Route
-    }
-    '/v2/exceptions': {
-      id: '/v2/exceptions'
-      path: '/exceptions'
-      fullPath: '/v2/exceptions'
-      preLoaderRoute: typeof V2ExceptionsRouteImport
-      parentRoute: typeof V2Route
-    }
-    '/v2/onboarding': {
-      id: '/v2/onboarding'
-      path: '/onboarding'
-      fullPath: '/v2/onboarding'
-      preLoaderRoute: typeof V2OnboardingRouteImport
-      parentRoute: typeof V2Route
-    }
-    '/v2/reset-password': {
-      id: '/v2/reset-password'
-      path: '/reset-password'
-      fullPath: '/v2/reset-password'
-      preLoaderRoute: typeof V2ResetPasswordRouteImport
-      parentRoute: typeof V2Route
-    }
-    '/v2/review': {
-      id: '/v2/review'
-      path: '/review'
-      fullPath: '/v2/review'
-      preLoaderRoute: typeof V2ReviewRouteImport
-      parentRoute: typeof V2Route
-    }
-    '/v2/settings': {
-      id: '/v2/settings'
-      path: '/settings'
-      fullPath: '/v2/settings'
-      preLoaderRoute: typeof V2SettingsRouteImport
-      parentRoute: typeof V2Route
     }
     '/_adminAuth/admin/_protected': {
       id: '/_adminAuth/admin/_protected'
@@ -3353,40 +3353,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicWhatsappWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app/clients/': {
+      id: '/app/clients/'
+      path: '/clients'
+      fullPath: '/app/clients/'
+      preLoaderRoute: typeof AppClientsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/clients/$clientId': {
+      id: '/app/clients/$clientId'
+      path: '/clients/$clientId'
+      fullPath: '/app/clients/$clientId'
+      preLoaderRoute: typeof AppClientsClientIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/reports/': {
+      id: '/app/reports/'
+      path: '/reports'
+      fullPath: '/app/reports/'
+      preLoaderRoute: typeof AppReportsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/reports/$reportId': {
+      id: '/app/reports/$reportId'
+      path: '/reports/$reportId'
+      fullPath: '/app/reports/$reportId'
+      preLoaderRoute: typeof AppReportsReportIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/shared/mis/$token': {
       id: '/shared/mis/$token'
       path: '/shared/mis/$token'
       fullPath: '/shared/mis/$token'
       preLoaderRoute: typeof SharedMisTokenRouteImport
       parentRoute: typeof rootRouteImport
-    }
-    '/v2/clients/': {
-      id: '/v2/clients/'
-      path: '/clients'
-      fullPath: '/v2/clients/'
-      preLoaderRoute: typeof V2ClientsIndexRouteImport
-      parentRoute: typeof V2Route
-    }
-    '/v2/clients/$clientId': {
-      id: '/v2/clients/$clientId'
-      path: '/clients/$clientId'
-      fullPath: '/v2/clients/$clientId'
-      preLoaderRoute: typeof V2ClientsClientIdRouteImport
-      parentRoute: typeof V2Route
-    }
-    '/v2/reports/': {
-      id: '/v2/reports/'
-      path: '/reports'
-      fullPath: '/v2/reports/'
-      preLoaderRoute: typeof V2ReportsIndexRouteImport
-      parentRoute: typeof V2Route
-    }
-    '/v2/reports/$reportId': {
-      id: '/v2/reports/$reportId'
-      path: '/reports/$reportId'
-      fullPath: '/v2/reports/$reportId'
-      preLoaderRoute: typeof V2ReportsReportIdRouteImport
-      parentRoute: typeof V2Route
     }
     '/_adminAuth/admin/_protected/': {
       id: '/_adminAuth/admin/_protected/'
@@ -4508,37 +4508,37 @@ const MainRouteChildren: MainRouteChildren = {
 
 const MainRouteWithChildren = MainRoute._addFileChildren(MainRouteChildren)
 
-interface V2RouteChildren {
-  V2ChaserRoute: typeof V2ChaserRoute
-  V2DocumentsRoute: typeof V2DocumentsRoute
-  V2ExceptionsRoute: typeof V2ExceptionsRoute
-  V2OnboardingRoute: typeof V2OnboardingRoute
-  V2ResetPasswordRoute: typeof V2ResetPasswordRoute
-  V2ReviewRoute: typeof V2ReviewRoute
-  V2SettingsRoute: typeof V2SettingsRoute
-  V2IndexRoute: typeof V2IndexRoute
-  V2ClientsClientIdRoute: typeof V2ClientsClientIdRoute
-  V2ReportsReportIdRoute: typeof V2ReportsReportIdRoute
-  V2ClientsIndexRoute: typeof V2ClientsIndexRoute
-  V2ReportsIndexRoute: typeof V2ReportsIndexRoute
+interface AppRouteChildren {
+  AppChaserRoute: typeof AppChaserRoute
+  AppDocumentsRoute: typeof AppDocumentsRoute
+  AppExceptionsRoute: typeof AppExceptionsRoute
+  AppOnboardingRoute: typeof AppOnboardingRoute
+  AppResetPasswordRoute: typeof AppResetPasswordRoute
+  AppReviewRoute: typeof AppReviewRoute
+  AppSettingsRoute: typeof AppSettingsRoute
+  AppIndexRoute: typeof AppIndexRoute
+  AppClientsClientIdRoute: typeof AppClientsClientIdRoute
+  AppReportsReportIdRoute: typeof AppReportsReportIdRoute
+  AppClientsIndexRoute: typeof AppClientsIndexRoute
+  AppReportsIndexRoute: typeof AppReportsIndexRoute
 }
 
-const V2RouteChildren: V2RouteChildren = {
-  V2ChaserRoute: V2ChaserRoute,
-  V2DocumentsRoute: V2DocumentsRoute,
-  V2ExceptionsRoute: V2ExceptionsRoute,
-  V2OnboardingRoute: V2OnboardingRoute,
-  V2ResetPasswordRoute: V2ResetPasswordRoute,
-  V2ReviewRoute: V2ReviewRoute,
-  V2SettingsRoute: V2SettingsRoute,
-  V2IndexRoute: V2IndexRoute,
-  V2ClientsClientIdRoute: V2ClientsClientIdRoute,
-  V2ReportsReportIdRoute: V2ReportsReportIdRoute,
-  V2ClientsIndexRoute: V2ClientsIndexRoute,
-  V2ReportsIndexRoute: V2ReportsIndexRoute,
+const AppRouteChildren: AppRouteChildren = {
+  AppChaserRoute: AppChaserRoute,
+  AppDocumentsRoute: AppDocumentsRoute,
+  AppExceptionsRoute: AppExceptionsRoute,
+  AppOnboardingRoute: AppOnboardingRoute,
+  AppResetPasswordRoute: AppResetPasswordRoute,
+  AppReviewRoute: AppReviewRoute,
+  AppSettingsRoute: AppSettingsRoute,
+  AppIndexRoute: AppIndexRoute,
+  AppClientsClientIdRoute: AppClientsClientIdRoute,
+  AppReportsReportIdRoute: AppReportsReportIdRoute,
+  AppClientsIndexRoute: AppClientsIndexRoute,
+  AppReportsIndexRoute: AppReportsIndexRoute,
 }
 
-const V2RouteWithChildren = V2Route._addFileChildren(V2RouteChildren)
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   AdminAuthRoute: AdminAuthRouteWithChildren,
@@ -4546,10 +4546,10 @@ const rootRouteChildren: RootRouteChildren = {
   CaAuthRoute: CaAuthRouteWithChildren,
   InternalAdminRoute: InternalAdminRouteWithChildren,
   MainRoute: MainRouteWithChildren,
+  AppRoute: AppRouteWithChildren,
   GuideRoute: GuideRoute,
   SamplesRoute: SamplesRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
-  V2Route: V2RouteWithChildren,
   DemoSplatRoute: DemoSplatRoute,
   DemoIndexRoute: DemoIndexRoute,
   ApiPublicCaAutoEscalateChasersRoute: ApiPublicCaAutoEscalateChasersRoute,

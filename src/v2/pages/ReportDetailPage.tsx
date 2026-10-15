@@ -17,7 +17,7 @@ function dedupeParticulars(p: string): string {
 }
 
 export default function ReportDetailPage() {
-  const { reportId } = useParams({ from: "/v2/reports/$reportId" });
+  const { reportId } = useParams({ from: "/app/reports/$reportId" });
   const { reports, clientName, firm, session, signOffReport, requestCorrection, markCorrected, generateReport, partnerView, exceptions, review, docs } = useV2();
   const report = reports.find((r) => r.id === reportId);
   const [source, setSource] = useState<{ label: string; rows: Txn[] } | null>(null);
@@ -41,7 +41,7 @@ export default function ReportDetailPage() {
   }, [reportId]);
 
   if (!report) {
-    return <EmptyState title="Report not found" description="This report may have been removed. Go back to the reports list to pick another one." action={<Link className="v2-btn v2-btn-primary" to="/v2/reports">Back to reports</Link>} />;
+    return <EmptyState title="Report not found" description="This report may have been removed. Go back to the reports list to pick another one." action={<Link className="v2-btn v2-btn-primary" to="/app/reports">Back to reports</Link>} />;
   }
 
   const net = report.revenue - report.expenses;
@@ -104,7 +104,7 @@ export default function ReportDetailPage() {
 
   return (
     <>
-      <Link to="/v2/reports" style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12.5, color: V.body, textDecoration: "none", marginBottom: 12 }}>
+      <Link to="/app/reports" style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12.5, color: V.body, textDecoration: "none", marginBottom: 12 }}>
         <ChevronLeft size={14} /> Reports
       </Link>
       <PageHeader
@@ -142,11 +142,11 @@ export default function ReportDetailPage() {
                 generateReport(report.clientId, report.period, report.template, (r) => {
                   setRegenerating(false);
                   toast.success("Regenerated");
-                  navigate({ to: "/v2/reports/$reportId", params: { reportId: r.id } });
+                  navigate({ to: "/app/reports/$reportId", params: { reportId: r.id } });
                 });
               }}>{regenerating ? "Regenerating…" : "Regenerate"}</button>
             ) : (
-              <Link className="v2-btn v2-btn-ghost" to="/v2/reports/$reportId" params={{ reportId: latestId! }}>Open the latest</Link>
+              <Link className="v2-btn v2-btn-ghost" to="/app/reports/$reportId" params={{ reportId: latestId! }}>Open the latest</Link>
             )}
           </div>
         </Card>

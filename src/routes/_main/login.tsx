@@ -4,7 +4,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 export const Route = createFileRoute("/_main/login")({
   beforeLoad: ({ location }) => {
     const mode = new URLSearchParams(location.searchStr).get("mode") === "signup" ? "signup" : "signin";
-    throw redirect({ href: `/v2/onboarding?mode=${mode}` });
+    throw redirect({ href: `/app/onboarding?mode=${mode}` });
   },
   component: () => null,
 });

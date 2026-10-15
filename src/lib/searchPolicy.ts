@@ -12,7 +12,7 @@ const INDEXABLE_HOSTS = new Set([SITE_HOST, SITE_HOST.replace(/^www\./, "")]);
 
 // App, account and admin areas: never in search results.
 const PRIVATE_PREFIXES = [
-  "/v2", "/dashboard", "/admin", "/intern", "/blog-admin", "/ca", "/shared",
+  "/app", "/v2", "/dashboard", "/admin", "/intern", "/blog-admin", "/ca", "/shared",
   "/login", "/signup", "/onboarding", "/reset-password", "/api", "/waitlist", "/demo",
 ];
 
@@ -30,6 +30,11 @@ export function robotsHeaderFor(host: string, path: string): string | null {
 export function normalizeUrl(request: Request): Response | null {
   if (request.method !== "GET" && request.method !== "HEAD") return null;
   const url = new URL(request.url);
+  // The app moved from /v2 to /app: old bookmarks, emails and sign-in returns
+  // land on the same page (the browser keeps any #fragment).
+  if (url.pathname === "/v2" || url.pathname.startsWith("/v2/")) {
+    return new Response(null, { status: 308, headers: { location: `/app${url.pathname.slice(3)}${url.search}` } });
+  }
   if (url.pathname.length > 1 && url.pathname.endsWith("/")) {
     const path = url.pathname.replace(/\/+$/, "") || "/";
     return new Response(null, { status: 308, headers: { location: path + url.search } });

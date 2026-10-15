@@ -49,7 +49,7 @@ export default function ReportsPage({ clientId: scopedClient }: { clientId?: str
     setOpen(false);
     generateReport(clientId, period, template, (r) => {
       toast.success(`${r.template} ready`);
-      navigate({ to: "/v2/reports/$reportId", params: { reportId: r.id } });
+      navigate({ to: "/app/reports/$reportId", params: { reportId: r.id } });
     });
   };
 
@@ -101,7 +101,7 @@ export default function ReportsPage({ clientId: scopedClient }: { clientId?: str
                     initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                     transition={{ duration: 0.3 }}
                     className="clickable"
-                    onClick={() => navigate({ to: "/v2/reports/$reportId", params: { reportId: r.id } })}
+                    onClick={() => navigate({ to: "/app/reports/$reportId", params: { reportId: r.id } })}
                   >
                     {!scopedClient && <td style={{ fontWeight: 600 }}>{clientName(r.clientId)}</td>}
                     <td style={{ color: V.body }}>{r.period}</td>

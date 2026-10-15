@@ -93,7 +93,7 @@ export async function inviteMember(
   });
   if (error) throw new PracticeError("db_error", error.message);
 
-  const link = `${appOrigin ?? process.env["PUBLIC_APP_URL"] ?? "https://fynhelp.com"}/v2/onboarding`;
+  const link = `${appOrigin ?? process.env["PUBLIC_APP_URL"] ?? "https://fynhelp.com"}/app/onboarding`;
   const text = `You have been invited to join ${ctx.firmName} on FynHelp as ${role}.\n\nCreate your account with this email address (${email}) here:\n${link}\n\nYou will join the practice automatically.`;
   const sent = await sendEmail({
     to: email,

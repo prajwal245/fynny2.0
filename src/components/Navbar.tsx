@@ -15,7 +15,7 @@ import {
 } from "@/components/site/cta";
 import { DemoLink } from "@/components/site/BookDemo";
 
-const SIGNIN_URL = "/v2/onboarding?mode=signin";
+const SIGNIN_URL = "/app/onboarding?mode=signin";
 
 const LINKS: { label: string; href: string }[] = [
   { label: "Product", href: "/pipeline" },

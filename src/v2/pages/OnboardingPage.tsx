@@ -92,8 +92,8 @@ export default function OnboardingPage() {
   useEffect(() => {
     // Only while the browser is really on onboarding: during the hand-off to the
     // client workspace this page can re-mount for a moment with fresh state.
-    if (typeof window !== "undefined" && window.location.pathname !== "/v2/onboarding") return;
-    if (session && firm && !settingUp.current && step <= 1) navigate({ to: "/v2" });
+    if (typeof window !== "undefined" && window.location.pathname !== "/app/onboarding") return;
+    if (session && firm && !settingUp.current && step <= 1) navigate({ to: "/app" });
   }, [session, firm, step, navigate]);
   // An email typed on the website (hero box, demo form) carries over, so nobody types it twice.
   const [account, setAccount] = useState(() => {
@@ -151,7 +151,7 @@ export default function OnboardingPage() {
       }
       if (mode === "forgot") {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/v2/reset-password`,
+          redirectTo: `${window.location.origin}/app/reset-password`,
         });
         if (error) { toast.error(authError(error.message)); return; }
         toast.success("If an account exists for this email, a reset link is on its way.");
@@ -201,7 +201,7 @@ export default function OnboardingPage() {
       const fid = await firmIdReady();
       if (!fid) throw new Error("Create your practice first");
       // After Google's consent the partner lands in Settings, where the first check runs and shows what it found.
-      try { window.sessionStorage.setItem("fynhelp.gmail.return", "/v2/settings"); } catch { /* private mode */ }
+      try { window.sessionStorage.setItem("fynhelp.gmail.return", "/app/settings"); } catch { /* private mode */ }
       const { url } = await startGmailConnect({ data: { firmId: fid, origin: window.location.origin } });
       window.location.href = url;
     } catch (e) {
@@ -239,8 +239,8 @@ export default function OnboardingPage() {
     await completeOnboarding();
     track("onboarding_completed", { role: "practice", with_client: Boolean(clientId), with_document: Boolean(uploaded) });
     // Land inside the client, where the next best action is already waiting.
-    if (clientId) navigate({ to: "/v2/clients/$clientId", params: { clientId } });
-    else navigate({ to: "/v2" });
+    if (clientId) navigate({ to: "/app/clients/$clientId", params: { clientId } });
+    else navigate({ to: "/app" });
   };
 
   const clientName = client.name.trim() || "your client";
@@ -461,7 +461,7 @@ export default function OnboardingPage() {
                   <button className="v2-btn v2-btn-ghost" onClick={connectGmail}>
                     <GmailIcon size={16} /> Connect Gmail
                   </button>
-                  <button className="v2-btn v2-btn-quiet" onClick={() => void completeOnboarding().then(() => navigate({ to: "/v2/settings" }))}>
+                  <button className="v2-btn v2-btn-quiet" onClick={() => void completeOnboarding().then(() => navigate({ to: "/app/settings" }))}>
                     <Users size={15} /> Invite your team
                   </button>
                 </Actions>

@@ -178,7 +178,7 @@ export default function SettingsPage() {
     run("gmail", async () => {
       if (!firmId) throw new Error("Create your practice first");
       try {
-        window.sessionStorage.setItem(GMAIL_RETURN_KEY, "/v2/settings");
+        window.sessionStorage.setItem(GMAIL_RETURN_KEY, "/app/settings");
       } catch {
         /* private mode */
       }
@@ -210,7 +210,7 @@ export default function SettingsPage() {
             canSignOff ? (
               <button className="v2-btn v2-btn-primary" onClick={() => setRole("Partner")}>Switch to Partner</button>
             ) : (
-              <a className="v2-btn v2-btn-primary" href="/v2">Back to Portfolio</a>
+              <a className="v2-btn v2-btn-primary" href="/app">Back to Portfolio</a>
             )
           }
         />
@@ -610,7 +610,7 @@ export default function SettingsPage() {
               description="Export the client's bank ledger from Tally as XML and drop it on Documents. Works with Tally on office PCs and Tally on Cloud. Nothing to install."
               status={{ tone: "good", label: "Ready" }}
               actions={
-                <Link to="/v2/documents" className="v2-btn v2-btn-ghost" style={{ padding: "8px 14px", fontSize: 13 }}>
+                <Link to="/app/documents" className="v2-btn v2-btn-ghost" style={{ padding: "8px 14px", fontSize: 13 }}>
                   <UploadCloud size={14} /> Upload export
                 </Link>
               }

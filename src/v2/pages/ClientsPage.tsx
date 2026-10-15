@@ -55,7 +55,7 @@ export default function ClientsPage() {
               </thead>
               <tbody>
                 {filtered.map((c) => (
-                  <tr key={c.id} className="clickable" onClick={() => navigate({ to: "/v2/clients/$clientId", params: { clientId: c.id } })}>
+                  <tr key={c.id} className="clickable" onClick={() => navigate({ to: "/app/clients/$clientId", params: { clientId: c.id } })}>
                     <td style={{ fontWeight: 600 }}>{c.name}</td>
                     <td style={{ color: V.body }}>{c.entityType}</td>
                     <td className="num" style={{ color: V.body }}>{c.gstin || "Not provided"}</td>

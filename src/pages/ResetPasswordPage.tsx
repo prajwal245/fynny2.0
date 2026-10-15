@@ -419,7 +419,7 @@ const ResetPasswordPage = () => {
       return;
     }
     toast.success("Password updated. You're signed in.", { id: updateToastId });
-    navigate("/v2", { replace: true });
+    navigate("/app", { replace: true });
   };
 
   const inputClass =

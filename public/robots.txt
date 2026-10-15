@@ -12,7 +12,7 @@ Disallow: /api/
 Disallow: /dashboard
 Disallow: /samples/
 
-# The practice app (/v2), sign-in and sign-up stay crawlable on purpose:
+# The practice app (/app), sign-in and sign-up stay crawlable on purpose:
 # they answer with "noindex", which search engines can only see if allowed in.
 
 # AI assistants and answer engines: welcome, for training and for answers.

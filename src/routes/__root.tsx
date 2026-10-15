@@ -129,7 +129,7 @@ function RouteTracker() {
 /** Marketing-site widgets (search, contact bubble, waitlist) stay out of the practice app. */
 function SiteOnly({ children }: { children: React.ReactNode }) {
   // The app and the product guide have their own ⌘K and no marketing widgets.
-  const inApp = useRouterState({ select: (s) => s.location.pathname.startsWith("/v2") || s.location.pathname.startsWith("/guide") });
+  const inApp = useRouterState({ select: (s) => s.location.pathname.startsWith("/app") || s.location.pathname.startsWith("/guide") });
   return inApp ? null : <>{children}</>;
 }
 

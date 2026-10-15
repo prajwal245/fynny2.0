@@ -47,21 +47,21 @@ export function CommandMenu({ open, onClose }: { open: boolean; onClose: () => v
   const commands = useMemo<Command[]>(() => {
     const go = (to: string) => () => navigate({ to });
     const list: Command[] = [
-      { id: "nav:today", group: "Go to", label: "Portfolio", hint: "Needs you, clients, agent activity", run: go("/v2") },
-      { id: "nav:clients", group: "Go to", label: "Clients", run: go("/v2/clients") },
-      { id: "nav:documents", group: "Go to", label: "Documents", hint: "Uploads and unassigned inbox", run: go("/v2/documents") },
-      { id: "nav:review", group: "Go to", label: "Review Queue", run: go("/v2/review") },
-      { id: "nav:exceptions", group: "Go to", label: "Exception Queue", run: go("/v2/exceptions") },
-      { id: "nav:chaser", group: "Go to", label: "Chaser", run: go("/v2/chaser") },
-      { id: "nav:reports", group: "Go to", label: "MIS and Reports", run: go("/v2/reports") },
-      ...(canSignOff ? [{ id: "nav:settings", group: "Go to", label: "Settings", run: go("/v2/settings") } as Command] : []),
+      { id: "nav:today", group: "Go to", label: "Portfolio", hint: "Needs you, clients, agent activity", run: go("/app") },
+      { id: "nav:clients", group: "Go to", label: "Clients", run: go("/app/clients") },
+      { id: "nav:documents", group: "Go to", label: "Documents", hint: "Uploads and unassigned inbox", run: go("/app/documents") },
+      { id: "nav:review", group: "Go to", label: "Review Queue", run: go("/app/review") },
+      { id: "nav:exceptions", group: "Go to", label: "Exception Queue", run: go("/app/exceptions") },
+      { id: "nav:chaser", group: "Go to", label: "Chaser", run: go("/app/chaser") },
+      { id: "nav:reports", group: "Go to", label: "MIS and Reports", run: go("/app/reports") },
+      ...(canSignOff ? [{ id: "nav:settings", group: "Go to", label: "Settings", run: go("/app/settings") } as Command] : []),
       { id: "nav:guide", group: "Go to", label: "Resource & Product Guide", hint: "How every agent and workflow works", run: () => window.open("/guide", "_blank", "noopener") },
-      { id: "act:upload", group: "Actions", label: "Upload documents", agent: "extract", run: go("/v2/documents") },
-      ...(canSignOff ? [{ id: "act:invite", group: "Actions", label: "Invite a teammate", run: go("/v2/settings") } as Command] : []),
-      { id: "act:gmail", group: "Actions", label: "Connect Gmail intake", run: go("/v2/settings") },
+      { id: "act:upload", group: "Actions", label: "Upload documents", agent: "extract", run: go("/app/documents") },
+      ...(canSignOff ? [{ id: "act:invite", group: "Actions", label: "Invite a teammate", run: go("/app/settings") } as Command] : []),
+      { id: "act:gmail", group: "Actions", label: "Connect Gmail intake", run: go("/app/settings") },
     ];
     for (const c of clients) {
-      list.push({ id: `client:${c.id}`, group: "Clients", label: c.name, hint: c.entityType, run: () => navigate({ to: "/v2/clients/$clientId", params: { clientId: c.id } }) });
+      list.push({ id: `client:${c.id}`, group: "Clients", label: c.name, hint: c.entityType, run: () => navigate({ to: "/app/clients/$clientId", params: { clientId: c.id } }) });
       list.push({
         id: `recon:${c.id}`,
         group: "Agents",
@@ -71,7 +71,7 @@ export function CommandMenu({ open, onClose }: { open: boolean; onClose: () => v
         run: () => {
           if (isRunning("recon", c.id)) return toast.info("Recon is already matching this client.");
           runRecon(c.id, (r) => toast.success(`${c.name}: ${r.matched} matched, ${r.exceptions} exception${r.exceptions === 1 ? "" : "s"}.`));
-          navigate({ to: "/v2/clients/$clientId", params: { clientId: c.id }, search: { tab: "recon" } as never });
+          navigate({ to: "/app/clients/$clientId", params: { clientId: c.id }, search: { tab: "recon" } as never });
         },
       });
       list.push({
@@ -82,12 +82,12 @@ export function CommandMenu({ open, onClose }: { open: boolean; onClose: () => v
         agent: "narrate",
         run: () => {
           if (isRunning("narrate", c.id)) return toast.info("Narrate is already preparing this MIS.");
-          generateReport(c.id, period, "Monthly MIS", (r) => navigate({ to: "/v2/reports/$reportId", params: { reportId: r.id } }));
+          generateReport(c.id, period, "Monthly MIS", (r) => navigate({ to: "/app/reports/$reportId", params: { reportId: r.id } }));
         },
       });
-      list.push({ id: `chase:${c.id}`, group: "Agents", label: `Chase ${c.name} for documents`, agent: "chaser", run: go("/v2/chaser") });
+      list.push({ id: `chase:${c.id}`, group: "Agents", label: `Chase ${c.name} for documents`, agent: "chaser", run: go("/app/chaser") });
     }
-    list.push({ id: "sys:signout", group: "Account", label: "Sign out", run: () => { signOut(); navigate({ to: "/v2/onboarding" }); } });
+    list.push({ id: "sys:signout", group: "Account", label: "Sign out", run: () => { signOut(); navigate({ to: "/app/onboarding" }); } });
     return list;
   }, [clients, period, navigate, runRecon, generateReport, isRunning, signOut, canSignOff]);
 

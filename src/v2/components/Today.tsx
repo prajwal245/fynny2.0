@@ -63,7 +63,7 @@ export function useNeedsYou(): NeedsItem[] {
         tone: "bad",
         title: `Call ${clientName(c.clientId)}`,
         detail: `${c.type}: two follow-ups went unanswered. The Chaser has stopped and handed it to you.`,
-        action: { label: "Open chase", to: "/v2/chaser" },
+        action: { label: "Open chase", to: "/app/chaser" },
       });
     }
     for (const d of docs.filter((d) => d.clientId && d.status === "Failed" && !d.retryAt)) {
@@ -74,7 +74,7 @@ export function useNeedsYou(): NeedsItem[] {
         tone: "bad",
         title: `${d.name} needs attention`,
         detail: d.error ?? "The Extract agent could not read this file.",
-        action: { label: "Fix", to: `/v2/clients/${d.clientId}?tab=documents&doc=${d.id}` },
+        action: { label: "Fix", to: `/app/clients/${d.clientId}?tab=documents&doc=${d.id}` },
       });
     }
     // A correction a partner asked for is the team's job until someone marks it done.
@@ -86,7 +86,7 @@ export function useNeedsYou(): NeedsItem[] {
         tone: "bad",
         title: `Correct the ${r.template} for ${clientName(r.clientId)}, ${r.period}`,
         detail: `${r.correction!.byName ? `${r.correction!.byName}: ` : ""}"${r.correction!.note}". Fix it, then mark it corrected on the report.`,
-        action: { label: "Open report", to: `/v2/reports/${r.id}` },
+        action: { label: "Open report", to: `/app/reports/${r.id}` },
       });
     }
     for (const c of clients) {
@@ -101,7 +101,7 @@ export function useNeedsYou(): NeedsItem[] {
           tone: "warn",
           title: `Resolve ${ex} exception${ex === 1 ? "" : "s"} for ${c.name} in ${period}`,
           detail: `Recon matched everything else. Each one has a reason code and suggested matches.${earlier ? ` ${earlier} more from other months: choose All periods in the queue.` : ""}`,
-          action: { label: "Resolve", to: `/v2/clients/${c.id}?tab=exceptions` },
+          action: { label: "Resolve", to: `/app/clients/${c.id}?tab=exceptions` },
         });
       else if (earlier)
         items.push({
@@ -111,7 +111,7 @@ export function useNeedsYou(): NeedsItem[] {
           tone: "warn",
           title: `${earlier} exception${earlier === 1 ? "" : "s"} from earlier months for ${c.name}`,
           detail: `Nothing open in ${period}. Choose All periods in the Exception Queue to see them.`,
-          action: { label: "Open", to: `/v2/clients/${c.id}?tab=exceptions` },
+          action: { label: "Open", to: `/app/clients/${c.id}?tab=exceptions` },
         });
       const rv = review.filter((r) => r.clientId === c.id && r.status === "open").length;
       if (rv)
@@ -122,7 +122,7 @@ export function useNeedsYou(): NeedsItem[] {
           tone: "info",
           title: `Confirm ${rv} line${rv === 1 ? "" : "s"} for ${c.name}`,
           detail: "The Extract agent was unsure about these. Your answer is remembered for next month.",
-          action: { label: "Review", to: `/v2/clients/${c.id}?tab=review` },
+          action: { label: "Review", to: `/app/clients/${c.id}?tab=review` },
         });
       const hasReport = reports.some((r) => r.clientId === c.id && r.period === period);
       if (isReadyForMis(c.id, period) && !hasReport && !ex && !rv) {
@@ -141,7 +141,7 @@ export function useNeedsYou(): NeedsItem[] {
               : () =>
                   generateReport(c.id, period, "Monthly MIS", (r) => {
                     toast.success(`${c.name}: ${period} MIS ready for sign-off`);
-                    navigate({ to: "/v2/reports/$reportId", params: { reportId: r.id } });
+                    navigate({ to: "/app/reports/$reportId", params: { reportId: r.id } });
                   }),
           },
         });
@@ -156,7 +156,7 @@ export function useNeedsYou(): NeedsItem[] {
           tone: "info",
           title: `Sign off ${clientName(r.clientId)} · ${r.period}`,
           detail: "Open any number to see the transactions behind it, then accept or send it back.",
-          action: { label: "Review MIS", to: `/v2/reports/${r.id}` },
+          action: { label: "Review MIS", to: `/app/reports/${r.id}` },
         });
       }
     return items.sort((a, b) => a.rank - b.rank);
@@ -199,7 +199,7 @@ export function NeedsYou({ items }: { items: NeedsItem[] }) {
                 {it.action.to ? (
                   <Link
                     className="v2-btn v2-btn-ghost v2-btn-sm"
-                    // "/v2/clients/x?tab=documents&doc=y": the router takes the path and the query separately.
+                    // "/app/clients/x?tab=documents&doc=y": the router takes the path and the query separately.
                     to={it.action.to.split("?")[0] as never}
                     search={Object.fromEntries(new URLSearchParams(it.action.to.split("?")[1] ?? "")) as never}
                   >
@@ -266,12 +266,12 @@ export function SetupChecklist() {
   });
   const rows = docs.flatMap((d) => d.rows);
   const steps = [
-    { label: "Add a client", done: clients.length > 0, to: "/v2/clients" },
-    { label: "Upload a bank statement", done: docs.some((d) => d.side !== "books" && d.status !== "Failed"), to: "/v2/documents" },
-    { label: "Upload the books (Tally or ledger)", done: docs.some((d) => d.side === "books" && d.status !== "Failed"), to: "/v2/documents" },
-    { label: "Reconcile a month", done: rows.some((r) => r.matchStatus === "matched"), to: clients[0] ? `/v2/clients/${clients[0].id}?tab=recon` : "/v2/clients" },
-    { label: "Generate an MIS", done: reports.length > 0, to: "/v2/reports" },
-    { label: "Connect Gmail intake", done: Boolean(firm?.gmailConnected), to: "/v2/settings" },
+    { label: "Add a client", done: clients.length > 0, to: "/app/clients" },
+    { label: "Upload a bank statement", done: docs.some((d) => d.side !== "books" && d.status !== "Failed"), to: "/app/documents" },
+    { label: "Upload the books (Tally or ledger)", done: docs.some((d) => d.side === "books" && d.status !== "Failed"), to: "/app/documents" },
+    { label: "Reconcile a month", done: rows.some((r) => r.matchStatus === "matched"), to: clients[0] ? `/app/clients/${clients[0].id}?tab=recon` : "/app/clients" },
+    { label: "Generate an MIS", done: reports.length > 0, to: "/app/reports" },
+    { label: "Connect Gmail intake", done: Boolean(firm?.gmailConnected), to: "/app/settings" },
   ];
   const done = steps.filter((s) => s.done).length;
   if (hidden || done === steps.length) return null;

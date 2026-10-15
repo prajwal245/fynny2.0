@@ -46,6 +46,38 @@ function isH3SwallowedErrorBody(body: string): boolean {
 
 import { normalizeUrl, robotsHeaderFor } from "./lib/searchPolicy";
 
+/**
+ * Only the services the site really uses may load scripts, frames or receive
+ * requests: Supabase, Google Analytics, PostHog (both only after consent),
+ * Razorpay Checkout, Calendly, YouTube embeds in articles, Google Fonts /
+ * Fontshare, and the breached-password check.
+ */
+function contentSecurityPolicy(): string {
+  const supa = (process.env["SUPABASE_URL"] ?? process.env["VITE_SUPABASE_URL"] ?? "").replace(/\/$/, "");
+  const supaWs = supa.replace(/^http/, "ws");
+  const analytics = "https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://stats.g.doubleclick.net";
+  const posthog = "https://us.i.posthog.com https://us-assets.i.posthog.com";
+  const razorpay = "https://checkout.razorpay.com https://api.razorpay.com https://lumberjack.razorpay.com";
+  const calendly = "https://calendly.com https://assets.calendly.com";
+  const local = /^http:\/\/(127\.0\.0\.1|localhost)/.test(supa) ? " ws://127.0.0.1:* ws://localhost:*" : "";
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'unsafe-inline' ${analytics} ${posthog} ${razorpay} ${calendly}`,
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.fontshare.com https://assets.calendly.com",
+    "font-src 'self' data: https://fonts.gstatic.com https://cdn.fontshare.com https://api.fontshare.com",
+    "img-src 'self' data: blob: https:",
+    `connect-src 'self' ${supa} ${supaWs} ${analytics} ${posthog} ${razorpay} https://api.pwnedpasswords.com https://*.ingest.us.sentry.io https://*.ingest.sentry.io${local}`.replace(/\s+/g, " "),
+    `frame-src 'self' ${razorpay} ${calendly} https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com`,
+    "worker-src 'self' blob:",
+    "media-src 'self' blob: https:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self' https://api.razorpay.com",
+    "frame-ancestors 'self'",
+    ...(local ? [] : ["upgrade-insecure-requests"]),
+  ].join("; ");
+}
+
 function withSearchHeaders(request: Request, response: Response): Response {
   const url = new URL(request.url);
   const host = (request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? url.host).split(",")[0].trim();
@@ -57,6 +89,9 @@ function withSearchHeaders(request: Request, response: Response): Response {
     headers.set("x-content-type-options", "nosniff");
     headers.set("referrer-policy", "strict-origin-when-cross-origin");
     headers.set("x-frame-options", "SAMEORIGIN");
+    headers.set("content-security-policy", contentSecurityPolicy());
+    headers.set("permissions-policy", 'camera=(), microphone=(), geolocation=(), usb=(), payment=(self "https://api.razorpay.com" "https://checkout.razorpay.com")');
+    headers.set("cross-origin-opener-policy", "same-origin-allow-popups");
   }
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }

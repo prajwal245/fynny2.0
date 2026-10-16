@@ -22,7 +22,8 @@ const statusOf = (report: Report) =>
 const day = (iso: string) => new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
 
-export type ExportMeta = { clientName: string; firmName: string };
+/** branded: Firm and Scale (and the trial) put the firm's name in the footer; Essential says "Prepared with FynHelp". */
+export type ExportMeta = { clientName: string; firmName: string; branded?: boolean };
 
 function rowsTable(title: string, rows: { date: string; particulars: string; amount: number }[]) {
   if (rows.length === 0) return "";
@@ -136,7 +137,7 @@ export function buildReportHtml(report: Report, meta: ExportMeta) {
   ${isException || !report.insights.length ? "" : `<h3>Insights</h3>
   ${report.insights.map((i) => `<div class="insight">${esc(i.text)}<br /><em>Based on ${esc(i.source)}</em></div>`).join("")}`}
   ${body}
-  <footer>Prepared in FynHelp. Every figure above is derived from ${all.length + flowCount} matched transaction${all.length + flowCount === 1 ? "" : "s"} held in the workspace.</footer>
+  <footer>${meta.branded ? `Prepared by ${esc(meta.firmName)}.` : "Prepared with FynHelp &middot; fynhelp.com."} Every figure above is derived from ${all.length + flowCount} matched transaction${all.length + flowCount === 1 ? "" : "s"} held in the workspace.</footer>
 </body></html>`;
 }
 

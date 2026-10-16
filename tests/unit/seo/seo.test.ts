@@ -58,7 +58,7 @@ describe("structured data", () => {
 
   it("prices plans in INR, matching the pricing page", () => {
     const offers = softwareLd().offers as { name: string; price: string; priceCurrency: string }[];
-    expect(offers.map((o) => [o.name, o.price])).toEqual([["Starter", "2999"], ["Professional", "5999"], ["Scale", "12999"]]);
+    expect(offers.map((o) => [o.name, o.price])).toEqual([["Essential", "1999"], ["Firm", "4499"], ["Scale", "9999"]]);
     expect(offers.every((o) => o.priceCurrency === "INR")).toBe(true);
   });
 

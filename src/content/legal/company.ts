@@ -18,6 +18,12 @@ export const COMPANY = {
   region: "Sydney, Australia (Supabase ap-southeast-2)",
 };
 
+/**
+ * WhatsApp number for sales and support, digits only with country code, e.g.
+ * "919876543210". Empty hides the WhatsApp link on the pricing page.
+ */
+export const SUPPORT_WHATSAPP: string = "";
+
 const TOKENS: Record<string, keyof typeof COMPANY> = {
   "{ENTITY}": "entity",
   "{CIN}": "cin",

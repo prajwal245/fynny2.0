@@ -99,11 +99,22 @@ export async function withRun<T>(
   fn: () => Promise<T>,
   describe: (result: T) => RunOutcome,
 ): Promise<T> {
+  // A reconciliation makes its client active this month: check the trial or
+  // plan covers that before the run is recorded (the record itself counts).
+  if (meta.agent === "recon" && meta.businessId) {
+    const { assertWorkRoom } = await import("./billing.server");
+    await assertWorkRoom(db, meta.firmId, { businessId: meta.businessId, newDocument: false });
+  }
   const started = Date.now();
   const runId = await startRun(db, meta);
   try {
     const result = await fn();
-    await finishRun(db, runId, started, describe(result));
+    const outcome = describe(result);
+    await finishRun(db, runId, started, outcome);
+    if ((meta.agent === "recon" || meta.agent === "narrate") && (outcome.status ?? "succeeded") === "succeeded") {
+      const { checkTrialActivation } = await import("./billing.server");
+      await checkTrialActivation(db, meta.firmId).catch((e) => console.error(`[billing] activation check failed: ${(e as Error).message}`));
+    }
     return result;
   } catch (e) {
     await finishRun(db, runId, started, {
@@ -193,15 +204,23 @@ async function chainRecon(db: Db, firmId: string, businessId: string, period: st
   const ctx = await systemContext(db, firmId);
   if (!ctx) return "no_owner";
   const { runRecon } = await import("./recon.server");
-  const summary = await withRun(
-    db,
-    { firmId, businessId, agent: "recon", trigger: "pipeline", period: p.label, userId: null },
-    () => runRecon(db, ctx, businessId, p.label),
-    (s) => ({
-      summary: `Recon ran automatically: ${s.message}`,
-      detail: { run_id: s.run_id, matched_by_stage: s.matched_by_stage, exceptions: s.exceptions_by_reason },
-    }),
-  );
+  let summary: Awaited<ReturnType<typeof runRecon>>;
+  try {
+    summary = await withRun(
+      db,
+      { firmId, businessId, agent: "recon", trigger: "pipeline", period: p.label, userId: null },
+      () => runRecon(db, ctx, businessId, p.label),
+      (s) => ({
+        summary: `Recon ran automatically: ${s.message}`,
+        detail: { run_id: s.run_id, matched_by_stage: s.matched_by_stage, exceptions: s.exceptions_by_reason },
+      }),
+    );
+  } catch (e) {
+    // Past the trial or plan limit: the document stays read; Recon waits for a plan.
+    const code = (e as { code?: string }).code;
+    if (code === "usage_limit" || code === "billing_paused") return "limit_reached";
+    throw e;
+  }
   await afterRecon(db, firmId, businessId, p.label);
   return summary.run_id ? "reconciled" : "nothing_to_match";
 }

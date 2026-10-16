@@ -42,15 +42,15 @@ export const REFUND: LegalDoc = {
      "No refund; access continues until the end of that month"
     ],
     [
-     "Annual subscription cancelled within seven (7) days of the first annual payment",
+     "Annual subscription cancelled within thirty (30) days of the first annual payment",
      "Full refund"
     ],
     [
-     "Annual subscription cancelled after seven (7) days",
+     "Annual subscription cancelled after thirty (30) days",
      "No refund; access continues until the end of the annual term"
     ],
     [
-     "Charges for additional active Client Entities",
+     "Charges for additional active Client Entities or document overage",
      "Not refundable once the entities have been processed"
     ],
     [
@@ -71,12 +71,12 @@ export const REFUND: LegalDoc = {
   {
    "t": "c",
    "n": "2.1",
-   "text": "The fourteen (14) day free trial on the Starter plan does not require a payment method, and no charge is levied for it."
+   "text": "The free trial runs for fourteen (14) days from the Customer’s first document upload, extended to thirty (30) days once the Customer completes its first reconciliation and first MIS report. It covers up to five (5) active Client Entities and two hundred (200) documents, and does not require a payment method. No charge is levied for it."
   },
   {
    "t": "c",
    "n": "2.2",
-   "text": "If the Customer does not subscribe to a paid plan, access is suspended on expiry of the trial. No cancellation is required."
+   "text": "If the Customer does not subscribe to a paid plan, the account becomes read-only on expiry of the trial and its data remains available for export for thirty (30) days. No cancellation is required."
   },
   {
    "t": "h",
@@ -96,7 +96,7 @@ export const REFUND: LegalDoc = {
   {
    "t": "c",
    "n": "3.3",
-   "text": "Fees for partial months, unused Client Entity allowance, or months in which the Service was not used are not refundable. The free trial is offered so that the Service may be evaluated before any payment is made."
+   "text": "Fees for partial months, unused Client Entity or document allowance, or months in which the Service was not used are not refundable. The free trial is offered so that the Service may be evaluated before any payment is made."
   },
   {
    "t": "h",
@@ -111,7 +111,7 @@ export const REFUND: LegalDoc = {
   {
    "t": "c",
    "n": "4.2",
-   "text": "Where the Customer cancels within seven (7) days of its first annual payment, FynHelp shall refund the full amount paid. This entitlement is available once per Customer and applies only to the first annual purchase.",
+   "text": "Where the Customer cancels within thirty (30) days of its first annual payment, FynHelp shall refund the full amount paid. This entitlement is available once per Customer and applies only to the first annual purchase.",
    "lead": "Initial refund window."
   },
   {

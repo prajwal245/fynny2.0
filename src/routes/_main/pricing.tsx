@@ -9,7 +9,7 @@ export const Route = createFileRoute("/_main/pricing")({
     seo({
       title: "Pricing for CA firms: per client, unlimited users",
       description:
-        "FynHelp pricing for CA firms: a 14-day free trial, then Starter ₹2,999, Professional ₹5,999 and Scale ₹12,999 a month. Unlimited users, no per-seat fees.",
+        "FynHelp pricing for CA firms: Essential ₹1,999, Firm ₹4,499 and Scale ₹9,999 a month + GST, priced per active client. Unlimited users, free trial from your first upload, no card needed.",
       path: "/pricing",
       image: "/og/pricing.png",
       imageAlt: "FynHelp pricing for CA firms",

@@ -343,7 +343,7 @@ export function FirstRunWelcome() {
             </a>
           </div>
           <p style={{ fontSize: 12.5, color: V.muted, margin: 0 }}>
-            You can reopen the steps any time from <b>Your first MIS</b> at the bottom of the menu. Your free trial runs 14 days.
+            You can reopen the steps any time from <b>Your first MIS</b> at the bottom of the menu. Your free trial runs 14 days from your first upload, and 30 once you have made your first MIS.
           </p>
         </div>
       </Drawer>

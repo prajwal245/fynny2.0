@@ -156,7 +156,7 @@ export async function listFirms(ctx: AdminCtx, f: FirmFilter) {
       city: x.city,
       createdAt: x.created_at,
       status: (x.admin_status ?? "active") as "active" | "suspended" | "flagged",
-      plan: b ? `${PLANS[b.plan]?.name ?? b.plan}${b.cycle === "annual" ? " yearly" : ""}` : "Starter trial",
+      plan: b ? `${PLANS[b.plan]?.name ?? b.plan}${b.cycle === "annual" ? " yearly" : ""}` : "Trial",
       planState: planState(b),
       trialEnds: b?.status === "trialing" ? b.trial_ends_at : null,
       clients: clients.get(x.id) ?? 0,

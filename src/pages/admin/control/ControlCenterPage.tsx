@@ -43,7 +43,7 @@ export default function ControlCenterPage() {
             <Kpi label="Firms" value={d.kpis.firms} hint={`${d.kpis.newFirms30} new in 30 days`} />
             <Kpi label="On free trial" value={d.kpis.trials} />
             <Kpi label="Paying firms" value={d.kpis.paid} />
-            <Kpi label="MRR (incl. GST)" value={inr(d.kpis.mrr)} hint="Yearly plans counted per month" />
+            <Kpi label="MRR (excl. GST)" value={inr(d.kpis.mrr)} hint="Yearly plans counted per month" />
             <Kpi label="Churn, 30 days" value={`${d.kpis.churnRate}%`} />
             <Kpi label="Documents, 30 days" value={d.kpis.documents30.toLocaleString("en-IN")} />
             <Kpi label="MIS generated, 30 days" value={d.kpis.mis30.toLocaleString("en-IN")} />

@@ -39,7 +39,7 @@ export default function BillingPage() {
       <PageHead title="Billing & Ledger" sub="Subscriptions, every payment and refund through Razorpay, with the GST inside each amount." />
       <div className="grid gap-3 mb-5" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))" }}>
         <Kpi label="Paying firms" value={paid.length} />
-        <Kpi label="MRR (incl. GST)" value={inr(mrr)} />
+        <Kpi label="MRR (excl. GST)" value={inr(mrr)} />
         <Kpi label="GST inside MRR" value={inr((mrr * 18) / 118)} hint="18% included in list prices" />
         <Kpi label="Cancelling at period end" value={(subs.data ?? []).filter((s) => s.status === "cancelling").length} />
       </div>

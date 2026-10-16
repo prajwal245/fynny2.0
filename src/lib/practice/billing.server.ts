@@ -5,7 +5,7 @@
  *   RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET      API keys (Dashboard → Account & Settings → API keys)
  *   RAZORPAY_WEBHOOK_SECRET                   the secret typed when adding the webhook
  * Optional:
- *   FYNHELP_GST_PERCENT                       added on top of list prices; leave unset, list prices include GST
+ *   FYNHELP_GST_PERCENT                       GST added on top of list prices (default 18; list prices exclude GST)
  *   RAZORPAY_PLAN_{STARTER|PROFESSIONAL|SCALE}_{MONTHLY|ANNUAL}
  *                                             use an existing plan id instead of the one FynHelp creates
  * The six Razorpay plans are created on first use and remembered in
@@ -20,6 +20,13 @@ import { PracticeError } from "./core";
 import {
   accessFor,
   changeTiming,
+  documentWarning,
+  GST_PERCENT,
+  monthlyBill,
+  TRIAL_DAYS,
+  TRIAL_ACTIVATED_DAYS,
+  type BillBreakdown,
+  type UsageWarning,
   PLANS,
   planAmountPaise,
   planEnvKey,
@@ -36,6 +43,11 @@ import {
 // RAZORPAY_API_BASE exists only so tests can point at a stand-in Razorpay.
 const API = process.env["RAZORPAY_API_BASE"] || "https://api.razorpay.com/v1";
 const env = (k: string) => process.env[k] || undefined;
+/** GST added on top of list prices (default 18%). */
+const gstPercent = () => {
+  const v = Number(env("FYNHELP_GST_PERCENT") ?? GST_PERCENT);
+  return Number.isFinite(v) && v >= 0 ? v : GST_PERCENT;
+};
 
 export interface BillingView extends BillingRow {
   access: Access;
@@ -52,10 +64,16 @@ export interface BillingView extends BillingRow {
   billingGstin: string | null;
   /** Until when cancelling refunds the first annual payment in full. */
   refundUntil: string | null;
+  /** This calendar month so far. */
+  usage: { month: string; activeClients: number; documents: number };
+  /** What this month comes to on the current plan (paid plans; the trial shows the Firm plan). */
+  bill: BillBreakdown;
+  warning: UsageWarning | null;
+  activated: boolean;
 }
 
 const COLS =
-  "plan, cycle, status, trial_ends_at, current_period_end, razorpay_subscription_id, cancel_at_period_end, scheduled_plan, scheduled_cycle, billing_name, billing_gstin, first_payment_id, first_paid_at, first_paid_cycle, refund_used";
+  "plan, cycle, status, trial_ends_at, current_period_end, trial_started_at, activated_at, razorpay_subscription_id, cancel_at_period_end, scheduled_plan, scheduled_cycle, billing_name, billing_gstin, first_payment_id, first_paid_at, first_paid_cycle, refund_used";
 
 type Row = BillingRow & {
   razorpay_subscription_id: string | null;
@@ -108,7 +126,7 @@ async function planIdFor(db: Db, plan: PlanKey, cycle: Cycle): Promise<string> {
   const override = env(planEnvKey(plan, cycle));
   if (override) return override;
   const keyId = env("RAZORPAY_KEY_ID") ?? "";
-  const amount = planAmountPaise(plan, cycle, Number(env("FYNHELP_GST_PERCENT") ?? 0));
+  const amount = planAmountPaise(plan, cycle, gstPercent());
   const { data: known } = await db
     .from("ca_billing_plans")
     .select("razorpay_plan_id")
@@ -129,7 +147,7 @@ async function planIdFor(db: Db, plan: PlanKey, cycle: Cycle): Promise<string> {
     (await rzp<RzpPlan>("POST", "/plans", {
       period,
       interval: 1,
-      item: { name, amount, currency: "INR", description: `${PLANS[plan].clientsIncluded} client entities included, unlimited users` },
+      item: { name, amount, currency: "INR", description: `${PLANS[plan].clientsIncluded} active clients included, unlimited users, GST extra` },
       notes: { fynhelp_plan: plan, cycle },
     }));
   await db
@@ -140,6 +158,9 @@ async function planIdFor(db: Db, plan: PlanKey, cycle: Cycle): Promise<string> {
 
 export async function billingView(db: Db, ctx: FirmContext): Promise<BillingView> {
   const row = await loadBilling(db, ctx.firmId);
+  const { usageFor } = await import("./billing/usage.server");
+  const usage = await usageFor(db, ctx.firmId);
+  const planShown: PlanKey = row.status === "trialing" ? "professional" : row.plan;
   const available = env("RAZORPAY_KEY_ID") && env("RAZORPAY_KEY_SECRET") ? allPlans() : [];
   return {
     plan: row.plan,
@@ -156,6 +177,10 @@ export async function billingView(db: Db, ctx: FirmContext): Promise<BillingView
     billingName: row.billing_name ?? null,
     billingGstin: row.billing_gstin ?? null,
     refundUntil: row.status === "active" && !row.cancel_at_period_end ? (refundWindowEnd(row)?.toISOString() ?? null) : null,
+    usage: { month: usage.month, activeClients: usage.activeClients, documents: usage.documents },
+    bill: monthlyBill(planShown, row.cycle, usage, gstPercent()),
+    warning: row.status === "trialing" ? null : documentWarning(row.plan, usage),
+    activated: !!row.activated_at,
   };
 }
 
@@ -178,20 +203,52 @@ export async function firmCanWork(db: Db, firmId: string): Promise<boolean> {
   return accessFor(await loadBilling(db, firmId)).canWork;
 }
 
-/** Throws when adding one more client would pass the plan's limit. */
+/**
+ * Adding a client is always allowed while the firm can work: plans count
+ * active clients (worked on this month), not client entities.
+ */
 export async function assertClientRoom(db: Db, firmId: string): Promise<void> {
+  await assertCanWork(db, firmId);
+}
+
+/** Throws before new work the firm's trial or plan limits do not cover. */
+export async function assertWorkRoom(db: Db, firmId: string, work: { businessId: string | null; newDocument: boolean }): Promise<void> {
   const row = await loadBilling(db, firmId);
   const a = accessFor(row);
   if (!a.canWork) throw new PracticeError("billing_paused", a.reason ?? "New work is paused for this firm.");
-  if (a.maxClients == null) return;
-  const { count } = await db.from("ca_clients").select("id", { count: "exact", head: true }).eq("ca_firm_id", firmId);
-  if ((count ?? 0) >= a.maxClients)
-    throw new PracticeError(
-      "client_limit",
-      a.state === "trial"
-        ? `The free trial covers up to ${a.maxClients} clients. Choose a plan in Settings, Billing to add more.`
-        : `Your plan covers up to ${a.maxClients} clients. Move to Professional in Settings, Billing to add more.`,
-    );
+  const { assertUsageRoom } = await import("./billing/usage.server");
+  await assertUsageRoom(db, firmId, row, work, a);
+}
+
+/** The trial clock starts at the first document upload. */
+export async function startTrialClock(db: Db, firmId: string, now: Date = new Date()): Promise<void> {
+  const row = await loadBilling(db, firmId);
+  if (row.status !== "trialing" || row.trial_started_at) return;
+  await db
+    .from("ca_billing")
+    .update({ trial_started_at: now.toISOString(), trial_ends_at: new Date(now.getTime() + TRIAL_DAYS * 86_400_000).toISOString() })
+    .eq("ca_firm_id", firmId)
+    .is("trial_started_at", null);
+}
+
+/** One reconciliation run and one MIS on the firm's own data: the trial grows to 30 days. */
+export async function checkTrialActivation(db: Db, firmId: string): Promise<boolean> {
+  const row = await loadBilling(db, firmId);
+  if (row.status !== "trialing" || row.activated_at || !row.trial_started_at) return false;
+  const [recon, mis] = await Promise.all([
+    db.from("ca_agent_runs").select("id", { count: "exact", head: true }).eq("ca_firm_id", firmId).eq("agent", "recon").eq("status", "succeeded"),
+    db.from("ca_agent_runs").select("id", { count: "exact", head: true }).eq("ca_firm_id", firmId).eq("agent", "narrate").eq("status", "succeeded"),
+  ]);
+  if (!(recon.count ?? 0) || !(mis.count ?? 0)) return false;
+  const ends = new Date(new Date(row.trial_started_at).getTime() + TRIAL_ACTIVATED_DAYS * 86_400_000);
+  const { data } = await db
+    .from("ca_billing")
+    .update({ activated_at: new Date().toISOString(), trial_ends_at: ends.toISOString() })
+    .eq("ca_firm_id", firmId)
+    .is("activated_at", null)
+    .select("ca_firm_id")
+    .maybeSingle();
+  return !!data;
 }
 
 /* ── Razorpay ───────────────────────────────────────────────── */
@@ -453,7 +510,7 @@ export async function cancelSubscription(db: Db, ctx: FirmContext, reason: strin
       const refund = await rzp<{ id: string }>(
         "POST",
         `/payments/${encodeURIComponent(row.first_payment_id!)}/refund`,
-        { speed: "normal", notes: { firm_id: ctx.firmId, reason: "Cancelled within 7 days of the first annual payment" } },
+        { speed: "normal", notes: { firm_id: ctx.firmId, reason: "Cancelled within 30 days of the first annual payment" } },
         "The plan is cancelled, but Razorpay could not start the refund. We have been told and will refund you in full within 3 business days.",
       ).catch(async (e) => {
         await db.from("ca_billing").update({ status: "cancelled", current_period_end: now, cancel_requested_at: now, updated_at: now }).eq("ca_firm_id", ctx.firmId);
@@ -572,7 +629,7 @@ export async function sendRenewalReminders(db: Db, now: Date = new Date()) {
     if (r.renewal_reminded_for && new Date(r.renewal_reminded_for).getTime() === new Date(r.current_period_end).getTime()) continue;
     const firm = r.ca_firms;
     if (firm?.email) {
-      const amount = planAmountPaise(r.plan, r.cycle, Number(env("FYNHELP_GST_PERCENT") ?? 0)) / 100;
+      const amount = planAmountPaise(r.plan, r.cycle, gstPercent()) / 100;
       await billingMail({ firmId: r.ca_firm_id, firmName: firm.firm_name, firmEmail: firm.email, userId: "", role: "owner" }, "Your FynHelp plan renews soon", [
         `Hello ${firm.firm_name},`,
         `Your ${planLabel(r.plan, r.cycle)} plan renews on ${fmtDate(r.current_period_end)} for ₹${amount.toLocaleString("en-IN")} including GST.`,

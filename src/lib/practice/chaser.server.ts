@@ -225,6 +225,10 @@ export async function sendFollowUp(
   const count = row.chaser_count + 1;
 
   if (channel === "WhatsApp") {
+    const { loadBilling } = await import("./billing.server");
+    const { accessFor } = await import("./billing/plans");
+    if (!accessFor(await loadBilling(db, ctx.firmId)).whatsappChaser)
+      throw new PracticeError("plan_feature", "Chasing by WhatsApp is on the Firm and Scale plans. Email follow-ups work on every plan.");
     const message = whatsappMessage(t);
     const link = whatsappLink(row.contact_phone || t.clientPhone, message);
     if (!link.url) throw new PracticeError("invalid_phone", link.error!);

@@ -343,7 +343,7 @@ const PIPELINE = [
   { icon: FileSearch, t: "Extract", d: "Multi-format documents classified and read into structured lines.", plan: "All plans" },
   { icon: GitCompareArrows, t: "Recon", d: "Exact, fuzzy and firm-rule matching. Every exception gets a reason code.", plan: "All plans" },
   { icon: MessageSquareText, t: "Narrate", d: "A monthly MIS built from matched lines, every figure linked to source.", plan: "All plans" },
-  { icon: BellRing, t: "Chaser", d: "Scheduled email follow-ups for missing documents, plus a WhatsApp quick-send link.", plan: "Professional+" },
+  { icon: BellRing, t: "Chaser", d: "Scheduled email follow-ups for missing documents, plus a WhatsApp quick-send link.", plan: "Email on all plans, WhatsApp on Firm+" },
   { icon: ScrollText, t: "Audit trail", d: "Who decided what, when, with the note they left and the source line it touched.", plan: "All plans" },
   { icon: Users, t: "Unlimited users", d: "Your whole firm, every role. Never priced per seat.", plan: "All plans" },
 ];
@@ -365,10 +365,20 @@ const TRUST = [
 ];
 
 const PLANS = [
-  { name: "Starter", monthly: 2999, annual: 30590, clients: "15 client entities included", extra: "Extra client \u20B9149 (cap 25)", adds: ["Extract, Recon and MIS reports", "Full audit trail", "Unlimited users"], cta: "Start free trial" },
-  { name: "Professional", monthly: 5999, annual: 61190, clients: "40 client entities included", extra: "Extra client \u20B9119", adds: ["Everything in Starter", "Chaser follow-ups by email and WhatsApp", "Gmail intake for client documents", "Shareable MIS links for clients"], cta: "Choose Professional", popular: true },
-  { name: "Scale", monthly: 12999, annual: 132590, clients: "100 client entities included", extra: "Extra client \u20B999 (no cap)", adds: ["Everything in Professional", "Set-up with a founder on a call", "Volume pricing for larger books"], cta: "Talk to us" },
-];
+  { key: "starter" as const, adds: ["Extract, Recon and MIS reports", "Email Chaser follow-ups", "Full audit trail", "Unlimited users"], cta: "Start free, no card" },
+  { key: "professional" as const, adds: ["Everything in Essential", "WhatsApp Chaser follow-ups", "Your firm's branding on MIS exports", "Gmail intake for client documents"], cta: "Start free, no card", popular: true },
+  { key: "scale" as const, adds: ["Everything in Firm", "Guided onboarding with a founder", "Priority support"], cta: "Talk to us" },
+].map((p) => {
+  const b = BILLING_PLANS[p.key];
+  return {
+    ...p,
+    name: b.name,
+    monthly: b.monthly,
+    annual: b.annual,
+    clients: `${b.clientsIncluded} active clients included`,
+    extra: `Extra active client \u20B9${b.extraClient}${b.maxActiveClients ? ` (up to ${b.maxActiveClients})` : ""} · ${b.docsPerClient} docs per client`,
+  };
+});
 
 
 
@@ -535,7 +545,7 @@ export default function HomePage() {
                     <span className="ital">the week it loses</span>
                   </h2>
                   <p className="fh-lead">
-                    Priced per client entity, never per seat. Onboard the whole practice, keep your ledger
+                    Priced per active client, never per seat. Onboard the whole practice, keep your ledger
                     exactly where it is, and start with the entities that hurt most.
                   </p>
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 26 }}>
@@ -548,12 +558,12 @@ export default function HomePage() {
                   </div>
                 </div>
                 <div className="fh-maroon-card">
-                  <div className="lbl">Starter plan</div>
-                  <div className="v num">{money(2999, cur)}<small style={{ fontSize: 16 }}>/mo</small></div>
-                  <div className="fh-uptick">14-day free trial, no card needed</div>
+                  <div className="lbl">{BILLING_PLANS.starter.name} plan</div>
+                  <div className="v num">{money(BILLING_PLANS.starter.monthly, cur)}<small style={{ fontSize: 16 }}>/mo</small></div>
+                  <div className="fh-uptick">Free trial from your first upload, no card needed</div>
                   <div className="fh-line">
-                    <span>Client entities included</span>
-                    <b>15</b>
+                    <span>Active clients included</span>
+                    <b>{BILLING_PLANS.starter.clientsIncluded}</b>
                   </div>
                   <div className="fh-line">
                     <span>Users</span>
@@ -561,7 +571,7 @@ export default function HomePage() {
                   </div>
                   <div className="fh-line">
                     <span>Prices</span>
-                    <b>Incl. GST</b>
+                    <b>+ 18% GST</b>
                   </div>
                 </div>
               </div>
@@ -722,7 +732,7 @@ export default function HomePage() {
             <h2 className="fh-h2">
               Choose a plan <span className="ital">that fits</span>
             </h2>
-            <p className="fh-lead">Every firm starts with a 14-day free trial of Starter, no card needed. Annual billing saves 15%.</p>
+            <p className="fh-lead">Every firm starts with a free trial, 14 days from the first upload, no card needed. Pay yearly and get 2 months free. Prices exclude 18% GST.</p>
             <div className="fh-billing" role="group" aria-label="Billing period">
               <button
                 type="button"
@@ -738,7 +748,7 @@ export default function HomePage() {
                 aria-pressed={billing === "annual"}
                 onClick={() => setBilling("annual")}
               >
-                Annual <i>Save 15%</i>
+                Yearly <i>2 months free</i>
               </button>
             </div>
             <CurrencySwitch className="fh-billing fh-cur" value={cur} />
@@ -758,7 +768,7 @@ export default function HomePage() {
                   <div className="fh-annual">
                     {billing === "annual"
                       ? `${money(p.annual, cur)} billed yearly · save ${money(p.monthly * 12 - p.annual, cur)}`
-                      : "Billed monthly · switch to annual and save 15%"}
+                      : "Billed monthly · pay yearly for 2 months free"}
                   </div>
 
                   <ul>

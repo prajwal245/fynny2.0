@@ -3,7 +3,18 @@ import { toast } from "sonner";
 import { Badge, Card, Modal, V, formatDate, type Tone } from "../ui";
 import { useV2 } from "../store";
 import { cancelPracticePlan, changePracticePlan, confirmPracticeCheckout, getPracticePayments, previewPracticeCoupon, redeemPracticeTrialCode, startPracticeCheckout } from "@/lib/practice/practice.functions";
-import { PLANS, changeTiming, validGstin, type Cycle, type PlanKey } from "@/lib/practice/billing/plans";
+import {
+  PLANS,
+  TRIAL_ACTIVATED_DAYS,
+  TRIAL_DAYS,
+  TRIAL_MAX_ACTIVE_CLIENTS,
+  TRIAL_MAX_DOCUMENTS,
+  changeTiming,
+  documentAllowance,
+  validGstin,
+  type Cycle,
+  type PlanKey,
+} from "@/lib/practice/billing/plans";
 import { loadRazorpay, refreshBilling, setBilling, useBilling } from "../lib/billing";
 
 const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
@@ -23,7 +34,7 @@ type RzpCtor = new (opts: Record<string, unknown>) => { open: () => void; on: (e
 export function BillingSection() {
   const b = useBilling();
   const { session } = useV2();
-  const [cycle, setCycle] = useState<Cycle>("monthly");
+  const [cycle, setCycle] = useState<Cycle>("annual");
   const [busy, setBusy] = useState<PlanKey | "cancel" | null>(null);
   const [billingName, setBillingName] = useState("");
   const [gstin, setGstin] = useState("");
@@ -151,7 +162,9 @@ export function BillingSection() {
       </div>
       <p style={{ fontSize: 13, color: V.muted, margin: "6px 0 16px", lineHeight: 1.6 }} data-testid="billing-summary">
         {a.state === "trial" &&
-          `Free trial of Starter until ${formatDate(b.trial_ends_at)}${a.trialDaysLeft != null ? ` (${a.trialDaysLeft <= 1 ? "last day" : `${a.trialDaysLeft} days left`})` : ""}, up to ${a.maxClients} clients. Choose a plan any time; you are charged only from the day you choose.`}
+          (a.trialNotStarted
+            ? `Your ${TRIAL_DAYS}-day free trial starts with your first upload. It covers up to ${TRIAL_MAX_ACTIVE_CLIENTS} active clients and ${TRIAL_MAX_DOCUMENTS} documents, with every Firm feature except the WhatsApp Chaser. No card needed.`
+            : `Free trial until ${formatDate(b.trial_ends_at)}${a.trialDaysLeft != null ? ` (${a.trialDaysLeft <= 1 ? "last day" : `${a.trialDaysLeft} days left`})` : ""}. ${b.activated ? `Extended to ${TRIAL_ACTIVATED_DAYS} days because you ran a reconciliation and made an MIS.` : `Run one reconciliation and make one MIS on your own data to extend it to ${TRIAL_ACTIVATED_DAYS} days.`} Choose a plan any time; you are charged only from the day you choose.`)}
         {a.state === "active" &&
           (b.cancelAtPeriodEnd || b.status === "cancelled"
             ? `${PLANS[b.plan].name}, billed ${b.cycle === "annual" ? "yearly" : "monthly"}. Cancelled: full access until ${formatDate(b.current_period_end ?? "")}, then it stops. You will not be charged again.`
@@ -165,6 +178,8 @@ export function BillingSection() {
         </p>
       )}
 
+      <UsageMeter b={b} />
+
       {!(hasPlan && b.cancelAtPeriodEnd) && (
         <>
           <div role="group" aria-label="Billing period" style={{ display: "inline-flex", gap: 4, background: V.gray, padding: 4, borderRadius: 999, marginBottom: 14 }}>
@@ -176,7 +191,7 @@ export function BillingSection() {
                 className={`v2-btn v2-btn-sm ${cycle === c ? "v2-btn-primary" : "v2-btn-ghost"}`}
                 onClick={() => setCycle(c)}
               >
-                {c === "monthly" ? "Monthly" : "Yearly, save 15%"}
+                {c === "monthly" ? "Monthly" : "Yearly, 2 months free"}
               </button>
             ))}
           </div>
@@ -188,12 +203,13 @@ export function BillingSection() {
               return (
                 <div key={k} style={{ border: `1px solid ${timing === "same" ? V.maroon : "rgba(42,15,12,.1)"}`, borderRadius: 14, padding: 16, display: "grid", gap: 8, alignContent: "start" }}>
                   <div style={{ fontWeight: 600 }}>{p.name}</div>
+                  <div style={{ fontSize: 12, color: V.muted, marginTop: -4 }}>{p.recommendedFor}</div>
                   <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}>
                     {price(k)}
-                    <span style={{ fontSize: 13, fontWeight: 500, color: V.muted }}>{cycle === "monthly" ? " /month" : " /year"}</span>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: V.muted }}>{cycle === "monthly" ? " /month" : " /year"} + GST</span>
                   </div>
                   <div style={{ fontSize: 12.5, color: V.muted }}>
-                    {p.clientsIncluded} clients included{p.maxClients ? `, up to ${p.maxClients}` : ""}. Unlimited users. Incl. GST.
+                    {p.clientsIncluded} active clients included, then {inr(p.extraClient)} each{p.maxActiveClients ? `, up to ${p.maxActiveClients} in total` : ""}. {p.docsPerClient} documents per active client. Unlimited users. Prices exclude 18% GST.
                   </div>
                   {timing === "same" ? (
                     <div style={{ fontSize: 13, fontWeight: 600, color: V.maroon, padding: "8px 0" }}>Your plan</div>
@@ -271,7 +287,7 @@ export function BillingSection() {
       )}
 
       <p style={{ fontSize: 12, color: V.muted, margin: "16px 0 0", lineHeight: 1.6 }}>
-        Prices include GST. Payments are processed by Razorpay; FynHelp never sees your card or UPI details. By choosing a plan you agree to the{" "}
+        Prices are before GST; 18% GST is added at checkout. Payments are processed by Razorpay; FynHelp never sees your card or UPI details. By choosing a plan you agree to the{" "}
         <a className="v2-link" href="/terms" target="_blank" rel="noreferrer">Terms</a> and the{" "}
         <a className="v2-link" href="/refund-policy" target="_blank" rel="noreferrer">Refund and Cancellation Policy</a>.
         {hasPlan && !b.cancelAtPeriodEnd && (
@@ -288,7 +304,7 @@ export function BillingSection() {
         <div style={{ display: "grid", gap: 12, fontSize: 14, lineHeight: 1.6 }} data-testid="cancel-modal">
           {b.refundUntil ? (
             <p style={{ margin: 0 }}>
-              You are within 7 days of your first yearly payment, so the plan stops <b>now</b> and the payment is <b>refunded in full</b> to the card or account you paid from. Banks usually credit it in 5 to 7 business days.
+              You are within 30 days of your first yearly payment, so the plan stops <b>now</b> and the payment is <b>refunded in full</b> to the card or account you paid from. Banks usually credit it in 5 to 7 business days.
             </p>
           ) : b.status === "pending" ? (
             <p style={{ margin: 0 }}>The plan has not been charged yet, so it stops now and nothing is taken.</p>
@@ -311,5 +327,79 @@ export function BillingSection() {
         </div>
       </Modal>
     </Card>
+  );
+}
+
+
+type BillingData = NonNullable<ReturnType<typeof useBilling>>;
+
+/** This month's active clients and documents against the trial limits or the plan's allowance. */
+function UsageMeter({ b }: { b: BillingData }) {
+  const a = b.access;
+  const trial = a.state === "trial";
+  const u = b.usage;
+  const plan = PLANS[b.plan];
+  const clientLimit = trial ? TRIAL_MAX_ACTIVE_CLIENTS : (plan.maxActiveClients ?? null);
+  const docLimit = trial ? TRIAL_MAX_DOCUMENTS : documentAllowance(b.plan, u.activeClients);
+  const monthLabel = new Date(`${u.month}-01T00:00:00Z`).toLocaleString("en-IN", { month: "long", year: "numeric", timeZone: "UTC" });
+  const bar = (used: number, limit: number | null, label: string, note: string, testId: string) => {
+    const pct = limit ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+    const tone = limit && used >= limit ? V.maroon : limit && used >= limit * 0.8 ? "#B45309" : "#1F6B45";
+    return (
+      <div style={{ display: "grid", gap: 6 }} data-testid={testId}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+          <span>{label}</span>
+          <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>
+            {used.toLocaleString("en-IN")}
+            {limit != null ? ` / ${limit.toLocaleString("en-IN")}` : ""}
+          </span>
+        </div>
+        {limit != null && (
+          <div style={{ height: 6, borderRadius: 6, background: "rgba(23,18,8,.08)", overflow: "hidden" }}>
+            <div style={{ width: `${pct}%`, height: "100%", background: tone, borderRadius: 6, transition: "width .6s cubic-bezier(.16,1,.3,1)" }} />
+          </div>
+        )}
+        <div style={{ fontSize: 12, color: V.muted }}>{note}</div>
+      </div>
+    );
+  };
+  return (
+    <div style={{ background: V.gray, borderRadius: 14, padding: "14px 16px", margin: "0 0 16px", display: "grid", gap: 14 }} data-testid="usage-meter">
+      <div style={{ fontSize: 12, fontWeight: 650, textTransform: "uppercase", letterSpacing: ".08em", color: V.muted }}>{monthLabel} so far</div>
+      <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit,minmax(min(240px,100%),1fr))" }}>
+        {bar(
+          u.activeClients,
+          trial ? clientLimit : plan.clientsIncluded,
+          "Active clients",
+          trial
+            ? `The trial covers ${TRIAL_MAX_ACTIVE_CLIENTS}. A client is active once a document is read or a reconciliation runs for them this month.`
+            : `${plan.clientsIncluded} included, then ${inr(plan.extraClient)} each${clientLimit ? ` (up to ${clientLimit})` : ""}. Clients you don't work on this month are free.`,
+          "usage-clients",
+        )}
+        {bar(
+          u.documents,
+          docLimit,
+          "Documents",
+          trial
+            ? `The trial covers ${TRIAL_MAX_DOCUMENTS} documents.`
+            : `${plan.docsPerClient} per active client, pooled. Past it, ₹499 per 250 documents on the next invoice; work is never blocked.`,
+          "usage-documents",
+        )}
+      </div>
+      {!trial && (
+        <div style={{ fontSize: 13 }} data-testid="usage-bill">
+          This month comes to <b>{inr(b.bill.subtotal)}</b> + {inr(b.bill.gst)} GST
+          {b.bill.extraClients > 0 && ` (includes ${b.bill.extraClients} extra active client${b.bill.extraClients === 1 ? "" : "s"})`}
+          {b.bill.overageAmount > 0 && ` and ${inr(b.bill.overageAmount)} document overage`}.
+        </div>
+      )}
+      {b.warning && (
+        <div role="status" style={{ fontSize: 13, color: b.warning.level === "100" ? V.maroon : "#92400E" }} data-testid="usage-warning">
+          {b.warning.level === "100"
+            ? `You have used your ${b.warning.limit.toLocaleString("en-IN")} documents for this month. Uploads carry on; extra documents are billed at ₹499 per 250.`
+            : `You have used 80% of this month's ${b.warning.limit.toLocaleString("en-IN")} documents.`}
+        </div>
+      )}
+    </div>
   );
 }

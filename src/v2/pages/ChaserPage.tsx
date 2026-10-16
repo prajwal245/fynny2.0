@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
-import { Send, Plus, MessageCircle, Mail } from "lucide-react";
+import { Send, Plus, MessageCircle, Mail, Lock } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { useBilling } from "../lib/billing";
 import { Badge, Card, Drawer, EmptyState, Modal, PageHeader, Tone, V, formatDate } from "../ui";
 import { AgentGlyph, AgentStatusBadge, AgentTimeline, ShimmerText } from "../agents";
 import { Chase, useV2 } from "../store";
@@ -13,6 +15,8 @@ const FILTERS = ["All", "Open", "Following Up", "Escalated", "Resolved"] as cons
 /** Chaser. All follow-ups as a page; the client's Chaser tab when given a clientId. */
 export default function ChaserPage({ clientId: scopedClient }: { clientId?: string } = {}) {
   const { chases: allChases, clients, clientName, addChase, sendFollowUp, setChaseStatus, runs } = useV2();
+  // WhatsApp chasing is on Firm and Scale (not Essential or the trial).
+  const whatsappAllowed = useBilling()?.access.whatsappChaser ?? false;
   const chases = scopedClient ? allChases.filter((c) => c.clientId === scopedClient) : allChases;
   const [creating, setCreating] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -189,7 +193,12 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
               <label className="v2-label">Message the client receives</label>
               <div style={{ background: V.gray, borderRadius: 12, padding: 14, fontSize: 13, lineHeight: 1.6 }}>{message(active)}</div>
               <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-                {active.phone && active.status !== "Resolved" && (
+                {active.phone && active.status !== "Resolved" && !whatsappAllowed && (
+                  <Link to="/app/settings" hash="billing" className="v2-btn v2-btn-ghost" title="Chasing by WhatsApp is on the Firm and Scale plans" data-testid="whatsapp-locked">
+                    <Lock size={14} /> WhatsApp on Firm plan
+                  </Link>
+                )}
+                {active.phone && active.status !== "Resolved" && whatsappAllowed && (
                   <a
                     className="v2-btn v2-btn-primary"
                     href={waLink(active)}

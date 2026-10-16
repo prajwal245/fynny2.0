@@ -31,6 +31,14 @@ export function TrialBanner({ partnerView }: { partnerView: boolean }) {
         </span>
       </div>
     );
+  if (a.state === "trial" && a.trialNotStarted)
+    return (
+      <div role="status" data-testid="trial-banner" style={bar(false)}>
+        <span style={{ minWidth: 0 }}>
+          <b>Your free trial starts with your first upload.</b> 14 days, extended to 30 once you run a reconciliation and make an MIS. No card needed.
+        </span>
+      </div>
+    );
   if (a.state === "trial" && a.trialDaysLeft != null)
     return (
       <div role="status" data-testid="trial-banner" style={bar(a.trialDaysLeft <= 3)}>
@@ -38,7 +46,7 @@ export function TrialBanner({ partnerView }: { partnerView: boolean }) {
           <b>
             {a.trialDaysLeft <= 1 ? "Last day of your free trial." : `${a.trialDaysLeft} days left in your free trial.`}
           </b>{" "}
-          Everything in Starter, up to {a.maxClients} clients. No card needed until you choose a plan.
+          {b.activated ? "Extended to 30 days. " : "Run a reconciliation and make an MIS to extend it to 30 days. "}Every Firm feature except the WhatsApp Chaser, up to {a.maxActiveClients} active clients and {a.maxDocuments} documents. No card needed.
         </span>
         {action}
       </div>

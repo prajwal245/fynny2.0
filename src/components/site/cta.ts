@@ -13,7 +13,7 @@ export const CALENDLY_URL = "https://calendly.com/nidhi-fynhelp/nidhi-meetings";
 export const CTA_START = "Start free trial";
 export const CTA_DEMO = "Book a demo";
 /** Shown under the main button wherever there is room. */
-export const CTA_NOTE = "14-day free trial · No card needed · Set up in 5 minutes";
+export const CTA_NOTE = "Free trial, 14 days from your first upload · No card needed";
 
 /** Sign-up link that carries an email the visitor already typed. */
 export function signupUrl(email?: string): string {

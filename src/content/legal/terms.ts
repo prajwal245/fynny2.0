@@ -184,12 +184,12 @@ export const TERMS: LegalDoc = {
   {
    "t": "c",
    "n": "5.1",
-   "text": "FynHelp may offer a free trial of the Service, currently for a period of fourteen (14) days on the Starter plan, without requiring a payment method."
+   "text": "FynHelp may offer a free trial of the Service. The free trial runs for fourteen (14) days from the Customer’s first document upload, extended to thirty (30) days once the Customer completes its first reconciliation and first MIS report. It covers up to five (5) active Client Entities and two hundred (200) documents, and does not require a payment method."
   },
   {
    "t": "c",
    "n": "5.2",
-   "text": "On expiry of the trial, access is suspended unless the Customer subscribes to a paid plan. No charge is levied for a trial that is not converted to a paid plan."
+   "text": "On expiry of the trial, the account becomes read-only unless the Customer subscribes to a paid plan, and Customer Data remains available for export for thirty (30) days. No charge is levied for a trial that is not converted to a paid plan."
   },
   {
    "t": "c",
@@ -332,7 +332,7 @@ export const TERMS: LegalDoc = {
   {
    "t": "c",
    "n": "9.2",
-   "text": "Fees are payable in advance, monthly or annually, through FynHelp’s authorised payment gateway, presently Razorpay. Annual plans carry the discount stated at the time of purchase."
+   "text": "Fees are payable in advance, monthly or annually, through FynHelp’s authorised payment gateway, presently Razorpay. Annual plans carry the discount stated at the time of purchase, presently two (2) months free."
   },
   {
    "t": "c",
@@ -347,7 +347,7 @@ export const TERMS: LegalDoc = {
   {
    "t": "c",
    "n": "9.5",
-   "text": "Charges for additional active Client Entities are computed at the end of each calendar month and billed on the following invoice."
+   "text": "Charges for additional active Client Entities, and for documents processed beyond the plan’s pooled document allowance (charged per block of 250 documents at the published rate), are computed at the end of each calendar month and billed on the following invoice. Document allowances are not a hard limit, and FynHelp shall notify the Customer when eighty per cent (80%) and one hundred per cent (100%) of the allowance is used."
   },
   {
    "t": "c",

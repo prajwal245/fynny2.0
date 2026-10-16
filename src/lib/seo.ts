@@ -10,6 +10,7 @@
  * trailing slash. Filtered or tracking URLs (?tab=, ?utm_…) all point back
  * to the clean page.
  */
+import { PLANS as BILLING_PLANS, PLAN_ORDER } from "@/lib/practice/billing/plans";
 
 /** The one public address of the site. Preview deployments are noindexed (vercel.json). */
 export const SITE_URL = (
@@ -154,12 +155,11 @@ export function websiteLd(): JsonLd {
   };
 }
 
-/** Plans as shown on /pricing (monthly, exclusive of GST). Keep in step with the pricing page. */
-const PLANS = [
-  { name: "Starter", price: "2999", description: "15 active client entities included, unlimited users." },
-  { name: "Professional", price: "5999", description: "40 active client entities included, Chaser follow-ups, unlimited users." },
-  { name: "Scale", price: "12999", description: "100 active client entities included, unlimited users." },
-];
+/** Plans as shown on /pricing (monthly, before 18% GST), straight from the billing plans. */
+const PLANS = PLAN_ORDER.map((k) => {
+  const p = BILLING_PLANS[k];
+  return { name: p.name, price: String(p.monthly), description: `${p.clientsIncluded} active clients included, then ₹${p.extraClient} each; unlimited users. GST extra.` };
+});
 
 export function softwareLd(): JsonLd {
   return {
@@ -192,13 +192,13 @@ export function softwareLd(): JsonLd {
       url: absoluteUrl("/pricing"),
       availability: "https://schema.org/InStock",
       ...(p.price !== "0"
-        ? { priceSpecification: { "@type": "UnitPriceSpecification", price: p.price, priceCurrency: "INR", unitText: "MONTH", valueAddedTaxIncluded: true } }
+        ? { priceSpecification: { "@type": "UnitPriceSpecification", price: p.price, priceCurrency: "INR", unitText: "MONTH", valueAddedTaxIncluded: false } }
         : {}),
     })),
   };
 }
 
-/** Product + Offer, for /pricing and /ca-firms: the three plans, GST included, per month. */
+/** Product + Offer, for /pricing and /ca-firms: the three plans per month, before GST. */
 export function productLd(): JsonLd {
   const paid = PLANS.filter((p) => p.price !== "0");
   return {
@@ -225,7 +225,7 @@ export function productLd(): JsonLd {
         priceCurrency: "INR",
         url: absoluteUrl("/pricing"),
         availability: "https://schema.org/InStock",
-        priceSpecification: { "@type": "UnitPriceSpecification", price: p.price, priceCurrency: "INR", unitText: "MONTH", valueAddedTaxIncluded: true },
+        priceSpecification: { "@type": "UnitPriceSpecification", price: p.price, priceCurrency: "INR", unitText: "MONTH", valueAddedTaxIncluded: false },
       })),
     },
   };

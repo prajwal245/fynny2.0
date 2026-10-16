@@ -125,6 +125,11 @@ export async function registerDocument(
     return { extraction_id: existing.id, duplicate: true };
   }
 
+  // Uploads and Zoho pulls check the trial / plan limits first; documents that
+  // arrive on their own (Gmail, WhatsApp) are always taken in.
+  const billing = await import("./billing.server");
+  if (input.channel === "Manual" || input.channel === "Zoho Books")
+    await billing.assertWorkRoom(db, ctx.firmId, { businessId: input.business_id, newDocument: true });
   const kind = detectKind(bytes, input.filename, input.mime);
   const side = input.side ?? inferSide(input.filename, kind);
   const { data, error } = await db
@@ -164,6 +169,7 @@ export async function registerDocument(
     }
     throw new PracticeError("db_error", error.message);
   }
+  await billing.startTrialClock(db, ctx.firmId).catch((e) => console.error(`[billing] trial clock: ${(e as Error).message}`));
   if (input.process !== false)
     await processExtraction(db, data.id, {
       trigger: input.channel === "Manual" ? "user" : "channel",

@@ -9,6 +9,8 @@ import { downloadExcel, downloadPdf, flowMoney, printReport } from "../lib/expor
 import { toast } from "sonner";
 import { openExceptions } from "../lib/exceptions";
 import { latestIds } from "../lib/reportStatus";
+import { useBilling } from "../lib/billing";
+import { PLANS } from "@/lib/practice/billing/plans";
 
 /** Older reports stored "SALARY — SALARY": show the text once. */
 function dedupeParticulars(p: string): string {
@@ -19,6 +21,7 @@ function dedupeParticulars(p: string): string {
 export default function ReportDetailPage() {
   const { reportId } = useParams({ from: "/app/reports/$reportId" });
   const { reports, clientName, firm, session, signOffReport, requestCorrection, markCorrected, generateReport, partnerView, exceptions, review, docs } = useV2();
+  const billing = useBilling();
   const report = reports.find((r) => r.id === reportId);
   const [source, setSource] = useState<{ label: string; rows: Txn[] } | null>(null);
   const [insightsReady, setInsightsReady] = useState(false);
@@ -82,7 +85,8 @@ export default function ReportDetailPage() {
   const flowCount = (report.otherFlows ?? []).reduce((n, f) => n + f.count, 0);
   const matchedCount = allRows.length + flowCount;
 
-  const meta = { clientName: clientName(report.clientId), firmName: firm?.name ?? "FynHelp" };
+  const features = billing?.access.features;
+  const meta = { clientName: clientName(report.clientId), firmName: firm?.name ?? "FynHelp", branded: features ? PLANS[features].firmBranding : false };
 
   // The gateway gross-up is part of the Revenue and Expenses figures, so it is listed with their sources.
   const g = report.gateway;

@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge, Card, Modal, V, formatDate, type Tone } from "../ui";
 import { useV2 } from "../store";
-import { cancelPracticePlan, changePracticePlan, confirmPracticeCheckout, getPracticePayments, previewPracticeCoupon, redeemPracticeTrialCode, startPracticeCheckout } from "@/lib/practice/practice.functions";
+import { cancelPracticePlan, changePracticePlan, confirmPracticeCheckout, getPracticePayments, previewPracticeCoupon, redeemPracticeTrialCode, setPracticeLifecycleEmails, startPracticeCheckout } from "@/lib/practice/practice.functions";
+import { monthName } from "@/lib/practice/billing/arrears";
 import {
   PLANS,
   TRIAL_ACTIVATED_DAYS,
@@ -286,6 +287,9 @@ export function BillingSection() {
         </div>
       )}
 
+      <UsageCharges b={b} />
+      <EmailPrefs b={b} />
+
       <p style={{ fontSize: 12, color: V.muted, margin: "16px 0 0", lineHeight: 1.6 }}>
         Prices are before GST; 18% GST is added at checkout. Payments are processed by Razorpay; FynHelp never sees your card or UPI details. By choosing a plan you agree to the{" "}
         <a className="v2-link" href="/terms" target="_blank" rel="noreferrer">Terms</a> and the{" "}
@@ -401,5 +405,92 @@ function UsageMeter({ b }: { b: BillingData }) {
         </div>
       )}
     </div>
+  );
+}
+
+const CHARGE_STATUS: Record<string, { label: string; tone: Tone }> = {
+  none: { label: "Inside plan", tone: "neutral" },
+  pending: { label: "Being billed", tone: "info" },
+  billed: { label: "Billed", tone: "info" },
+  paid: { label: "Paid", tone: "good" },
+  failed: { label: "Retrying", tone: "warn" },
+  waived: { label: "Waived", tone: "neutral" },
+};
+
+/** Extras billed for past months: extra active clients and document overage. */
+function UsageCharges({ b }: { b: NonNullable<ReturnType<typeof useBilling>> }) {
+  if (!b.usageCharges?.length) return null;
+  return (
+    <div style={{ marginTop: 18 }} data-testid="usage-charges">
+      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Monthly usage</div>
+      <p style={{ fontSize: 12, color: V.muted, margin: "0 0 8px", lineHeight: 1.6 }}>
+        Extra active clients and documents over the allowance are billed after each month ends: monthly plans with the next payment, yearly plans by a Razorpay invoice.
+      </p>
+      <div style={{ overflowX: "auto" }}>
+        <table className="v2-table" style={{ fontSize: 13, minWidth: 460 }}>
+          <thead>
+            <tr><th>Month</th><th>Active clients</th><th>Documents</th><th>Extras</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            {b.usageCharges.map((c) => {
+              const st = CHARGE_STATUS[c.status] ?? { label: c.status, tone: "neutral" as Tone };
+              return (
+                <tr key={c.month}>
+                  <td>{monthName(c.month)}</td>
+                  <td className="num">{c.activeClients}</td>
+                  <td className="num">{c.documents.toLocaleString("en-IN")}</td>
+                  <td className="num">
+                    {c.total > 0 ? (
+                      <span title={`${inr(c.subtotal)} + GST`}>
+                        {inr(c.total)}
+                        <span style={{ color: V.muted }}> incl. GST</span>
+                      </span>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td>
+                    <Badge tone={st.tone}>{st.label}</Badge>
+                    {c.status === "billed" && c.method === "invoice" && c.payUrl && (
+                      <>
+                        {" "}
+                        <a className="v2-link" href={c.payUrl} target="_blank" rel="noreferrer">Pay</a>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/** Trial reminders, usage summaries and tips by email. Billing emails always go. */
+function EmailPrefs({ b }: { b: NonNullable<ReturnType<typeof useBilling>> }) {
+  const [busy, setBusy] = useState(false);
+  const toggle = async (on: boolean) => {
+    setBusy(true);
+    try {
+      await setPracticeLifecycleEmails({ data: { on } });
+      setBilling({ ...b, lifecycleEmails: on });
+      toast.success(on ? "Tips and reminders are on." : "Tips and reminders are off. Billing emails still come.");
+    } catch (e) {
+      toast.error(errMsg(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <label style={{ display: "flex", gap: 10, alignItems: "flex-start", marginTop: 18, fontSize: 13, lineHeight: 1.5, cursor: busy ? "wait" : "pointer" }}>
+      <input type="checkbox" checked={b.lifecycleEmails} disabled={busy} onChange={(e) => void toggle(e.target.checked)} data-testid="lifecycle-emails" style={{ marginTop: 3 }} />
+      <span>
+        <b>Email the firm tips, trial reminders and monthly usage summaries</b>
+        <br />
+        <span style={{ color: V.muted }}>Sent to the firm's email, at most one a day. Emails about charges and renewals always go.</span>
+      </span>
+    </label>
   );
 }

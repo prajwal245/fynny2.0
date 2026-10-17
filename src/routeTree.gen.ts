@@ -112,6 +112,7 @@ import { Route as ApiPublicCaComplianceAutoAlertRouteImport } from './routes/api
 import { Route as ApiPublicCaIntegrationSyncRouteImport } from './routes/api/public/ca-integration-sync'
 import { Route as ApiPublicCaInvoicePaymentWebhookRouteImport } from './routes/api/public/ca-invoice-payment-webhook'
 import { Route as ApiPublicCaPollGmailRouteImport } from './routes/api/public/ca-poll-gmail'
+import { Route as ApiPublicEmailPreferencesRouteImport } from './routes/api/public/email-preferences'
 import { Route as ApiPublicPracticeTickRouteImport } from './routes/api/public/practice-tick'
 import { Route as ApiPublicRazorpayWebhookRouteImport } from './routes/api/public/razorpay-webhook'
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp-webhook'
@@ -747,6 +748,12 @@ const ApiPublicCaPollGmailRoute = ApiPublicCaPollGmailRouteImport.update({
   path: '/api/public/ca-poll-gmail',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicEmailPreferencesRoute =
+  ApiPublicEmailPreferencesRouteImport.update({
+    id: '/api/public/email-preferences',
+    path: '/api/public/email-preferences',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicPracticeTickRoute = ApiPublicPracticeTickRouteImport.update({
   id: '/api/public/practice-tick',
   path: '/api/public/practice-tick',
@@ -1444,6 +1451,7 @@ export interface FileRoutesByFullPath {
   '/api/public/ca-integration-sync': typeof ApiPublicCaIntegrationSyncRoute
   '/api/public/ca-invoice-payment-webhook': typeof ApiPublicCaInvoicePaymentWebhookRoute
   '/api/public/ca-poll-gmail': typeof ApiPublicCaPollGmailRoute
+  '/api/public/email-preferences': typeof ApiPublicEmailPreferencesRoute
   '/api/public/practice-tick': typeof ApiPublicPracticeTickRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/whatsapp-webhook': typeof ApiPublicWhatsappWebhookRoute
@@ -1643,6 +1651,7 @@ export interface FileRoutesByTo {
   '/api/public/ca-integration-sync': typeof ApiPublicCaIntegrationSyncRoute
   '/api/public/ca-invoice-payment-webhook': typeof ApiPublicCaInvoicePaymentWebhookRoute
   '/api/public/ca-poll-gmail': typeof ApiPublicCaPollGmailRoute
+  '/api/public/email-preferences': typeof ApiPublicEmailPreferencesRoute
   '/api/public/practice-tick': typeof ApiPublicPracticeTickRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/whatsapp-webhook': typeof ApiPublicWhatsappWebhookRoute
@@ -1853,6 +1862,7 @@ export interface FileRoutesById {
   '/api/public/ca-integration-sync': typeof ApiPublicCaIntegrationSyncRoute
   '/api/public/ca-invoice-payment-webhook': typeof ApiPublicCaInvoicePaymentWebhookRoute
   '/api/public/ca-poll-gmail': typeof ApiPublicCaPollGmailRoute
+  '/api/public/email-preferences': typeof ApiPublicEmailPreferencesRoute
   '/api/public/practice-tick': typeof ApiPublicPracticeTickRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/whatsapp-webhook': typeof ApiPublicWhatsappWebhookRoute
@@ -2059,6 +2069,7 @@ export interface FileRouteTypes {
     | '/api/public/ca-integration-sync'
     | '/api/public/ca-invoice-payment-webhook'
     | '/api/public/ca-poll-gmail'
+    | '/api/public/email-preferences'
     | '/api/public/practice-tick'
     | '/api/public/razorpay-webhook'
     | '/api/public/whatsapp-webhook'
@@ -2258,6 +2269,7 @@ export interface FileRouteTypes {
     | '/api/public/ca-integration-sync'
     | '/api/public/ca-invoice-payment-webhook'
     | '/api/public/ca-poll-gmail'
+    | '/api/public/email-preferences'
     | '/api/public/practice-tick'
     | '/api/public/razorpay-webhook'
     | '/api/public/whatsapp-webhook'
@@ -2467,6 +2479,7 @@ export interface FileRouteTypes {
     | '/api/public/ca-integration-sync'
     | '/api/public/ca-invoice-payment-webhook'
     | '/api/public/ca-poll-gmail'
+    | '/api/public/email-preferences'
     | '/api/public/practice-tick'
     | '/api/public/razorpay-webhook'
     | '/api/public/whatsapp-webhook'
@@ -2601,6 +2614,7 @@ export interface RootRouteChildren {
   ApiPublicCaIntegrationSyncRoute: typeof ApiPublicCaIntegrationSyncRoute
   ApiPublicCaInvoicePaymentWebhookRoute: typeof ApiPublicCaInvoicePaymentWebhookRoute
   ApiPublicCaPollGmailRoute: typeof ApiPublicCaPollGmailRoute
+  ApiPublicEmailPreferencesRoute: typeof ApiPublicEmailPreferencesRoute
   ApiPublicPracticeTickRoute: typeof ApiPublicPracticeTickRoute
   ApiPublicRazorpayWebhookRoute: typeof ApiPublicRazorpayWebhookRoute
   ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
@@ -3330,6 +3344,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/ca-poll-gmail'
       fullPath: '/api/public/ca-poll-gmail'
       preLoaderRoute: typeof ApiPublicCaPollGmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/email-preferences': {
+      id: '/api/public/email-preferences'
+      path: '/api/public/email-preferences'
+      fullPath: '/api/public/email-preferences'
+      preLoaderRoute: typeof ApiPublicEmailPreferencesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/practice-tick': {
@@ -4565,6 +4586,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicCaIntegrationSyncRoute: ApiPublicCaIntegrationSyncRoute,
   ApiPublicCaInvoicePaymentWebhookRoute: ApiPublicCaInvoicePaymentWebhookRoute,
   ApiPublicCaPollGmailRoute: ApiPublicCaPollGmailRoute,
+  ApiPublicEmailPreferencesRoute: ApiPublicEmailPreferencesRoute,
   ApiPublicPracticeTickRoute: ApiPublicPracticeTickRoute,
   ApiPublicRazorpayWebhookRoute: ApiPublicRazorpayWebhookRoute,
   ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,

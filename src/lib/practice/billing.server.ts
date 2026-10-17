@@ -44,7 +44,7 @@ import {
 const API = process.env["RAZORPAY_API_BASE"] || "https://api.razorpay.com/v1";
 const env = (k: string) => process.env[k] || undefined;
 /** GST added on top of list prices (default 18%). */
-const gstPercent = () => {
+export const gstPercent = () => {
   const v = Number(env("FYNHELP_GST_PERCENT") ?? GST_PERCENT);
   return Number.isFinite(v) && v >= 0 ? v : GST_PERCENT;
 };
@@ -70,6 +70,10 @@ export interface BillingView extends BillingRow {
   bill: BillBreakdown;
   warning: UsageWarning | null;
   activated: boolean;
+  /** Extras billed for past months, newest first. */
+  usageCharges: import("./billing/arrears.server").UsageChargeRow[];
+  /** Lifecycle emails (tips, trial reminders) are on for this firm. */
+  lifecycleEmails: boolean;
 }
 
 const COLS =
@@ -159,7 +163,11 @@ async function planIdFor(db: Db, plan: PlanKey, cycle: Cycle): Promise<string> {
 export async function billingView(db: Db, ctx: FirmContext): Promise<BillingView> {
   const row = await loadBilling(db, ctx.firmId);
   const { usageFor } = await import("./billing/usage.server");
-  const usage = await usageFor(db, ctx.firmId);
+  const [usage, usageCharges, lifecycleEmails] = await Promise.all([
+    usageFor(db, ctx.firmId),
+    import("./billing/arrears.server").then((m) => m.recentUsageCharges(db, ctx.firmId)),
+    import("./lifecycle/optout.server").then((m) => m.getLifecycleEmails(db, ctx.firmId)),
+  ]);
   const planShown: PlanKey = row.status === "trialing" ? "professional" : row.plan;
   const available = env("RAZORPAY_KEY_ID") && env("RAZORPAY_KEY_SECRET") ? allPlans() : [];
   return {
@@ -181,6 +189,8 @@ export async function billingView(db: Db, ctx: FirmContext): Promise<BillingView
     bill: monthlyBill(planShown, row.cycle, usage, gstPercent()),
     warning: row.status === "trialing" ? null : documentWarning(row.plan, usage),
     activated: !!row.activated_at,
+    usageCharges,
+    lifecycleEmails,
   };
 }
 
@@ -447,10 +457,11 @@ export async function confirmCheckout(
 export async function handleRazorpayWebhook(
   db: Db,
   eventId: string,
-  payload: { event?: string; payload?: { subscription?: { entity?: RzpSubscription } } },
+  payload: { event?: string; payload?: { subscription?: { entity?: RzpSubscription }; invoice?: { entity?: { id?: string; notes?: Record<string, string> | null } } } },
 ) {
   const sub = payload.payload?.subscription?.entity;
-  let firmId: string | null = sub?.notes?.firm_id ?? null;
+  const invoice = payload.payload?.invoice?.entity;
+  let firmId: string | null = sub?.notes?.firm_id ?? (invoice?.notes?.kind === "usage" ? (invoice.notes.firm_id ?? null) : null);
   if (!firmId && sub?.id) {
     const { data } = await db.from("ca_billing").select("ca_firm_id").eq("razorpay_subscription_id", sub.id).maybeSingle();
     firmId = (data?.ca_firm_id as string) ?? null;
@@ -464,6 +475,11 @@ export async function handleRazorpayWebhook(
     const { data: row } = await db.from("ca_billing").select("razorpay_subscription_id").eq("ca_firm_id", firmId).maybeSingle();
     if (!row?.razorpay_subscription_id || row.razorpay_subscription_id === sub.id) await applySubscription(db, firmId, sub);
   }
+  // Usage extras: a paid usage invoice, or add-ons settled by a subscription payment.
+  if (payload.event === "invoice.paid" && invoice?.id && invoice.notes?.kind === "usage")
+    await (await import("./billing/arrears.server")).markUsagePaid(db, { invoiceId: invoice.id });
+  if (payload.event === "subscription.charged" && firmId)
+    await (await import("./billing/arrears.server")).markUsagePaid(db, { firmId, subscriptionCharged: true });
   return { duplicate: false, firmId };
 }
 
@@ -702,3 +718,5 @@ export async function redeemTrialCoupon(db: Db, ctx: FirmContext, code: string) 
 
 /** Razorpay API for the admin panel (refunds, lookups). */
 export const razorpayApi = rzp;
+/** Razorpay keys are set, so charges can be created. */
+export const razorpayReady = () => Boolean(env("RAZORPAY_KEY_ID") && env("RAZORPAY_KEY_SECRET"));

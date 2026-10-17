@@ -5,6 +5,8 @@
  *     failed for a temporary reason, with backoff
  *   - send chaser follow-ups that are due and escalate unanswered ones
  *   - open the "missing bank statement" chase after each firm's chase day
+ *   - bill last month's extra clients and document overage (hourly at most)
+ *   - send trial, usage and retention emails (hourly, 9 am to 8 pm IST)
  * Extract chains into Recon by itself (see orchestrator.server).
  */
 import { runDueFollowups } from "./chaser.server";
@@ -35,5 +37,15 @@ export async function practiceTick(
   const renewals = await import("./billing.server")
     .then(async (b) => b.sendRenewalReminders(await (await import("./db.server")).adminDb(), now))
     .catch((e) => ({ sent: 0, error: (e as Error).message }));
-  return { gmail, queue, autoChase, chaser, renewals, ms: Date.now() - started };
+  const db = await (await import("./db.server")).adminDb();
+  const { claimJob, istParts } = await import("./jobs.server");
+  // Extras are billed before the usage summary emails that describe them.
+  const arrears = await claimJob(db, "arrears", istParts(now).hourKey)
+    .then(async (mine) => (mine ? (await import("./billing/arrears.server")).runArrearsBilling(db, now) : { skipped: "already ran this hour" }))
+    .catch((e) => ({ error: (e as Error).message }));
+  const lifecycle = await import("./lifecycle/lifecycle.server")
+    .then((m) => m.runLifecycle(db, now))
+    .then((r) => ({ ...r, sent: r.sent.length }))
+    .catch((e) => ({ error: (e as Error).message }));
+  return { gmail, queue, autoChase, chaser, renewals, arrears, lifecycle, ms: Date.now() - started };
 }

@@ -26,8 +26,11 @@ export interface MonthUsage extends Usage {
   activeIds: Set<string>;
 }
 
-export async function usageFor(db: Db, firmId: string, month: string = billingMonth()): Promise<MonthUsage> {
-  const { start, end } = monthRange(month);
+/** Usage in a month; `from` counts only activity on or after that moment (e.g. the first paid day). */
+export async function usageFor(db: Db, firmId: string, month: string = billingMonth(), from?: string | null): Promise<MonthUsage> {
+  const range = monthRange(month);
+  const start = from && from > range.start ? new Date(from).toISOString() : range.start;
+  const end = range.end;
   const [docs, runs, docCount] = await Promise.all([
     db.from("ca_document_extractions").select("business_id").eq("ca_firm_id", firmId).gte("created_at", start).lt("created_at", end).not("business_id", "is", null).limit(20000),
     db.from("ca_agent_runs").select("business_id").eq("ca_firm_id", firmId).eq("agent", "recon").gte("started_at", start).lt("started_at", end).not("business_id", "is", null).limit(20000),

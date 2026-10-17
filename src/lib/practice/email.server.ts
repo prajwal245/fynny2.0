@@ -16,6 +16,8 @@ export async function sendEmail(msg: {
   text: string;
   replyTo?: string | null;
   fromName?: string;
+  /** Extra headers, e.g. List-Unsubscribe on lifecycle emails. */
+  headers?: Record<string, string>;
 }): Promise<SendResult> {
   const key = process.env["RESEND_API_KEY"];
   if (!key)
@@ -26,7 +28,9 @@ export async function sendEmail(msg: {
     ? `${msg.fromName.replace(/[<>"]/g, "")} via FynHelp <${fromAddress}>`
     : `FynHelp <${fromAddress}>`;
   try {
-    const res = await fetch("https://api.resend.com/emails", {
+    // RESEND_API_BASE exists only so tests can point at a stand-in.
+    const base = process.env["RESEND_API_BASE"] || "https://api.resend.com";
+    const res = await fetch(`${base}/emails`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${key}`,
@@ -39,6 +43,7 @@ export async function sendEmail(msg: {
         html: msg.html,
         text: msg.text,
         ...(msg.replyTo ? { reply_to: msg.replyTo } : {}),
+        ...(msg.headers ? { headers: msg.headers } : {}),
       }),
     });
     const body = (await res.json().catch(() => ({}))) as {

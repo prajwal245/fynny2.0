@@ -821,6 +821,20 @@ export const updatePracticePipelineSettings = createServerFn({
 
 /* ── billing ──────────────────────────────────────────── */
 
+/** Partners switch the lifecycle emails (trial reminders, tips, usage summaries) on or off. */
+export const setPracticeLifecycleEmails = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ on: z.boolean() }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      const { PracticeError } = await import("./core");
+      const { canSignOff } = await import("./db.server");
+      if (!canSignOff(ctx)) throw new PracticeError("forbidden", "Only a partner can change the firm's email settings.");
+      await (await import("./lifecycle/optout.server")).setLifecycleEmails(db, ctx.firmId, data.on);
+      return { on: data.on };
+    }),
+  );
+
 export const getPracticeBilling = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) =>

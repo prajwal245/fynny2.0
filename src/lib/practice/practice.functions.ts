@@ -1059,3 +1059,48 @@ export const getClientBooks = createServerFn({ method: "POST" })
       return (await import("./tally.server")).statements(db, ctx, data.businessId, data.asOn);
     }),
   );
+
+/* ── WhatsApp follow-ups from FynHelp's number ─────────── */
+
+export const whatsappFollowUpStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => withFirm(context.userId, async (db, ctx) => (await import("./whatsappOut.server")).status(db, ctx)));
+
+export const whatsappFollowUpSettings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z
+      .object({
+        enabled: z.boolean().optional(),
+        mode: z.enum(["approve", "auto"]).optional(),
+        daily_limit: z.number().int().min(1).max(1000).optional(),
+        confirmConsent: z.boolean().optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      await asPartner(ctx, "change WhatsApp follow-ups");
+      return (await import("./whatsappOut.server")).saveSettings(db, ctx, data);
+    }),
+  );
+
+export const whatsappApprove = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ ids: z.array(uuid).min(1).max(100) }).parse(d))
+  .handler(async ({ data, context }) =>
+    withWork(context.userId, async (db, ctx) => {
+      await asPartner(ctx, "approve WhatsApp messages");
+      return (await import("./chaser.server")).approveWhatsApp(db, ctx, data.ids);
+    }),
+  );
+
+export const whatsappDiscard = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ ids: z.array(uuid).min(1).max(100) }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      await asPartner(ctx, "discard WhatsApp messages");
+      return (await import("./whatsappOut.server")).discardDrafts(db, ctx, data.ids);
+    }),
+  );

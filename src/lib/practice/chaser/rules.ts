@@ -18,6 +18,8 @@ export interface ChaseState {
   next_follow_up_at: string | null;
   do_not_disturb: boolean;
   contact_email: string | null;
+  /** True when WhatsApp can carry the follow-up (firm switched on, valid number), so a missing email is not a dead end. */
+  reachable_by_phone?: boolean;
 }
 
 export type ChaseDecision =
@@ -68,7 +70,7 @@ export function decide(s: ChaseState, now: Date): ChaseDecision {
     return { action: "skip", reason: "already chased today" };
   }
   if (s.chaser_count >= s.max_follow_ups) return { action: "escalate" };
-  if (!s.contact_email) return { action: "skip", reason: "no contact email" };
+  if (!s.contact_email && !s.reachable_by_phone) return { action: "skip", reason: "no contact email" };
   const next = slotAt(s.created_at, schedule, s.chaser_count + 1);
   // If the schedule has no further slot, escalate one schedule-gap later.
   const fallback = new Date(now.getTime() + 4 * DAY).toISOString();
@@ -108,6 +110,8 @@ const esc = (s: string) =>
 
 const what = (t: TemplateInput) =>
   `${t.item.toLowerCase()}${t.period ? ` for ${t.period}` : ""}`;
+/** "bank statement for September 2026", as it reads inside a message. */
+export const whatText = what;
 
 export function renderEmail(
   followUpNumber: number,

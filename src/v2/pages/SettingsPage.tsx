@@ -24,6 +24,7 @@ import { GmailHealth } from "../components/GmailHealth";
 import { GmailIcon, WhatsAppIcon } from "../components/BrandIcons";
 import { ZohoBooksSection } from "../components/ZohoBooks";
 import { TallySection } from "../components/TallyConnect";
+import { WhatsAppFollowUpsCard } from "../components/WhatsAppFollowUps";
 import { INTEGRATION_STYLES, IntegrationCard } from "../components/IntegrationCard";
 import { Link } from "@tanstack/react-router";
 import { FileSpreadsheet, UploadCloud } from "lucide-react";
@@ -531,12 +532,14 @@ export default function SettingsPage() {
 
             <TallySection index={2} />
 
+            <WhatsAppFollowUpsCard index={2} />
+
             <IntegrationCard
               index={2}
               testId="whatsapp-card"
               icon={<WhatsAppIcon size={26} />}
               tint="rgba(37,211,102,.1)"
-              name="WhatsApp Business"
+              name="Your own WhatsApp number"
               description={
                 intg.whatsapp.available
                   ? intg.whatsapp.channels.length

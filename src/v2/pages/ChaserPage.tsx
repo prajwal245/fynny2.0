@@ -7,6 +7,7 @@ import { useBilling } from "../lib/billing";
 import { Badge, Card, Drawer, EmptyState, Modal, PageHeader, Tone, V, formatDate } from "../ui";
 import { AgentGlyph, AgentStatusBadge, AgentTimeline, ShimmerText } from "../agents";
 import { Chase, useV2 } from "../store";
+import { WhatsAppApprovals, useWaStatus, viaFynHelp } from "../components/WhatsAppFollowUps";
 
 const TONE: Record<Chase["status"], Tone> = { Open: "info", "Following Up": "warn", Escalated: "bad", Resolved: "good" };
 const TYPES = ["Missing bank statement", "Missing invoice", "Overdue receivable", "GST confirmation", "Custom"];
@@ -17,6 +18,8 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
   const { chases: allChases, clients, clientName, addChase, sendFollowUp, setChaseStatus, runs } = useV2();
   // WhatsApp chasing is on Firm and Scale (not Essential or the trial).
   const whatsappAllowed = useBilling()?.access.whatsappChaser ?? false;
+  const { st: waSt } = useWaStatus();
+  const fromFynHelp = viaFynHelp(waSt);
   const chases = scopedClient ? allChases.filter((c) => c.clientId === scopedClient) : allChases;
   const [creating, setCreating] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -68,6 +71,8 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
         action={<button className="v2-btn v2-btn-primary" onClick={openCreate}><Plus size={15} /> Create chase item</button>}
       />
       )}
+
+      <WhatsAppApprovals clientId={scopedClient} />
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
         {FILTERS.map((f) => (
@@ -198,7 +203,12 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
                     <Lock size={14} /> WhatsApp on Firm plan
                   </Link>
                 )}
-                {active.phone && active.status !== "Resolved" && whatsappAllowed && (
+                {active.phone && active.status !== "Resolved" && whatsappAllowed && fromFynHelp && (
+                  <button className="v2-btn v2-btn-primary" data-testid="whatsapp-send-fynhelp" onClick={() => { sendFollowUp(active.id, "WhatsApp"); }}>
+                    <MessageCircle size={15} /> Send WhatsApp from FynHelp
+                  </button>
+                )}
+                {active.phone && active.status !== "Resolved" && whatsappAllowed && !fromFynHelp && (
                   <a
                     className="v2-btn v2-btn-primary"
                     href={waLink(active)}

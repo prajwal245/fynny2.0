@@ -16,7 +16,9 @@ import {
   decide,
   isClosed,
   renderEmail,
+  normalisePhone,
   slotAt,
+  whatText,
   whatsappLink,
   whatsappMessage,
   DEFAULT_SCHEDULE,
@@ -24,6 +26,7 @@ import {
   type TemplateInput,
 } from "./chaser/rules";
 import { isEmail, sendEmail } from "./email.server";
+import type { WaChaseInput } from "./whatsapp/templates";
 
 const DAY = 86_400_000;
 
@@ -207,6 +210,13 @@ function nextSlot(row: ChaseRow, sentCount: number, now: Date): string {
     : new Date(now.getTime() + 4 * DAY).toISOString();
 }
 
+const waInput = (t: TemplateInput & { clientName: string }): WaChaseInput => ({
+  contactName: t.contactName,
+  firmName: t.firmName,
+  item: whatText(t),
+  clientName: t.clientName,
+});
+
 /** A follow-up sent now by a person (Email) or prepared for WhatsApp. */
 export async function sendFollowUp(
   db: Db,
@@ -229,6 +239,40 @@ export async function sendFollowUp(
     const { accessFor } = await import("./billing/plans");
     if (!accessFor(await loadBilling(db, ctx.firmId)).whatsappChaser)
       throw new PracticeError("plan_feature", "Chasing by WhatsApp is on the Firm and Scale plans. Email follow-ups work on every plan.");
+    // Switched on: the message goes from FynHelp's number, as the approved template. Pressing Send is the approval.
+    const wa = await import("./whatsappOut.server");
+    const waSettings = await wa.getSettings(db, ctx.firmId);
+    if (waSettings.enabled && wa.platformReady()) {
+      const made = await wa.createFollowUp(db, {
+        firmId: ctx.firmId,
+        businessId: row.business_id,
+        chaseId: row.id,
+        followUpNumber: count,
+        maxFollowUps: row.max_follow_ups,
+        phone: row.contact_phone || t.clientPhone,
+        doNotDisturb: t.dnd,
+        chase: waInput(t),
+      });
+      if ("blocked" in made) throw new PracticeError("wa_blocked", made.reason);
+      const sent = await wa.sendDraft(db, made.id, ctx.userId);
+      if (!sent.ok) throw new PracticeError("wa_failed", sent.error);
+      await db
+        .from("ca_document_requests")
+        .update({ chaser_count: count, last_chased_at: now.toISOString(), next_follow_up_at: nextSlot(row, count, now) })
+        .eq("id", row.id);
+      await chaserEvent(db, {
+        chaser_id: row.id,
+        ca_firm_id: ctx.firmId,
+        business_id: row.business_id,
+        event_type: "sent",
+        channel: "whatsapp",
+        template_id: "fynhelp_whatsapp",
+        note: `WhatsApp follow up ${count} sent from FynHelp's number`,
+        actor_id: ctx.userId,
+        metadata: { message: made.body, wamid: sent.wamid },
+      });
+      return { channel, via: "fynhelp" as const, message: made.body, follow_ups: count };
+    }
     const message = whatsappMessage(t);
     const link = whatsappLink(row.contact_phone || t.clientPhone, message);
     if (!link.url) throw new PracticeError("invalid_phone", link.error!);
@@ -418,8 +462,12 @@ export async function runDueFollowups(now = new Date(), firmId?: string) {
     escalated: 0,
     skipped: 0,
     failed: 0,
+    drafted: 0,
   };
   const { firmCanWork } = await import("./billing.server");
+  const wa = await import("./whatsappOut.server");
+  // Per firm: is WhatsApp on (switched on, consent given, FynHelp's number configured), and who approves?
+  const waCfg = new Map<string, { on: boolean; mode: "approve" | "auto" }>();
   const working = new Map<string, boolean>();
   for (const row of (data ?? []) as ChaseRow[]) {
     summary.checked++;
@@ -442,10 +490,19 @@ export async function runDueFollowups(now = new Date(), firmId?: string) {
     }
     const firm = firmNames.get(row.ca_firm_id)!;
     const t = await templateInput(db, row, firm.name);
+    if (!waCfg.has(row.ca_firm_id)) {
+      const s = await wa.getSettings(db, row.ca_firm_id);
+      waCfg.set(row.ca_firm_id, { on: s.enabled && !!s.consent_confirmed_at && wa.platformReady(), mode: s.mode });
+    }
+    const cfg = waCfg.get(row.ca_firm_id)!;
+    const phone = row.contact_phone || t.clientPhone;
+    // A firm that switched WhatsApp on follows up there when the contact has a usable number that has not opted out.
+    const viaWhatsApp = cfg.on && !!normalisePhone(phone) && !(await wa.isOptedOut(db, phone));
     const state: ChaseState = {
       ...row,
       do_not_disturb: t.dnd,
       contact_email: row.contact_email || t.clientEmail,
+      reachable_by_phone: viaWhatsApp,
     };
     const decision = decide(state, now);
 
@@ -513,6 +570,65 @@ export async function runDueFollowups(now = new Date(), firmId?: string) {
         "chaser",
         `Chase "${row.title}" escalated after ${row.chaser_count} unanswered follow ups.`,
       );
+      continue;
+    }
+
+    if (viaWhatsApp && decision.action === "send") {
+      const park = () =>
+        db.from("ca_document_requests").update({ next_follow_up_at: new Date(now.getTime() + DAY).toISOString() }).eq("id", row.id).eq("next_follow_up_at", row.next_follow_up_at);
+      const base = {
+        firmId: row.ca_firm_id,
+        businessId: row.business_id,
+        chaseId: row.id,
+        followUpNumber: decision.follow_up_number,
+        maxFollowUps: row.max_follow_ups,
+        phone,
+        doNotDisturb: t.dnd,
+        chase: waInput(t),
+      };
+      if (cfg.mode === "approve") {
+        // A partner approves each round, so the round is not used up until it goes. One draft per round.
+        await park();
+        const { data: waiting } = await db.from("ca_wa_messages").select("id").eq("chase_id", row.id).eq("follow_up_number", decision.follow_up_number).eq("status", "draft").limit(1);
+        if (waiting?.length) { summary.skipped++; continue; }
+        const made = await wa.createFollowUp(db, base, now);
+        if ("blocked" in made) {
+          summary.skipped++;
+          await chaserEvent(db, { chaser_id: row.id, ca_firm_id: row.ca_firm_id, business_id: row.business_id, event_type: "skipped", channel: "whatsapp", note: `WhatsApp not prepared: ${made.reason}` });
+          continue;
+        }
+        summary.drafted++;
+        await chaserEvent(db, { chaser_id: row.id, ca_firm_id: row.ca_firm_id, business_id: row.business_id, event_type: "whatsapp_draft", channel: "whatsapp", template_id: "fynhelp_whatsapp", note: `WhatsApp follow up ${decision.follow_up_number} is ready for a partner to approve`, metadata: { message: made.body } });
+        continue;
+      }
+      // Automatic: claim the slot first, as for email, so a parallel run cannot send twice.
+      const { data: won } = await db
+        .from("ca_document_requests")
+        .update({ chaser_count: decision.follow_up_number, last_chased_at: now.toISOString(), next_follow_up_at: decision.next_follow_up_at })
+        .eq("id", row.id)
+        .eq("chaser_count", row.chaser_count)
+        .eq("status", "open")
+        .select("id")
+        .maybeSingle();
+      if (!won) continue;
+      const giveBack = () =>
+        db.from("ca_document_requests").update({ chaser_count: row.chaser_count, last_chased_at: row.last_chased_at, next_follow_up_at: new Date(now.getTime() + DAY).toISOString() }).eq("id", row.id);
+      const made = await wa.createFollowUp(db, base, now);
+      if ("blocked" in made) {
+        summary.skipped++;
+        await giveBack();
+        await chaserEvent(db, { chaser_id: row.id, ca_firm_id: row.ca_firm_id, business_id: row.business_id, event_type: "skipped", channel: "whatsapp", note: `Automatic WhatsApp skipped: ${made.reason}` });
+        continue;
+      }
+      const sent = await wa.sendDraft(db, made.id, null);
+      if (!sent.ok) {
+        summary.failed++;
+        await giveBack();
+        await chaserEvent(db, { chaser_id: row.id, ca_firm_id: row.ca_firm_id, business_id: row.business_id, event_type: "skipped", channel: "whatsapp", note: `Automatic WhatsApp failed: ${sent.error}. Will retry tomorrow.` });
+        continue;
+      }
+      summary.sent++;
+      await chaserEvent(db, { chaser_id: row.id, ca_firm_id: row.ca_firm_id, business_id: row.business_id, event_type: "sent", channel: "whatsapp", template_id: "fynhelp_whatsapp", note: `Automatic follow up ${decision.follow_up_number} sent on WhatsApp from FynHelp's number`, metadata: { message: made.body, wamid: sent.wamid } });
       continue;
     }
 
@@ -588,6 +704,58 @@ export async function runDueFollowups(now = new Date(), firmId?: string) {
         provider_id: result.provider_id,
       },
     });
+  }
+  return summary;
+}
+
+/**
+ * A partner approves WhatsApp drafts. Each goes out from FynHelp's number and
+ * counts as that round of the chase; a draft for a chase that has since been
+ * resolved is cancelled instead of sent.
+ */
+export async function approveWhatsApp(db: Db, ctx: FirmContext, ids: string[]) {
+  const wa = await import("./whatsappOut.server");
+  const summary = { sent: 0, failed: 0, cancelled: 0, errors: [] as string[] };
+  for (const id of ids) {
+    const { data: msg } = await db
+      .from("ca_wa_messages")
+      .select("id, chase_id, business_id, follow_up_number, status, body")
+      .eq("id", id)
+      .eq("ca_firm_id", ctx.firmId)
+      .maybeSingle();
+    if (!msg || msg.status !== "draft") continue;
+    const { data: chase } = msg.chase_id ? await db.from("ca_document_requests").select(COLS).eq("id", msg.chase_id).eq("ca_firm_id", ctx.firmId).maybeSingle() : { data: null };
+    if (!chase || isClosed((chase as ChaseRow).status)) {
+      await db.from("ca_wa_messages").update({ status: "cancelled", error: "The chase was resolved", updated_at: new Date().toISOString() }).eq("id", id);
+      summary.cancelled++;
+      continue;
+    }
+    const row = chase as ChaseRow;
+    const sent = await wa.sendDraft(db, id, ctx.userId);
+    if (!sent.ok) {
+      if (sent.cancelled) summary.cancelled++;
+      else summary.failed++;
+      summary.errors.push(sent.error);
+      continue;
+    }
+    const now = new Date();
+    const count = Math.max(row.chaser_count, msg.follow_up_number);
+    await db
+      .from("ca_document_requests")
+      .update({ chaser_count: count, last_chased_at: now.toISOString(), next_follow_up_at: nextSlot(row, count, now) })
+      .eq("id", row.id);
+    await chaserEvent(db, {
+      chaser_id: row.id,
+      ca_firm_id: ctx.firmId,
+      business_id: row.business_id,
+      event_type: "sent",
+      channel: "whatsapp",
+      template_id: "fynhelp_whatsapp",
+      note: `WhatsApp follow up ${msg.follow_up_number} approved and sent from FynHelp's number`,
+      actor_id: ctx.userId,
+      metadata: { message: msg.body, wamid: sent.wamid },
+    });
+    summary.sent++;
   }
   return summary;
 }

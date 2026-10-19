@@ -10,6 +10,7 @@
 import { adminDb, logActivity, type Db, type FirmContext } from "./db.server";
 import { BUCKET, registerDocument } from "./documents.server";
 import { PracticeError } from "./core";
+import { isStopReply } from "./whatsapp/templates";
 
 // WHATSAPP_GRAPH_BASE exists only so tests and demos can use a stand-in Meta Graph API.
 const GRAPH = process.env["WHATSAPP_GRAPH_BASE"] || "https://graph.facebook.com/v21.0";
@@ -150,40 +151,65 @@ async function matchClient(
   return chaseHits.length === 1 ? chaseHits[0] : null;
 }
 
+interface WaStatus {
+  id: string;
+  status: string;
+  errors?: { title?: string; message?: string; code?: number }[];
+}
+
+interface WaMessageText extends WaMessage {
+  text?: { body?: string };
+}
+
 export async function handleWhatsappWebhook(payload: {
   entry?: { changes?: WaChange[] }[];
 }) {
   const token = env("WHATSAPP_ACCESS_TOKEN");
   const db = await adminDb();
+  const out = await import("./whatsappOut.server");
   const results: { message: string; status: string }[] = [];
   for (const entry of payload.entry ?? []) {
     for (const change of entry.changes ?? []) {
-      const v = change.value ?? {};
+      const v = (change.value ?? {}) as NonNullable<WaChange["value"]> & { statuses?: WaStatus[] };
+      // Delivered / read / failed receipts for messages FynHelp sent.
+      for (const st of v.statuses ?? []) {
+        const known = await out.applyStatus(db, st.id, st.status, st.errors?.[0] ? out.friendlyError(st.errors[0].code, st.errors[0].message ?? st.errors[0].title, 200) : undefined);
+        results.push({ message: st.id, status: known ? `status ${st.status}` : "status for unknown message" });
+      }
       const phoneNumberId = v.metadata?.phone_number_id;
       if (!phoneNumberId || !v.messages?.length) continue;
-      const { data: channel } = await db
-        .from("ca_whatsapp_channels")
-        .select("ca_firm_id")
-        .eq("phone_number_id", phoneNumberId)
-        .eq("is_active", true)
-        .maybeSingle();
-      if (!channel) {
-        results.push({
-          message: "-",
-          status: `no firm for number ${phoneNumberId}`,
-        });
-        continue;
+      const platform = out.isPlatformNumber(phoneNumberId);
+      let channelFirm: string | null = null;
+      if (!platform) {
+        const { data: channel } = await db
+          .from("ca_whatsapp_channels")
+          .select("ca_firm_id")
+          .eq("phone_number_id", phoneNumberId)
+          .eq("is_active", true)
+          .maybeSingle();
+        if (!channel) {
+          results.push({ message: "-", status: `no firm for number ${phoneNumberId}` });
+          continue;
+        }
+        channelFirm = channel.ca_firm_id;
+        if (!(await (await import("./billing.server")).firmCanWork(db, channelFirm!))) {
+          results.push({ message: "-", status: "firm paused: trial or plan ended" });
+          continue;
+        }
+        await db
+          .from("ca_whatsapp_channels")
+          .update({ last_message_at: new Date().toISOString() })
+          .eq("phone_number_id", phoneNumberId);
       }
-      if (!(await (await import("./billing.server")).firmCanWork(db, channel.ca_firm_id))) {
-        results.push({ message: "-", status: "firm paused: trial or plan ended" });
-        continue;
-      }
-      await db
-        .from("ca_whatsapp_channels")
-        .update({ last_message_at: new Date().toISOString() })
-        .eq("phone_number_id", phoneNumberId);
 
-      for (const m of v.messages) {
+      for (const m of v.messages as WaMessageText[]) {
+        // STOP ends WhatsApp follow-ups for that number, for every firm.
+        if (m.type === "text" && isStopReply(m.text?.body)) {
+          await out.recordOptOut(db, m.from);
+          await out.sendText(m.from, "You will not get any more WhatsApp reminders from us. If this was a mistake, ask your CA to message you again.");
+          results.push({ message: m.id, status: "opted out" });
+          continue;
+        }
         const media =
           m.type === "document"
             ? m.document
@@ -193,6 +219,20 @@ export async function handleWhatsappWebhook(payload: {
         if (!media) {
           results.push({ message: m.id, status: `ignored ${m.type}` });
           continue;
+        }
+        // On the shared number the sender decides the firm; on a firm's own number the number does.
+        let firmId = channelFirm;
+        if (platform) {
+          firmId = await out.routeFirm(db, m.from);
+          if (!firmId) {
+            await out.sendText(m.from, "Thanks. We could not tell which CA firm this is for. Please reply to the message your CA sent you, or ask them to message you first.");
+            results.push({ message: m.id, status: "no firm for sender" });
+            continue;
+          }
+          if (!(await (await import("./billing.server")).firmCanWork(db, firmId))) {
+            results.push({ message: m.id, status: "firm paused: trial or plan ended" });
+            continue;
+          }
         }
         if (!token) {
           results.push({
@@ -212,12 +252,12 @@ export async function handleWhatsappWebhook(payload: {
         }
         try {
           const { bytes, mime } = await downloadMedia(media.id, token);
-          const businessId = await matchClient(db, channel.ca_firm_id, m.from);
+          const businessId = await matchClient(db, firmId!, m.from);
           const baseName =
             m.type === "document" && m.document?.filename
               ? m.document.filename
               : `whatsapp_${m.id.slice(-8)}.${EXT[mime] ?? "bin"}`;
-          const path = `${channel.ca_firm_id}/${businessId ?? "unassigned"}/whatsapp/${Date.now()}_${safeName(baseName)}`;
+          const path = `${firmId}/${businessId ?? "unassigned"}/whatsapp/${Date.now()}_${safeName(baseName)}`;
           const { error: upErr } = await db.storage
             .from(BUCKET)
             .upload(path, bytes, { contentType: mime, upsert: false });
@@ -226,7 +266,7 @@ export async function handleWhatsappWebhook(payload: {
             v.contacts?.find((c) => c.wa_id === m.from)?.profile?.name ?? null;
           const res = await registerDocument(
             db,
-            { firmId: channel.ca_firm_id, userId: null },
+            { firmId: firmId!, userId: null },
             {
               storage_path: path,
               filename: baseName,
@@ -247,14 +287,14 @@ export async function handleWhatsappWebhook(payload: {
           );
           await logActivity(
             db,
-            channel.ca_firm_id,
+            firmId!,
             businessId,
             "extract",
             `${baseName} received on WhatsApp from ${profile ?? m.from}${businessId ? "" : " (sender not matched to a client yet)"}.`,
           );
           if (!businessId) {
             await db.from("ca_notifications").insert({
-              ca_firm_id: channel.ca_firm_id,
+              ca_firm_id: firmId,
               type: "whatsapp_unassigned",
               severity: "warning",
               title: "Unassigned WhatsApp document",
@@ -262,6 +302,10 @@ export async function handleWhatsappWebhook(payload: {
               is_read: false,
               metadata: { extraction_id: res.extraction_id },
             });
+          }
+          if (platform && !res.duplicate) {
+            const { data: firm } = await db.from("ca_firms").select("firm_name").eq("id", firmId).maybeSingle();
+            await out.sendText(m.from, `Received, thank you. We have passed it to ${firm?.firm_name ?? "your CA"}.`);
           }
           results.push({
             message: m.id,

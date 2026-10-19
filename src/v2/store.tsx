@@ -1550,14 +1550,16 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
         chase ? `${chase.type} · ${clients.find((c) => c.id === chase.clientId)?.name ?? ""}` : "Follow up",
         id,
         {
-          stage: channel === "Email" ? "Chaser is sending follow-up" : "Chaser is logging the WhatsApp follow-up",
+          stage: channel === "Email" ? "Chaser is sending follow-up" : "Chaser is sending the WhatsApp follow-up",
           clientId: chase?.clientId,
           describe: (res) =>
             channel === "Email" && "simulated" in res && res.simulated
               ? "Recorded on the timeline. Email is not connected yet, so nothing was sent."
               : channel === "Email"
                 ? "Follow-up emailed and logged. The chase stops automatically when the document arrives."
-                : "WhatsApp follow-up logged on the timeline.",
+                : "via" in res
+                  ? "WhatsApp sent from FynHelp's number and logged. The chase stops automatically when the document arrives."
+                  : "WhatsApp follow-up logged on the timeline.",
         },
         () => sendPracticeFollowUp({ data: { id, channel } }),
       )
@@ -1567,6 +1569,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
               "Email service is not configured yet, so the follow up was recorded but not sent.",
             );
           else if (channel === "Email") toast.success("Email follow up sent");
+          else if ("via" in res) toast.success("WhatsApp sent from FynHelp's number");
           else toast.success("Follow up logged on the timeline");
         })
         .catch((e) => toast.error(errMsg(e)))

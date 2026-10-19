@@ -15,6 +15,9 @@ import { round2 } from "../core";
 export interface GroupMaster {
   name: string;
   parent: string;
+  /** Debit positive. Present when Tally reports a value for the group (Stock-in-Hand). */
+  opening?: number;
+  closing?: number;
 }
 export interface LedgerBalance {
   name: string;
@@ -49,6 +52,16 @@ export const PRIMARY: Record<string, Nature> = {
   "indirect expenses": "expense",
   "expenses (indirect)": "expense",
 };
+
+/**
+ * Stock in Tally is worked out when a report runs, not posted to a ledger.
+ * `opening` is the stock the year started with (already inside capital and
+ * reserves), `closing` what is on hand now. Both are debit-positive values.
+ */
+export interface Stock {
+  opening: number;
+  closing: number;
+}
 
 const key = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
 
@@ -85,6 +98,20 @@ export function resolveLedgers(groups: GroupMaster[], ledgers: LedgerBalance[]):
   });
 }
 
+/**
+ * Stock values from Tally's Stock-in-Hand group, used only when no ledger under
+ * it carries a balance (otherwise the stock is already posted and counting the
+ * group again would double it).
+ */
+export function stockFromGroups(groups: GroupMaster[], res: Resolved[]): Stock | undefined {
+  const g = groups.find((x) => key(x.name) === "stock-in-hand");
+  if (!g || (g.closing === undefined && g.opening === undefined)) return undefined;
+  const posted = res.filter((r) => r.path.some((p) => key(p) === "stock-in-hand")).reduce((sum, r) => sum + Math.abs(r.closing), 0);
+  if (posted >= 1) return undefined;
+  const stock = { opening: round2(Math.max(0, g.opening ?? 0)), closing: round2(Math.max(0, g.closing ?? 0)) };
+  return stock.opening || stock.closing ? stock : undefined;
+}
+
 /* ── Trial Balance ─────────────────────────────────────────── */
 
 export interface TbRow {
@@ -103,7 +130,7 @@ export interface TrialBalance {
   balanced: boolean;
 }
 
-export function trialBalance(res: Resolved[]): TrialBalance {
+export function trialBalance(res: Resolved[], stock?: Stock): TrialBalance {
   const rows = res
     .filter((r) => Math.abs(r.closing) >= 0.005)
     .map((r) => ({
@@ -113,11 +140,14 @@ export function trialBalance(res: Resolved[]): TrialBalance {
       debit: r.closing > 0 ? round2(r.closing) : 0,
       credit: r.closing < 0 ? round2(-r.closing) : 0,
     }))
+  // Tally's own trial balance lists opening stock as a debit; it is what the capital side was struck against.
+  if (stock && stock.opening >= 0.005) rows.push({ ledger: "Opening Stock", group: "Stock-in-Hand", primary: "Current Assets", debit: stock.opening, credit: 0 })
+  const sorted = rows
     .sort((a, b) => a.primary.localeCompare(b.primary) || a.group.localeCompare(b.group) || a.ledger.localeCompare(b.ledger));
-  const totalDebit = round2(rows.reduce((s, r) => s + r.debit, 0));
-  const totalCredit = round2(rows.reduce((s, r) => s + r.credit, 0));
+  const totalDebit = round2(sorted.reduce((s, r) => s + r.debit, 0));
+  const totalCredit = round2(sorted.reduce((s, r) => s + r.credit, 0));
   const difference = round2(totalDebit - totalCredit);
-  return { rows, totalDebit, totalCredit, difference, balanced: Math.abs(difference) < 1 };
+  return { rows: sorted, totalDebit, totalCredit, difference, balanced: Math.abs(difference) < 1 };
 }
 
 /* ── Schedule III heads ────────────────────────────────────── */
@@ -204,19 +234,23 @@ const pct = (n: number, d: number) => (Math.abs(d) < 0.005 ? null : Math.round((
 
 /**
  * Revenue from operations is Sales Accounts plus Direct Incomes. Indirect
- * incomes are other income. Closing stock is not a ledger posting in Tally
- * (it is worked out when the report runs), so a business that holds stock
- * passes `stockAdjustment` = closing stock less opening stock.
+ * incomes are other income. When stock is held, the year's change in it
+ * (opening less closing) runs through direct costs, as in Tally's trading account.
  */
-export function profitAndLoss(res: Resolved[], stockAdjustment = 0): ProfitAndLoss {
+export function profitAndLoss(res: Resolved[], stock?: Stock): ProfitAndLoss {
   const by = (p: string[]) => res.filter((r) => p.includes(key(r.primary)));
-  const revenue = groupLines(by(["sales accounts", "direct incomes", "income (direct)"]), -1);
-  const otherIncome = groupLines(by(["indirect incomes", "income (indirect)"]), -1);
   const directCosts = groupLines(by(["purchase accounts", "direct expenses", "expenses (direct)"]), 1);
-  if (Math.abs(stockAdjustment) >= 0.005) {
-    directCosts.push({ label: "Change in inventories", amount: round2(-stockAdjustment), ledgers: [] });
-  }
-  const indirectExpenses = groupLines(by(["indirect expenses", "expenses (indirect)"]), 1);
+  const change = stock ? round2(stock.opening - stock.closing) : 0;
+  if (Math.abs(change) >= 0.005) directCosts.push({ label: "Change in inventories", amount: change, ledgers: [] });
+  return assemblePl(
+    groupLines(by(["sales accounts", "direct incomes", "income (direct)"]), -1),
+    groupLines(by(["indirect incomes", "income (indirect)"]), -1),
+    directCosts,
+    groupLines(by(["indirect expenses", "expenses (indirect)"]), 1),
+  );
+}
+
+function assemblePl(revenue: Line[], otherIncome: Line[], directCosts: Line[], indirectExpenses: Line[]): ProfitAndLoss {
   const revenueTotal = sum(revenue);
   const otherIncomeTotal = sum(otherIncome);
   const directCostsTotal = sum(directCosts);
@@ -285,13 +319,13 @@ function build(rs: Resolved[], sections: string[], sign: 1 | -1, extra: Record<s
  * Profit for the year (income less expenses, in the snapshot) is carried into
  * Reserves and surplus, the way Tally's own balance sheet shows it.
  */
-export function balanceSheet(res: Resolved[], stockAdjustment = 0): BalanceSheet {
+export function balanceSheet(res: Resolved[], stock?: Stock): BalanceSheet {
   const sheet = res.filter((r) => r.nature === "asset" || r.nature === "liability");
-  const pl = profitAndLoss(res, stockAdjustment);
-  // Closing stock sits in assets only if the ledger carries it; an adjustment
-  // for the year is mirrored here so the sheet still balances.
+  const pl = profitAndLoss(res, stock);
+  // Stock is not in any ledger, so the whole closing value is an asset here.
+  // Opening stock is already inside capital and reserves, so the sheet balances.
   const assetsExtra: Record<string, Line[]> = {};
-  if (Math.abs(stockAdjustment) >= 0.005) assetsExtra["Current assets"] = [{ label: "Inventories (closing stock adjustment)", amount: round2(stockAdjustment), ledgers: [] }];
+  if (stock && stock.closing >= 0.005) assetsExtra["Current assets"] = [{ label: "Inventories", amount: stock.closing, ledgers: [] }];
 
   const liabRes = sheet.filter((r) => r.nature === "liability" && !(key(r.primary) === "suspense a/c" && r.closing > 0));
   const assetRes = sheet.filter((r) => r.nature === "asset" && !(key(r.primary) === "suspense a/c" && r.closing < 0));
@@ -336,15 +370,15 @@ export interface Finding {
 const money = (n: number) => "₹" + Math.abs(Math.round(n)).toLocaleString("en-IN");
 
 /** Rule-based review of a snapshot. Every finding names the ledgers it came from. */
-export function reviewBooks(res: Resolved[], stockAdjustment = 0): Finding[] {
+export function reviewBooks(res: Resolved[], stock?: Stock): Finding[] {
   const out: Finding[] = [];
-  const tb = trialBalance(res);
+  const tb = trialBalance(res, stock);
   if (!tb.balanced) {
     out.push({
       id: "tb-out-of-balance",
       severity: "high",
       title: "Trial balance does not tally",
-      detail: `Debits ${money(tb.totalDebit)} against credits ${money(tb.totalCredit)}, a gap of ${money(tb.difference)}. Check the sync covered every ledger, then look for ledgers outside any group.`,
+      detail: `Debits ${money(tb.totalDebit)} against credits ${money(tb.totalCredit)}, a gap of ${money(tb.difference)}.${!stock && Math.abs(tb.difference) > 0 ? " If the client keeps inventory, this gap is usually its opening stock, which Tally holds outside the ledgers." : ""} Otherwise check the sync covered every ledger, then look for ledgers outside any group.`,
       ledgers: [],
     });
   }
@@ -399,7 +433,16 @@ export function reviewBooks(res: Resolved[], stockAdjustment = 0): Finding[] {
       ledgers: drCreditors.slice(0, 8).map((r) => r.name),
     });
   }
-  const pl = profitAndLoss(res, stockAdjustment);
+  const pl = profitAndLoss(res, stock);
+  if (stock) {
+    out.push({
+      id: "stock-source",
+      severity: "info",
+      title: "Stock taken from Tally's Stock-in-Hand",
+      detail: `Opening ${money(stock.opening)} and closing ${money(stock.closing)}, as Tally values them. Inventories on the balance sheet and the change in inventories in the P&L come from these.`,
+      ledgers: [],
+    });
+  }
   if (pl.revenueTotal > 0 && pl.netProfit < 0) {
     out.push({
       id: "loss",
@@ -409,13 +452,13 @@ export function reviewBooks(res: Resolved[], stockAdjustment = 0): Finding[] {
       ledgers: [],
     });
   }
-  const bs = balanceSheet(res, stockAdjustment);
+  const bs = balanceSheet(res, stock);
   if (tb.balanced && !bs.balanced) {
     out.push({
       id: "bs-out-of-balance",
       severity: "medium",
-      title: "Balance sheet is off by closing stock",
-      detail: `Assets and liabilities differ by ${money(bs.difference)}. If the client keeps inventory, Tally adds closing stock when the report runs; enter closing less opening stock to bring it in.`,
+      title: "Balance sheet does not balance",
+      detail: `Assets and liabilities differ by ${money(bs.difference)} although the trial balance tallies. If the client keeps inventory, the stock value did not come through from Tally; check the Stock-in-Hand group.`,
       ledgers: [],
     });
   }
@@ -444,6 +487,39 @@ export function reviewBooks(res: Resolved[], stockAdjustment = 0): Finding[] {
   }
   const order: Record<Severity, number> = { high: 0, medium: 1, info: 2 };
   return out.sort((a, b) => order[a.severity] - order[b.severity]);
+}
+
+/* ── Movement between two year-to-date P&Ls ────────────────── */
+
+function subLines(cur: Line[], prev: Line[]): Line[] {
+  const out = new Map<string, Line>(cur.map((l) => [l.label, { ...l, ledgers: l.ledgers.map((x) => ({ ...x })) }]));
+  for (const p of prev) {
+    const l = out.get(p.label) ?? { label: p.label, amount: 0, ledgers: [] };
+    l.amount = round2(l.amount - p.amount);
+    for (const pl of p.ledgers) {
+      const e = l.ledgers.find((x) => x.name === pl.name);
+      if (e) e.amount = round2(e.amount - pl.amount);
+      else l.ledgers.push({ name: pl.name, amount: round2(-pl.amount) });
+    }
+    out.set(p.label, l);
+  }
+  return [...out.values()]
+    .map((l) => ({ ...l, ledgers: l.ledgers.filter((x) => Math.abs(x.amount) >= 0.005).sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)) }))
+    .filter((l) => Math.abs(l.amount) >= 0.005)
+    .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
+}
+
+/**
+ * The P&L for the period between two year-to-date snapshots of the same
+ * financial year: line by line, current less previous.
+ */
+export function plMovement(cur: ProfitAndLoss, prev: ProfitAndLoss): ProfitAndLoss {
+  return assemblePl(
+    subLines(cur.revenue, prev.revenue),
+    subLines(cur.otherIncome, prev.otherIncome),
+    subLines(cur.directCosts, prev.directCosts),
+    subLines(cur.indirectExpenses, prev.indirectExpenses),
+  );
 }
 
 /* ── Month-by-month: year-to-date snapshots to monthly movement ── */

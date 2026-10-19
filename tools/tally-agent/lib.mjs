@@ -1,7 +1,7 @@
 // Pure helpers for the FynHelp Tally agent: build Tally XML requests, read
 // the replies, and work out which dates to snapshot. No network, no files.
 
-export const AGENT_VERSION = "0.1.0";
+export const AGENT_VERSION = "0.2.0";
 
 const ENTITIES = { "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&apos;": "'", "&#13;": "", "&#10;": " " };
 export const xmlText = (s) =>
@@ -48,7 +48,7 @@ export function collectionRequest({ id, type, fields, company, from, to }) {
 }
 
 export const companiesRequest = () => collectionRequest({ id: "FHCompanies", type: "Company", fields: ["Name"] });
-export const groupsRequest = (company, from, to) => collectionRequest({ id: "FHGroups", type: "Group", fields: ["Name", "Parent"], company, from, to });
+export const groupsRequest = (company, from, to) => collectionRequest({ id: "FHGroups", type: "Group", fields: ["Name", "Parent", "OpeningBalance", "ClosingBalance"], company, from, to });
 export const ledgersRequest = (company, from, to) =>
   collectionRequest({ id: "FHLedgers", type: "Ledger", fields: ["Name", "Parent", "OpeningBalance", "ClosingBalance"], company, from, to });
 
@@ -68,7 +68,14 @@ export function parseCollection(xml, tag) {
 }
 
 export const parseCompanies = (xml) => parseCollection(xml, "COMPANY").map((c) => ({ name: c.name }));
-export const parseGroups = (xml) => parseCollection(xml, "GROUP").map((g) => ({ name: g.name, parent: xmlText(g.fields.PARENT ?? "") }));
+/** Groups carry their value only when Tally reports one (Stock-in-Hand does); others are sent bare. */
+export const parseGroups = (xml) =>
+  parseCollection(xml, "GROUP").map((g) => ({
+    name: g.name,
+    parent: xmlText(g.fields.PARENT ?? ""),
+    ...(xmlText(g.fields.OPENINGBALANCE ?? "") ? { opening: tallyAmount(g.fields.OPENINGBALANCE) } : {}),
+    ...(xmlText(g.fields.CLOSINGBALANCE ?? "") ? { closing: tallyAmount(g.fields.CLOSINGBALANCE) } : {}),
+  }));
 export const parseLedgers = (xml) =>
   parseCollection(xml, "LEDGER").map((l) => ({
     name: l.name,

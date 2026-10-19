@@ -7,9 +7,12 @@
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
+import { createLimiter } from "@/lib/practice/tally/limits";
 import { ingestPayload } from "@/lib/practice/tally/payload";
 
 const MAX_BYTES = 8 * 1024 * 1024;
+/** Pairing codes are guessable only by brute force; make that slow. Per instance, which is enough to blunt a script. */
+const pairingAttempts = createLimiter({ max: 10, windowMs: 10 * 60_000 });
 
 const pairPayload = z.object({
   kind: z.literal("pair"),
@@ -42,6 +45,8 @@ export const Route = createFileRoute("/api/integrations/tally/agent")({
         const db = await adminDb();
         try {
           if ((raw as { kind?: string })?.kind === "pair") {
+            const ip = (request.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
+            if (!pairingAttempts.hit(ip)) return reply({ ok: false, error: "Too many pairing attempts. Wait ten minutes and try again." }, 429);
             const p = pairPayload.safeParse(raw);
             if (!p.success) return reply({ ok: false, error: "The pairing request was incomplete." }, 400);
             const r = await tally.redeemPairing(db, p.data.code, p.data);

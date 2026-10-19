@@ -199,6 +199,50 @@ describe("Tally server", () => {
     expect(apr.linked && apr.snapshot?.pl.revenueTotal).toBe(100000);
   });
 
+  it("takes stock from the Stock-in-Hand group and builds statements that balance with it", async () => {
+    const { agent } = await paired(db);
+    // Tally signs: debit negative. Bank 300,000 Dr; capital 220,000 Cr (it already holds the 100,000 opening stock); sales 180,000 Cr.
+    // Closing stock 150,000: assets 450,000 = capital 220,000 + profit 230,000 (sales 180,000 plus the 50,000 stock rise).
+    await tally.ingestSnapshot(db, agent, snapshot("2026-09-30", {
+      groups: [
+        { name: "Bank Accounts", parent: "Current Assets" },
+        { name: "Stock-in-Hand", parent: "Current Assets", opening: -100000, closing: -150000 },
+      ],
+      ledgers: [
+        { name: "HDFC", parent: "Bank Accounts", closing: -300000 },
+        { name: "Capital", parent: "Capital Account", closing: 220000 },
+        { name: "Sales", parent: "Sales Accounts", closing: 180000 },
+      ],
+    }));
+    expect(db.tables["ca_tally_snapshots"][0]).toMatchObject({ opening_stock: 100000, closing_stock: 150000 });
+    await tally.linkCompany(db, ctx, db.tables["ca_tally_companies"][0].id as string, CLIENT);
+    const r = await tally.statements(db, ctx, CLIENT);
+    if (!r.linked || !r.snapshot) throw new Error("expected a snapshot");
+    expect(r.snapshot.stock).toEqual({ opening: 100000, closing: 150000 });
+    expect(r.snapshot.trialBalance.balanced).toBe(true);
+    expect(r.snapshot.pl.netProfit).toBe(230000);
+    expect(r.snapshot.balanceSheet).toMatchObject({ balanced: true, totalAssets: 450000, totalLiabilities: 450000 });
+    expect(r.snapshot.findings.filter((f) => f.severity !== "info")).toEqual([]);
+  });
+
+  it("gives the period since the previous snapshot as well as the year to date", async () => {
+    const { agent } = await paired(db);
+    const at = (asOn: string, sales: number) => snapshot(asOn, {
+      groups: [{ name: "Bank Accounts", parent: "Current Assets" }],
+      ledgers: [{ name: "HDFC", parent: "Bank Accounts", closing: -sales }, { name: "Sales", parent: "Sales Accounts", closing: sales }],
+    });
+    await tally.ingestSnapshot(db, agent, at("2026-08-31", 100000));
+    await tally.linkCompany(db, ctx, db.tables["ca_tally_companies"][0].id as string, CLIENT);
+    const first = await tally.statements(db, ctx, CLIENT);
+    expect(first.linked && first.snapshot?.plPeriod).toBeNull(); // nothing earlier to compare with
+    await tally.ingestSnapshot(db, agent, at("2026-09-30", 250000));
+    const r = await tally.statements(db, ctx, CLIENT);
+    if (!r.linked || !r.snapshot) throw new Error("expected a snapshot");
+    expect(r.snapshot.pl.revenueTotal).toBe(250000);
+    expect(r.snapshot.plPeriod).toMatchObject({ from: "2026-08-31" });
+    expect(r.snapshot.plPeriod!.pl.revenueTotal).toBe(150000);
+  });
+
   describe("Day Book to Recon", () => {
     const XML = "<ENVELOPE><VOUCHER><DATE>20260915</DATE></VOUCHER></ENVELOPE>";
     const book = (extra: Record<string, unknown> = {}) => ({ kind: "daybook" as const, company: "Kaveri Traders", from: "2026-09-01", to: "2026-09-30", xml: XML, ...extra });

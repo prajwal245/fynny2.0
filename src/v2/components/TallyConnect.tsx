@@ -177,6 +177,11 @@ export function TallySection({ index = 0 }: { index?: number }) {
                 <div style={{ fontSize: 12.5, color: V.body }}>
                   {a.online ? "Online" : "Offline"} · last heard {ago(a.last_seen_at)}{a.tally_version ? ` · ${a.tally_version}` : ""}{a.agent_version ? ` · agent ${a.agent_version}` : ""}
                 </div>
+                {a.updateAvailable && (
+                  <div style={{ fontSize: 12, color: V.warnFg }}>
+                    A newer agent ({st.latestAgentVersion}) is available. <a href="/tally-agent/fynhelp-tally-agent.zip" download style={{ color: V.brandDeep, fontWeight: 600 }}>Download</a>, unzip, and double-click Install.bat again. No code needed.
+                  </div>
+                )}
                 {!a.online && <div style={{ fontSize: 12, color: V.warnFg }}>The PC may be off, or Tally is not open. It catches up on its own.</div>}
               </div>
             </div>

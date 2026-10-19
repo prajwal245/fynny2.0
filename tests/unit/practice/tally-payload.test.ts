@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { createLimiter, isOlder, LATEST_AGENT_VERSION } from "@/lib/practice/tally/limits";
+// @ts-expect-error plain ESM script shipped to client PCs
+import { AGENT_VERSION } from "../../../tools/tally-agent/lib.mjs";
 import { fyStartOf, ingestPayload, newAgentToken, newPairingCode, normaliseCode, normaliseSnapshot, sha256, snapshotPayload } from "@/lib/practice/tally/payload";
 
 const snap = {
@@ -41,6 +44,31 @@ describe("Tally agent payload", () => {
     expect(a).toMatch(/^fhta_[0-9a-f]{64}$/);
     expect(a).not.toBe(newAgentToken());
     expect(await sha256("abc")).toBe("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+  });
+
+  it("flips the sign of group values too, which is how Stock-in-Hand arrives", () => {
+    const n = normaliseSnapshot(snapshotPayload.parse({ ...snap, groups: [{ name: "Stock-in-Hand", parent: "Current Assets", opening: -100000, closing: -150000 }, { name: "Plain", parent: "Current Assets" }] }));
+    expect(n.groups.find((g) => g.name === "Stock-in-Hand")).toMatchObject({ opening: 100000, closing: 150000 });
+    expect(n.groups.find((g) => g.name === "Plain")).toEqual({ name: "Plain", parent: "Current Assets" });
+  });
+
+  it("limits attempts per key within a window, then lets them through again", () => {
+    const l = createLimiter({ max: 3, windowMs: 1000 });
+    expect([1, 2, 3, 4].map(() => l.hit("a", 0))).toEqual([true, true, true, false]);
+    expect(l.hit("b", 0)).toBe(true); // another caller is unaffected
+    expect(l.hit("a", 1001)).toBe(true);
+  });
+
+  it("knows which agent versions are old", () => {
+    expect(isOlder("0.1.0", "0.2.0")).toBe(true);
+    expect(isOlder("0.2.0", "0.2.0")).toBe(false);
+    expect(isOlder("0.10.0", "0.9.0")).toBe(false);
+    expect(isOlder(null, "0.2.0")).toBe(true);
+    expect(isOlder("beta", "0.2.0")).toBe(true);
+  });
+
+  it("keeps the server's idea of the newest agent in step with the agent itself", () => {
+    expect(LATEST_AGENT_VERSION).toBe(AGENT_VERSION);
   });
 
   it("finds the April to March year", () => {

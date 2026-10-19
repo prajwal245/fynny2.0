@@ -12,6 +12,7 @@ import { getClientBooks } from "@/lib/practice/practice.functions";
 import type { Finding, Line, Section } from "@/lib/practice/tally/statements";
 import { Badge, Card, EmptyState, Stat, Tabs, V, formatDate, formatINR } from "../ui";
 import { AgentGlyph, FadeIn, RowSkeleton } from "../agents";
+import { useV2 } from "../store";
 
 type Books = Awaited<ReturnType<typeof getClientBooks>>;
 type Linked = Extract<Books, { linked: true }>;
@@ -34,7 +35,13 @@ const STYLES = `
 .bk-two { display:grid; gap:18px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); align-items:start; }
 .bk-bar { transition: height .5s cubic-bezier(.16,1,.3,1), y .5s cubic-bezier(.16,1,.3,1); }
 @keyframes bk-in { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform:none; } }
-@media print { .bk-noprint { display:none !important; } }
+.bk-printhead { display:none; }
+.bk-seg { display:inline-flex; background:${V.gray}; border-radius:12px; padding:3px; gap:2px; margin-bottom:12px; }
+.bk-seg button { border:0; background:transparent; padding:6px 14px; border-radius:10px; font:inherit; font-size:13px; color:${V.body}; cursor:pointer; }
+.bk-seg button[aria-pressed="true"] { background:#fff; color:${V.ink}; font-weight:650; box-shadow:0 1px 3px rgba(42,15,12,.12); }
+.bk-printsec { break-inside:avoid-page; margin-top:22px; }
+.bk-printsec h2 { font-size:17px; margin:0 0 8px; }
+@media print { .bk-noprint { display:none !important; } .bk-printhead { display:block; margin-bottom:16px; border-bottom:2px solid ${V.ink}; padding-bottom:10px; } }
 @media (prefers-reduced-motion: reduce) { .bk-ledgers, .bk-find, .bk-bar, .bk-line svg { animation:none !important; transition:none !important; } }
 `;
 
@@ -253,11 +260,25 @@ async function downloadExcel(client: string, company: string, s: Snapshot) {
   XLSX.writeFile(wb, `${client.replace(/[^\w]+/g, "_")}_Financials_${s.asOn}.xlsx`);
 }
 
+function SignOffLine() {
+  return (
+    <div className="bk-printhead" style={{ marginTop: 36, borderBottom: 0, paddingBottom: 0 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 24, fontSize: 13, color: V.body }}>
+        <div style={{ flex: 1, borderTop: `1px solid ${V.ink}`, paddingTop: 6 }}>Prepared by</div>
+        <div style={{ flex: 1, borderTop: `1px solid ${V.ink}`, paddingTop: 6 }}>Reviewed and signed off by (partner), with membership no. and date</div>
+      </div>
+    </div>
+  );
+}
+
 export default function ClientBooks({ clientId, clientName, onOpenSettings }: { clientId: string; clientName: string; onOpenSettings?: () => void }) {
   const [data, setData] = useState<Books | null>(null);
   const [asOn, setAsOn] = useState<string | undefined>();
   const [tab, setTab] = useState("pl");
   const [loading, setLoading] = useState(false);
+  const [period, setPeriod] = useState<"ytd" | "month">("ytd");
+  const [printAll, setPrintAll] = useState(false);
+  const { firm } = useV2();
 
   const load = useCallback(async (on?: string) => {
     setLoading(true);
@@ -294,6 +315,12 @@ export default function ClientBooks({ clientId, clientName, onOpenSettings }: { 
     );
   }
 
+  const shown = period === "month" && s.plPeriod ? s.plPeriod.pl : s.pl;
+  const printPack = () => {
+    setPrintAll(true);
+    // let the full pack render before the print dialog opens
+    setTimeout(() => { window.print(); setPrintAll(false); }, 200);
+  };
   const cash = s.balanceSheet.assets.flatMap((x) => x.lines).find((l) => l.label === "Cash and bank balances")?.amount ?? 0;
   const recv = s.parties.debtors.reduce((a, d) => a + d.amount, 0);
   const pay = s.parties.creditors.reduce((a, d) => a + d.amount, 0);
@@ -301,6 +328,12 @@ export default function ClientBooks({ clientId, clientName, onOpenSettings }: { 
   return (
     <FadeIn>
       <style>{STYLES}</style>
+      <div className="bk-printhead">
+        <div style={{ fontSize: 12, letterSpacing: ".08em", textTransform: "uppercase", color: V.body }}>{firm?.name ?? "FynHelp"}</div>
+        <div style={{ fontSize: 22, fontWeight: 700, marginTop: 2 }}>{clientName}</div>
+        <div style={{ fontSize: 13, color: V.body }}>Financial statements for the year from {formatDate(s.fyStart)} to {formatDate(s.asOn)} · Tally company: {data.company.name}</div>
+        <div style={{ fontSize: 12, color: V.muted, marginTop: 4 }}>Draft until signed off by the partner. Prepared from the client's Tally books with FynHelp.</div>
+      </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
         <div>
           <div style={{ fontSize: 13, color: V.muted }}>Tally company</div>
@@ -315,7 +348,7 @@ export default function ClientBooks({ clientId, clientName, onOpenSettings }: { 
             </select>
           </label>
           <button className="v2-btn v2-btn-ghost" onClick={() => void downloadExcel(clientName, data.company.name, s).catch((e) => toast.error(errMsg(e)))}><Download size={14} /> Excel</button>
-          <button className="v2-btn v2-btn-ghost" onClick={() => window.print()}><Printer size={14} /> Print</button>
+          <button className="v2-btn v2-btn-ghost" onClick={printPack}><Printer size={14} /> Print pack</button>
         </div>
       </div>
 
@@ -338,8 +371,18 @@ export default function ClientBooks({ clientId, clientName, onOpenSettings }: { 
           { value: "trend", label: "Monthly trend" },
         ]} />
       </div>
-      <div style={{ opacity: loading ? 0.5 : 1, transition: "opacity .2s" }}>
-        {tab === "pl" && <ProfitLoss pl={s.pl} />}
+      <div className={printAll ? "bk-noprint" : undefined} style={{ opacity: loading ? 0.5 : 1, transition: "opacity .2s" }}>
+        {tab === "pl" && (
+          <>
+            {s.plPeriod && (
+              <div className="bk-seg bk-noprint" role="group" aria-label="Period">
+                <button aria-pressed={period === "ytd"} onClick={() => setPeriod("ytd")}>Year to date</button>
+                <button aria-pressed={period === "month"} onClick={() => setPeriod("month")}>Since {formatDate(s.plPeriod.from)}</button>
+              </div>
+            )}
+            <ProfitLoss pl={shown} />
+          </>
+        )}
         {tab === "bs" && (
           <>
             {!s.balanceSheet.balanced && <div style={{ marginBottom: 10 }}><Badge tone="warn">Off by {formatINR(Math.abs(s.balanceSheet.difference))}: see the Books agent</Badge></div>}
@@ -358,6 +401,20 @@ export default function ClientBooks({ clientId, clientName, onOpenSettings }: { 
         )}
         {tab === "trend" && <Trend monthly={s.monthly} />}
       </div>
+
+      {printAll && (
+        <div aria-hidden>
+          <div className="bk-printsec"><h2>Profit and Loss</h2><ProfitLoss pl={s.pl} /></div>
+          <div className="bk-printsec"><h2>Balance Sheet</h2>
+            <div className="bk-two"><SheetSide title="Equity and liabilities" sections={s.balanceSheet.liabilities} total={s.balanceSheet.totalLiabilities} /><SheetSide title="Assets" sections={s.balanceSheet.assets} total={s.balanceSheet.totalAssets} /></div>
+          </div>
+          <div className="bk-printsec"><h2>Trial Balance</h2><TrialBalanceTable tb={s.trialBalance} /></div>
+          <div className="bk-printsec"><h2>Debtors and Creditors</h2>
+            <div className="bk-two"><PartyList title="Debtors" rows={s.parties.debtors} hint="Largest first." /><PartyList title="Creditors" rows={s.parties.creditors} hint="Largest first." /></div>
+          </div>
+        </div>
+      )}
+      <SignOffLine />
     </FadeIn>
   );
 }

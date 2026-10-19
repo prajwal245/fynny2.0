@@ -34,6 +34,8 @@ describe("Tally agent library", () => {
     expect(l.map((x: { name: string }) => x.name)).toEqual(["HDFC Current A/c", "Kaveri & Sons", "Web Sales"]);
     expect(l[0]).toMatchObject({ parent: "Bank Accounts", opening: -1000, closing: -300000 });
     expect(l[1]).toMatchObject({ opening: 0, closing: -120000.5 });
+    const withStock = lib.parseGroups('<GROUP NAME="Stock-in-Hand"><PARENT>Current Assets</PARENT><OPENINGBALANCE>-100000.00</OPENINGBALANCE><CLOSINGBALANCE>-150000.00 </CLOSINGBALANCE></GROUP><GROUP NAME="Other"><PARENT>X</PARENT><OPENINGBALANCE></OPENINGBALANCE></GROUP>');
+    expect(withStock).toEqual([{ name: "Stock-in-Hand", parent: "Current Assets", opening: -100000, closing: -150000 }, { name: "Other", parent: "X" }]);
     expect(lib.parseGroups(GROUPS)).toEqual([
       { name: "Bank Accounts", parent: "Current Assets" },
       { name: "Sundry Debtors", parent: "Current Assets" },

@@ -9,15 +9,19 @@
 import { PracticeError, sha256Hex } from "./core";
 import { logActivity, type Db, type FirmContext } from "./db.server";
 import { BUCKET, processExtraction, registerDocument } from "./documents.server";
+import { LATEST_AGENT_VERSION, isOlder } from "./tally/limits";
 import { fyStartOf, newAgentToken, newPairingCode, normaliseCode, normaliseSnapshot, sha256, type DaybookPayload, type SnapshotPayload } from "./tally/payload";
 import {
   balanceSheet,
   monthlySeries,
   parties,
+  plMovement,
   profitAndLoss,
   resolveLedgers,
   reviewBooks,
+  stockFromGroups,
   trialBalance,
+  type Stock,
   type GroupMaster,
   type LedgerBalance,
 } from "./tally/statements";
@@ -105,7 +109,7 @@ export async function ingestCompanies(db: Db, agent: AgentRow, p: { companies: {
   await touchAgent(db, agent, p.agentVersion, p.tallyVersion);
   const rows = [...new Set(p.companies.map((c) => c.name))].map((name) => ({ ca_firm_id: agent.ca_firm_id, agent_id: agent.id, name }));
   if (rows.length) await db.from("ca_tally_companies").upsert(rows, { onConflict: "agent_id,name", ignoreDuplicates: true });
-  return { companies: rows.length };
+  return { companies: rows.length, latestAgentVersion: LATEST_AGENT_VERSION };
 }
 
 async function companyFor(db: Db, agent: AgentRow, name: string) {
@@ -129,7 +133,8 @@ export async function ingestSnapshot(db: Db, agent: AgentRow, p: SnapshotPayload
     throw new PracticeError("bad_period", `fyStart ${p.fyStart} does not match an April to March year containing ${p.asOn}.`);
   }
   const { groups, ledgers } = normaliseSnapshot(p);
-  const hash = await sha256(JSON.stringify([groups, ledgers, p.stockAdjustment ?? 0]));
+  const stock = stockFromGroups(groups, resolveLedgers(groups, ledgers));
+  const hash = await sha256(JSON.stringify([groups, ledgers]));
   const { data: prev } = await db.from("ca_tally_snapshots").select("id, content_hash").eq("company_id", company.id).eq("fy_start", p.fyStart).eq("as_on", p.asOn).maybeSingle();
   const now = new Date().toISOString();
   if (prev?.content_hash === hash) {
@@ -145,13 +150,14 @@ export async function ingestSnapshot(db: Db, agent: AgentRow, p: SnapshotPayload
     groups,
     ledgers,
     ledger_count: ledgers.length,
-    stock_adjustment: p.stockAdjustment ?? 0,
+    opening_stock: stock?.opening ?? 0,
+    closing_stock: stock?.closing ?? 0,
   };
   const { error } = await db.from("ca_tally_snapshots").upsert(row, { onConflict: "company_id,fy_start,as_on" });
   if (error) throw new PracticeError("db_error", error.message);
 
   const res = resolveLedgers(groups, ledgers);
-  const findings = reviewBooks(res, p.stockAdjustment ?? 0);
+  const findings = reviewBooks(res, stock);
   const high = findings.filter((f) => f.severity === "high").length;
   const note = `${ledgers.length} ledgers as on ${p.asOn}${findings.length ? `; Books agent flagged ${findings.length}${high ? `, ${high} needing action` : ""}` : "; nothing flagged"}.`;
   await db.from("ca_tally_companies").update({ fy_start: p.fyStart, last_synced_at: now, last_as_on: p.asOn, last_sync_note: note }).eq("id", company.id);
@@ -220,7 +226,9 @@ export async function status(db: Db, ctx: FirmContext) {
     agents: (agents ?? []).map((a) => ({
       ...a,
       online: !!a.last_seen_at && now - new Date(a.last_seen_at).getTime() < OFFLINE_AFTER_MS,
+      updateAvailable: isOlder(a.agent_version, LATEST_AGENT_VERSION),
     })),
+    latestAgentVersion: LATEST_AGENT_VERSION,
     companies: companies ?? [],
   };
 }
@@ -249,7 +257,13 @@ export async function revokeAgent(db: Db, ctx: FirmContext, agentId: string) {
 
 /* ── statements for a client ───────────────────────────── */
 
-type SnapRow = { as_on: string; fy_start: string; groups: GroupMaster[]; ledgers: LedgerBalance[]; stock_adjustment: number; created_at: string };
+type SnapRow = { as_on: string; fy_start: string; groups: GroupMaster[]; ledgers: LedgerBalance[]; opening_stock: number; closing_stock: number; created_at: string };
+
+const stockOf = (r: Pick<SnapRow, "opening_stock" | "closing_stock">): Stock | undefined => {
+  const opening = Number(r.opening_stock) || 0;
+  const closing = Number(r.closing_stock) || 0;
+  return opening || closing ? { opening, closing } : undefined;
+};
 
 /** The client's Books: statements as on the latest (or a chosen) snapshot. */
 export async function statements(db: Db, ctx: FirmContext, businessId: string, asOn?: string) {
@@ -266,20 +280,21 @@ export async function statements(db: Db, ctx: FirmContext, businessId: string, a
   if (!available.length) return { linked: true as const, company: { name: company.name, lastSyncedAt: company.last_synced_at }, snapshot: null, available };
   const chosen = asOn && available.includes(asOn) ? asOn : available[0];
 
-  const { data: cur } = await db.from("ca_tally_snapshots").select("as_on, fy_start, groups, ledgers, stock_adjustment, created_at").eq("company_id", company.id).eq("as_on", chosen).order("created_at", { ascending: false }).limit(1).maybeSingle();
+  // Year-to-date snapshots of the same year, up to the chosen date: the month-by-month trend and the movement since the last one.
+  const { data: cur } = await db.from("ca_tally_snapshots").select("as_on, fy_start, groups, ledgers, opening_stock, closing_stock, created_at").eq("company_id", company.id).eq("as_on", chosen).order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (!cur) return { linked: true as const, company: { name: company.name, lastSyncedAt: company.last_synced_at }, snapshot: null, available };
   const snap = cur as SnapRow;
-  const stock = Number(snap.stock_adjustment) || 0;
+  const stock = stockOf(snap);
   const res = resolveLedgers(snap.groups, snap.ledgers);
 
-  // Year-to-date snapshots of the same year give the month-by-month trend.
-  const { data: year } = await db.from("ca_tally_snapshots").select("as_on, groups, ledgers, stock_adjustment").eq("company_id", company.id).eq("fy_start", snap.fy_start).lte("as_on", chosen).order("as_on").limit(13);
-  const monthly = monthlySeries(
-    ((year ?? []) as Pick<SnapRow, "as_on" | "groups" | "ledgers" | "stock_adjustment">[]).map((y) => ({
-      asOn: y.as_on,
-      pl: profitAndLoss(resolveLedgers(y.groups, y.ledgers), Number(y.stock_adjustment) || 0),
-    })),
-  );
+  const { data: year } = await db.from("ca_tally_snapshots").select("as_on, groups, ledgers, opening_stock, closing_stock").eq("company_id", company.id).eq("fy_start", snap.fy_start).lte("as_on", chosen).order("as_on").limit(13);
+  const ytd = ((year ?? []) as Pick<SnapRow, "as_on" | "groups" | "ledgers" | "opening_stock" | "closing_stock">[]).map((y) => ({
+    asOn: y.as_on,
+    pl: profitAndLoss(resolveLedgers(y.groups, y.ledgers), stockOf(y)),
+  }));
+  const monthly = monthlySeries(ytd);
+  const pl = profitAndLoss(res, stock);
+  const before = ytd.length > 1 ? ytd[ytd.length - 2] : null;
 
   return {
     linked: true as const,
@@ -289,12 +304,15 @@ export async function statements(db: Db, ctx: FirmContext, businessId: string, a
       asOn: snap.as_on,
       fyStart: snap.fy_start,
       ledgerCount: snap.ledgers.length,
-      trialBalance: trialBalance(res),
-      pl: profitAndLoss(res, stock),
+      trialBalance: trialBalance(res, stock),
+      pl,
+      /** Movement since the previous snapshot of the year; null for the first one. */
+      plPeriod: before ? { from: before.asOn, pl: plMovement(pl, before.pl) } : null,
       balanceSheet: balanceSheet(res, stock),
       parties: parties(res),
       findings: reviewBooks(res, stock),
       monthly,
+      stock: stock ?? null,
     },
   };
 }

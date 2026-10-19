@@ -3,6 +3,8 @@ import {
   balanceSheet,
   fromTallySign,
   monthlySeries,
+  plMovement,
+  stockFromGroups,
   parties,
   profitAndLoss,
   resolveLedgers,
@@ -108,6 +110,65 @@ describe("Tally statements", () => {
     expect(m[0].revenue).toBe(500_000);
     expect(m[1].revenue).toBe(500_000);
     expect(m[0].netProfit + m[1].netProfit).toBe(140_000);
+  });
+
+  describe("stock held outside the ledgers", () => {
+    // Opening stock 100,000 sits inside capital (credit side); no ledger carries stock.
+    const noStockLedgers = ledgers.filter((l) => l.name !== "Closing Stock").map((l) => (l.name === "Owner Capital" ? { ...l, closing: -420_000 } : l));
+    const g: GroupMaster[] = [...groups.filter((x) => x.name !== "Stock-in-Hand"), { name: "Stock-in-Hand", parent: "Current Assets", opening: 100_000, closing: 150_000 }];
+    const r = resolveLedgers(g, noStockLedgers);
+    const stock = stockFromGroups(g, r);
+
+    it("reads stock from the Stock-in-Hand group", () => {
+      expect(stock).toEqual({ opening: 100_000, closing: 150_000 });
+    });
+
+    it("ignores the group when a ledger already carries the stock, so it is never counted twice", () => {
+      expect(stockFromGroups(g, resolveLedgers(g, [...noStockLedgers, { name: "Stock A/c", parent: "Stock-in-Hand", closing: 150_000 }]))).toBeUndefined();
+      expect(stockFromGroups(groups, r)).toBeUndefined(); // group reports no value
+      expect(stockFromGroups([{ name: "Stock-in-Hand", parent: "Current Assets", opening: 0, closing: 0 }], r)).toBeUndefined();
+    });
+
+    it("tallies the trial balance once opening stock is shown, and not without it", () => {
+      expect(trialBalance(r).balanced).toBe(false);
+      expect(trialBalance(r).difference).toBe(-100_000);
+      const tb = trialBalance(r, stock);
+      expect(tb.balanced).toBe(true);
+      expect(tb.rows.find((x) => x.ledger === "Opening Stock")).toMatchObject({ debit: 100_000 });
+    });
+
+    it("runs the change in stock through the P&L and the full closing stock through the balance sheet", () => {
+      const pl = profitAndLoss(r, stock);
+      expect(pl.directCosts.find((l) => l.label === "Change in inventories")!.amount).toBe(-50_000);
+      expect(pl.netProfit).toBe(190_000); // 140,000 before stock plus the 50,000 rise
+      const bs = balanceSheet(r, stock);
+      expect(bs.balanced).toBe(true);
+      expect(bs.totalAssets).toBe(800_000);
+      expect(bs.assets.flatMap((s) => s.lines).find((l) => l.label === "Inventories")!.amount).toBe(150_000);
+    });
+
+    it("tells the reviewer where the stock came from, and says nothing alarming", () => {
+      const f = reviewBooks(r, stock);
+      expect(f.map((x) => x.id)).toContain("stock-source");
+      expect(f.filter((x) => x.severity !== "info")).toEqual([]);
+    });
+
+    it("explains a trial balance gap that is really missing stock", () => {
+      const f = reviewBooks(r).find((x) => x.id === "tb-out-of-balance")!;
+      expect(f.detail).toMatch(/opening stock/);
+    });
+  });
+
+  it("works out a period's own P&L from two year-to-date ones, line by line", () => {
+    const half = profitAndLoss(resolveLedgers(groups, ledgers.map((l) => ({ ...l, closing: l.closing / 2 }))));
+    const full = profitAndLoss(res);
+    const mv = plMovement(full, half);
+    expect(mv.revenueTotal).toBe(500_000);
+    expect(mv.netProfit).toBe(70_000);
+    expect(mv.revenue.find((l) => l.label === "Online Sales")!.ledgers[0]).toEqual({ name: "Web Sales", amount: 450_000 });
+    // a line that only existed before shows as a reversal
+    const gone = plMovement(profitAndLoss(resolveLedgers(groups, [])), half);
+    expect(gone.revenueTotal).toBe(-500_000);
   });
 
   describe("books agent", () => {

@@ -26,10 +26,8 @@ export const snapshotPayload = z.object({
   company: name,
   fyStart: date,
   asOn: date,
-  groups: z.array(z.object({ name, parent: z.string().trim().max(300) })).max(5_000),
+  groups: z.array(z.object({ name, parent: z.string().trim().max(300), opening: money.optional(), closing: money.optional() })).max(5_000),
   ledgers: z.array(z.object({ name, parent: z.string().trim().max(300), closing: money, opening: money.optional() })).max(30_000),
-  /** Closing stock less opening stock for the year, when the agent can read it. */
-  stockAdjustment: money.optional(),
 });
 export type SnapshotPayload = z.infer<typeof snapshotPayload>;
 
@@ -48,7 +46,12 @@ export const ingestPayload = z.discriminatedUnion("kind", [companiesPayload, sna
 
 /** One snapshot, signs flipped to debit-positive and duplicates merged. */
 export function normaliseSnapshot(p: SnapshotPayload): { groups: GroupMaster[]; ledgers: LedgerBalance[] } {
-  const groups = [...new Map(p.groups.map((g) => [g.name.toLowerCase(), g])).values()];
+  const groups: GroupMaster[] = [...new Map(p.groups.map((g) => [g.name.toLowerCase(), g])).values()].map((g) => ({
+    name: g.name,
+    parent: g.parent,
+    ...(g.opening === undefined ? {} : { opening: fromTallySign(g.opening) }),
+    ...(g.closing === undefined ? {} : { closing: fromTallySign(g.closing) }),
+  }));
   const merged = new Map<string, LedgerBalance>();
   for (const l of p.ledgers) {
     const k = l.name.toLowerCase();

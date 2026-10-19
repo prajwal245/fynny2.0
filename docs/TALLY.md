@@ -72,26 +72,38 @@ Books agent checks: trial balance tallies; ledgers outside any primary group; su
 cash/bank; debtors with credit balances and creditors with debit balances; balance sheet off (closing stock);
 TDS ledger in debit; one customer holding most receivables; running at a loss. Every finding names its ledgers.
 
+## Stock
+
+Tally works stock out when a report runs; it is in no ledger. The agent reads opening and closing value from the
+**Stock-in-Hand group**; the server uses them only when no ledger under that group carries a balance (so stock is
+never counted twice). Opening stock is already inside capital and reserves, so: Inventories on the balance sheet =
+closing stock; the P&L gets "Change in inventories" = opening less closing; the trial balance shows an
+"Opening Stock" debit, as Tally's does. The Books agent notes where the figures came from.
+
 ## Not validated yet, needs real Tally data
 
-These are written from Tally's documented XML behaviour and tested against hand-made fixtures, **not** against
-a real Tally Prime company:
+Written from Tally's documented XML behaviour and tested against hand-made fixtures, **not** a real company:
 
-- The exact element names and the `ClosingBalance` format in the `Collection` export (the parser accepts
-  `-1500.00`, `1,500.00 Dr`/`Cr`). Different Tally versions may differ.
+- Element names and the `ClosingBalance` format in the `Collection` export (the parser accepts `-1500.00`, `1,500.00 Dr`/`Cr`).
 - That `SVFROMDATE`/`SVTODATE` give year-to-date closing balances for nominal (P&L) ledgers as assumed.
-- **Closing stock.** Tally works it out when a report runs; it is not a ledger posting. `snapshot.stockAdjustment`
-  and the statements support it, but the agent does not read it yet, so a client that keeps inventory will see the
-  Books agent say the balance sheet is off by the stock figure.
+- That the Stock-in-Hand group's `OpeningBalance`/`ClosingBalance` are the opening and closing stock values.
+- That a Day Book export parses through the existing Tally extractor the same as an uploaded one.
 - Large companies (tens of thousands of ledgers) and Tally's own timeouts.
 
-No Tally samples exist yet. The first client install is the sample: run `node agent.mjs diagnose` on that PC (names are replaced, amounts kept; the client can read the file before sending) and check the parser against it before wider rollout.
+No samples exist yet. The first client install is the sample: run `node agent.mjs diagnose` on that PC (names are replaced,
+amounts kept; the client can read the file before sending) and check the parser against it before wider rollout.
+
+## Updating the agent
+
+The server knows the newest agent (`LATEST_AGENT_VERSION`, kept equal to `AGENT_VERSION` by a test). An older agent is
+flagged in Settings and says so in its own log. To update, the client downloads the zip and double-clicks `Install.bat`
+again: on an already-paired PC it only refreshes the files, no code needed. Bump both versions together, then run
+`scripts/build-tally-agent.sh`.
 
 ## Next slices
 
-1. Read closing and opening stock in the agent (`$ClosingValue` of Stock-in-Hand).
-2. Vouchers (Day Book) for drill-down below the ledger, GST and TDS reconciliations, debtor/creditor ageing by bill.
+1. Voucher-level data in the app (the Day Book is filed for Recon today, but not browsable) for drill-down below the ledger, GST and TDS reconciliations, debtor/creditor ageing by bill.
 3. Budget vs actual, Cash Flow (indirect), prior-year comparatives, signed-off Schedule III pack as PDF.
 4. Signed Windows installer (`.exe`/MSI) so Node.js is not a prerequisite; auto-update.
 5. Tally-importable journal vouchers for adjustments (write-back is a separate, explicitly confirmed phase).
-6. A pairing attempt limiter on the endpoint.
+6. A shared (database-backed) pairing limiter; today it is per server instance.

@@ -93,7 +93,8 @@ async function sync({ backfill }) {
   const only = (cfg.companies ?? null); // optional allow-list in config.json
   const companies = parseCompanies(await tally(cfg, companiesRequest())).filter((c) => !only || only.includes(c.name));
   if (!companies.length) fail("No company is open in Tally. Open the client's company and run again.");
-  await send(cfg, { kind: "companies", companies, agentVersion: AGENT_VERSION });
+  const hello = await send(cfg, { kind: "companies", companies, agentVersion: AGENT_VERSION });
+  if (hello.latestAgentVersion && hello.latestAgentVersion !== AGENT_VERSION) log(`A newer agent (${hello.latestAgentVersion}) is available. Download it from FynHelp > Settings > Tally Prime and double-click Install.bat; no code is needed.`);
   const today = new Date().toISOString().slice(0, 10);
   const { fyStart, dates } = snapshotDates(today, { backfill: backfill || !cfg.lastBackfill });
   let sent = 0;

@@ -115,7 +115,8 @@ export interface GoogleTokens {
 
 export async function exchangeCode(code: string, redirectUri: string): Promise<GoogleTokens> {
   const { clientId, clientSecret } = gmailCredentials();
-  const res = await fetch("https://oauth2.googleapis.com/token", {
+  // GOOGLE_TOKEN_URL exists only so tests and demos can use a stand-in Google.
+  const res = await fetch(process.env.GOOGLE_TOKEN_URL || "https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -166,7 +167,7 @@ export async function refreshAccessTokenDetailed(refreshToken: string): Promise<
 
 export async function refreshAccessToken(refreshToken: string): Promise<{ access_token: string; expires_in: number } | null> {
   const { clientId, clientSecret } = gmailCredentials();
-  const res = await fetch("https://oauth2.googleapis.com/token", {
+  const res = await fetch(process.env.GOOGLE_TOKEN_URL || "https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -182,7 +183,8 @@ export async function refreshAccessToken(refreshToken: string): Promise<{ access
 }
 
 export async function fetchGmailAddress(accessToken: string): Promise<string> {
-  const res = await fetch("https://www.googleapis.com/oauth2/v1/userinfo", {
+  // GOOGLE_USERINFO_URL exists only so tests and demos can use a stand-in Google.
+  const res = await fetch(process.env.GOOGLE_USERINFO_URL || "https://www.googleapis.com/oauth2/v1/userinfo", {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   const body = (await res.json()) as { email?: string };

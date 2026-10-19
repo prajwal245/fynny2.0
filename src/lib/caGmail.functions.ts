@@ -50,7 +50,9 @@ export const startGmailConnect = createServerFn({ method: "POST" })
       state,
     });
     console.log(`[fyn:gmail] consent start — redirect_uri=${redirectUri}`);
-    return { url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`, redirectUri };
+    // GOOGLE_AUTH_URL exists only so tests and demos can use a stand-in Google.
+    const authUrl = process.env.GOOGLE_AUTH_URL || "https://accounts.google.com/o/oauth2/v2/auth";
+    return { url: `${authUrl}?${params.toString()}`, redirectUri };
   });
 
 /** "Check now": check this firm's inboxes immediately and read what arrived. */

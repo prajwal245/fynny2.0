@@ -997,3 +997,65 @@ export const zohoBooksSync = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) =>
     withWork(context.userId, async (db, ctx) => (await import("./zoho.server")).sync(db, ctx, data.linkId, data.month)),
   );
+
+/* ── Tally Prime (read-only, through the FynHelp agent) ─── */
+
+export const tallyStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => withFirm(context.userId, async (db, ctx) => (await import("./tally.server")).status(db, ctx)));
+
+/** A one-time code to type into the agent on the client's PC. */
+export const tallyNewPairing = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      await asPartner(ctx, "add a Tally computer");
+      return (await import("./tally.server")).createPairing(db, ctx);
+    }),
+  );
+
+export const tallyLinkCompany = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ companyId: uuid, businessId: uuid.nullable() }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      await asPartner(ctx, "link a client to Tally");
+      if (data.businessId) {
+        const { assertClient } = await import("./db.server");
+        await assertClient(db, ctx, data.businessId);
+      }
+      return (await import("./tally.server")).linkCompany(db, ctx, data.companyId, data.businessId);
+    }),
+  );
+
+export const tallySetCompanySync = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ companyId: uuid, enabled: z.boolean() }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      await asPartner(ctx, "pause Tally sync");
+      return (await import("./tally.server")).setCompanySync(db, ctx, data.companyId, data.enabled);
+    }),
+  );
+
+export const tallyRevokeAgent = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ agentId: uuid }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      await asPartner(ctx, "remove a Tally computer");
+      return (await import("./tally.server")).revokeAgent(db, ctx, data.agentId);
+    }),
+  );
+
+/** Trial Balance, Schedule III P&L, Balance Sheet and the Books agent's review for a client. */
+export const getClientBooks = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ businessId: uuid, asOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      const { assertClient } = await import("./db.server");
+      await assertClient(db, ctx, data.businessId);
+      return (await import("./tally.server")).statements(db, ctx, data.businessId, data.asOn);
+    }),
+  );

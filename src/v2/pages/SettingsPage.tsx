@@ -23,6 +23,7 @@ import { BillingSection } from "../components/BillingSection";
 import { GmailHealth } from "../components/GmailHealth";
 import { GmailIcon, WhatsAppIcon } from "../components/BrandIcons";
 import { ZohoBooksSection } from "../components/ZohoBooks";
+import { TallySection } from "../components/TallyConnect";
 import { INTEGRATION_STYLES, IntegrationCard } from "../components/IntegrationCard";
 import { Link } from "@tanstack/react-router";
 import { FileSpreadsheet, UploadCloud } from "lucide-react";
@@ -527,6 +528,8 @@ export default function SettingsPage() {
             </IntegrationCard>
 
             <ZohoBooksSection index={1} />
+
+            <TallySection index={2} />
 
             <IntegrationCard
               index={2}

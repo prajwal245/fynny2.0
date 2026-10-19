@@ -15,6 +15,7 @@ import DocumentsPage from "./DocumentsPage";
 import ReviewPage from "./ReviewPage";
 import ExceptionsPage from "./ExceptionsPage";
 import ReportsPage from "./ReportsPage";
+import ClientBooks from "../components/ClientBooks";
 import ChaserPage from "./ChaserPage";
 import { parsePeriod } from "@/lib/practice/core";
 import { openExceptionsIn } from "../lib/exceptions";
@@ -36,7 +37,7 @@ export default function ClientWorkspacePage() {
   const [tab, setTab] = useState(() => {
     if (typeof window === "undefined") return "overview";
     const t = new URLSearchParams(window.location.search).get("tab");
-    return t && ["overview", "documents", "review", "exceptions", "recon", "mis", "chaser", "activity"].includes(t) ? t : "overview";
+    return t && ["overview", "documents", "review", "exceptions", "recon", "mis", "books", "chaser", "activity"].includes(t) ? t : "overview";
   });
 
   // "Fix" in Needs you names the failed file: /v2/clients/:id?tab=documents&doc=<id>
@@ -159,6 +160,7 @@ export default function ClientWorkspacePage() {
           { value: "exceptions", label: "Exception Queue", count: cEx.length },
           { value: "recon", label: "Recon" },
           { value: "mis", label: "MIS", count: cReports.filter((r) => r.period === period).length },
+          { value: "books", label: "Books" },
           { value: "chaser", label: "Chaser", count: cChases.length },
           { value: "activity", label: "Activity", count: timeline.length + agentRunsFor(client.id).length },
         ]}
@@ -290,6 +292,8 @@ export default function ClientWorkspacePage() {
       <MatchDrawer txnId={viewMatch} onClose={() => setViewMatch(null)} />
 
       {tab === "mis" && <ReportsPage clientId={client.id} />}
+
+      {tab === "books" && <ClientBooks clientId={client.id} clientName={client.name} onOpenSettings={() => navigate({ to: "/app/settings" })} />}
 
       {tab === "chaser" && <ChaserPage clientId={client.id} />}
       {tab === "activity" && (

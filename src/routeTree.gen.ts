@@ -196,6 +196,7 @@ import { Route as MainDashboardSettingsProfileRouteImport } from './routes/_main
 import { Route as MainDashboardSettingsSecurityRouteImport } from './routes/_main/dashboard/settings/security'
 import { Route as MainDashboardSettingsTeamRouteImport } from './routes/_main/dashboard/settings/team'
 import { Route as ApiIntegrationsZohoCallbackRouteImport } from './routes/api/integrations/zoho/callback'
+import { Route as ApiIntegrationsTallyAgentRouteImport } from './routes/api/integrations/tally/agent'
 import { Route as CaIntegrationsGmailCallbackRouteImport } from './routes/ca.integrations.gmail.callback'
 import { Route as AdminAuthAdminProtectedBlogIndexRouteImport } from './routes/_adminAuth/admin/_protected/blog/index'
 import { Route as AdminAuthAdminProtectedBlogNewRouteImport } from './routes/_adminAuth/admin/_protected/blog/new'
@@ -1229,6 +1230,12 @@ const ApiIntegrationsZohoCallbackRoute =
     path: '/api/integrations/zoho/callback',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiIntegrationsTallyAgentRoute =
+  ApiIntegrationsTallyAgentRouteImport.update({
+    id: '/api/integrations/tally/agent',
+    path: '/api/integrations/tally/agent',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const CaIntegrationsGmailCallbackRoute =
   CaIntegrationsGmailCallbackRouteImport.update({
     id: '/ca/integrations/gmail/callback',
@@ -1535,6 +1542,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/settings/security': typeof MainDashboardSettingsSecurityRoute
   '/dashboard/settings/team': typeof MainDashboardSettingsTeamRoute
   '/api/integrations/zoho/callback': typeof ApiIntegrationsZohoCallbackRoute
+  '/api/integrations/tally/agent': typeof ApiIntegrationsTallyAgentRoute
   '/ca/integrations/gmail/callback': typeof CaIntegrationsGmailCallbackRoute
   '/admin/': typeof AdminAuthAdminProtectedIndexRoute
   '/ca/': typeof CaAuthCaPortalIndexRoute
@@ -1735,6 +1743,7 @@ export interface FileRoutesByTo {
   '/dashboard/settings/security': typeof MainDashboardSettingsSecurityRoute
   '/dashboard/settings/team': typeof MainDashboardSettingsTeamRoute
   '/api/integrations/zoho/callback': typeof ApiIntegrationsZohoCallbackRoute
+  '/api/integrations/tally/agent': typeof ApiIntegrationsTallyAgentRoute
   '/ca/integrations/gmail/callback': typeof CaIntegrationsGmailCallbackRoute
   '/admin': typeof AdminAuthAdminProtectedIndexRoute
   '/ca': typeof CaAuthCaPortalIndexRoute
@@ -1946,6 +1955,7 @@ export interface FileRoutesById {
   '/_main/dashboard/settings/security': typeof MainDashboardSettingsSecurityRoute
   '/_main/dashboard/settings/team': typeof MainDashboardSettingsTeamRoute
   '/api/integrations/zoho/callback': typeof ApiIntegrationsZohoCallbackRoute
+  '/api/integrations/tally/agent': typeof ApiIntegrationsTallyAgentRoute
   '/ca/integrations/gmail/callback': typeof CaIntegrationsGmailCallbackRoute
   '/_adminAuth/admin/_protected/': typeof AdminAuthAdminProtectedIndexRoute
   '/_caAuth/ca/_portal/': typeof CaAuthCaPortalIndexRoute
@@ -2153,6 +2163,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/security'
     | '/dashboard/settings/team'
     | '/api/integrations/zoho/callback'
+    | '/api/integrations/tally/agent'
     | '/ca/integrations/gmail/callback'
     | '/admin/'
     | '/ca/'
@@ -2353,6 +2364,7 @@ export interface FileRouteTypes {
     | '/dashboard/settings/security'
     | '/dashboard/settings/team'
     | '/api/integrations/zoho/callback'
+    | '/api/integrations/tally/agent'
     | '/ca/integrations/gmail/callback'
     | '/admin'
     | '/ca'
@@ -2563,6 +2575,7 @@ export interface FileRouteTypes {
     | '/_main/dashboard/settings/security'
     | '/_main/dashboard/settings/team'
     | '/api/integrations/zoho/callback'
+    | '/api/integrations/tally/agent'
     | '/ca/integrations/gmail/callback'
     | '/_adminAuth/admin/_protected/'
     | '/_caAuth/ca/_portal/'
@@ -2620,6 +2633,7 @@ export interface RootRouteChildren {
   ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
   SharedMisTokenRoute: typeof SharedMisTokenRoute
   ApiIntegrationsZohoCallbackRoute: typeof ApiIntegrationsZohoCallbackRoute
+  ApiIntegrationsTallyAgentRoute: typeof ApiIntegrationsTallyAgentRoute
   CaIntegrationsGmailCallbackRoute: typeof CaIntegrationsGmailCallbackRoute
 }
 
@@ -3934,6 +3948,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiIntegrationsZohoCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/integrations/tally/agent': {
+      id: '/api/integrations/tally/agent'
+      path: '/api/integrations/tally/agent'
+      fullPath: '/api/integrations/tally/agent'
+      preLoaderRoute: typeof ApiIntegrationsTallyAgentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/ca/integrations/gmail/callback': {
       id: '/ca/integrations/gmail/callback'
       path: '/ca/integrations/gmail/callback'
@@ -4592,6 +4613,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,
   SharedMisTokenRoute: SharedMisTokenRoute,
   ApiIntegrationsZohoCallbackRoute: ApiIntegrationsZohoCallbackRoute,
+  ApiIntegrationsTallyAgentRoute: ApiIntegrationsTallyAgentRoute,
   CaIntegrationsGmailCallbackRoute: CaIntegrationsGmailCallbackRoute,
 }
 export const routeTree = rootRouteImport

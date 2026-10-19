@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Connect Tally to FynHelp: client guide</title>
+<style>
+  :root { --ink:#2A0F0C; --body:rgba(42,15,12,.74); --line:rgba(138,30,24,.14); --brand:#D8302A; --cream:#FCEEE4; --bg:#FFF8F3; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 40px 16px 80px; }
+  h1 { font-size: 30px; line-height: 1.2; letter-spacing: -.02em; margin: 0 0 8px; }
+  h2 { font-size: 19px; margin: 36px 0 10px; }
+  p, li { color: var(--body); }
+  .lead { font-size: 17px; }
+  ol { padding-left: 22px; } li { margin: 8px 0; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:16px; padding:16px 18px; margin: 14px 0; }
+  code { background: var(--cream); padding: 2px 7px; border-radius: 6px; font: 14px ui-monospace, Menlo, Consolas, monospace; color: var(--ink); }
+  .ok { border-left: 4px solid #2F6B4F; } .warn { border-left: 4px solid #B87333; }
+  a { color: var(--brand); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Connect Tally to FynHelp</h1>
+  <p class="lead">About 10 minutes, once. Your CA gets your Trial Balance, Profit and Loss and Balance Sheet without asking you for exports every month.</p>
+
+  <div class="card ok">
+    <strong>What it does, and what it never does.</strong>
+    <ul>
+      <li>It <b>reads</b> ledger names, groups and balances from Tally on this PC.</li>
+      <li>It sends them to your CA's FynHelp account over a secure (HTTPS) connection.</li>
+      <li>It <b>never changes anything in Tally</b>. It cannot create, edit or delete a voucher.</li>
+      <li>Nothing connects in to your PC. The agent only sends data out.</li>
+      <li>It does not read bank passwords, GST logins or any file outside Tally.</li>
+    </ul>
+  </div>
+
+  <h2>Before you start</h2>
+  <ul>
+    <li>A Windows PC where <b>Tally Prime</b> (or Tally.ERP 9) is installed and your company opens.</li>
+    <li><b>Node.js 18 or newer</b>, free from <a href="https://nodejs.org">nodejs.org</a> (choose LTS). Your CA's team can install it on a call.</li>
+    <li>The <b>pairing code</b> your CA gave you, like <code>FYN-7K3Q-9XPA</code>. It works once and expires in 30 minutes; ask for a new one if it lapses.</li>
+  </ul>
+
+  <h2>1. Switch on Tally's local connection</h2>
+  <ol>
+    <li>Open Tally Prime and open your company.</li>
+    <li>Press <b>F1 (Help)</b> → <b>Settings</b> → <b>Connectivity</b> → <b>Client/Server configuration</b>.</li>
+    <li>Set <b>TallyPrime acts as</b> to <b>Both</b> (or <b>Server</b>) and the port to <b>9000</b>. Accept.</li>
+  </ol>
+  <p>This only opens Tally to programs on the same PC.</p>
+
+  <h2>2. Install the agent</h2>
+  <ol>
+    <li>Unzip <code>fynhelp-tally-agent.zip</code> to a folder, for example your Desktop.</li>
+    <li>Right-click <code>install.ps1</code> and choose <b>Run with PowerShell</b>. If Windows asks, allow it for this session.</li>
+    <li>When asked, type the pairing code. The agent pairs, sends the year so far, and sets itself to refresh every 4 hours.</li>
+  </ol>
+
+  <h2>3. Check it worked</h2>
+  <p>Your CA's FynHelp screen shows <b>Connected</b> within a few seconds, and your company appears there for them to link to your file. You do not need to do anything else.</p>
+
+  <h2>Day to day</h2>
+  <ul>
+    <li>Keep Tally Prime <b>open</b> on that PC in office hours. If it is closed, the agent simply tries again later.</li>
+    <li>The PC does not need to stay on overnight; it catches up when it is next on.</li>
+    <li>To stop it: your CA can remove the PC in FynHelp, or you can delete the scheduled task <i>FynHelp Tally Sync</i> in Windows Task Scheduler.</li>
+  </ul>
+
+  <h2>If something goes wrong</h2>
+  <div class="card warn">
+    <p><b>"Cannot reach Tally"</b>: Tally is closed, or step 1 was not saved. Open Tally, repeat step 1.</p>
+    <p><b>"No company is open in Tally"</b>: open your company, then run again.</p>
+    <p><b>"Pairing code is wrong or expired"</b>: ask your CA for a new code.</p>
+    <p><b>Node.js not found</b>: install Node.js LTS, then run the installer again.</p>
+    <p>To see what the agent is doing, open PowerShell in <code>%LOCALAPPDATA%\FynHelpTally</code> and run <code>node agent.mjs status</code>.</p>
+  </div>
+  <p>Still stuck? Tell your CA, or write to <a href="mailto:support@fynhelp.com">support@fynhelp.com</a>. We can finish the install with you on a short screen-share.</p>
+</main>
+</body>
+</html>

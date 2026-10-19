@@ -11,7 +11,8 @@ import { adminDb, logActivity, type Db, type FirmContext } from "./db.server";
 import { BUCKET, registerDocument } from "./documents.server";
 import { PracticeError } from "./core";
 
-const GRAPH = "https://graph.facebook.com/v21.0";
+// WHATSAPP_GRAPH_BASE exists only so tests and demos can use a stand-in Meta Graph API.
+const GRAPH = process.env["WHATSAPP_GRAPH_BASE"] || "https://graph.facebook.com/v21.0";
 
 function env(name: string) {
   const v = process.env[name];

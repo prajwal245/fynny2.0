@@ -52,6 +52,17 @@ describe("Tally agent library", () => {
     expect(lib.tallyError(LEDGERS)).toBeNull();
   });
 
+  it("anonymises company and ledger names but keeps amounts and groups", () => {
+    const out = lib.anonymiseXml(LEDGERS + COMPANIES);
+    expect(out).not.toContain("HDFC");
+    expect(out).not.toContain("Kaveri");
+    expect(out).toContain("Ledger 1");
+    expect(out).toContain("Bank Accounts");
+    expect(out).toContain("-300000.00");
+    // the same name maps to the same alias everywhere
+    expect(lib.anonymiseXml('<LEDGER NAME="A"/><LEDGER NAME="B"/><LEDGER NAME="A"/>')).toBe('<LEDGER NAME="Ledger 1"/><LEDGER NAME="Ledger 2"/><LEDGER NAME="Ledger 1"/>');
+  });
+
   it("picks snapshot dates: backfill is every closed month end, a normal run is the last one", () => {
     expect(lib.snapshotDates("2026-10-19", { backfill: true })).toEqual({
       fyStart: "2026-04-01",
@@ -86,6 +97,10 @@ describe("Tally agent, end to end against stand-ins", () => {
       await run("node", [agent, "pair", "FYN-ABCD-EFGH"], { env });
       expect(JSON.parse(await readFile(join(home, "config.json"), "utf8")).token).toMatch(/^fhta_/);
       await run("node", [agent, "sync", "--backfill"], { env });
+      await run("node", [agent, "diagnose"], { env });
+      const diag = await readFile(join(home, "tally-diagnostic.txt"), "utf8");
+      expect(diag).toContain("Ledgers read: 3");
+      expect(diag).not.toContain("Kaveri");
 
       const snaps = received.filter((r) => r.body.kind === "snapshot");
       expect(snaps.length).toBeGreaterThan(2);

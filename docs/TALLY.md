@@ -19,7 +19,7 @@ Tally Prime ──XML/9000──▶ agent (client PC) ──HTTPS POST──▶ 
 
 | Where | What |
 |---|---|
-| `tools/tally-agent/` | `agent.mjs` (CLI: `pair`, `sync [--backfill]`, `status`), `lib.mjs` (Tally XML requests and parsing, snapshot dates), `install.ps1` (copies, pairs, schedules every 4 h) |
+| `tools/tally-agent/` | `agent.mjs` (CLI: `pair`, `sync [--backfill]`, `status`), `lib.mjs` (Tally XML requests and parsing, snapshot dates), `Install.bat` (double-click; asks for the code) → `install.ps1` (copies, pairs, schedules every 4 h), `diagnose` (anonymised sample of what Tally sends, for support) |
 | `public/tally-agent/` | `fynhelp-tally-agent.zip` (built by `scripts/build-tally-agent.sh`, rebuild after any change under `tools/tally-agent`) and the client-facing `guide.html` |
 | `src/routes/api/integrations/tally/agent.ts` | The one endpoint the agent calls: `pair`, `companies`, `snapshot` |
 | `src/lib/practice/tally.server.ts` | Pairing, token auth, ingest, linking, `statements()` |
@@ -32,7 +32,7 @@ Tally Prime ──XML/9000──▶ agent (client PC) ──HTTPS POST──▶ 
 ## Flow
 
 1. Partner: Settings → Tally Prime → **Connect**. FynHelp shows a one-time code (`FYN-XXXX-XXXX`, 30 minutes, stored hashed).
-2. Client (or our team on a call) unzips the agent, runs `install.ps1`, enters the code. The agent swaps it for a bearer token (shown once, stored hashed server side, kept in `%APPDATA%\FynHelpTally\config.json`).
+2. Client (or our team on a call) unzips the agent, double-clicks `Install.bat`, enters the code. The agent swaps it for a bearer token (shown once, stored hashed server side, kept in `%APPDATA%\FynHelpTally\config.json`).
 3. The agent lists the open companies, then for each sends a snapshot as on today and (first run, or `--backfill`) every month end of the financial year.
 4. Settings notices the agent and lists the companies. The partner links each to a client (a name match is pre-selected).
 5. On every snapshot the **Books agent** reads the ledgers and records what it found in the client's activity log.
@@ -75,7 +75,7 @@ a real Tally Prime company:
   Books agent say the balance sheet is off by the stock figure.
 - Large companies (tens of thousands of ledgers) and Tally's own timeouts.
 
-Validate with 2 or 3 real company exports (one clean, one messy) before wider rollout.
+No Tally samples exist yet. The first client install is the sample: run `node agent.mjs diagnose` on that PC (names are replaced, amounts kept; the client can read the file before sending) and check the parser against it before wider rollout.
 
 ## Next slices
 

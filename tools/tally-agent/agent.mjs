@@ -6,6 +6,7 @@
 //   node agent.mjs pair FYN-XXXX-XXXX     once, with the code from FynHelp
 //   node agent.mjs sync [--backfill]      read Tally and send (the scheduled task runs this)
 //   node agent.mjs status                 check Tally and FynHelp are reachable
+//   node agent.mjs diagnose               save an anonymised sample of what Tally sends, to share with support
 //
 // Needs Node 18+. Tally must be open with "Enable ODBC / allow XML on port 9000"
 // (F1 > Settings > Connectivity > Client/Server configuration).
@@ -13,7 +14,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir, hostname } from "node:os";
 import { join } from "node:path";
 import {
-  AGENT_VERSION, companiesRequest, groupsRequest, ledgersRequest, parseCompanies, parseGroups, parseLedgers, snapshotDates, tallyError,
+  AGENT_VERSION, anonymiseXml, companiesRequest, groupsRequest, ledgersRequest, parseCompanies, parseGroups, parseLedgers, snapshotDates, tallyError,
 } from "./lib.mjs";
 
 const DIR = process.env.FYNHELP_HOME ?? join(process.env.APPDATA ?? join(homedir(), ".config"), "FynHelpTally");
@@ -114,12 +115,36 @@ async function sync({ backfill }) {
   if (sent) await saveConfig({ ...cfg, lastBackfill: cfg.lastBackfill ?? new Date().toISOString(), lastSync: new Date().toISOString() });
 }
 
+async function diagnose() {
+  const cfg = (await loadConfig()) ?? { tallyUrl: process.env.TALLY_URL ?? "http://localhost:9000" };
+  const companies = parseCompanies(await tally(cfg, companiesRequest()));
+  if (!companies.length) fail("No company is open in Tally. Open one and run again.");
+  const today = new Date().toISOString().slice(0, 10);
+  const { fyStart } = snapshotDates(today);
+  const first = companies[0].name;
+  const raw = [await tally(cfg, companiesRequest()), await tally(cfg, groupsRequest(first, fyStart, today)), await tally(cfg, ledgersRequest(first, fyStart, today))];
+  const excerpt = (x) => anonymiseXml(x).slice(0, 12_000);
+  const ledgers = parseLedgers(raw[2]);
+  const report = [
+    `FynHelp Tally agent ${AGENT_VERSION} diagnostic, ${today}`,
+    `Companies open: ${companies.length}. Groups read: ${parseGroups(raw[1]).length}. Ledgers read: ${ledgers.length}.`,
+    `Ledgers with a balance: ${ledgers.filter((l) => l.closing).length}. Ledgers with no parent group: ${ledgers.filter((l) => !l.parent).length}.`,
+    "", "Names are replaced (Company 1, Ledger 1); amounts are kept so the format can be checked.", "",
+    "--- COMPANIES ---", excerpt(raw[0]), "--- GROUPS ---", excerpt(raw[1]), "--- LEDGERS ---", excerpt(raw[2]),
+  ].join("\n");
+  await mkdir(DIR, { recursive: true });
+  const file = join(DIR, "tally-diagnostic.txt");
+  await writeFile(file, report);
+  log(`Saved ${file}\n  Read it first if you like. Send it to support@fynhelp.com or your CA only if you are happy to.`);
+}
+
 const [cmd, ...rest] = process.argv.slice(2);
 try {
   if (cmd === "pair") await pair(rest[0]);
   else if (cmd === "sync") await sync({ backfill: rest.includes("--backfill") });
   else if (cmd === "status") await status();
-  else fail("Commands: pair <code> | sync [--backfill] | status");
+  else if (cmd === "diagnose") await diagnose();
+  else fail("Commands: pair <code> | sync [--backfill] | status | diagnose");
 } catch (e) {
   fail(e.message);
 }

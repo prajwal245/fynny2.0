@@ -55,8 +55,8 @@
   <h2>2. Install the agent</h2>
   <ol>
     <li>Unzip <code>fynhelp-tally-agent.zip</code> to a folder, for example your Desktop.</li>
-    <li>Right-click <code>install.ps1</code> and choose <b>Run with PowerShell</b>. If Windows asks, allow it for this session.</li>
-    <li>When asked, type the pairing code. The agent pairs, sends the year so far, and sets itself to refresh every 4 hours.</li>
+    <li>Double-click <code>Install.bat</code>. If Windows shows a blue "protected your PC" box, choose <b>More info</b> then <b>Run anyway</b>.</li>
+    <li>When asked, type the pairing code (copy and paste works). The agent pairs, sends the year so far, and sets itself to refresh every 4 hours.</li>
   </ol>
 
   <h2>3. Check it worked</h2>
@@ -75,7 +75,7 @@
     <p><b>"No company is open in Tally"</b>: open your company, then run again.</p>
     <p><b>"Pairing code is wrong or expired"</b>: ask your CA for a new code.</p>
     <p><b>Node.js not found</b>: install Node.js LTS, then run the installer again.</p>
-    <p>To see what the agent is doing, open PowerShell in <code>%LOCALAPPDATA%\FynHelpTally</code> and run <code>node agent.mjs status</code>.</p>
+    <p>To see what the agent is doing, open Command Prompt in <code>%LOCALAPPDATA%\FynHelpTally</code> and run <code>node agent.mjs status</code>. If your CA asks for a sample, run <code>node agent.mjs diagnose</code>; it saves a file with names replaced that you can read before sending.</p>
   </div>
   <p>Still stuck? Tell your CA, or write to <a href="mailto:support@fynhelp.com">support@fynhelp.com</a>. We can finish the install with you on a short screen-share.</p>
 </main>

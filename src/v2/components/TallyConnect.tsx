@@ -37,7 +37,7 @@ const ago = (iso: string | null) => {
 
 const STEPS = [
   ["Download", "Save the agent on the PC where Tally Prime is installed."],
-  ["Install", "Right-click install.ps1, choose Run with PowerShell, and paste the code when asked."],
+  ["Install", "Double-click Install.bat and paste the code when asked."],
   ["Done", "Keep Tally open. This screen shows the company the moment it connects."],
 ];
 

@@ -41,9 +41,9 @@ create table if not exists public.ca_tally_companies (
   last_synced_at timestamptz,
   last_as_on date,
   last_sync_note text,
-  created_at timestamptz not null default now(),
-  unique (agent_id, name)
+  created_at timestamptz not null default now()
 );
+create unique index if not exists ca_tally_companies_agent_name_uidx on public.ca_tally_companies (agent_id, name);
 create index if not exists ca_tally_companies_firm_idx on public.ca_tally_companies (ca_firm_id);
 create index if not exists ca_tally_companies_client_idx on public.ca_tally_companies (ca_firm_id, business_id);
 
@@ -60,9 +60,9 @@ create table if not exists public.ca_tally_snapshots (
   ledgers jsonb not null default '[]'::jsonb,
   ledger_count int not null default 0,
   stock_adjustment numeric(16,2) not null default 0,
-  created_at timestamptz not null default now(),
-  unique (company_id, fy_start, as_on)
+  created_at timestamptz not null default now()
 );
+create unique index if not exists ca_tally_snapshots_company_asof_uidx on public.ca_tally_snapshots (company_id, fy_start, as_on);
 create index if not exists ca_tally_snapshots_company_idx on public.ca_tally_snapshots (company_id, as_on desc);
 
 alter table public.ca_tally_pairings enable row level security;

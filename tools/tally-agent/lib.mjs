@@ -108,3 +108,22 @@ export function snapshotDates(today, { backfill = false } = {}) {
   const dates = backfill ? ends : ends.slice(-1);
   return { fyStart: fy, dates: [...dates, today] };
 }
+
+/**
+ * Replace company and ledger names with Company 1, Ledger 1 ... so an export
+ * can be shared to check formats without naming anyone. Amounts are kept.
+ */
+export function anonymiseXml(xml) {
+  const maps = { COMPANY: new Map(), LEDGER: new Map() };
+  const alias = (kind, name) => {
+    const m = maps[kind];
+    if (!m.has(name)) m.set(name, `${kind === "COMPANY" ? "Company" : "Ledger"} ${m.size + 1}`);
+    return m.get(name);
+  };
+  let out = String(xml);
+  for (const kind of ["COMPANY", "LEDGER"]) {
+    out = out.replace(new RegExp(`(<${kind}\\b[^>]*?\\bNAME=")([^"]*)(")`, "gi"), (_, a, n, c) => a + alias(kind, n) + c);
+  }
+  out = out.replace(/<(LANGUAGENAME\.LIST|NAME)\b[^>]*>[\s\S]*?<\/\1>/gi, "").replace(/(<(?:GSTIN|PARTYGSTIN|EMAIL|PHONE\w*|ADDRESS\w*|PINCODE|PAN\w*)\b[^>]*>)[^<]*/gi, "$1");
+  return out;
+}

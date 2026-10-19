@@ -15,7 +15,7 @@ export const STUCK_READ_MESSAGE =
   "Reading this file took too long and was stopped. Press Retry to read it again; if it stops again, send the file as CSV or Excel.";
 const ROWS_PER_DOC = 200;
 
-type Source = "Manual" | "Gmail" | "WhatsApp" | "Zoho Books";
+type Source = "Manual" | "Gmail" | "WhatsApp" | "Zoho Books" | "Tally";
 
 const channelOf = (
   sourceType: string | null,
@@ -25,6 +25,7 @@ const channelOf = (
   if (s.includes("gmail") || s === "email") return "Gmail";
   if (s.includes("whatsapp")) return "WhatsApp";
   if (s.includes("zoho")) return "Zoho Books";
+  if (s.includes("tally")) return "Tally";
   return "Manual";
 };
 

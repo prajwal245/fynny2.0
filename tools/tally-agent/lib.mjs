@@ -77,6 +77,18 @@ export const parseLedgers = (xml) =>
     closing: tallyAmount(l.fields.CLOSINGBALANCE),
   }));
 
+/** Tally's Day Book report: every voucher between two dates, as XML. */
+export function dayBookRequest(company, from, to) {
+  return (
+    `<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>Day Book</ID></HEADER>` +
+    `<BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>` +
+    `<SVCURRENTCOMPANY>${xmlEsc(company)}</SVCURRENTCOMPANY>` +
+    `<SVFROMDATE TYPE="Date">${tallyDate(from)}</SVFROMDATE><SVTODATE TYPE="Date">${tallyDate(to)}</SVTODATE>` +
+    `</STATICVARIABLES></DESC></BODY></ENVELOPE>`
+  );
+}
+export const hasVouchers = (xml) => /<VOUCHER\b/i.test(xml);
+
 /** Tally answers errors with a LINEERROR or RESPONSE text instead of data. */
 export const tallyError = (xml) => /<LINEERROR>([\s\S]*?)<\/LINEERROR>/i.exec(xml)?.[1]?.trim() ?? null;
 
@@ -126,4 +138,42 @@ export function anonymiseXml(xml) {
   }
   out = out.replace(/<(LANGUAGENAME\.LIST|NAME)\b[^>]*>[\s\S]*?<\/\1>/gi, "").replace(/(<(?:GSTIN|PARTYGSTIN|EMAIL|PHONE\w*|ADDRESS\w*|PINCODE|PAN\w*)\b[^>]*>)[^<]*/gi, "$1");
   return out;
+}
+
+const addDays = (isoDate, n) => new Date(Date.parse(isoDate + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
+
+/**
+ * Month ranges to send Day Books for. A normal run covers this month and last
+ * (a late entry in last month still lands); a backfill covers the financial
+ * year so far. The current month ends today.
+ */
+export function dayBookRanges(today, { backfill = false } = {}) {
+  const fy = fyStartOf(today);
+  const out = [];
+  let y = Number(fy.slice(0, 4));
+  let m = 4;
+  for (let i = 0; i < 12; i++) {
+    const from = iso(y, m, 1);
+    if (from > today) break;
+    const end = iso(y, m, lastDay(y, m));
+    out.push({ from, to: end < today ? end : today });
+    m += 1;
+    if (m === 13) { m = 1; y += 1; }
+  }
+  if (backfill) return out;
+  const last = out.slice(-2);
+  if (last.length === 1 && last[0].from === fy) {
+    // First days of a new year: last month belongs to the previous one.
+    const y = Number(fy.slice(0, 4)); // the March just before this April
+    return [{ from: iso(y, 3, 1), to: iso(y, 3, 31) }, ...last];
+  }
+  return last;
+}
+
+/** Halve a range, for a Day Book too big to send in one go. Null at a single day. */
+export function splitRange({ from, to }) {
+  if (from >= to) return null;
+  const days = Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000);
+  const mid = addDays(from, Math.floor(days / 2));
+  return [{ from, to: mid }, { from: addDays(mid, 1), to }];
 }

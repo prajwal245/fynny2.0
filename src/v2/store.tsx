@@ -75,7 +75,7 @@ export type Doc = {
   id: string;
   name: string;
   clientId: string;
-  source: "Manual" | "Gmail" | "WhatsApp" | "Zoho Books";
+  source: "Manual" | "Gmail" | "WhatsApp" | "Zoho Books" | "Tally";
   /** Uploading (in the browser) → Queued → Processing → Parsed / Needs review / Failed. */
   status: "Uploading" | "Queued" | "Processing" | "Parsed" | "Needs review" | "Failed";
   /** When a temporary failure will be retried automatically. */

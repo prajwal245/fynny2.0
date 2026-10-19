@@ -6,9 +6,10 @@
  * Balance, Schedule III P&L and Balance Sheet, with the Books agent's review.
  * FynHelp never writes to Tally.
  */
-import { PracticeError } from "./core";
+import { PracticeError, sha256Hex } from "./core";
 import { logActivity, type Db, type FirmContext } from "./db.server";
-import { fyStartOf, newAgentToken, newPairingCode, normaliseCode, normaliseSnapshot, sha256, type SnapshotPayload } from "./tally/payload";
+import { BUCKET, processExtraction, registerDocument } from "./documents.server";
+import { fyStartOf, newAgentToken, newPairingCode, normaliseCode, normaliseSnapshot, sha256, type DaybookPayload, type SnapshotPayload } from "./tally/payload";
 import {
   balanceSheet,
   monthlySeries,
@@ -156,6 +157,55 @@ export async function ingestSnapshot(db: Db, agent: AgentRow, p: SnapshotPayload
   await db.from("ca_tally_companies").update({ fy_start: p.fyStart, last_synced_at: now, last_as_on: p.asOn, last_sync_note: note }).eq("id", company.id);
   if (company.business_id) await logActivity(db, agent.ca_firm_id, company.business_id, "narrate", `Tally sync: ${note}`);
   return { status: "synced" as const, note, findings: findings.length };
+}
+
+/**
+ * Agent: a range of the Day Book. For a linked company it becomes the client's
+ * books-side document, read by the same Tally parser as an uploaded export, so
+ * Recon has the books without anyone exporting Tally. Re-sent ranges are read
+ * in place; lines already matched stay matched.
+ */
+export async function ingestDaybook(db: Db, agent: AgentRow, p: DaybookPayload) {
+  await touchAgent(db, agent, p.agentVersion);
+  const company = await companyFor(db, agent, p.company);
+  if (!company.business_id) return { status: "waiting" as const, note: "Waiting for your CA to link this company to a client." };
+  if (!company.sync_enabled) return { status: "paused" as const, note: "Sync is switched off for this company in FynHelp." };
+  if (p.to < p.from) throw new PracticeError("bad_period", "The Day Book range ends before it starts.");
+
+  const bytes = new TextEncoder().encode(p.xml);
+  const hash = await sha256Hex(bytes);
+  const path = `${agent.ca_firm_id}/${company.business_id}/tally/${company.id}-${p.from}_${p.to}.xml`;
+  const filename = `Tally Day Book - ${p.company.replace(/[\\/]/g, "-")} - ${p.from} to ${p.to}.xml`.replace(/[:*?"<>|]/g, " ");
+  const { data: prev } = await db.from("ca_document_extractions").select("id, content_hash").eq("ca_firm_id", agent.ca_firm_id).eq("storage_path", path).maybeSingle();
+  if (prev?.content_hash === hash) return { status: "unchanged" as const, note: "No changes since the last sync." };
+
+  const note = `Day Book ${p.from} to ${p.to}`;
+  const touch = () => db.from("ca_tally_companies").update({ last_synced_at: new Date().toISOString(), last_sync_note: `${note} received.` }).eq("id", company.id);
+  try {
+    const { error: upErr } = await db.storage.from(BUCKET).upload(path, bytes, { contentType: "application/xml", upsert: true });
+    if (upErr) throw new PracticeError("storage", upErr.message);
+    if (prev) {
+      await db.from("ca_document_extractions").update({ content_hash: hash, original_filename: filename, extract_status: "queued", error_message: null }).eq("id", prev.id);
+      await processExtraction(db, prev.id, { trigger: "channel", userId: null });
+    } else {
+      await registerDocument(db, { firmId: agent.ca_firm_id, userId: null }, {
+        storage_path: path,
+        filename,
+        mime: "application/xml",
+        business_id: company.business_id,
+        side: "books",
+        channel: "Tally",
+        source_metadata: { tally_company: p.company, from: p.from, to: p.to },
+      });
+    }
+  } catch (e) {
+    // A paused plan is not an error the agent can fix: say so and let it try again later.
+    if ((e as { code?: string }).code === "billing_paused") return { status: "paused" as const, note: (e as Error).message };
+    throw e;
+  }
+  await touch();
+  await logActivity(db, agent.ca_firm_id, company.business_id, "extract", `Tally Day Book ${p.from} to ${p.to} arrived from the agent and is being read for Recon.`);
+  return { status: "synced" as const, note };
 }
 
 /* ── settings screen ───────────────────────────────────── */

@@ -33,10 +33,21 @@ export function ZohoIcon({ size = 18, color = "#E42527" }: { size?: number; colo
   );
 }
 
+/** Tally: a plain red "T" tile, drawn here rather than borrowed. */
+export function TallyIcon({ size = 18, color = "#C8102E" }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false" style={{ flex: "0 0 auto" }}>
+      <rect width="24" height="24" rx="6" fill={color} />
+      <path fill="#fff" d="M6 6.5h12v2.6h-4.7V18h-2.6V9.1H6z" />
+    </svg>
+  );
+}
+
 /** Channel icon for a document source: Gmail, WhatsApp, Zoho Books, or a plain upload. */
 export function SourceIcon({ source, size = 16 }: { source: string; size?: number }) {
   if (source === "Gmail") return <GmailIcon size={size} />;
   if (source === "WhatsApp") return <WhatsAppIcon size={size} />;
   if (source === "Zoho Books") return <ZohoIcon size={size} />;
+  if (source === "Tally") return <TallyIcon size={size} />;
   return null;
 }

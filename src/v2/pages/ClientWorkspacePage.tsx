@@ -258,7 +258,7 @@ export default function ClientWorkspacePage() {
                   <table className="v2-table v2-table-stack">
                     <thead><tr><th>Date</th><th>Particulars</th><th>Amount</th><th>Status</th><th className="v2-sticky-end" /></tr></thead>
                     <tbody>
-                      {rows.length === 0 && <tr><td colSpan={5} style={{ color: V.muted, textAlign: "center", padding: 22 }}>{all.length && onlyOpen ? "Every line here is matched or decided." : label === "Bank side" ? "No bank statement lines yet." : "No book entries yet. Upload the Tally export or ledger."}</td></tr>}
+                      {rows.length === 0 && <tr><td colSpan={5} style={{ color: V.muted, textAlign: "center", padding: 22 }}>{all.length && onlyOpen ? "Every line here is matched or decided." : label === "Bank side" ? "No bank statement lines yet." : "No book entries yet. Upload the Tally export or ledger, or connect Tally in Settings."}</td></tr>}
                       {rows.map((r, i) => (
                         <tr key={r.id ?? i}>
                           <td className="num">{formatDate(r.date)}</td>

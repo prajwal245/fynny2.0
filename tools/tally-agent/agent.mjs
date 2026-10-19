@@ -14,7 +14,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir, hostname } from "node:os";
 import { join } from "node:path";
 import {
-  AGENT_VERSION, anonymiseXml, companiesRequest, groupsRequest, ledgersRequest, parseCompanies, parseGroups, parseLedgers, snapshotDates, tallyError,
+  AGENT_VERSION, anonymiseXml, companiesRequest, dayBookRanges, dayBookRequest, hasVouchers, splitRange, groupsRequest, ledgersRequest, parseCompanies, parseGroups, parseLedgers, snapshotDates, tallyError,
 } from "./lib.mjs";
 
 const DIR = process.env.FYNHELP_HOME ?? join(process.env.APPDATA ?? join(homedir(), ".config"), "FynHelpTally");
@@ -112,6 +112,20 @@ async function sync({ backfill }) {
       }
     }
   }
+  // Vouchers for the books side of reconciliation, so nobody exports Tally by hand.
+  for (const c of companies) {
+    for (const range of dayBookRanges(today, { backfill: backfill || !cfg.lastBackfill })) {
+      try {
+        const r = await sendDayBook(cfg, c.name, range);
+        if (r?.empty) continue;
+        log(`${c.name} vouchers ${range.from} to ${range.to}: ${r.status}${r.note ? ` (${r.note})` : ""}`);
+        sent++;
+      } catch (e) {
+        log(`${c.name} vouchers ${range.from} to ${range.to}: ${e.message}`);
+        if (e.fatal) process.exit(2);
+      }
+    }
+  }
   if (sent) await saveConfig({ ...cfg, lastBackfill: cfg.lastBackfill ?? new Date().toISOString(), lastSync: new Date().toISOString() });
 }
 
@@ -136,6 +150,22 @@ async function diagnose() {
   const file = join(DIR, "tally-diagnostic.txt");
   await writeFile(file, report);
   log(`Saved ${file}\n  Read it first if you like. Send it to support@fynhelp.com or your CA only if you are happy to.`);
+}
+
+const MAX_XML = 5 * 1024 * 1024;
+
+/** One range's Day Book, halved until each piece is small enough to send. */
+async function sendDayBook(cfg, company, range) {
+  const xml = await tally(cfg, dayBookRequest(company, range.from, range.to));
+  if (!hasVouchers(xml)) return { empty: true };
+  if (Buffer.byteLength(xml) > MAX_XML) {
+    const halves = splitRange(range);
+    if (!halves) throw new Error(`One day's vouchers on ${range.from} are larger than the upload limit.`);
+    let last;
+    for (const h of halves) last = await sendDayBook(cfg, company, h);
+    return last;
+  }
+  return send(cfg, { kind: "daybook", company, from: range.from, to: range.to, xml, agentVersion: AGENT_VERSION });
 }
 
 const [cmd, ...rest] = process.argv.slice(2);

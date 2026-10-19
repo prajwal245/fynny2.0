@@ -194,7 +194,7 @@ export async function runRecon(
     .lte("txn_date", period.end);
   if (!bookCount)
     return empty(
-      `No book entries for ${period.label}. Upload the Tally export or ledger before running recon.`,
+      `No book entries for ${period.label}. Upload the Tally export or ledger, or connect the client's Tally in Settings so it arrives on its own, before running recon.`,
     );
   const { count: bankCount } = await db
     .from("ca_txns")

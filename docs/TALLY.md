@@ -29,6 +29,14 @@ Tally Prime ──XML/9000──▶ agent (client PC) ──HTTPS POST──▶ 
 | `src/v2/components/ClientBooks.tsx` | Client workspace → Books |
 | `supabase/migrations/20261019120000_tally_connector.sql` | `ca_tally_pairings`, `ca_tally_agents`, `ca_tally_companies`, `ca_tally_snapshots` |
 
+## Product principle
+
+A connector earns its place by removing a step the firm repeats for every client every month: exporting
+Tally and uploading it. So after one link per client, the books arrive by themselves: each month's Day Book
+becomes a books-side document (source "Tally"), is read by the same parser as an uploaded export, and Recon
+runs against it. The Books tab keeps the statements current. Pull first and read-only; write-back stays a
+separate, explicitly confirmed phase.
+
 ## Flow
 
 1. Partner: Settings → Tally Prime → **Connect**. FynHelp shows a one-time code (`FYN-XXXX-XXXX`, 30 minutes, stored hashed).
@@ -38,6 +46,8 @@ Tally Prime ──XML/9000──▶ agent (client PC) ──HTTPS POST──▶ 
 5. On every snapshot the **Books agent** reads the ledgers and records what it found in the client's activity log.
 
 ## Wire format
+
+`kind: "daybook"` carries a range of Tally's Day Book as raw XML (the agent halves a range above 5 MB). For a linked company it is filed via `registerDocument` as `side: books`, `channel: Tally`; an unlinked company gets `waiting`, a paused plan gets `paused`, an identical resend `unchanged`.
 
 `POST /api/integrations/tally/agent`, JSON, 8 MB cap. `Authorization: Bearer fhta_…` except for `pair`.
 `closing`/`opening` are **Tally's own sign** (a debit is negative); the server flips them once, so everything

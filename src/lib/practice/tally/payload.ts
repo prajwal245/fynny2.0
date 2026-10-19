@@ -33,7 +33,18 @@ export const snapshotPayload = z.object({
 });
 export type SnapshotPayload = z.infer<typeof snapshotPayload>;
 
-export const ingestPayload = z.discriminatedUnion("kind", [companiesPayload, snapshotPayload]);
+/** One range of Tally's Day Book, as the XML Tally produced. Read by the same Tally parser as an uploaded export. */
+export const daybookPayload = z.object({
+  kind: z.literal("daybook"),
+  agentVersion: z.string().max(40).optional(),
+  company: name,
+  from: date,
+  to: date,
+  xml: z.string().min(20).max(6 * 1024 * 1024),
+});
+export type DaybookPayload = z.infer<typeof daybookPayload>;
+
+export const ingestPayload = z.discriminatedUnion("kind", [companiesPayload, snapshotPayload, daybookPayload]);
 
 /** One snapshot, signs flipped to debit-positive and duplicates merged. */
 export function normaliseSnapshot(p: SnapshotPayload): { groups: GroupMaster[]; ledgers: LedgerBalance[] } {

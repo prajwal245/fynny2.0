@@ -1,4 +1,17 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { sha256Hex } from "@/lib/practice/core";
+
+const registered: Record<string, unknown>[] = [];
+const registerFails = { code: "" };
+vi.mock("@/lib/practice/documents.server", () => ({
+  BUCKET: "ca-client-documents",
+  processExtraction: vi.fn(async () => ({ status: "parsed" })),
+  registerDocument: vi.fn(async (_db: unknown, _ctx: unknown, input: Record<string, unknown>) => {
+    if (registerFails.code) throw Object.assign(new Error("New work is paused for this firm."), { code: registerFails.code });
+    registered.push(input);
+    return { extraction_id: "x1", duplicate: false };
+  }),
+}));
 import * as tally from "@/lib/practice/tally.server";
 import type { Db, FirmContext } from "@/lib/practice/db.server";
 
@@ -59,6 +72,7 @@ function fakeDb() {
       return b;
     },
   };
+  (db as unknown as { storage: unknown }).storage = { from: () => ({ upload: async () => ({ error: null }) }) };
   return db as unknown as Db & { tables: typeof tables };
 }
 
@@ -87,7 +101,7 @@ async function paired(db: ReturnType<typeof fakeDb>) {
 
 describe("Tally server", () => {
   let db: ReturnType<typeof fakeDb>;
-  beforeEach(() => { db = fakeDb(); });
+  beforeEach(() => { db = fakeDb(); registered.length = 0; registerFails.code = ""; });
 
   it("pairs once: the code works a single time and the token is stored only as a hash", async () => {
     const { code, token } = await paired(db);
@@ -183,5 +197,53 @@ describe("Tally server", () => {
     expect(r.snapshot.monthly.map((m) => m.revenue)).toEqual([100000, 150000]);
     const apr = await tally.statements(db, ctx, CLIENT, "2026-04-30");
     expect(apr.linked && apr.snapshot?.pl.revenueTotal).toBe(100000);
+  });
+
+  describe("Day Book to Recon", () => {
+    const XML = "<ENVELOPE><VOUCHER><DATE>20260915</DATE></VOUCHER></ENVELOPE>";
+    const book = (extra: Record<string, unknown> = {}) => ({ kind: "daybook" as const, company: "Kaveri Traders", from: "2026-09-01", to: "2026-09-30", xml: XML, ...extra });
+
+    it("waits, without filing anything, until the company is linked to a client", async () => {
+      const { agent } = await paired(db);
+      const r = await tally.ingestDaybook(db, agent, book());
+      expect(r.status).toBe("waiting");
+      expect(registered).toHaveLength(0);
+    });
+
+    it("files a linked company's Day Book as the client's books-side document", async () => {
+      const { agent } = await paired(db);
+      await tally.ingestCompanies(db, agent, { companies: [{ name: "Kaveri Traders" }] });
+      await tally.linkCompany(db, ctx, db.tables["ca_tally_companies"][0].id as string, CLIENT);
+      const r = await tally.ingestDaybook(db, agent, book());
+      expect(r.status).toBe("synced");
+      expect(registered).toHaveLength(1);
+      expect(registered[0]).toMatchObject({ side: "books", channel: "Tally", business_id: CLIENT, mime: "application/xml" });
+      expect(String(registered[0].storage_path)).toMatch(new RegExp(`^firm1/${CLIENT}/tally/.*2026-09-01_2026-09-30\\.xml$`));
+      expect(db.tables["ca_activity_log"]?.some((x) => String(x.description).includes("Day Book"))).toBe(true);
+    });
+
+    it("does nothing for an identical resend, and reads a changed one in place", async () => {
+      const { agent } = await paired(db);
+      await tally.ingestCompanies(db, agent, { companies: [{ name: "Kaveri Traders" }] });
+      const company = db.tables["ca_tally_companies"][0];
+      await tally.linkCompany(db, ctx, company.id as string, CLIENT);
+      const path = `firm1/${CLIENT}/tally/${company.id}-2026-09-01_2026-09-30.xml`;
+      db.tables["ca_document_extractions"] = [{ id: "d1", ca_firm_id: "firm1", storage_path: path, content_hash: await sha256Hex(new TextEncoder().encode(XML)) }];
+      expect((await tally.ingestDaybook(db, agent, book())).status).toBe("unchanged");
+      expect(registered).toHaveLength(0);
+      const changed = book({ xml: XML.replace("20260915", "20260916") });
+      expect((await tally.ingestDaybook(db, agent, changed)).status).toBe("synced");
+      expect(registered).toHaveLength(0); // updated the existing document, did not add a second
+      expect(db.tables["ca_document_extractions"]).toHaveLength(1);
+      expect(db.tables["ca_document_extractions"][0].extract_status).toBe("queued");
+    });
+
+    it("tells the agent when the firm's plan is paused instead of failing", async () => {
+      const { agent } = await paired(db);
+      await tally.ingestCompanies(db, agent, { companies: [{ name: "Kaveri Traders" }] });
+      await tally.linkCompany(db, ctx, db.tables["ca_tally_companies"][0].id as string, CLIENT);
+      registerFails.code = "billing_paused";
+      expect((await tally.ingestDaybook(db, agent, book())).status).toBe("paused");
+    });
   });
 });

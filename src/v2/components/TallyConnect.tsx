@@ -129,6 +129,17 @@ export function TallySection({ index = 0 }: { index?: number }) {
   const clientName = (id: string | null) => clients.find((c) => c.id === id)?.name ?? "Client removed";
   if (!st) return <div className="ic-skel" aria-label="Loading Tally Prime" />;
 
+  // Exact name matches for companies not linked yet, each client used once.
+  const suggestions = (() => {
+    const used = new Set(st.companies.filter((c) => c.business_id).map((c) => c.business_id));
+    const out: { company: Company; client: { id: string; name: string } }[] = [];
+    for (const company of st.companies) {
+      if (company.business_id) continue;
+      const client = suggest(company.name, clients);
+      if (client && !used.has(client.id)) { used.add(client.id); out.push({ company, client }); }
+    }
+    return out;
+  })();
   const online = st.agents.filter((a) => a.online).length;
   const linked = st.companies.filter((c) => c.business_id).length;
   const status = st.agents.length
@@ -178,7 +189,22 @@ export function TallySection({ index = 0 }: { index?: number }) {
           </div>
         ))}
 
-        {st.companies.length > 0 && <div className="ic-step-label" style={{ marginTop: 4 }}>Tally companies</div>}
+        {st.companies.length > 0 && (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 4 }}>
+            <div className="ic-step-label" style={{ margin: 0 }}>Tally companies</div>
+            {canSignOff && suggestions.length > 1 && (
+              <button className="v2-btn v2-btn-ghost" style={{ padding: "6px 12px", fontSize: 12.5 }} disabled={busy === "linkall"} data-testid="tally-link-all"
+                onClick={() => void act("linkall", async () => { for (const s of suggestions) await tallyLinkCompany({ data: { companyId: s.company.id, businessId: s.client.id } }); }, `Linked ${suggestions.length} companies`)}>
+                Link all {suggestions.length} suggested
+              </button>
+            )}
+          </div>
+        )}
+        {linked > 0 && (
+          <div style={{ fontSize: 12.5, color: V.body, lineHeight: 1.55, background: V.cream, borderRadius: 12, padding: "10px 12px" }}>
+            For each linked client, FynHelp now receives the books by itself: the month's vouchers go straight to <b>Documents</b> and into <b>Recon</b>, and the <b>Books</b> tab keeps the P&amp;L, Balance Sheet and Trial Balance current. Nobody has to export Tally or upload it.
+          </div>
+        )}
         {st.companies.map((c: Company) => {
           const sug = !c.business_id ? suggest(c.name, clients) : null;
           const value = pick[c.id] ?? sug?.id ?? "";

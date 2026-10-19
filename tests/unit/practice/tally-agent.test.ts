@@ -17,6 +17,7 @@ const LEDGERS = `<ENVELOPE><BODY><DATA><COLLECTION>
 <LEDGER NAME="Web Sales"><PARENT>Sales Accounts</PARENT><CLOSINGBALANCE>420000 Cr</CLOSINGBALANCE></LEDGER>
 </COLLECTION></DATA></BODY></ENVELOPE>`;
 const GROUPS = `<ENVELOPE><BODY><DATA><COLLECTION><GROUP NAME="Bank Accounts"><PARENT>Current Assets</PARENT></GROUP><GROUP NAME="Sundry Debtors"><PARENT>Current Assets</PARENT></GROUP></COLLECTION></DATA></BODY></ENVELOPE>`;
+const DAYBOOK = `<ENVELOPE><BODY><DATA><TALLYMESSAGE><VOUCHER VCHTYPE="Receipt"><DATE>20260915</DATE><VOUCHERTYPENAME>Receipt</VOUCHERTYPENAME><ALLLEDGERENTRIES.LIST><LEDGERNAME>HDFC</LEDGERNAME><AMOUNT>-5000</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE></DATA></BODY></ENVELOPE>`;
 const COMPANIES = `<ENVELOPE><BODY><DATA><COLLECTION><COMPANY NAME="Kaveri Traders"><NAME>Kaveri Traders</NAME></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>`;
 
 describe("Tally agent library", () => {
@@ -63,6 +64,22 @@ describe("Tally agent library", () => {
     expect(lib.anonymiseXml('<LEDGER NAME="A"/><LEDGER NAME="B"/><LEDGER NAME="A"/>')).toBe('<LEDGER NAME="Ledger 1"/><LEDGER NAME="Ledger 2"/><LEDGER NAME="Ledger 1"/>');
   });
 
+  it("plans Day Book ranges: this and last month normally, the whole year on backfill", () => {
+    expect(lib.dayBookRanges("2026-10-19")).toEqual([{ from: "2026-09-01", to: "2026-09-30" }, { from: "2026-10-01", to: "2026-10-19" }]);
+    expect(lib.dayBookRanges("2026-10-19", { backfill: true })).toHaveLength(7);
+    expect(lib.dayBookRanges("2026-10-19", { backfill: true })[0]).toEqual({ from: "2026-04-01", to: "2026-04-30" });
+    // first weeks of a new year still cover last year's March
+    expect(lib.dayBookRanges("2026-04-05")).toEqual([{ from: "2026-03-01", to: "2026-03-31" }, { from: "2026-04-01", to: "2026-04-05" }]);
+  });
+
+  it("halves a range until a single day", () => {
+    expect(lib.splitRange({ from: "2026-09-01", to: "2026-09-30" })).toEqual([{ from: "2026-09-01", to: "2026-09-15" }, { from: "2026-09-16", to: "2026-09-30" }]);
+    expect(lib.splitRange({ from: "2026-09-01", to: "2026-09-02" })).toEqual([{ from: "2026-09-01", to: "2026-09-01" }, { from: "2026-09-02", to: "2026-09-02" }]);
+    expect(lib.splitRange({ from: "2026-09-01", to: "2026-09-01" })).toBeNull();
+    expect(lib.hasVouchers(DAYBOOK)).toBe(true);
+    expect(lib.hasVouchers("<ENVELOPE></ENVELOPE>")).toBe(false);
+  });
+
   it("picks snapshot dates: backfill is every closed month end, a normal run is the last one", () => {
     expect(lib.snapshotDates("2026-10-19", { backfill: true })).toEqual({
       fyStart: "2026-04-01",
@@ -80,7 +97,7 @@ describe("Tally agent, end to end against stand-ins", () => {
     const body = (req: IncomingMessage) => new Promise<string>((res) => { let s = ""; req.on("data", (c) => (s += c)); req.on("end", () => res(s)); });
     const tallySrv = createServer(async (req, res) => {
       const b = await body(req);
-      res.end(b.includes("FHCompanies") ? COMPANIES : b.includes("FHGroups") ? GROUPS : LEDGERS);
+      res.end(b.includes("Day Book") ? DAYBOOK : b.includes("FHCompanies") ? COMPANIES : b.includes("FHGroups") ? GROUPS : LEDGERS);
     });
     const fynSrv = createServer(async (req, res) => {
       const b = JSON.parse(await body(req));
@@ -107,6 +124,10 @@ describe("Tally agent, end to end against stand-ins", () => {
       expect(snaps.every((s) => s.auth?.startsWith("Bearer fhta_"))).toBe(true);
       // The exact payload must pass the server's validator.
       for (const s of snaps) expect(ingestPayload.safeParse(s.body).success).toBe(true);
+      const books = received.filter((r) => r.body.kind === "daybook");
+      expect(books.length).toBe(7); // backfill: one per month of the year so far
+      for (const b of books) expect(ingestPayload.safeParse(b.body).success).toBe(true);
+      expect(books[0].body).toMatchObject({ company: "Kaveri Traders", from: expect.stringMatching(/^\d{4}-04-01$/) });
       expect(snaps[0].body).toMatchObject({ company: "Kaveri Traders", fyStart: expect.stringMatching(/-04-01$/) });
     } finally {
       tallySrv.close();

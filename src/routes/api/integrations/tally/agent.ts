@@ -51,6 +51,7 @@ export const Route = createFileRoute("/api/integrations/tally/agent")({
           const p = ingestPayload.safeParse(raw);
           if (!p.success) return reply({ ok: false, error: `The data was not in the expected shape: ${p.error.issues[0]?.path.join(".") || "body"} ${p.error.issues[0]?.message ?? ""}`.trim() }, 400);
           if (p.data.kind === "companies") return reply({ ok: true, ...(await tally.ingestCompanies(db, agent, p.data)) });
+          if (p.data.kind === "daybook") return reply({ ok: true, ...(await tally.ingestDaybook(db, agent, p.data)) });
           return reply({ ok: true, ...(await tally.ingestSnapshot(db, agent, p.data)) });
         } catch (e) {
           const err = e as { code?: string; message?: string };

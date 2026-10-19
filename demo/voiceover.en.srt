@@ -1,0 +1,75 @@
+1
+00:00:00,300 --> 00:00:03,900
+Month-end close for CA firms, without the scramble.
+
+2
+00:00:04,300 --> 00:00:14,487
+This is FynHelp. Your clients' statements come in, their books get matched, and a signed-off MIS goes out. Let's close one real month.
+
+3
+00:00:15,300 --> 00:00:28,040
+Pricing is per active client, with unlimited users. Pay yearly and get two months free. Tell the helper how many clients you close, and it picks the cheapest plan.
+
+4
+00:00:29,300 --> 00:00:42,891
+Signing up takes a minute, and there's no card. The fourteen-day trial only starts when you upload your first document, so you can set up the firm at your own pace.
+
+5
+00:00:48,300 --> 00:00:54,657
+Add your first client. A name, an email and a WhatsApp number are enough.
+
+6
+00:00:58,300 --> 00:01:06,785
+Drop in September's bank statement. Extract reads every line in seconds, and sets aside anything unclear for a person.
+
+7
+00:01:09,300 --> 00:01:22,040
+Now add the books. A Tally export works. As soon as both sides are in, Recon starts by itself: exact matches first, then close ones, then your firm's rules.
+
+8
+00:01:23,300 --> 00:01:30,083
+A US-dollar payout needs a person, and FynHelp says why. Fix it once; it remembers.
+
+9
+00:01:31,300 --> 00:01:47,870
+Exceptions arrive with a suggested match and the evidence side by side. Here, forty thousand rupees came in against a fifty-thousand-rupee bill, so we record a part payment, with a note. Every decision lands on the audit trail.
+
+10
+00:01:52,300 --> 00:02:07,168
+With nothing left open, the MIS is one click away. It's built only from matched transactions, and every figure opens the exact bank lines behind it. No guesswork for the client, or the partner.
+
+11
+00:02:12,300 --> 00:02:17,806
+The partner reviews and signs off. September is closed, start to finish.
+
+12
+00:02:20,300 --> 00:02:43,679
+Missing a document? Create a chase. The Chaser emails the client a polite reminder in your firm's name, and keeps following up on its own. The moment the invoice arrives, the chase closes by itself. No more spreadsheets of who still owes what. On the Firm plan, it can follow up on WhatsApp too.
+
+13
+00:02:56,300 --> 00:03:21,806
+Next month, documents start arriving on their own. Connect the firm's Gmail once. FynHelp checks the inbox on a schedule, and only takes in attachments from people it knows. Ramesh emailed October's HDFC statement, and it's already filed under his company, ready to reconcile. Anything from an address FynHelp doesn't know waits in an unassigned inbox for your team.
+
+14
+00:03:31,300 --> 00:03:51,700
+Many clients prefer WhatsApp. Link the firm's official WhatsApp Business number. When Ramesh sends his Axis statement from his phone, FynHelp recognises his number, files it under Sundara Textiles, and reads it straight away. Messages from unknown numbers wait in an unassigned inbox, so nothing gets lost.
+
+15
+00:04:03,300 --> 00:04:25,402
+If a client keeps their books in Zoho, connect Zoho Books. Access is read-only, so FynHelp never changes anything in Zoho. Map the client to its organisation and bank account, choose October, and pull. The books arrive, and Recon matches them against the statement Ramesh emailed, without anyone typing a line.
+
+16
+00:04:48,300 --> 00:04:58,913
+Every morning, one screen shows what needs you, and what the agents did. Press Command K to find anything, or to run an agent.
+
+17
+00:05:03,300 --> 00:05:09,657
+Invite the whole team. Partners sign off, juniors prepare, and nobody pays per seat.
+
+18
+00:05:14,300 --> 00:05:27,891
+You can see this month's active clients and documents as you go. When you're ready, choose a plan and pay through Razorpay. Clients you don't touch in a month are free.
+
+19
+00:05:30,300 --> 00:05:36,232
+Close your books in days, not weeks. Start free at fynhelp dot com.

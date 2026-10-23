@@ -232,12 +232,16 @@ export const createReportShare = createServerFn({ method: "POST" })
 
     const { data: log, error } = await admin
       .from("ca_reports_log")
-      .select("id, business_id, report_name")
+      .select("id, business_id, report_name, report_type, signed_off_at")
       .eq("id", data.report_log_id)
       .eq("ca_firm_id", firmId)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!log) throw new Error("Report not found");
+    // Report-type MIS must be signed off by a CA before a client can see it.
+    if (String(log.report_type ?? "").startsWith("mis_") && !log.signed_off_at) {
+      throw new Error("Sign off this report before sharing it with the client.");
+    }
 
     const { data: existing } = await admin
       .from("ca_report_shares")

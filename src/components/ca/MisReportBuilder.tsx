@@ -3,7 +3,7 @@ import * as XLSX from "xlsx";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Lock, X } from "lucide-react";
-import { generateTypedMis } from "@/lib/caMis.functions";
+import { generateTypedMis, signOffTypedMis } from "@/lib/caMis.functions";
 import {
   financialYearOf,
   MIS_CATALOG,
@@ -176,6 +176,24 @@ function ReportPreview({ report, saving, onSave, onClose }: {
   report: TypedMisReport; saving: boolean; onSave: () => void; onClose: () => void;
 }) {
   const [trace, setTrace] = useState<{ row: ReportRow; section: string } | null>(null);
+  const doSignOff = useServerFn(signOffTypedMis);
+  const [signNote, setSignNote] = useState("");
+  const [signing, setSigning] = useState(false);
+  const [signOff, setSignOff] = useState(report.sign_off);
+  useEffect(() => { setSignOff(report.sign_off); }, [report.report_id, report.sign_off]);
+  const current: TypedMisReport = { ...report, sign_off: signOff };
+  const handleSignOff = async () => {
+    if (!report.report_id) return;
+    setSigning(true);
+    try {
+      setSignOff(await doSignOff({ data: { report_log_id: report.report_id, notes: signNote.trim() || null } }));
+      toast.success("Report signed off. It can now be shared with the client.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Sign-off failed");
+    } finally {
+      setSigning(false);
+    }
+  };
   const blocked = report.issues.some((i) => i.level === "error");
   const saved = !!report.report_id;
 
@@ -188,6 +206,8 @@ function ReportPreview({ report, saving, onSave, onClose }: {
       ["Financial year", report.financial_year],
       ...(report.comparison_label ? [["Compared with", report.comparison_label]] : []),
       ["Generated", new Date(report.generated_at).toLocaleString("en-IN")],
+      ["Status", signOff ? `Signed off by ${signOff.by} on ${new Date(signOff.at).toLocaleString("en-IN")}` : "DRAFT — not signed off"],
+      ...(report.basis_note ? [["Basis of preparation", report.basis_note]] : []),
       [],
       ["Data checks"],
       ...report.issues.map((i) => [ISSUE_STYLE[i.level].label, i.message]),
@@ -211,7 +231,7 @@ function ReportPreview({ report, saving, onSave, onClose }: {
   };
 
   const exportPdf = () => {
-    try { printHtmlDocument(reportToHtml(report)); }
+    try { printHtmlDocument(reportToHtml(current)); }
     catch (e) { toast.error(e instanceof Error ? e.message : "Could not open the print view"); }
   };
 
@@ -232,13 +252,21 @@ function ReportPreview({ report, saving, onSave, onClose }: {
               {report.comparison_label ? ` · vs ${report.comparison_label}` : ""}
             </div>
             <div style={{ marginTop: 8 }}>
-              <CABadge tone={saved ? "green" : "amber"}>{saved ? "Saved" : "Preview — not saved"}</CABadge>
+              <CABadge tone={signOff ? "green" : "amber"}>
+                {signOff ? `Signed off by ${signOff.by}` : saved ? "Saved — awaiting CA sign-off" : "Preview — not saved"}
+              </CABadge>
             </div>
           </div>
           <button aria-label="Close" onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: CA.muted }}>
             <X size={18} aria-hidden="true" />
           </button>
         </div>
+
+        {report.basis_note && (
+          <div style={{ marginTop: 14, background: "rgba(23,18,8,0.05)", borderRadius: 8, padding: "8px 12px", fontFamily: CA.sans, fontSize: 12.5, color: CA.muted }}>
+            <strong>Basis of preparation: </strong>{report.basis_note}
+          </div>
+        )}
 
         {report.issues.length > 0 && (
           <div style={{ marginTop: 14, display: "grid", gap: 6 }} role="status">
@@ -283,6 +311,30 @@ function ReportPreview({ report, saving, onSave, onClose }: {
           All figures are calculated from the records above. No AI is used for any number in this report.
         </div>
 
+        {saved && !signOff && (
+          <div style={{ marginTop: 18, border: `0.5px solid ${CA.line}`, borderRadius: 10, padding: 14 }}>
+            <div style={{ fontFamily: CA.sans, fontSize: 13, fontWeight: 700 }}>CA sign-off</div>
+            <div style={{ fontFamily: CA.sans, fontSize: 12.5, color: CA.muted, margin: "4px 0 8px" }}>
+              By signing off you confirm you have reviewed the figures and data checks above. The report cannot be shared with the client until it is signed off.
+            </div>
+            <textarea
+              value={signNote} onChange={(e) => setSignNote(e.target.value)} maxLength={1000}
+              placeholder="Optional note — assumptions, open items, caveats."
+              style={{ ...caInputStyle, width: "100%", minHeight: 60, padding: 10, resize: "vertical" }}
+            />
+            <div style={{ marginTop: 8 }}>
+              <CAButton onClick={() => void handleSignOff()} disabled={signing || blocked}>
+                {signing ? "Signing off…" : "Sign off report"}
+              </CAButton>
+            </div>
+          </div>
+        )}
+        {signOff && (
+          <div style={{ marginTop: 18, fontFamily: CA.sans, fontSize: 12.5, color: CA.green }}>
+            Signed off by {signOff.by} on {new Date(signOff.at).toLocaleString("en-IN")}{signOff.note ? ` — “${signOff.note}”` : ""}. You can now share it from the report list.
+          </div>
+        )}
+
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20, flexWrap: "wrap" }}>
           <CAButton variant="ghost" onClick={onClose}>Close</CAButton>
           {!saved && (
@@ -295,7 +347,7 @@ function ReportPreview({ report, saving, onSave, onClose }: {
         </div>
         {!saved && !blocked && (
           <div style={{ fontFamily: CA.sans, fontSize: 12, color: CA.faint, textAlign: "right", marginTop: 6 }}>
-            Review the figures, then save to enable export.
+            Review the figures, then save to enable export. Exports are marked DRAFT until signed off.
           </div>
         )}
       </div>

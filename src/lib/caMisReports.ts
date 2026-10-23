@@ -186,6 +186,10 @@ export interface TypedMisReport {
   sources: ReportSource[];
   /** Set only when the report was saved (not for previews). */
   report_id: string | null;
+  /** How the figures were prepared, when they are not ledger-based. */
+  basis_note: string | null;
+  /** Set once a CA has signed the saved report off; required before sharing. */
+  sign_off: { by: string; at: string; note: string | null } | null;
 }
 
 // ── Period helpers (Indian financial year, Apr–Mar) ──────────────────────

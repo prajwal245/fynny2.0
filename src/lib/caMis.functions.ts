@@ -271,6 +271,11 @@ export interface GenerateTypedMisInput {
 
 const ROW_LIMIT = 5000;
 
+const BASIS_NOTES: Partial<Record<MisReportKind, string>> = {
+  pnl: "Prepared from reviewed documents uploaded to FynHelp, not from a ledger or books of account. Excludes depreciation, provisions and journal adjustments.",
+  balance_sheet: "Prepared from a recorded balance sheet snapshot, not from a trial balance or ledger.",
+};
+
 /**
  * Builds one of the report-type MIS reports (P&L, Balance Sheet, Cash & Bank,
  * Receivables/Payables Aging, Bank Reconciliation). All figures come from the
@@ -462,6 +467,8 @@ export const generateTypedMis = createServerFn({ method: "POST" })
       issues: built.issues,
       sources,
       report_id: null,
+      basis_note: BASIS_NOTES[kind] ?? null,
+      sign_off: null,
     };
 
     if (!data.persist) return report;
@@ -497,4 +504,80 @@ export const generateTypedMis = createServerFn({ method: "POST" })
       detail: { period: report.period_label, report_type: `mis_${kind}`, issues: built.issues.length } as never,
     });
     return { ...report, report_id: logRow?.id ?? null };
+  });
+
+export interface SignOffTypedMisInput {
+  report_log_id: string;
+  notes?: string | null;
+}
+
+/**
+ * Records a CA's sign-off on a saved report-type MIS. Sharing a report with a
+ * client is refused until this has been done (see createReportShare).
+ */
+export const signOffTypedMis = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: SignOffTypedMisInput) => {
+    if (!input?.report_log_id) throw new Error("report_log_id is required");
+    if (input.notes && input.notes.length > 1000) throw new Error("Note is too long");
+    return input;
+  })
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: log, error } = await supabase
+      .from("ca_reports_log")
+      .select("id, ca_firm_id, business_id, report_type, period, content, signed_off_at")
+      .eq("id", data.report_log_id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!log || !String(log.report_type).startsWith("mis_")) throw new Error("Report not found");
+    if (log.signed_off_at) throw new Error("This report is already signed off.");
+
+    // Caller must be an active member (or owner) of the report's firm.
+    const [{ data: owner }, { data: member }] = await Promise.all([
+      supabase.from("ca_firms").select("id").eq("id", log.ca_firm_id).eq("user_id", userId).maybeSingle(),
+      supabase.from("ca_firm_members").select("id").eq("ca_firm_id", log.ca_firm_id)
+        .eq("user_id", userId).eq("status", "active").maybeSingle(),
+    ]);
+    if (!owner && !member) throw new Error("Only CA firm members can sign off reports.");
+
+    const content = (log.content ?? {}) as unknown as TypedMisReport;
+    if (content.issues?.some((i) => i.level === "error")) {
+      throw new Error("A report with blocking errors cannot be signed off.");
+    }
+    const { data: prof } = await supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle();
+    const by = prof?.full_name?.trim() || "CA";
+    const at = new Date().toISOString();
+    const note = data.notes?.trim() || null;
+
+    const { error: updErr } = await supabase
+      .from("ca_reports_log")
+      .update({
+        signed_off_by: userId,
+        signed_off_at: at,
+        status: "signed_off",
+        content: { ...content, sign_off: { by, at, note } } as never,
+      })
+      .eq("id", log.id)
+      .is("signed_off_at", null);
+    if (updErr) throw new Error(updErr.message);
+
+    await supabase.from("ca_mis_signoffs").insert({
+      ca_firm_id: log.ca_firm_id,
+      client_id: log.business_id,
+      period_id: log.period,
+      report_type: log.report_type,
+      signed_off_by: userId,
+      notes: note,
+    });
+    await supabase.from("ca_audit_events").insert({
+      ca_firm_id: log.ca_firm_id,
+      business_id: log.business_id,
+      actor_id: userId,
+      entity_type: "report",
+      entity_id: log.id,
+      action: "mis_signed_off",
+      detail: { report_type: log.report_type, period: log.period } as never,
+    });
+    return { by, at, note };
   });

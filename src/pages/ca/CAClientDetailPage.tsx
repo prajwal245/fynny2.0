@@ -12,6 +12,8 @@ import { renderReportHtml, createReportShare, revokeReportShare } from "@/lib/ca
 import { printHtmlDocument } from "@/lib/printPdf";
 import { formatINR } from "@/lib/indian-format";
 
+import MisReportBuilder from "@/components/ca/MisReportBuilder";
+import { misLabel } from "@/lib/caMisReports";
 import ClientDocumentsTab from "@/components/ca/ClientDocumentsTab";
 import ClientSyncPanel from "@/components/ca/ClientSyncPanel";
 import ClientRemindersSection from "@/components/ca/ClientRemindersSection";
@@ -1205,6 +1207,12 @@ export default function CAClientDetailPage() {
 
         {tab === "Reports" && (
           <>
+            <MisReportBuilder
+              firmId={firmId}
+              businessId={businessId}
+              clientName={client?.client_name ?? "Client"}
+              defaultMonth={misPeriodInput}
+              generalContent={(
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
               <CAButton onClick={generateReport} disabled={!businessId || generating}>
                 {generating ? "Generating…" : "Generate MIS PDF"}
@@ -1229,6 +1237,8 @@ export default function CAClientDetailPage() {
               </CAButton>
 
             </div>
+              )}
+            />
 
             {subCount > 0 && (
               <div style={{ position: "relative", marginTop: 16 }}>
@@ -1341,7 +1351,7 @@ export default function CAClientDetailPage() {
                   <tbody>
                     {reports.map((r) => (
                       <tr key={r.id}>
-                        <td style={caTd}>{r.report_type ?? "—"}</td>
+                        <td style={caTd}>{misLabel(r.report_type ?? "") || "—"}</td>
                         <td style={caTd}>{r.period ?? "—"}</td>
                         <td style={caTd}><CABadge tone={statusTone(r.status)}>{r.status ?? "—"}</CABadge></td>
                         <td style={caTd}>{dateIN(r.created_at)}</td>

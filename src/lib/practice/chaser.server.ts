@@ -14,16 +14,24 @@ import {
 } from "./db.server";
 import {
   decide,
+  inSendWindow,
   isClosed,
+  parseTone,
   renderEmail,
+  renderGroupedEmail,
   slotAt,
+  snoozeResume,
   whatsappLink,
   whatsappMessage,
+  DEFAULT_MAX_FOLLOW_UPS,
   DEFAULT_SCHEDULE,
   type ChaseState,
+  type ChaserTone,
+  type RenderedEmail,
   type TemplateInput,
 } from "./chaser/rules";
-import { isEmail, sendEmail } from "./email.server";
+import { isEmail, sendEmail, type SendResult } from "./email.server";
+import { sendViaGmail } from "./gmailSend.server";
 
 const DAY = 86_400_000;
 
@@ -100,6 +108,120 @@ async function templateInput(
   };
 }
 
+/* ── how a chase email leaves: the firm's Gmail when opted in, else FynHelp ── */
+
+interface ChasePrefs {
+  viaGmail: boolean;
+  tone: ChaserTone;
+}
+
+async function firmChasePrefs(db: Db, firmId: string): Promise<ChasePrefs> {
+  const { data } = await db.from("ca_firms").select("notification_prefs").eq("id", firmId).maybeSingle();
+  const p = (data?.notification_prefs ?? {}) as Record<string, unknown>;
+  return {
+    // Both: the partner switched it on, and Google actually granted sending.
+    viaGmail: p["chaser_via_gmail"] === true && p["gmail_send_granted"] === true,
+    tone: parseTone(p["chaser_tone"]),
+  };
+}
+
+interface Delivered {
+  result: SendResult;
+  sentVia: "gmail" | "fynhelp";
+  threadId: string | null;
+  threadSubject: string | null;
+  subject: string;
+  note: string | null;
+}
+
+async function deliver(
+  db: Db,
+  firm: { id: string; name: string; email: string | null },
+  prefs: ChasePrefs,
+  email: RenderedEmail,
+  to: string,
+  chaseIds: string[],
+): Promise<Delivered> {
+  let note: string | null = null;
+  if (prefs.viaGmail) {
+    const { data: prev } = await db
+      .from("ca_chaser_events")
+      .select("metadata")
+      .in("chaser_id", chaseIds)
+      .eq("event_type", "sent")
+      .order("created_at", { ascending: false })
+      .limit(10);
+    const meta = (prev ?? [])
+      .map((r) => r.metadata as { gmail_thread_id?: string; thread_subject?: string } | null)
+      .find((m) => m?.gmail_thread_id);
+    const g = await sendViaGmail(db, firm.id, {
+      to,
+      subject: email.subject,
+      text: email.text,
+      html: email.html,
+      fromName: firm.name,
+      replyTo: firm.email,
+      thread: meta?.gmail_thread_id ? { id: meta.gmail_thread_id, subject: meta.thread_subject ?? email.subject } : null,
+    });
+    if (g.ok) {
+      return {
+        result: { sent: true, simulated: false, provider_id: g.id, error: null },
+        sentVia: "gmail",
+        threadId: g.threadId,
+        threadSubject: meta?.thread_subject ?? email.subject,
+        subject: g.subject,
+        note: null,
+      };
+    }
+    note = `Gmail could not send (${g.error}); sent from the FynHelp address instead.`;
+    if (g.needsConsent) {
+      // Sending permission is gone: ask the partner to allow it again.
+      const { data: f } = await db.from("ca_firms").select("notification_prefs").eq("id", firm.id).maybeSingle();
+      await db
+        .from("ca_firms")
+        .update({ notification_prefs: { ...((f?.notification_prefs as object | null) ?? {}), gmail_send_granted: false } })
+        .eq("id", firm.id);
+    }
+  }
+  const result = await sendEmail({
+    to,
+    subject: email.subject,
+    html: email.html,
+    text: email.text,
+    replyTo: firm.email,
+    fromName: firm.name,
+  });
+  return { result, sentVia: "fynhelp", threadId: null, threadSubject: null, subject: email.subject, note };
+}
+
+const sentMetadata = (d: Delivered) => ({
+  subject: d.subject,
+  simulated: d.result.simulated,
+  provider_id: d.result.provider_id,
+  sent_via: d.sentVia,
+  ...(d.threadId ? { gmail_thread_id: d.threadId, thread_subject: d.threadSubject } : {}),
+});
+
+/** The client promised the document by a date: pause follow-ups until the day after. */
+export async function snoozeChase(db: Db, ctx: FirmContext, id: string, promisedOn: string) {
+  const row = await loadChase(db, ctx, id);
+  if (isClosed(row.status)) throw new PracticeError("closed", "This chase is already resolved.");
+  const resume = snoozeResume(promisedOn, new Date());
+  if (!resume)
+    throw new PracticeError("bad_date", "Pick a date between tomorrow and 60 days from now.");
+  await db.from("ca_document_requests").update({ next_follow_up_at: resume }).eq("id", row.id);
+  await chaserEvent(db, {
+    chaser_id: row.id,
+    ca_firm_id: ctx.firmId,
+    business_id: row.business_id,
+    event_type: "snoozed",
+    note: `Client promised it by ${promisedOn}. Follow-ups resume the next day if it has not arrived.`,
+    actor_id: ctx.userId,
+    metadata: { promised_on: promisedOn, resume_at: resume },
+  });
+  return { resume_at: resume };
+}
+
 export interface CreateChaseInput {
   business_id: string;
   type: string;
@@ -153,7 +275,7 @@ export async function createChase(
       contact_name: contactName,
       contact_email: contactEmail,
       contact_phone: input.phone || client.client_phone,
-      max_follow_ups: 2,
+      max_follow_ups: DEFAULT_MAX_FOLLOW_UPS,
       schedule_days: DEFAULT_SCHEDULE,
       next_follow_up_at: now.toISOString(),
       managed_by: "practice",
@@ -260,15 +382,10 @@ export async function sendFollowUp(
       "no_email",
       "No email address for this contact. Add one to the client or use WhatsApp.",
     );
-  const email = renderEmail(count, t);
-  const result = await sendEmail({
-    to: to!,
-    subject: email.subject,
-    html: email.html,
-    text: email.text,
-    replyTo: ctx.firmEmail,
-    fromName: ctx.firmName,
-  });
+  const prefs = await firmChasePrefs(db, ctx.firmId);
+  const email = renderEmail(count, t, prefs.tone);
+  const delivered = await deliver(db, { id: ctx.firmId, name: ctx.firmName, email: ctx.firmEmail }, prefs, email, to!, [row.id]);
+  const result = delivered.result;
   if (result.error) {
     await chaserEvent(db, {
       chaser_id: row.id,
@@ -302,19 +419,15 @@ export async function sendFollowUp(
     template_id: email.template_id,
     note: result.simulated
       ? `Email follow up recorded (email service not configured, nothing was sent) to ${to}`
-      : `Email follow up sent to ${to}`,
+      : `Email follow up sent to ${to}${delivered.sentVia === "gmail" ? " from the firm's Gmail" : ""}${delivered.note ? `. ${delivered.note}` : ""}`,
     actor_id: ctx.userId,
-    metadata: {
-      subject: email.subject,
-      simulated: result.simulated,
-      provider_id: result.provider_id,
-    },
+    metadata: sentMetadata(delivered),
   });
   return {
     channel,
     simulated: result.simulated,
     to,
-    subject: email.subject,
+    subject: delivered.subject,
     follow_ups: count,
   };
 }
@@ -418,7 +531,15 @@ export async function runDueFollowups(now = new Date(), firmId?: string) {
     escalated: 0,
     skipped: 0,
     failed: 0,
+    deferred: 0,
   };
+  const sendQueue: {
+    row: ChaseRow;
+    t: Awaited<ReturnType<typeof templateInput>>;
+    state: ChaseState;
+    decision: ReturnType<typeof decide>;
+    firm: { name: string; email: string | null };
+  }[] = [];
   const { firmCanWork } = await import("./billing.server");
   const working = new Map<string, boolean>();
   for (const row of (data ?? []) as ChaseRow[]) {
@@ -516,78 +637,107 @@ export async function runDueFollowups(now = new Date(), firmId?: string) {
       continue;
     }
 
-    // Claim the slot first: a second cron run in parallel cannot send again.
-    const { data: claimed } = await db
-      .from("ca_document_requests")
-      .update({
-        chaser_count: decision.follow_up_number,
-        last_chased_at: now.toISOString(),
-        next_follow_up_at: decision.next_follow_up_at,
-      })
-      .eq("id", row.id)
-      .eq("chaser_count", row.chaser_count)
-      .eq("status", "open")
-      .select("id")
-      .maybeSingle();
-    if (!claimed) continue;
-    // Last check right before sending: never chase for a document that has arrived.
-    const { data: fresh } = await db
-      .from("ca_document_requests")
-      .select("status")
-      .eq("id", row.id)
-      .maybeSingle();
-    if (fresh && isClosed(fresh.status)) continue;
+    sendQueue.push({ row, t, state, decision, firm });
+  }
 
-    const to = state.contact_email!;
-    const email = renderEmail(decision.follow_up_number, t);
-    const result = await sendEmail({
-      to,
-      subject: email.subject,
-      html: email.html,
-      text: email.text,
-      replyTo: firm.email,
-      fromName: firm.name,
-    });
-    if (result.error) {
-      summary.failed++;
-      // Give the slot back and retry tomorrow.
-      await db
-        .from("ca_document_requests")
-        .update({
-          chaser_count: row.chaser_count,
-          last_chased_at: row.last_chased_at,
-          next_follow_up_at: new Date(now.getTime() + DAY).toISOString(),
-        })
-        .eq("id", row.id);
-      await chaserEvent(db, {
-        chaser_id: row.id,
-        ca_firm_id: row.ca_firm_id,
-        business_id: row.business_id,
-        event_type: "skipped",
-        channel: "email",
-        template_id: email.template_id,
-        note: `Automatic email failed: ${result.error}. Will retry tomorrow.`,
-      });
+  // One email per client for everything due, sent only inside the send window.
+  const groups = new Map<string, typeof sendQueue>();
+  for (const q of sendQueue) {
+    const key = `${q.row.ca_firm_id}|${q.row.business_id}|${q.state.contact_email!.toLowerCase()}`;
+    groups.set(key, [...(groups.get(key) ?? []), q]);
+  }
+  const prefsByFirm = new Map<string, ChasePrefs>();
+  for (const group of groups.values()) {
+    if (!inSendWindow(now)) {
+      // Leave the slots as they are: the next run inside the window sends them.
+      summary.deferred += group.length;
       continue;
     }
-    if (result.simulated) summary.simulated++;
-    else summary.sent++;
-    await chaserEvent(db, {
-      chaser_id: row.id,
-      ca_firm_id: row.ca_firm_id,
-      business_id: row.business_id,
-      event_type: "sent",
-      channel: "email",
-      template_id: email.template_id,
-      note: result.simulated
-        ? `Follow up ${decision.follow_up_number} recorded (email service not configured, nothing was sent)`
-        : `Automatic follow up ${decision.follow_up_number} emailed to ${to}`,
-      metadata: {
-        subject: email.subject,
-        simulated: result.simulated,
-        provider_id: result.provider_id,
-      },
-    });
+    const first = group[0];
+    if (!prefsByFirm.has(first.row.ca_firm_id)) prefsByFirm.set(first.row.ca_firm_id, await firmChasePrefs(db, first.row.ca_firm_id));
+    const prefs = prefsByFirm.get(first.row.ca_firm_id)!;
+
+    // Claim every slot first: a second cron run in parallel cannot send again.
+    const claimedItems: typeof group = [];
+    for (const q of group) {
+      if (q.decision.action !== "send") continue;
+      const { data: claimed } = await db
+        .from("ca_document_requests")
+        .update({
+          chaser_count: q.decision.follow_up_number,
+          last_chased_at: now.toISOString(),
+          next_follow_up_at: q.decision.next_follow_up_at,
+        })
+        .eq("id", q.row.id)
+        .eq("chaser_count", q.row.chaser_count)
+        .eq("status", "open")
+        .select("id")
+        .maybeSingle();
+      if (!claimed) continue;
+      // Last check right before sending: never chase for a document that has arrived.
+      const { data: fresh } = await db.from("ca_document_requests").select("status").eq("id", q.row.id).maybeSingle();
+      if (fresh && isClosed(fresh.status)) continue;
+      claimedItems.push(q);
+    }
+    if (!claimedItems.length) continue;
+
+    const to = first.state.contact_email!;
+    const step = Math.max(...claimedItems.map((q) => (q.decision.action === "send" ? q.decision.follow_up_number : 1)));
+    const email = renderGroupedEmail(
+      step,
+      first.t,
+      claimedItems.map((q) => ({ item: q.t.item, period: q.t.period, dueDate: q.t.dueDate })),
+      prefs.tone,
+    );
+    const delivered = await deliver(
+      db,
+      { id: first.row.ca_firm_id, name: first.firm.name, email: first.firm.email },
+      prefs,
+      email,
+      to,
+      claimedItems.map((q) => q.row.id),
+    );
+    if (delivered.result.error) {
+      summary.failed += claimedItems.length;
+      // Give the slots back and retry tomorrow.
+      for (const q of claimedItems) {
+        await db
+          .from("ca_document_requests")
+          .update({
+            chaser_count: q.row.chaser_count,
+            last_chased_at: q.row.last_chased_at,
+            next_follow_up_at: new Date(now.getTime() + DAY).toISOString(),
+          })
+          .eq("id", q.row.id);
+        await chaserEvent(db, {
+          chaser_id: q.row.id,
+          ca_firm_id: q.row.ca_firm_id,
+          business_id: q.row.business_id,
+          event_type: "skipped",
+          channel: "email",
+          template_id: email.template_id,
+          note: `Automatic email failed: ${delivered.result.error}. Will retry tomorrow.`,
+        });
+      }
+      continue;
+    }
+    if (delivered.result.simulated) summary.simulated += claimedItems.length;
+    else summary.sent += claimedItems.length;
+    for (const q of claimedItems) {
+      const n = q.decision.action === "send" ? q.decision.follow_up_number : step;
+      await chaserEvent(db, {
+        chaser_id: q.row.id,
+        ca_firm_id: q.row.ca_firm_id,
+        business_id: q.row.business_id,
+        event_type: "sent",
+        channel: "email",
+        template_id: email.template_id,
+        note: delivered.result.simulated
+          ? `Follow up ${n} recorded (email service not configured, nothing was sent)`
+          : `Automatic follow up ${n} emailed to ${to}${delivered.sentVia === "gmail" ? " from the firm's Gmail" : ""}${claimedItems.length > 1 ? ` together with ${claimedItems.length - 1} other item(s)` : ""}${delivered.note ? `. ${delivered.note}` : ""}`,
+        metadata: sentMetadata(delivered),
+      });
+    }
   }
   return summary;
 }

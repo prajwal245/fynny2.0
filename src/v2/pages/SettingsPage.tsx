@@ -21,6 +21,7 @@ import { useV2 } from "../store";
 import { AgentSettings } from "../components/AgentSettings";
 import { BillingSection } from "../components/BillingSection";
 import { GmailHealth } from "../components/GmailHealth";
+import { ChaserSending } from "../components/ChaserSending";
 import { GmailIcon, WhatsAppIcon } from "../components/BrandIcons";
 import { ZohoBooksSection } from "../components/ZohoBooks";
 import { INTEGRATION_STYLES, IntegrationCard } from "../components/IntegrationCard";
@@ -174,7 +175,7 @@ export default function SettingsPage() {
       .finally(() => void load());
   }, [justConnected, firmId, pollGmail, load]);
 
-  const connectGmail = () =>
+  const connectGmail = (enableSending = false) =>
     run("gmail", async () => {
       if (!firmId) throw new Error("Create your practice first");
       try {
@@ -183,7 +184,7 @@ export default function SettingsPage() {
         /* private mode */
       }
       const { url } = await startGmail({
-        data: { firmId, origin: window.location.origin },
+        data: { firmId, origin: window.location.origin, enableSending },
       });
       window.location.href = url;
     });
@@ -502,7 +503,7 @@ export default function SettingsPage() {
                         className="v2-btn v2-btn-primary"
                         style={{ padding: "8px 16px", fontSize: 13 }}
                         disabled={busy === "gmail"}
-                        onClick={connectGmail}
+                        onClick={() => void connectGmail()}
                       >
                         {busy === "gmail" ? <><span className="ic-spin" /> Opening Google…</> : "Connect"}
                       </button>
@@ -522,6 +523,9 @@ export default function SettingsPage() {
                       </div>
                     ))}
                   <GmailHealth firmId={firmId} lastResult={gmailResult} autoRun={justConnected} />
+                  {intg.gmail.connections.some((c) => c.is_active) && (
+                    <ChaserSending firmId={firmId} busy={busy === "gmail"} onAllow={() => void connectGmail(true)} />
+                  )}
                 </div>
               ) : undefined}
             </IntegrationCard>

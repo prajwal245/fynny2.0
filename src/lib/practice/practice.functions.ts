@@ -572,6 +572,16 @@ export const setPracticeChaseStatus = createServerFn({ method: "POST" })
     ),
   );
 
+/** The client promised the document by a date: pause follow-ups until the day after. */
+export const snoozePracticeChase = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: uuid, promised_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) =>
+      (await import("./chaser.server")).snoozeChase(db, ctx, data.id, data.promised_on),
+    ),
+  );
+
 /** Runs this firm's due follow-ups now (the scheduler does this every 15 minutes anyway). */
 export const runPracticeFollowUpsNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

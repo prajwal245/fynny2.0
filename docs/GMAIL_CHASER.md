@@ -53,6 +53,14 @@ Gmail send when the firm connected Gmail and opted in; FynHelp domain otherwise.
 - Escalate, never send a third automatic message without a person seeing it.
 - No AI in what is claimed to be owed; AI may only suggest the wording of an optional personal note.
 
+## Built (option C)
+- Cadence 0/3/7 then escalate on day 10; tone presets (Gentle / Standard / Firm); one grouped email per client.
+- Send window 9:30-18:30 IST Mon-Sat (due chases wait for the next window).
+- "Client promised it by" pause on the chase.
+- Send from the firm's Gmail when a partner allows it in Settings (Google `gmail.send` consent) and switches it on;
+  falls back to the FynHelp address on any Gmail failure, and asks for consent again if Google revokes it.
+- Not built yet: client upload page, chaser dashboard, auto-detecting promises in reply text, editable templates.
+
 ## Build order
 1. Group-per-client chase and tone presets (pure, testable in `rules.ts`).
 2. Send window and promise-to-send snooze.

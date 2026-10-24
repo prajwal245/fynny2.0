@@ -40,6 +40,7 @@ import {
   runPracticeRecon,
   sendPracticeFollowUp,
   setPracticeChaseStatus,
+  snoozePracticeChase,
   signOffPracticeReport,
   updatePracticeClient,
 } from "@/lib/practice/practice.functions";
@@ -430,6 +431,8 @@ type Store = {
   ) => void;
   sendFollowUp: (id: string, channel: "Email" | "WhatsApp") => void;
   setChaseStatus: (id: string, status: Chase["status"], note?: string) => void;
+  /** The client promised the document by this date (YYYY-MM-DD): pause follow-ups until the day after. */
+  snoozeChase: (id: string, promisedOn: string) => void;
   clientName: (id: string) => string;
   clientTxns: (clientId: string) => Txn[];
   matchedTxns: (clientId: string) => Txn[];
@@ -1593,6 +1596,18 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
     [refresh],
   );
 
+  const snoozeChase = useCallback(
+    (id: string, promisedOn: string) => {
+      void snoozePracticeChase({ data: { id, promised_on: promisedOn } })
+        .then(() => toast.success("Paused. Follow-ups resume the day after the promised date."))
+        .catch((e) => toast.error(errMsg(e)))
+        .finally(() => {
+          void refresh();
+        });
+    },
+    [refresh],
+  );
+
   const agentRunsFor = useCallback(
     (clientId: string) => agentRuns.filter((r) => r.clientId === clientId),
     [agentRuns],
@@ -1816,6 +1831,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       addChase,
       sendFollowUp,
       setChaseStatus,
+      snoozeChase,
       clientTxns,
       matchedTxns,
       signOffReport,
@@ -1889,6 +1905,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       addChase,
       sendFollowUp,
       setChaseStatus,
+      snoozeChase,
       clientTxns,
     ],
   );

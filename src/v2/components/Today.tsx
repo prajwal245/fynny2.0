@@ -62,7 +62,7 @@ export function useNeedsYou(): NeedsItem[] {
         icon: <PhoneCall size={16} />,
         tone: "bad",
         title: `Call ${clientName(c.clientId)}`,
-        detail: `${c.type}: two follow-ups went unanswered. The Chaser has stopped and handed it to you.`,
+        detail: `${c.type}: the follow-ups went unanswered. The Chaser has stopped and handed it to you.`,
         action: { label: "Open chase", to: "/app/chaser" },
       });
     }

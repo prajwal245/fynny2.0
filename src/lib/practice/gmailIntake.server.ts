@@ -37,7 +37,7 @@ const GMAIL = process.env.GMAIL_API_BASE || "https://gmail.googleapis.com/gmail/
 const MAX_LISTED = 300;
 const REPROCESS_STUCK_AFTER_MS = 10 * 60 * 1000;
 
-interface Connection {
+export interface Connection {
   id: string;
   ca_firm_id: string;
   user_id: string;
@@ -68,7 +68,7 @@ export interface PollSummary {
   problem?: string;
 }
 
-class GmailApiError extends Error {
+export class GmailApiError extends Error {
   constructor(
     public status: number,
     public reason: string,
@@ -133,7 +133,7 @@ async function disconnect(db: Db, conn: Connection, message: string) {
  * A valid access token, refreshing it when it expires within 5 minutes.
  * Only one run refreshes at a time (atomic lock); the others wait for it.
  */
-async function accessToken(db: Db, conn: Connection, force = false): Promise<string> {
+export async function accessToken(db: Db, conn: Connection, force = false): Promise<string> {
   const g = await import("@/lib/caGmail.server");
   const { encryptToken, refreshAccessTokenDetailed } = g;
   // Tokens saved under a different GMAIL_ENCRYPTION_KEY can never be read again.

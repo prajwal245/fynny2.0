@@ -28,22 +28,23 @@ async function assertFirmPartner(userId: string, firmId: string): Promise<void> 
 /** Build the Google consent URL. */
 export const startGmailConnect = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { firmId: string; origin?: string }) => {
+  .inputValidator((input: { firmId: string; origin?: string; enableSending?: boolean }) => {
     if (!input?.firmId) throw new Error("firmId is required");
     return input;
   })
   .handler(async ({ data, context }): Promise<{ url: string; redirectUri: string }> => {
     await assertFirmMember(context.supabase as never, data.firmId);
     await assertFirmPartner(context.userId, data.firmId);
-    const { gmailCredentials, redirectUriFor, GMAIL_SCOPES } = await import("@/lib/caGmail.server");
+    const { gmailCredentials, redirectUriFor, GMAIL_SCOPES, GMAIL_SEND_SCOPE } = await import("@/lib/caGmail.server");
     const { clientId } = gmailCredentials();
     const redirectUri = redirectUriFor(data.origin ?? null);
-    const state = btoa(JSON.stringify({ firmId: data.firmId, userId: context.userId, ts: Date.now() }));
+    const state = btoa(JSON.stringify({ firmId: data.firmId, userId: context.userId, ts: Date.now(), sending: data.enableSending === true }));
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: redirectUri,
       response_type: "code",
-      scope: GMAIL_SCOPES,
+      // Sending is asked for only when a partner turns on "send chasers from my Gmail".
+      scope: data.enableSending ? `${GMAIL_SCOPES} ${GMAIL_SEND_SCOPE}` : GMAIL_SCOPES,
       access_type: "offline",
       include_granted_scopes: "true",
       prompt: "consent",
@@ -105,7 +106,7 @@ export const completeGmailConnect = createServerFn({ method: "POST" })
     return input;
   })
   .handler(async ({ data, context }): Promise<{ ok: true; gmailAddress: string }> => {
-    let parsed: { firmId?: string; userId?: string };
+    let parsed: { firmId?: string; userId?: string; sending?: boolean };
     try {
       parsed = JSON.parse(atob(data.state));
     } catch {
@@ -176,6 +177,28 @@ export const completeGmailConnect = createServerFn({ method: "POST" })
     }
     console.log("[fyn:gmail] connection saved successfully for", gmailAddress);
 
+    // Record whether Google actually granted sending; turn chasing from Gmail on when that was the point.
+    if (tokens.scope) {
+      const grantedSend = tokens.scope.includes("gmail.send");
+      try {
+        const { data: f } = await dbClient.from("ca_firms").select("notification_prefs").eq("id", parsed.firmId).maybeSingle();
+        const prev = ((f as { notification_prefs?: Record<string, unknown> } | null)?.notification_prefs ?? {}) as Record<string, unknown>;
+        await dbClient
+          .from("ca_firms")
+          .update({
+            notification_prefs: {
+              ...prev,
+              gmail_send_granted: grantedSend,
+              ...(grantedSend && parsed.sending ? { chaser_via_gmail: true } : {}),
+              ...(!grantedSend ? { chaser_via_gmail: false } : {}),
+            },
+          } as never)
+          .eq("id", parsed.firmId);
+      } catch (e) {
+        console.warn("[fyn:gmail] could not save send permission", e instanceof Error ? e.message : e);
+      }
+    }
+
     try {
       await dbClient.from("ca_brain_events").insert({
         ca_firm_id: parsed.firmId,
@@ -238,4 +261,62 @@ export const disconnectGmail = createServerFn({ method: "POST" })
     } catch { /* fire and forget */ }
 
     return { ok: true };
+  });
+
+export interface ChaserPrefs {
+  viaGmail: boolean;
+  sendGranted: boolean;
+  tone: "gentle" | "standard" | "firm";
+}
+
+const readPrefs = (raw: unknown): ChaserPrefs => {
+  const p = (raw ?? {}) as Record<string, unknown>;
+  const tone = p["chaser_tone"];
+  return {
+    sendGranted: p["gmail_send_granted"] === true,
+    viaGmail: p["chaser_via_gmail"] === true && p["gmail_send_granted"] === true,
+    tone: tone === "gentle" || tone === "firm" ? tone : "standard",
+  };
+};
+
+/** How this firm's chasers go out: from its own Gmail or the FynHelp address, and in what tone. */
+export const getChaserPrefs = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { firmId: string }) => {
+    if (!input?.firmId) throw new Error("firmId is required");
+    return input;
+  })
+  .handler(async ({ data, context }): Promise<ChaserPrefs> => {
+    await assertFirmMember(context.supabase as never, data.firmId);
+    const { adminDb } = await import("@/lib/practice/db.server");
+    const { data: f } = await (await adminDb()).from("ca_firms").select("notification_prefs").eq("id", data.firmId).maybeSingle();
+    return readPrefs(f?.notification_prefs);
+  });
+
+/** Partner choice: send chasers from the firm's Gmail (needs Google's send permission) and the tone. */
+export const setChaserPrefs = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { firmId: string; viaGmail?: boolean; tone?: "gentle" | "standard" | "firm" }) => {
+    if (!input?.firmId) throw new Error("firmId is required");
+    if (input.tone !== undefined && !["gentle", "standard", "firm"].includes(input.tone)) throw new Error("Unknown tone");
+    return input;
+  })
+  .handler(async ({ data, context }): Promise<ChaserPrefs> => {
+    await assertFirmMember(context.supabase as never, data.firmId);
+    await assertFirmPartner(context.userId, data.firmId);
+    const { adminDb } = await import("@/lib/practice/db.server");
+    const db = await adminDb();
+    const { data: f } = await db.from("ca_firms").select("notification_prefs").eq("id", data.firmId).maybeSingle();
+    const prev = (f?.notification_prefs ?? {}) as Record<string, unknown>;
+    if (data.viaGmail === true && prev["gmail_send_granted"] !== true) {
+      throw new Error("Allow FynHelp to send from your Gmail first.");
+    }
+    const next = {
+      ...prev,
+      ...(data.viaGmail !== undefined ? { chaser_via_gmail: data.viaGmail } : {}),
+      ...(data.tone ? { chaser_tone: data.tone } : {}),
+    };
+    const { error } = await db.from("ca_firms").update({ notification_prefs: next }).eq("id", data.firmId);
+    if (error) throw new Error(error.message);
+    return readPrefs(next);
   });

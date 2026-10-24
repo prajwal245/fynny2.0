@@ -157,7 +157,7 @@ export function WhatsappSetup({ firmId, webhook, onChanged }: { firmId: string; 
                 ✓ Ready{status.shared.display ? `: ${status.shared.display}` : ""}{using === "fynhelp" ? " · in use" : ""}
               </div>
               <div style={{ fontSize: 13, color: V.body, lineHeight: 1.6 }}>
-                Reminders go out from this number, and replies and documents come back to your firm. A client you have not messaged yet can link themselves by sending this code to the number once:
+                Reminders go out from this number, and replies and documents come back to your firm. A client who writes first is matched to you automatically by the phone number saved in your client list. If that cannot be done (for example, the number is not saved, or the same number is a client of two firms), they can send this code to the number once:
               </div>
               {status.shared.join_code && (
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>

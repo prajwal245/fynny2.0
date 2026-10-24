@@ -10,7 +10,7 @@
 import { adminDb, chaserEvent, logActivity, type Db, type FirmContext } from "./db.server";
 import { BUCKET, registerDocument } from "./documents.server";
 import { PracticeError } from "./core";
-import { advances, classifyInbound, explainWaError, isWaDelivery, parseJoinCode, type WaDelivery } from "./whatsappFlow";
+import { advances, classifyInbound, explainWaError, isWaDelivery, parseJoinCode, phoneTail, pickAutoRoute, type WaDelivery } from "./whatsappFlow";
 import { bindRoute, chaseTemplate, chaseTemplateLang, ensureJoinCode, firmCountryCode, resolveSender, sendPlainText, sharedDisplayNumber, sharedPhoneNumberId } from "./whatsappSend.server";
 import { samePhone } from "./chaser/rules";
 
@@ -47,6 +47,23 @@ export async function verifySignature(
   for (let i = 0; i < given.length; i++)
     diff |= given.charCodeAt(i) ^ expected.charCodeAt(i);
   return diff === 0;
+}
+
+/**
+ * On FynHelp's shared number: which firm a first-time sender belongs to, judged by the phone
+ * numbers in the firms' client lists. Only firms that actually use the shared number count, and
+ * only an unambiguous match is taken (and remembered for next time).
+ */
+async function autoRoute(db: Db, from: string): Promise<string | null> {
+  const tail = phoneTail(from);
+  if (!tail) return null;
+  const { data } = await db.from("ca_clients").select("ca_firm_id").eq("phone_tail", tail).limit(20);
+  const firms = [...new Set((data ?? []).map((r) => r.ca_firm_id as string))];
+  const usingShared: string[] = [];
+  for (const id of firms) if ((await resolveSender(db, id)).sender?.shared) usingShared.push(id);
+  const firmId = pickAutoRoute(usingShared);
+  if (firmId) await bindRoute(db, from, firmId, "auto");
+  return firmId;
 }
 
 /**
@@ -376,11 +393,11 @@ export async function handleWhatsappWebhook(payload: {
             continue;
           }
           const { data: route } = await db.from("ca_whatsapp_routes").select("ca_firm_id").eq("phone_key", m.from).maybeSingle();
-          if (!route) {
+          const fid = (route?.ca_firm_id as string | undefined) ?? (await autoRoute(db, m.from));
+          if (!fid) {
             results.push({ message: m.id, status: "sender not linked to a firm on the shared number" });
             continue;
           }
-          const fid = route.ca_firm_id as string;
           groups.set(fid, [...(groups.get(fid) ?? []), m]);
         }
       }

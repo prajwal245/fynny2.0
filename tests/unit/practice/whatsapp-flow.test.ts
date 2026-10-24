@@ -143,3 +143,20 @@ describe("join codes on the shared number", () => {
     for (let i = 0; i < 50; i++) expect(newJoinCode()).toMatch(/^[ABCDEFGHJKMNPQRSTUVWXYZ2-9]{6}$/);
   });
 });
+
+import { phoneTail, pickAutoRoute } from "@/lib/practice/whatsappFlow";
+
+describe("matching a first-time sender to a firm", () => {
+  it("takes only an unambiguous match", () => {
+    expect(pickAutoRoute(["f1"])).toBe("f1");
+    expect(pickAutoRoute(["f1", "f1"])).toBe("f1");
+    expect(pickAutoRoute(["f1", "f2"])).toBeNull();
+    expect(pickAutoRoute([])).toBeNull();
+  });
+  it("compares the last 10 digits, ignoring formatting", () => {
+    expect(phoneTail("+91 98450 12345")).toBe("9845012345");
+    expect(phoneTail("919845012345")).toBe("9845012345");
+    expect(phoneTail("12345")).toBeNull();
+    expect(phoneTail(null)).toBeNull();
+  });
+});

@@ -146,7 +146,7 @@ export async function sendPlainText(sender: Pick<Sender, "phoneNumberId" | "toke
 }
 
 /** On the shared number, remember which firm a phone belongs to so its replies and documents find them. */
-export async function bindRoute(db: Db, phoneKey: string, firmId: string, via: "chase" | "join"): Promise<void> {
+export async function bindRoute(db: Db, phoneKey: string, firmId: string, via: "chase" | "join" | "auto"): Promise<void> {
   const { error } = await db
     .from("ca_whatsapp_routes")
     .upsert({ phone_key: phoneKey, ca_firm_id: firmId, via, updated_at: new Date().toISOString() }, { onConflict: "phone_key" });

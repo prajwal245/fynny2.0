@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { getChaserPrefs, setChaserPrefs, type ChaserPrefs } from "@/lib/caGmail.functions";
 import { checkPracticeWhatsapp } from "@/lib/practice/practice.functions";
 import { useBilling } from "../lib/billing";
+import { COUNTRY_CODES } from "@/lib/practice/chaser/rules";
 import { V } from "../ui";
 
 type Health = Awaited<ReturnType<typeof checkPracticeWhatsapp>>;
@@ -42,6 +43,15 @@ export function WhatsappChaser({ firmId }: { firmId: string }) {
     }
   };
 
+  const setCountry = async (countryCode: string) => {
+    try {
+      setPrefs(await save({ data: { firmId, countryCode } }));
+      toast.success("Default country saved");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save");
+    }
+  };
+
   return (
     <div style={{ borderTop: `1px solid ${V.line}`, paddingTop: 12, display: "grid", gap: 10 }} data-testid="whatsapp-chaser">
       <div style={{ fontWeight: 600, fontSize: 13.5 }}>Chaser on WhatsApp</div>
@@ -55,6 +65,18 @@ export function WhatsappChaser({ firmId }: { firmId: string }) {
       ) : (
         <div style={{ fontSize: 13, color: V.muted }}>Automatic WhatsApp reminders are on the Firm and Scale plans. You can still send one by hand from a chase on those plans.</div>
       )}
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <label className="v2-label" htmlFor="wa-country" style={{ margin: 0 }}>Numbers saved without a country code are in</label>
+        <select
+          id="wa-country" className="v2-input" style={{ width: 220 }} disabled={!prefs}
+          value={COUNTRY_CODES.some((c) => c.code === prefs?.countryCode) ? prefs?.countryCode : ""}
+          onChange={(e) => void setCountry(e.target.value)}
+        >
+          {!COUNTRY_CODES.some((c) => c.code === prefs?.countryCode) && <option value="">+{prefs?.countryCode ?? "91"}</option>}
+          {COUNTRY_CODES.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
+        </select>
+        <span style={{ fontSize: 12.5, color: V.muted }}>Numbers that start with + or 00 are always used as written.</span>
+      </div>
       <div>
         <button className="v2-btn v2-btn-ghost" disabled={checking} onClick={() => void runCheck()}>
           {checking ? "Checking…" : "Check WhatsApp connection"}

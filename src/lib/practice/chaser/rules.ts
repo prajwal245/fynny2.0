@@ -284,24 +284,72 @@ export function whatsappMessage(t: TemplateInput): string {
   return `Hi ${t.contactName || "there"}, hope you're well. Could you please share the ${what(t)} for ${t.clientName} when you get a chance? Thank you! – ${t.firmName}`;
 }
 
+export const DEFAULT_COUNTRY_CODE = "91";
+
+/** Country calling codes for the Settings picker (the firm's home country). */
+export const COUNTRY_CODES: { code: string; label: string }[] = [
+  { code: "91", label: "India (+91)" },
+  { code: "971", label: "United Arab Emirates (+971)" },
+  { code: "966", label: "Saudi Arabia (+966)" },
+  { code: "974", label: "Qatar (+974)" },
+  { code: "965", label: "Kuwait (+965)" },
+  { code: "968", label: "Oman (+968)" },
+  { code: "973", label: "Bahrain (+973)" },
+  { code: "65", label: "Singapore (+65)" },
+  { code: "60", label: "Malaysia (+60)" },
+  { code: "977", label: "Nepal (+977)" },
+  { code: "94", label: "Sri Lanka (+94)" },
+  { code: "880", label: "Bangladesh (+880)" },
+  { code: "44", label: "United Kingdom (+44)" },
+  { code: "1", label: "United States / Canada (+1)" },
+  { code: "61", label: "Australia (+61)" },
+  { code: "64", label: "New Zealand (+64)" },
+];
+
+export const parseCountryCode = (v: unknown): string => {
+  const d = String(v ?? "").replace(/\D/g, "");
+  return /^\d{1,3}$/.test(d) ? d : DEFAULT_COUNTRY_CODE;
+};
+
 /**
- * Normalises an Indian or international number for wa.me. Returns null for
- * numbers WhatsApp cannot open, so the UI can say so instead of failing.
+ * Normalises a phone number to the digits WhatsApp wants (country code first, no +).
+ * "+" or "00" numbers are taken as international. Otherwise the firm's own country
+ * code is added: India also accepts 10-digit mobiles and a leading 0. Null when it
+ * cannot be a real number, so the UI can say so instead of failing.
  */
-export function normalisePhone(raw: string | null | undefined): string | null {
-  let d = String(raw ?? "").replace(/\D/g, "");
-  if (d.startsWith("00")) d = d.slice(2);
-  if (d.length === 11 && d.startsWith("0")) d = d.slice(1);
-  if (d.length === 10 && /^[6-9]/.test(d)) d = `91${d}`;
-  if (d.length < 11 || d.length > 15) return null;
-  return d;
+export function normalisePhone(raw: string | null | undefined, defaultCc: string = DEFAULT_COUNTRY_CODE): string | null {
+  const s = String(raw ?? "").trim();
+  let d = s.replace(/\D/g, "");
+  const valid = (x: string) => (x.length >= 8 && x.length <= 15 ? x : null);
+  if (s.startsWith("+")) return valid(d);
+  if (d.startsWith("00")) return valid(d.slice(2));
+  const cc = parseCountryCode(defaultCc);
+  if (cc === "91") {
+    if (d.length === 11 && d.startsWith("0")) d = d.slice(1);
+    if (d.length === 10 && /^[6-9]/.test(d)) d = `91${d}`;
+    return d.length < 11 ? null : valid(d);
+  }
+  d = d.replace(/^0+/, "");
+  // Already carries the country code (e.g. 971501234567) vs a local number (501234567).
+  if (!(d.startsWith(cc) && d.length >= cc.length + 7)) d = cc + d;
+  return valid(d);
+}
+
+/** Two numbers are the same person: equal once normalised, or equal in their last 10 digits. */
+export function samePhone(a: string | null | undefined, b: string | null | undefined, cc: string = DEFAULT_COUNTRY_CODE): boolean {
+  const na = normalisePhone(a, cc);
+  const nb = normalisePhone(b, cc);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  return na.length >= 10 && nb.length >= 10 && na.slice(-10) === nb.slice(-10);
 }
 
 export function whatsappLink(
   phone: string | null | undefined,
   message: string,
+  cc: string = DEFAULT_COUNTRY_CODE,
 ): { url: string | null; error: string | null } {
-  const p = normalisePhone(phone);
+  const p = normalisePhone(phone, cc);
   if (!p)
     return {
       url: null,

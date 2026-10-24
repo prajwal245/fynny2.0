@@ -11,7 +11,8 @@ import { adminDb, chaserEvent, logActivity, type Db, type FirmContext } from "./
 import { BUCKET, registerDocument } from "./documents.server";
 import { PracticeError } from "./core";
 import { advances, classifyInbound, explainWaError, isWaDelivery, type WaDelivery } from "./whatsappFlow";
-import { chaseTemplate, chaseTemplateLang } from "./whatsappSend.server";
+import { chaseTemplate, chaseTemplateLang, firmCountryCode } from "./whatsappSend.server";
+import { samePhone } from "./chaser/rules";
 
 // WHATSAPP_GRAPH_BASE exists only so tests and demos can use a stand-in Meta Graph API.
 const GRAPH = process.env["WHATSAPP_GRAPH_BASE"] || "https://graph.facebook.com/v21.0";
@@ -127,9 +128,9 @@ async function matchClient(
   db: Db,
   firmId: string,
   from: string,
+  cc: string,
 ): Promise<string | null> {
-  const want = last10(from);
-  if (want.length < 10) return null;
+  if (last10(from).length < 8) return null;
   const { data } = await db
     .from("ca_clients")
     .select("business_id, client_phone")
@@ -139,7 +140,7 @@ async function matchClient(
   const hits = [
     ...new Set(
       (data ?? [])
-        .filter((c) => last10(c.client_phone) === want && c.business_id)
+        .filter((c) => samePhone(c.client_phone, from, cc) && c.business_id)
         .map((c) => c.business_id as string),
     ),
   ];
@@ -154,7 +155,7 @@ async function matchClient(
   const chaseHits = [
     ...new Set(
       (chase ?? [])
-        .filter((c) => last10(c.contact_phone) === want && c.business_id)
+        .filter((c) => samePhone(c.contact_phone, from, cc) && c.business_id)
         .map((c) => c.business_id as string),
     ),
   ];
@@ -221,10 +222,10 @@ async function handleStatuses(db: Db, firmId: string, statuses: WaStatus[]) {
  * client; anything else is logged for the team and gives the client two days
  * before the next automatic nudge, so nobody is chased straight after replying.
  */
-async function handleText(db: Db, firmId: string, m: WaMessage): Promise<string> {
+async function handleText(db: Db, firmId: string, m: WaMessage, cc: string): Promise<string> {
   const body = m.text?.body?.trim() ?? "";
   if (!body) return "ignored empty text";
-  const businessId = await matchClient(db, firmId, m.from);
+  const businessId = await matchClient(db, firmId, m.from, cc);
   if (!businessId) return "text from a number not matched to a client";
   const { data: seen } = await db
     .from("ca_chaser_events")
@@ -316,10 +317,25 @@ export async function handleWhatsappWebhook(payload: {
         .update({ last_message_at: new Date().toISOString() })
         .eq("phone_number_id", phoneNumberId);
 
+      const cc = await firmCountryCode(db, channel.ca_firm_id);
+      // Any message from a client opens a 24-hour window in which we may reply with plain text.
+      const heard = new Map<string, string>();
+      for (const m of v.messages) {
+        const at = m.timestamp ? new Date(Number(m.timestamp) * 1000).toISOString() : new Date().toISOString();
+        if (!heard.has(m.from) || heard.get(m.from)! < at) heard.set(m.from, at);
+      }
+      await db
+        .from("ca_whatsapp_contacts")
+        .upsert(
+          [...heard].map(([phone_key, last_inbound_at]) => ({ ca_firm_id: channel.ca_firm_id, phone_key, last_inbound_at })),
+          { onConflict: "ca_firm_id,phone_key" },
+        )
+        .then((r) => r.error && console.error(`[fyn:whatsapp] contact window: ${r.error.message}`));
+
       for (const m of v.messages) {
         if (m.type === "text") {
           try {
-            results.push({ message: m.id, status: await handleText(db, channel.ca_firm_id, m) });
+            results.push({ message: m.id, status: await handleText(db, channel.ca_firm_id, m, cc) });
           } catch (e) {
             console.error(`[fyn:whatsapp] ${m.id}: ${(e as Error).message}`);
             results.push({ message: m.id, status: `failed: ${(e as Error).message}` });
@@ -354,7 +370,7 @@ export async function handleWhatsappWebhook(payload: {
         }
         try {
           const { bytes, mime } = await downloadMedia(media.id, token);
-          const businessId = await matchClient(db, channel.ca_firm_id, m.from);
+          const businessId = await matchClient(db, channel.ca_firm_id, m.from, cc);
           const baseName =
             m.type === "document" && m.document?.filename
               ? m.document.filename

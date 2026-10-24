@@ -43,6 +43,10 @@ export async function practiceTick(
   const arrears = await claimJob(db, "arrears", istParts(now).hourKey)
     .then(async (mine) => (mine ? (await import("./billing/arrears.server")).runArrearsBilling(db, now) : { skipped: "already ran this hour" }))
     .catch((e) => ({ error: (e as Error).message }));
+  // Once a day: drop WhatsApp reply-window rows older than a week.
+  await claimJob(db, "wa_contacts_prune", istParts(now).date)
+    .then(async (mine) => mine && (await import("./whatsappSend.server")).pruneWhatsappContacts(db, now))
+    .catch(() => undefined);
   const lifecycle = await import("./lifecycle/lifecycle.server")
     .then((m) => m.runLifecycle(db, now))
     .then((r) => ({ ...r, sent: r.sent.length }))

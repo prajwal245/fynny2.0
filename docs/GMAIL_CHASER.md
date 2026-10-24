@@ -80,3 +80,13 @@ Behaviour: manual "Send WhatsApp" and the optional automatic reminder (second re
 delivered / read / failed receipts appear on the chase timeline; a text reply pauses the next nudge for two days and
 notifies the team; STOP turns reminders off for that client; a returning document closes the chase. Without a token
 and linked number the button falls back to opening WhatsApp with the message ready.
+
+### WhatsApp: free text inside 24 hours, and any country
+- When a client has written to the firm's number in the last 23 hours, the chase goes as plain text (same wording as
+  the template). Otherwise, or if WhatsApp says the window closed, it goes as the approved template.
+  `ca_whatsapp_contacts` holds one row per firm and number (last message time); rows older than 7 days are pruned daily.
+- Phone numbers: `+` or `00` numbers are used as written. Numbers without a country code get the firm's home
+  country code (Settings, WhatsApp Business; default India +91). India also accepts 10-digit mobiles and a leading 0.
+  Matching inbound senders to clients compares normalised numbers, so 8-digit and other formats work.
+- Quality protection: at most `WHATSAPP_DAILY_CAP_PER_FIRM` (default 200) automatic WhatsApp reminders per firm per IST day;
+  past that the email still goes and WhatsApp is skipped. Per-run lookups are cached per firm, and the cap check is one indexed count.

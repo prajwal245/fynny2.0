@@ -32,7 +32,7 @@ import {
 } from "./chaser/rules";
 import { isEmail, sendEmail, type SendResult } from "./email.server";
 import { sendViaGmail } from "./gmailSend.server";
-import { sendChaseWhatsapp } from "./whatsappSend.server";
+import { firmCountryCode, sendChaseWhatsapp, whatsappDailyCap } from "./whatsappSend.server";
 import { chaseTemplateParams } from "./whatsappFlow";
 
 const DAY = 86_400_000;
@@ -380,9 +380,9 @@ export async function sendFollowUp(
         event_type: "sent",
         channel: "whatsapp",
         template_id: "chase_whatsapp_template",
-        note: `WhatsApp follow up sent to +${api.to}`,
+        note: `WhatsApp follow up sent to +${api.to}${api.mode === "text" ? " (inside the client's 24-hour reply window)" : ""}`,
         actor_id: ctx.userId,
-        metadata: { wamid: api.wamid, delivery: "sent" },
+        metadata: { wamid: api.wamid, delivery: "sent", mode: api.mode },
       });
       return { channel, via: "api" as const, to: api.to, follow_ups: count };
     }
@@ -400,7 +400,7 @@ export async function sendFollowUp(
     }
     // Not set up for the API on this server: fall back to opening WhatsApp with the message ready.
     const message = whatsappMessage(t);
-    const link = whatsappLink(row.contact_phone || t.clientPhone, message);
+    const link = whatsappLink(row.contact_phone || t.clientPhone, message, await firmCountryCode(db, ctx.firmId));
     if (!link.url) throw new PracticeError("invalid_phone", link.error!);
     await db
       .from("ca_document_requests")
@@ -582,8 +582,11 @@ export async function runDueFollowups(now = new Date(), firmId?: string) {
     failed: 0,
     deferred: 0,
     whatsapp: 0,
+    whatsappCapped: 0,
   };
   const whatsappPlan = new Map<string, boolean>();
+  const waSentToday = new Map<string, number>();
+  const countryByFirm = new Map<string, string>();
   const sendQueue: {
     row: ChaseRow;
     t: Awaited<ReturnType<typeof templateInput>>;
@@ -798,7 +801,22 @@ export async function runDueFollowups(now = new Date(), firmId?: string) {
         whatsappPlan.set(first.row.ca_firm_id, accessFor(await loadBilling(db, first.row.ca_firm_id)).whatsappChaser);
       }
       const phone = first.row.contact_phone || first.t.clientPhone;
-      if (whatsappPlan.get(first.row.ca_firm_id) && phone) {
+      const firmId = first.row.ca_firm_id;
+      if (!waSentToday.has(firmId)) {
+        const { count } = await db
+          .from("ca_chaser_events")
+          .select("id", { count: "exact", head: true })
+          .eq("ca_firm_id", firmId)
+          .eq("channel", "whatsapp")
+          .eq("event_type", "sent")
+          .gte("created_at", new Date(Math.floor((now.getTime() + 19_800_000) / DAY) * DAY - 19_800_000).toISOString());
+        waSentToday.set(firmId, count ?? 0);
+      }
+      if (whatsappPlan.get(firmId) && phone && waSentToday.get(firmId)! + claimedItems.length > whatsappDailyCap()) {
+        // Over today's cap: the email already went; skip WhatsApp rather than risk the number's quality rating.
+        summary.whatsappCapped++;
+      } else if (whatsappPlan.get(firmId) && phone) {
+        if (!countryByFirm.has(firmId)) countryByFirm.set(firmId, await firmCountryCode(db, firmId));
         const wa = await sendChaseWhatsapp(
           db,
           first.row.ca_firm_id,
@@ -809,7 +827,9 @@ export async function runDueFollowups(now = new Date(), firmId?: string) {
             items: claimedItems.map((q) => `${q.t.item}${q.t.period ? ` (${q.t.period})` : ""}`),
             firmName: first.firm.name,
           }),
+          { cc: countryByFirm.get(firmId) },
         );
+        if (wa.ok) waSentToday.set(firmId, waSentToday.get(firmId)! + claimedItems.length);
         for (const q of claimedItems) {
           await chaserEvent(db, {
             chaser_id: q.row.id,
@@ -819,7 +839,7 @@ export async function runDueFollowups(now = new Date(), firmId?: string) {
             channel: "whatsapp",
             template_id: "chase_whatsapp_template",
             note: wa.ok ? `Automatic WhatsApp reminder sent to +${wa.to}` : `Automatic WhatsApp reminder not sent: ${wa.error}`,
-            metadata: wa.ok ? { wamid: wa.wamid, delivery: "sent" } : {},
+            metadata: wa.ok ? { wamid: wa.wamid, delivery: "sent", mode: wa.mode } : {},
           });
         }
         if (wa.ok) summary.whatsapp++;

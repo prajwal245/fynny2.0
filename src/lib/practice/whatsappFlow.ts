@@ -86,3 +86,28 @@ const RANK: Record<WaDelivery, number> = { sent: 1, delivered: 2, read: 3, faile
 export const isWaDelivery = (s: unknown): s is WaDelivery => typeof s === "string" && s in RANK;
 /** Meta can deliver statuses out of order; never go backwards (read, then a late "delivered"). */
 export const advances = (from: WaDelivery | null, to: WaDelivery) => !from || RANK[to] > RANK[from];
+
+/**
+ * WhatsApp lets a business send free-form text for 24 hours after the customer last
+ * wrote. We stop an hour short so a message never lands right on the edge.
+ */
+export const SERVICE_WINDOW_MS = 23 * 3_600_000;
+export const inServiceWindow = (lastInboundAt: string | null | undefined, now: Date = new Date()): boolean => {
+  if (!lastInboundAt) return false;
+  const age = now.getTime() - Date.parse(lastInboundAt);
+  return Number.isFinite(age) && age >= 0 && age < SERVICE_WINDOW_MS;
+};
+
+/** The same wording as the approved template, for free-form sends inside the window. */
+export const chaseText = (p: string[]) =>
+  `Hello ${p[0]}, this is ${p[3]}. For ${p[1]} we are still waiting for: ${p[2]}. Please reply here with the file attached. Thank you.`;
+
+export const buildTextMessage = (to: string, body: string) => ({
+  messaging_product: "whatsapp",
+  to,
+  type: "text",
+  text: { body: body.slice(0, 4096), preview_url: false },
+});
+
+/** 131047: the window had already closed; the caller retries with the template. */
+export const windowClosed = (code: number | undefined) => code === 131047;

@@ -59,3 +59,55 @@ describe("delivery receipts only move forward", () => {
     expect(advances("delivered", "failed")).toBe(true);
   });
 });
+
+import { normalisePhone, samePhone, parseCountryCode } from "@/lib/practice/chaser/rules";
+import { buildTextMessage, chaseText, inServiceWindow, windowClosed } from "@/lib/practice/whatsappFlow";
+
+describe("phone numbers in any country", () => {
+  it("keeps the India rules by default", () => {
+    expect(normalisePhone("98450 12345")).toBe("919845012345");
+    expect(normalisePhone("098450 12345")).toBe("919845012345");
+    expect(normalisePhone("12345")).toBeNull();
+  });
+  it("uses international numbers as written", () => {
+    expect(normalisePhone("+971 50 123 4567")).toBe("971501234567");
+    expect(normalisePhone("00447911123456")).toBe("447911123456");
+    expect(normalisePhone("+12025550123", "91")).toBe("12025550123");
+  });
+  it("adds the firm's own country code to local numbers", () => {
+    expect(normalisePhone("050 123 4567", "971")).toBe("971501234567");
+    expect(normalisePhone("501234567", "971")).toBe("971501234567");
+    expect(normalisePhone("971501234567", "971")).toBe("971501234567"); // already has it
+    expect(normalisePhone("8123 4567", "65")).toBe("6581234567"); // 8-digit Singapore
+    expect(normalisePhone("2025550123", "1")).toBe("12025550123");
+    expect(normalisePhone("abc", "971")).toBeNull();
+  });
+  it("matches the same person across formats", () => {
+    expect(samePhone("+91 98450 12345", "919845012345")).toBe(true);
+    expect(samePhone("050 123 4567", "971501234567", "971")).toBe(true);
+    expect(samePhone("9845012345", "9845012346")).toBe(false);
+    expect(samePhone(null, "919845012345")).toBe(false);
+  });
+  it("falls back to India for a bad country code", () => {
+    expect(parseCountryCode("abc")).toBe("91");
+    expect(parseCountryCode("+971")).toBe("971");
+    expect(parseCountryCode("12345")).toBe("91");
+  });
+});
+
+describe("24-hour reply window", () => {
+  const now = new Date("2026-10-26T10:00:00Z");
+  it("is open for 23 hours after the client last wrote", () => {
+    expect(inServiceWindow("2026-10-26T09:00:00Z", now)).toBe(true);
+    expect(inServiceWindow("2026-10-25T11:30:00Z", now)).toBe(true); // 22.5h
+    expect(inServiceWindow("2026-10-25T10:00:00Z", now)).toBe(false); // 24h
+    expect(inServiceWindow(null, now)).toBe(false);
+    expect(inServiceWindow("2026-10-27T10:00:00Z", now)).toBe(false); // future: clock skew, do not trust
+  });
+  it("sends the same wording as the template, as plain text", () => {
+    const body = chaseText(["Asha", "Acme", "Bank statement", "Rao & Co"]);
+    expect(body).toBe("Hello Asha, this is Rao & Co. For Acme we are still waiting for: Bank statement. Please reply here with the file attached. Thank you.");
+    expect(buildTextMessage("919845012345", body)).toMatchObject({ type: "text", to: "919845012345", text: { preview_url: false } });
+    expect(windowClosed(131047)).toBe(true);
+  });
+});

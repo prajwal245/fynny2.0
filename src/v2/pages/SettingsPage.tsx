@@ -87,7 +87,7 @@ export default function SettingsPage() {
     email: "",
     role: "junior" as Team["roles"][number],
   });
-  const [wa, setWa] = useState({ phoneNumberId: "", display: "" });
+  const [wa, setWa] = useState({ phoneNumberId: "", display: "", token: "", waba: "", secret: "" });
   const [profileName, setProfileName] = useState(session?.name ?? "");
   const [busy, setBusy] = useState<string | null>(null);
   const [gmailResult, setGmailResult] = useState<string | null>(null);
@@ -581,6 +581,17 @@ export default function SettingsPage() {
                     value={wa.display}
                     onChange={(e) => setWa({ ...wa, display: e.target.value })}
                   />
+                  <details style={{ flex: "1 1 100%" }}>
+                    <summary style={{ cursor: "pointer", fontSize: 12.5, color: V.body }}>
+                      Number on your own Meta business account? Add its token and app secret
+                    </summary>
+                    <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+                      <input className="v2-input" type="password" autoComplete="off" placeholder="Permanent access token for this number" value={wa.token} onChange={(e) => setWa({ ...wa, token: e.target.value })} />
+                      <input className="v2-input" type="password" autoComplete="off" placeholder="App secret of your Meta app (verifies incoming messages)" value={wa.secret} onChange={(e) => setWa({ ...wa, secret: e.target.value })} />
+                      <input className="v2-input" placeholder="WhatsApp Business Account ID (checks your template)" value={wa.waba} onChange={(e) => setWa({ ...wa, waba: e.target.value })} />
+                      <div style={{ fontSize: 12, color: V.muted }}>Stored encrypted and never shown again. Leave empty for a number that is on FynHelp's Meta app.</div>
+                    </div>
+                  </details>
                   <button
                     className="v2-btn v2-btn-ghost"
                     disabled={!wa.phoneNumberId.trim() || busy === "wa"}
@@ -592,7 +603,13 @@ export default function SettingsPage() {
                             data: {
                               phone_number_id: wa.phoneNumberId.trim(),
                               display_phone: wa.display.trim() || undefined,
+                              access_token: wa.token.trim() || undefined,
+                              app_secret: wa.secret.trim() || undefined,
+                              waba_id: wa.waba.trim() || undefined,
                             },
+                          }).then((r) => {
+                            setWa({ phoneNumberId: "", display: "", token: "", waba: "", secret: "" });
+                            return r;
                           }),
                         "WhatsApp number linked to this practice",
                       )
@@ -601,7 +618,7 @@ export default function SettingsPage() {
                     Link number
                   </button>
                 </div>
-                {firmId && intg.whatsapp.channels.length > 0 && <WhatsappChaser firmId={firmId} />}
+                {firmId && <WhatsappChaser firmId={firmId} />}
                 </div>
               ) : undefined}
             </IntegrationCard>

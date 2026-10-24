@@ -90,3 +90,15 @@ and linked number the button falls back to opening WhatsApp with the message rea
   Matching inbound senders to clients compares normalised numbers, so 8-digit and other formats work.
 - Quality protection: at most `WHATSAPP_DAILY_CAP_PER_FIRM` (default 200) automatic WhatsApp reminders per firm per IST day;
   past that the email still goes and WhatsApp is skipped. Per-run lookups are cached per firm, and the cap check is one indexed count.
+
+### WhatsApp number: FynHelp's or your own (per firm)
+Settings, WhatsApp Business, "Which WhatsApp number to use". Applies to the Chaser and to receiving documents.
+- **FynHelp's number** (set `WHATSAPP_DEFAULT_PHONE_NUMBER_ID`, optionally `WHATSAPP_DEFAULT_DISPLAY_NUMBER`): no setup. One number serves
+  many firms, so each client phone is linked to one firm in `ca_whatsapp_routes`, set when that firm chases the phone or when the
+  client sends the firm's code (`JOIN K7M2QX`, shown in Settings). Replies and documents from a linked phone go to that firm only.
+  A message from an unlinked phone is not stored.
+- **Own number**: Phone number ID, plus (only if the number is on the firm's own Meta business account) its permanent token,
+  that Meta app's secret and the WhatsApp Business Account ID. Token and secret are stored encrypted; the token is checked with Meta
+  before saving. Without a token the number uses FynHelp's server token (a number on FynHelp's Meta app).
+- With no choice made, a firm that already linked a number keeps it; otherwise FynHelp's number is used.
+- The webhook verifies each request against FynHelp's app secret, or the app secret of the number named in it.

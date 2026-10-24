@@ -10,8 +10,8 @@
 import { adminDb, chaserEvent, logActivity, type Db, type FirmContext } from "./db.server";
 import { BUCKET, registerDocument } from "./documents.server";
 import { PracticeError } from "./core";
-import { advances, classifyInbound, explainWaError, isWaDelivery, type WaDelivery } from "./whatsappFlow";
-import { chaseTemplate, chaseTemplateLang, firmCountryCode } from "./whatsappSend.server";
+import { advances, classifyInbound, explainWaError, isWaDelivery, parseJoinCode, type WaDelivery } from "./whatsappFlow";
+import { bindRoute, chaseTemplate, chaseTemplateLang, ensureJoinCode, firmCountryCode, resolveSender, sendPlainText, sharedDisplayNumber, sharedPhoneNumberId } from "./whatsappSend.server";
 import { samePhone } from "./chaser/rules";
 
 // WHATSAPP_GRAPH_BASE exists only so tests and demos can use a stand-in Meta Graph API.
@@ -47,6 +47,46 @@ export async function verifySignature(
   for (let i = 0; i < given.length; i++)
     diff |= given.charCodeAt(i) ^ expected.charCodeAt(i);
   return diff === 0;
+}
+
+/**
+ * Checks Meta's signature. FynHelp's own app secret is tried first; a number on a firm's own
+ * Meta app is signed with that app's secret, found through the phone number ID in the payload.
+ * The ID only selects which secret to test: without the real secret nothing verifies.
+ */
+export async function verifyWebhook(
+  rawBody: string,
+  header: string | null,
+): Promise<{ configured: boolean; valid: boolean }> {
+  const secrets: string[] = [];
+  const global = env("WHATSAPP_APP_SECRET");
+  if (global) secrets.push(global);
+  try {
+    const ids = new Set<string>();
+    const body = JSON.parse(rawBody) as { entry?: { changes?: WaChange[] }[] };
+    for (const e of body.entry ?? [])
+      for (const c of e.changes ?? []) {
+        const id = c.value?.metadata?.phone_number_id;
+        if (id && /^\d{6,20}$/.test(id)) ids.add(id);
+      }
+    if (ids.size) {
+      const db = await adminDb();
+      const { data } = await db.from("ca_whatsapp_channels").select("app_secret_enc").in("phone_number_id", [...ids]).not("app_secret_enc", "is", null);
+      const { decryptToken } = await import("@/lib/caGmail.server");
+      for (const row of data ?? []) {
+        try {
+          secrets.push(await decryptToken(row.app_secret_enc as string));
+        } catch {
+          /* unreadable secret: skip */
+        }
+      }
+    }
+  } catch {
+    /* not JSON or lookup failed: only the global secret applies */
+  }
+  if (!secrets.length) return { configured: false, valid: false };
+  for (const sec of secrets) if (await verifySignature(rawBody, header, sec)) return { configured: true, valid: true };
+  return { configured: true, valid: false };
 }
 
 interface WaMessage {
@@ -165,18 +205,18 @@ async function matchClient(
 const snippet = (s: string) => (s.length > 140 ? `${s.slice(0, 137)}...` : s).replace(/\s+/g, " ");
 
 /** Delivery receipts for chases we sent: sent, delivered, read or failed. */
-async function handleStatuses(db: Db, firmId: string, statuses: WaStatus[]) {
+async function handleStatuses(db: Db, statuses: WaStatus[]) {
   for (const st of statuses) {
     if (!isWaDelivery(st.status)) continue;
     const { data: ev } = await db
       .from("ca_chaser_events")
-      .select("id, chaser_id, business_id, metadata")
-      .eq("ca_firm_id", firmId)
+      .select("id, chaser_id, ca_firm_id, business_id, metadata")
       .eq("event_type", "sent")
       .eq("metadata->>wamid", st.id)
       .limit(1)
       .maybeSingle();
     if (!ev) continue;
+    const firmId = ev.ca_firm_id as string;
     const meta = (ev.metadata ?? {}) as Record<string, unknown>;
     const from = isWaDelivery(meta["delivery"]) ? (meta["delivery"] as WaDelivery) : null;
     // Receipts can arrive out of order or twice; only ever move forward.
@@ -292,22 +332,62 @@ export async function handleWhatsappWebhook(payload: {
       const v = change.value ?? {};
       const phoneNumberId = v.metadata?.phone_number_id;
       if (!phoneNumberId || (!v.messages?.length && !v.statuses?.length)) continue;
-      const { data: channel } = await db
+      const sharedId = sharedPhoneNumberId();
+      const { data: ownChannel } = await db
         .from("ca_whatsapp_channels")
-        .select("ca_firm_id")
+        .select("ca_firm_id, access_token_enc")
         .eq("phone_number_id", phoneNumberId)
         .eq("is_active", true)
         .maybeSingle();
-      if (!channel) {
-        results.push({
-          message: "-",
-          status: `no firm for number ${phoneNumberId}`,
-        });
+      const isShared = !ownChannel && Boolean(sharedId) && phoneNumberId === sharedId;
+      if (!ownChannel && !isShared) {
+        results.push({ message: "-", status: `no firm for number ${phoneNumberId}` });
         continue;
       }
       // Receipts for what we already sent are recorded even when the firm is paused.
-      if (v.statuses?.length) await handleStatuses(db, channel.ca_firm_id, v.statuses).catch((e) => console.error(`[fyn:whatsapp] status: ${(e as Error).message}`));
+      if (v.statuses?.length) await handleStatuses(db, v.statuses).catch((e) => console.error(`[fyn:whatsapp] status: ${(e as Error).message}`));
       if (!v.messages?.length) continue;
+
+      // Who the messages belong to: the firm that owns this number, or, on FynHelp's shared
+      // number, the firm each client's phone is linked to (by a past chase or a JOIN code).
+      let numberToken = token;
+      if (ownChannel?.access_token_enc) {
+        try {
+          numberToken = await (await import("@/lib/caGmail.server")).decryptToken(ownChannel.access_token_enc as string);
+        } catch {
+          numberToken = undefined;
+        }
+      }
+      const groups = new Map<string, WaMessage[]>();
+      if (ownChannel) {
+        groups.set(ownChannel.ca_firm_id as string, v.messages);
+      } else {
+        for (const m of v.messages) {
+          const code = m.type === "text" ? parseJoinCode(m.text?.body) : null;
+          if (code) {
+            const { data: f } = await db.from("ca_firms").select("id, firm_name").eq("whatsapp_join_code", code).maybeSingle();
+            if (f && token) {
+              await bindRoute(db, m.from, f.id as string, "join");
+              await sendPlainText({ phoneNumberId, token }, m.from, `You are linked to ${f.firm_name}. Send your documents here, and we will pass them on.`);
+              results.push({ message: m.id, status: "linked to firm by join code" });
+            } else {
+              results.push({ message: m.id, status: "unknown join code" });
+            }
+            continue;
+          }
+          const { data: route } = await db.from("ca_whatsapp_routes").select("ca_firm_id").eq("phone_key", m.from).maybeSingle();
+          if (!route) {
+            results.push({ message: m.id, status: "sender not linked to a firm on the shared number" });
+            continue;
+          }
+          const fid = route.ca_firm_id as string;
+          groups.set(fid, [...(groups.get(fid) ?? []), m]);
+        }
+      }
+
+      for (const [firmId, messages] of groups) {
+      const channel = { ca_firm_id: firmId };
+      const token = numberToken;
       if (!(await (await import("./billing.server")).firmCanWork(db, channel.ca_firm_id))) {
         results.push({ message: "-", status: "firm paused: trial or plan ended" });
         continue;
@@ -320,7 +400,7 @@ export async function handleWhatsappWebhook(payload: {
       const cc = await firmCountryCode(db, channel.ca_firm_id);
       // Any message from a client opens a 24-hour window in which we may reply with plain text.
       const heard = new Map<string, string>();
-      for (const m of v.messages) {
+      for (const m of messages) {
         const at = m.timestamp ? new Date(Number(m.timestamp) * 1000).toISOString() : new Date().toISOString();
         if (!heard.has(m.from) || heard.get(m.from)! < at) heard.set(m.from, at);
       }
@@ -332,7 +412,7 @@ export async function handleWhatsappWebhook(payload: {
         )
         .then((r) => r.error && console.error(`[fyn:whatsapp] contact window: ${r.error.message}`));
 
-      for (const m of v.messages) {
+      for (const m of messages) {
         if (m.type === "text") {
           try {
             results.push({ message: m.id, status: await handleText(db, channel.ca_firm_id, m, cc) });
@@ -433,6 +513,7 @@ export async function handleWhatsappWebhook(payload: {
           });
         }
       }
+      }
     }
   }
   return results;
@@ -442,9 +523,11 @@ export async function whatsappStatus(db: Db, ctx: FirmContext) {
   const { data } = await db
     .from("ca_whatsapp_channels")
     .select(
-      "phone_number_id, display_phone, is_active, last_message_at, created_at",
+      "phone_number_id, display_phone, is_active, last_message_at, created_at, access_token_enc, app_secret_enc",
     )
     .eq("ca_firm_id", ctx.firmId);
+  const r = await resolveSender(db, ctx.firmId);
+  const sharedConfigured = r.sharedConfigured;
   return {
     configured: {
       access_token: Boolean(env("WHATSAPP_ACCESS_TOKEN")),
@@ -452,9 +535,19 @@ export async function whatsappStatus(db: Db, ctx: FirmContext) {
       verify_token: Boolean(env("WHATSAPP_VERIFY_TOKEN")),
     },
     webhook_path: "/api/public/whatsapp-webhook",
-    channels: data ?? [],
-    // Messages can go out through the API (not just open wa.me) when a token and an active number exist.
-    send_ready: Boolean(env("WHATSAPP_ACCESS_TOKEN")) && (data ?? []).some((c) => c.is_active),
+    // Never send the stored token to the browser; say only that one is saved.
+    channels: (data ?? []).map(({ access_token_enc, app_secret_enc, ...c }) => ({ ...c, has_own_token: Boolean(access_token_enc), has_own_secret: Boolean(app_secret_enc) })),
+    // Messages go out through the API (not just open wa.me) when a sender can be resolved.
+    send_ready: Boolean(r.sender),
+    /** The number in use: FynHelp's shared one or the firm's own. */
+    sender: r.sender?.choice ?? null,
+    sender_pref: r.pref,
+    shared: {
+      configured: sharedConfigured,
+      display: sharedDisplayNumber() ?? null,
+      // The code clients send ("JOIN K7M2QX") to link their phone to this firm on the shared number.
+      join_code: sharedConfigured ? await ensureJoinCode(db, ctx.firmId).catch(() => null) : null,
+    },
   };
 }
 
@@ -467,17 +560,27 @@ export interface WaHealthStep {
 /** Checks each link in the chain for real and says which one is broken. */
 export async function whatsappHealth(db: Db, ctx: FirmContext): Promise<{ ok: boolean; steps: WaHealthStep[] }> {
   const steps: WaHealthStep[] = [];
-  const token = env("WHATSAPP_ACCESS_TOKEN");
-  steps.push({ label: "Access token", ok: Boolean(token), detail: token ? "Set on the server." : "WHATSAPP_ACCESS_TOKEN is not set." });
-  steps.push({ label: "Webhook secret", ok: Boolean(env("WHATSAPP_APP_SECRET")), detail: env("WHATSAPP_APP_SECRET") ? "Set." : "WHATSAPP_APP_SECRET is not set, so incoming messages and receipts are rejected." });
+  const r = await resolveSender(db, ctx.firmId);
+  const sender = r.sender;
+  steps.push({
+    label: "Number in use",
+    ok: Boolean(sender),
+    detail: sender
+      ? sender.shared
+        ? `FynHelp's shared number${sharedDisplayNumber() ? ` (${sharedDisplayNumber()})` : ""}.`
+        : "Your own number."
+      : (r.reason ?? "No WhatsApp number is set up."),
+  });
+  const { data: ownRow } = await db.from("ca_whatsapp_channels").select("app_secret_enc").eq("ca_firm_id", ctx.firmId).eq("is_active", true).limit(1).maybeSingle();
+  const hasSecret = Boolean(env("WHATSAPP_APP_SECRET")) || Boolean(ownRow?.app_secret_enc);
+  steps.push({ label: "Webhook secret", ok: hasSecret, detail: hasSecret ? "Set." : "No app secret is set, so incoming messages and receipts are rejected." });
   steps.push({ label: "Verify token", ok: Boolean(env("WHATSAPP_VERIFY_TOKEN")), detail: env("WHATSAPP_VERIFY_TOKEN") ? "Set." : "WHATSAPP_VERIFY_TOKEN is not set, so Meta cannot confirm the webhook." });
-  const { data: ch } = await db.from("ca_whatsapp_channels").select("phone_number_id, display_phone").eq("ca_firm_id", ctx.firmId).eq("is_active", true).limit(1).maybeSingle();
-  steps.push({ label: "Number linked", ok: Boolean(ch), detail: ch ? `Phone number ID ${ch.phone_number_id}.` : "Link the number's Phone number ID above." });
-  if (token && ch) {
+  const token = sender?.token;
+  if (sender && token) {
     try {
-      const r = await fetch(`${GRAPH}/${ch.phone_number_id}?fields=display_phone_number,verified_name,quality_rating`, { headers: { Authorization: `Bearer ${token}` } });
-      const b = (await r.json().catch(() => ({}))) as { display_phone_number?: string; verified_name?: string; quality_rating?: string; error?: { code?: number; message?: string } };
-      if (r.ok) {
+      const res = await fetch(`${GRAPH}/${sender.phoneNumberId}?fields=display_phone_number,verified_name,quality_rating`, { headers: { Authorization: `Bearer ${token}` } });
+      const b = (await res.json().catch(() => ({}))) as { display_phone_number?: string; verified_name?: string; quality_rating?: string; error?: { code?: number; message?: string } };
+      if (res.ok) {
         steps.push({ label: "Meta accepts the token and number", ok: true, detail: `${b.verified_name ?? "Number"} ${b.display_phone_number ?? ""}${b.quality_rating ? ` · quality ${b.quality_rating}` : ""}`.trim() });
       } else {
         steps.push({ label: "Meta accepts the token and number", ok: false, detail: explainWaError(b.error?.code, b.error?.message).message });
@@ -486,18 +589,18 @@ export async function whatsappHealth(db: Db, ctx: FirmContext): Promise<{ ok: bo
       steps.push({ label: "Meta accepts the token and number", ok: false, detail: `Could not reach Meta (${(e as Error).message}).` });
     }
   }
-  const waba = env("WHATSAPP_WABA_ID");
+  const waba = sender?.wabaId;
   if (!waba) {
-    steps.push({ label: `Template "${chaseTemplate()}"`, ok: null, detail: "Set WHATSAPP_WABA_ID to check that the template is approved." });
+    steps.push({ label: `Template "${chaseTemplate()}"`, ok: null, detail: "Add the WhatsApp Business Account ID to check that the template is approved." });
   } else if (token) {
     try {
-      const r = await fetch(`${GRAPH}/${waba}/message_templates?name=${encodeURIComponent(chaseTemplate())}&fields=name,status,language`, { headers: { Authorization: `Bearer ${token}` } });
-      const b = (await r.json().catch(() => ({}))) as { data?: { status: string; language: string }[]; error?: { message?: string } };
+      const res = await fetch(`${GRAPH}/${waba}/message_templates?name=${encodeURIComponent(chaseTemplate())}&fields=name,status,language`, { headers: { Authorization: `Bearer ${token}` } });
+      const b = (await res.json().catch(() => ({}))) as { data?: { status: string; language: string }[]; error?: { message?: string } };
       const t = b.data?.find((x) => x.language === chaseTemplateLang()) ?? b.data?.[0];
       steps.push({
         label: `Template "${chaseTemplate()}"`,
-        ok: r.ok && t?.status === "APPROVED",
-        detail: !r.ok ? (b.error?.message ?? "Could not read templates.") : !t ? "No template with this name. Create it in WhatsApp Manager (4 body fields)." : `${t.status} (${t.language}).`,
+        ok: res.ok && t?.status === "APPROVED",
+        detail: !res.ok ? (b.error?.message ?? "Could not read templates.") : !t ? "No template with this name. Create it in WhatsApp Manager (4 body fields)." : `${t.status} (${t.language}).`,
       });
     } catch (e) {
       steps.push({ label: `Template "${chaseTemplate()}"`, ok: false, detail: `Could not reach Meta (${(e as Error).message}).` });
@@ -511,12 +614,17 @@ export async function connectWhatsappNumber(
   ctx: FirmContext,
   phoneNumberId: string,
   displayPhone?: string,
+  opts: { accessToken?: string; wabaId?: string; appSecret?: string } = {},
 ) {
   if (!/^\d{6,20}$/.test(phoneNumberId))
     throw new PracticeError(
       "invalid",
       "The phone number ID is the numeric ID from Meta's WhatsApp Manager, not the phone number.",
     );
+  if (phoneNumberId === sharedPhoneNumberId())
+    throw new PracticeError("invalid", "That is FynHelp's own number. Choose \"FynHelp's number\" instead of linking it.");
+  if (opts.wabaId && !/^\d{6,20}$/.test(opts.wabaId))
+    throw new PracticeError("invalid", "The WhatsApp Business Account ID is a number from Meta's WhatsApp Manager.");
   const { data: existing } = await db
     .from("ca_whatsapp_channels")
     .select("ca_firm_id")
@@ -527,12 +635,25 @@ export async function connectWhatsappNumber(
       "conflict",
       "That WhatsApp number is connected to another practice.",
     );
+  let tokenEnc: string | null | undefined;
+  if (opts.accessToken?.trim()) {
+    // Prove the token and number belong together before saving anything.
+    const t = opts.accessToken.trim();
+    const check = await fetch(`${GRAPH}/${phoneNumberId}?fields=display_phone_number`, { headers: { Authorization: `Bearer ${t}` } }).catch(() => null);
+    if (!check?.ok)
+      throw new PracticeError("invalid", "Meta did not accept that access token for this phone number ID. Check both and try again.");
+    tokenEnc = await (await import("@/lib/caGmail.server")).encryptToken(t);
+  }
+  const secretEnc = opts.appSecret?.trim() ? await (await import("@/lib/caGmail.server")).encryptToken(opts.appSecret.trim()) : undefined;
   const { error } = await db.from("ca_whatsapp_channels").upsert(
     {
       ca_firm_id: ctx.firmId,
       phone_number_id: phoneNumberId,
       display_phone: displayPhone ?? null,
       is_active: true,
+      ...(tokenEnc !== undefined ? { access_token_enc: tokenEnc } : {}),
+      ...(secretEnc !== undefined ? { app_secret_enc: secretEnc } : {}),
+      ...(opts.wabaId ? { waba_id: opts.wabaId } : {}),
     },
     { onConflict: "phone_number_id" },
   );

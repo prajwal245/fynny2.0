@@ -617,6 +617,11 @@ export const connectPracticeWhatsapp = createServerFn({ method: "POST" })
       .object({
         phone_number_id: z.string().min(6).max(30),
         display_phone: z.string().max(30).optional(),
+        /** Only for a number on the firm's own Meta business account. Stored encrypted. */
+        access_token: z.string().min(20).max(1000).optional(),
+        waba_id: z.string().max(30).optional(),
+        /** The firm's own Meta app secret, so Meta's webhooks for that number can be verified. */
+        app_secret: z.string().min(10).max(200).optional(),
       })
       .parse(d),
   )
@@ -629,6 +634,7 @@ export const connectPracticeWhatsapp = createServerFn({ method: "POST" })
         ctx,
         data.phone_number_id,
         data.display_phone,
+        { accessToken: data.access_token, wabaId: data.waba_id, appSecret: data.app_secret },
       );
     }),
   );

@@ -271,6 +271,8 @@ export interface ChaserPrefs {
   whatsappAuto: boolean;
   /** Calling code for phone numbers saved without one (digits, e.g. "91"). */
   countryCode: string;
+  /** Which WhatsApp number the firm chose: FynHelp's shared one or its own (null: not chosen yet). */
+  whatsappSender: "fynhelp" | "own" | null;
 }
 
 const readPrefs = (raw: unknown): ChaserPrefs => {
@@ -281,6 +283,7 @@ const readPrefs = (raw: unknown): ChaserPrefs => {
     viaGmail: p["chaser_via_gmail"] === true && p["gmail_send_granted"] === true,
     tone: tone === "gentle" || tone === "firm" ? tone : "standard",
     whatsappAuto: p["chaser_whatsapp_auto"] === true,
+    whatsappSender: p["whatsapp_sender"] === "own" ? "own" : p["whatsapp_sender"] === "fynhelp" ? "fynhelp" : null,
     countryCode: /^\d{1,3}$/.test(String(p["default_country_code"] ?? "")) ? String(p["default_country_code"]) : "91",
   };
 };
@@ -302,9 +305,10 @@ export const getChaserPrefs = createServerFn({ method: "POST" })
 /** Partner choice: send chasers from the firm's Gmail (needs Google's send permission) and the tone. */
 export const setChaserPrefs = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { firmId: string; viaGmail?: boolean; tone?: "gentle" | "standard" | "firm"; whatsappAuto?: boolean; countryCode?: string }) => {
+  .inputValidator((input: { firmId: string; viaGmail?: boolean; tone?: "gentle" | "standard" | "firm"; whatsappAuto?: boolean; countryCode?: string; whatsappSender?: "fynhelp" | "own" }) => {
     if (!input?.firmId) throw new Error("firmId is required");
     if (input.tone !== undefined && !["gentle", "standard", "firm"].includes(input.tone)) throw new Error("Unknown tone");
+    if (input.whatsappSender !== undefined && !["fynhelp", "own"].includes(input.whatsappSender)) throw new Error("Unknown WhatsApp number choice");
     if (input.countryCode !== undefined && !/^\d{1,3}$/.test(input.countryCode)) throw new Error("Country code must be 1 to 3 digits");
     return input;
   })
@@ -318,8 +322,17 @@ export const setChaserPrefs = createServerFn({ method: "POST" })
     if (data.viaGmail === true && prev["gmail_send_granted"] !== true) {
       throw new Error("Allow FynHelp to send from your Gmail first.");
     }
+    if (data.whatsappSender === "own") {
+      const { data: own } = await db.from("ca_whatsapp_channels").select("id").eq("ca_firm_id", data.firmId).eq("is_active", true).limit(1).maybeSingle();
+      if (!own) throw new Error("Link your own WhatsApp number first.");
+    }
+    if (data.whatsappSender === "fynhelp") {
+      const { sharedPhoneNumberId } = await import("@/lib/practice/whatsappSend.server");
+      if (!sharedPhoneNumberId() || !process.env["WHATSAPP_ACCESS_TOKEN"]) throw new Error("FynHelp's WhatsApp number is not switched on yet.");
+    }
     const next = {
       ...prev,
+      ...(data.whatsappSender ? { whatsapp_sender: data.whatsappSender } : {}),
       ...(data.viaGmail !== undefined ? { chaser_via_gmail: data.viaGmail } : {}),
       ...(data.tone ? { chaser_tone: data.tone } : {}),
       ...(data.whatsappAuto !== undefined ? { chaser_whatsapp_auto: data.whatsappAuto } : {}),

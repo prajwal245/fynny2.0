@@ -111,3 +111,35 @@ describe("24-hour reply window", () => {
     expect(windowClosed(131047)).toBe(true);
   });
 });
+
+import { chooseSender, newJoinCode, parseJoinCode } from "@/lib/practice/whatsappFlow";
+
+describe("which WhatsApp number a firm uses", () => {
+  it("honours the firm's choice when it can be used", () => {
+    expect(chooseSender({ pref: "own", hasOwn: true, sharedConfigured: true })).toBe("own");
+    expect(chooseSender({ pref: "fynhelp", hasOwn: true, sharedConfigured: true })).toBe("fynhelp");
+  });
+  it("falls back to what exists", () => {
+    expect(chooseSender({ pref: "own", hasOwn: false, sharedConfigured: true })).toBe("fynhelp");
+    expect(chooseSender({ pref: "fynhelp", hasOwn: true, sharedConfigured: false })).toBe("own");
+  });
+  it("keeps a number linked before the choice existed, else uses FynHelp's", () => {
+    expect(chooseSender({ pref: null, hasOwn: true, sharedConfigured: true })).toBe("own");
+    expect(chooseSender({ pref: null, hasOwn: false, sharedConfigured: true })).toBe("fynhelp");
+    expect(chooseSender({ pref: null, hasOwn: false, sharedConfigured: false })).toBeNull();
+    expect(chooseSender({ pref: "bogus", hasOwn: false, sharedConfigured: false })).toBeNull();
+  });
+});
+
+describe("join codes on the shared number", () => {
+  it("reads JOIN messages, ignoring case and spacing", () => {
+    expect(parseJoinCode("JOIN k7m2qx")).toBe("K7M2QX");
+    expect(parseJoinCode("  join   K7M2QX  ")).toBe("K7M2QX");
+    expect(parseJoinCode("please join K7M2QX")).toBeNull();
+    expect(parseJoinCode("JOIN K7M2")).toBeNull();
+    expect(parseJoinCode(null)).toBeNull();
+  });
+  it("makes readable six-character codes", () => {
+    for (let i = 0; i < 50; i++) expect(newJoinCode()).toMatch(/^[ABCDEFGHJKMNPQRSTUVWXYZ2-9]{6}$/);
+  });
+});

@@ -111,3 +111,31 @@ export const buildTextMessage = (to: string, body: string) => ({
 
 /** 131047: the window had already closed; the caller retries with the template. */
 export const windowClosed = (code: number | undefined) => code === 131047;
+
+/* ── which number a firm uses ── */
+
+export type WaSenderChoice = "fynhelp" | "own";
+
+/**
+ * The number a firm sends from and receives on. The firm's choice wins when it can be used;
+ * with no choice, a linked number of its own is kept (that is how firms connected before this
+ * option existed), otherwise FynHelp's shared number. Null when neither exists.
+ */
+export function chooseSender(i: { pref: unknown; hasOwn: boolean; sharedConfigured: boolean }): WaSenderChoice | null {
+  if (i.pref === "own" && i.hasOwn) return "own";
+  if (i.pref === "fynhelp" && i.sharedConfigured) return "fynhelp";
+  if (i.hasOwn) return "own";
+  if (i.sharedConfigured) return "fynhelp";
+  return null;
+}
+
+/** "JOIN K7M2QX": the client links their phone to a firm on the shared number. */
+export const parseJoinCode = (text: string | null | undefined): string | null => {
+  const m = /^\s*join\s+([A-Za-z0-9]{6})\s*$/i.exec(text ?? "");
+  return m ? m[1].toUpperCase() : null;
+};
+
+// No 0/O/1/I/L: codes get read out and typed by hand.
+const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+export const newJoinCode = (rand: () => number = Math.random): string =>
+  Array.from({ length: 6 }, () => CODE_ALPHABET[Math.floor(rand() * CODE_ALPHABET.length)]).join("");

@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { getChaserPrefs, setChaserPrefs, type ChaserPrefs } from "@/lib/caGmail.functions";
-import { checkPracticeWhatsapp } from "@/lib/practice/practice.functions";
+import { checkPracticeWhatsapp, getPracticeWhatsappStatus } from "@/lib/practice/practice.functions";
 import { useBilling } from "../lib/billing";
 import { COUNTRY_CODES } from "@/lib/practice/chaser/rules";
 import { V } from "../ui";
 
 type Health = Awaited<ReturnType<typeof checkPracticeWhatsapp>>;
+type Status = Awaited<ReturnType<typeof getPracticeWhatsappStatus>>;
 
 /** WhatsApp for the Chaser: a connection check that names the broken link, and the auto-reminder switch. */
 export function WhatsappChaser({ firmId }: { firmId: string }) {
@@ -18,10 +19,25 @@ export function WhatsappChaser({ firmId }: { firmId: string }) {
   const [health, setHealth] = useState<Health | null>(null);
   const [checking, setChecking] = useState(false);
   const [prefs, setPrefs] = useState<ChaserPrefs | null>(null);
+  const [status, setStatus] = useState<Status | null>(null);
 
   useEffect(() => {
     void load({ data: { firmId } }).then(setPrefs).catch(() => setPrefs(null));
+    void getPracticeWhatsappStatus().then(setStatus).catch(() => setStatus(null));
   }, [load, firmId]);
+
+  const pickNumber = async (whatsappSender: "fynhelp" | "own") => {
+    try {
+      setPrefs(await save({ data: { firmId, whatsappSender } }));
+      setStatus(await getPracticeWhatsappStatus());
+      setHealth(null);
+      toast.success(whatsappSender === "own" ? "Using your own WhatsApp number" : "Using FynHelp's WhatsApp number");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save");
+    }
+  };
+  const ownLinked = Boolean(status?.channels.some((c) => c.is_active));
+  const using = status?.sender ?? null;
 
   const runCheck = async () => {
     setChecking(true);
@@ -54,6 +70,28 @@ export function WhatsappChaser({ firmId }: { firmId: string }) {
 
   return (
     <div style={{ borderTop: `1px solid ${V.line}`, paddingTop: 12, display: "grid", gap: 10 }} data-testid="whatsapp-chaser">
+      <div style={{ fontWeight: 600, fontSize: 13.5 }}>Which WhatsApp number to use</div>
+      <div role="radiogroup" aria-label="WhatsApp number" style={{ display: "grid", gap: 8 }}>
+        <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 13, opacity: status?.shared.configured ? 1 : 0.6 }}>
+          <input type="radio" name="wa-sender" checked={using === "fynhelp"} disabled={!status?.shared.configured} onChange={() => void pickNumber("fynhelp")} style={{ marginTop: 3 }} />
+          <span>
+            <b>FynHelp's number</b>{status?.shared.display ? ` (${status.shared.display})` : ""}. Nothing to set up. Reminders show your firm's name in the message, and replies and documents reach you.
+            {!status?.shared.configured && <span style={{ color: V.muted }}> Not switched on yet.</span>}
+            {using === "fynhelp" && status?.shared.join_code && (
+              <span style={{ display: "block", color: V.muted, marginTop: 4 }}>
+                To receive documents from a client who has not been chased yet, ask them to send <span className="num">JOIN {status.shared.join_code}</span> to this number once.
+              </span>
+            )}
+          </span>
+        </label>
+        <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 13, opacity: ownLinked ? 1 : 0.6 }}>
+          <input type="radio" name="wa-sender" checked={using === "own"} disabled={!ownLinked} onChange={() => void pickNumber("own")} style={{ marginTop: 3 }} />
+          <span>
+            <b>My own number</b>. Clients see your own WhatsApp Business number.
+            {!ownLinked && <span style={{ color: V.muted }}> Link it with the Phone number ID above first.</span>}
+          </span>
+        </label>
+      </div>
       <div style={{ fontWeight: 600, fontSize: 13.5 }}>Chaser on WhatsApp</div>
       {allowed ? (
         <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 13 }}>

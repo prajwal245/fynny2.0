@@ -96,7 +96,7 @@ Settings, WhatsApp Business, "Which WhatsApp number to use". Applies to the Chas
 - **FynHelp's number** (set `WHATSAPP_DEFAULT_PHONE_NUMBER_ID`, optionally `WHATSAPP_DEFAULT_DISPLAY_NUMBER`): no setup. One number serves
   many firms, so each client phone is linked to one firm in `ca_whatsapp_routes`, set when that firm chases the phone or when the
   client sends the firm's code (`JOIN K7M2QX`, shown in Settings). Replies and documents from a linked phone go to that firm only.
-  A message from an unlinked phone is not stored.
+  A client who writes first is matched automatically by the phone saved in the firm's client list (last 10 digits, only when exactly one firm that uses the shared number has it); otherwise they send the firm's JOIN code. A message that cannot be matched is not stored.
 - **Own number**: Phone number ID, plus (only if the number is on the firm's own Meta business account) its permanent token,
   that Meta app's secret and the WhatsApp Business Account ID. Token and secret are stored encrypted; the token is checked with Meta
   before saving. Without a token the number uses FynHelp's server token (a number on FynHelp's Meta app).

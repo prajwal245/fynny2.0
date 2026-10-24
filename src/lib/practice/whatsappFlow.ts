@@ -139,3 +139,19 @@ export const parseJoinCode = (text: string | null | undefined): string | null =>
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 export const newJoinCode = (rand: () => number = Math.random): string =>
   Array.from({ length: 6 }, () => CODE_ALPHABET[Math.floor(rand() * CODE_ALPHABET.length)]).join("");
+
+/**
+ * A phone number written to FynHelp's shared number is matched to a firm by the phone numbers
+ * in the firms' client lists. Only an unambiguous match is used: exactly one firm. Two firms
+ * with a client on the same number, or none, means the client must send the firm's JOIN code.
+ */
+export function pickAutoRoute(firmIds: string[]): string | null {
+  const distinct = [...new Set(firmIds)];
+  return distinct.length === 1 ? distinct[0] : null;
+}
+
+/** The last 10 digits, the same key the database stores for every client phone. */
+export const phoneTail = (raw: string | null | undefined): string | null => {
+  const d = String(raw ?? "").replace(/\D/g, "");
+  return d.length >= 10 ? d.slice(-10) : null;
+};

@@ -50,7 +50,7 @@ export const BUCKET = "ca-client-documents";
 const MAX_BYTES = 25 * 1024 * 1024;
 const STALE_PROCESSING_MS = 10 * 60 * 1000;
 
-export type Channel = "Manual" | "Gmail" | "WhatsApp" | "Zoho Books";
+export type Channel = "Manual" | "Gmail" | "WhatsApp" | "Zoho Books" | "Tally";
 
 interface ExtractionRow {
   id: string;
@@ -128,7 +128,7 @@ export async function registerDocument(
   // Uploads and Zoho pulls check the trial / plan limits first; documents that
   // arrive on their own (Gmail, WhatsApp) are always taken in.
   const billing = await import("./billing.server");
-  if (input.channel === "Manual" || input.channel === "Zoho Books")
+  if (input.channel === "Manual" || input.channel === "Zoho Books" || input.channel === "Tally")
     await billing.assertWorkRoom(db, ctx.firmId, { businessId: input.business_id, newDocument: true });
   const kind = detectKind(bytes, input.filename, input.mime);
   const side = input.side ?? inferSide(input.filename, kind);

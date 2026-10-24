@@ -204,7 +204,8 @@ export async function integrationStatus(db: Db, ctx: FirmContext) {
       connections: gmail ?? [],
     },
     whatsapp: {
-      available: env("WHATSAPP_ACCESS_TOKEN") && env("WHATSAPP_APP_SECRET"),
+      // Always offered: a firm can link a number on its own Meta account even when FynHelp has no shared number.
+      available: true,
       channels: wa ?? [],
     },
     email: { available: env("RESEND_API_KEY") },

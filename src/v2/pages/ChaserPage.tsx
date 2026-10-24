@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import { Send, Plus, MessageCircle, Mail, Lock } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { useBilling } from "../lib/billing";
+import { getPracticeWhatsappStatus } from "@/lib/practice/practice.functions";
 import { Badge, Card, Drawer, EmptyState, Modal, PageHeader, Tone, V, formatDate } from "../ui";
 import { AgentGlyph, AgentStatusBadge, AgentTimeline, ShimmerText } from "../agents";
 import { Chase, useV2 } from "../store";
@@ -14,12 +15,18 @@ const FILTERS = ["All", "Open", "Following Up", "Escalated", "Resolved"] as cons
 
 /** Chaser. All follow-ups as a page; the client's Chaser tab when given a clientId. */
 export default function ChaserPage({ clientId: scopedClient }: { clientId?: string } = {}) {
-  const { chases: allChases, clients, clientName, addChase, sendFollowUp, setChaseStatus, runs } = useV2();
+  const { chases: allChases, clients, clientName, addChase, sendFollowUp, setChaseStatus, snoozeChase, runs } = useV2();
   // WhatsApp chasing is on Firm and Scale (not Essential or the trial).
   const whatsappAllowed = useBilling()?.access.whatsappChaser ?? false;
+  // With a token and a linked number the message goes out itself; otherwise WhatsApp opens with it ready.
+  const [waSendReady, setWaSendReady] = useState(false);
+  useEffect(() => {
+    void getPracticeWhatsappStatus().then((s) => setWaSendReady(Boolean(s.send_ready))).catch(() => setWaSendReady(false));
+  }, []);
   const chases = scopedClient ? allChases.filter((c) => c.clientId === scopedClient) : allChases;
   const [creating, setCreating] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [promise, setPromise] = useState("");
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("All");
   const [form, setForm] = useState({ clientId: scopedClient ?? clients[0]?.id ?? "", type: TYPES[0], contact: "", email: "", phone: "", due: "", note: "" });
   // Chases go by email: start from the client's saved contact, editable.
@@ -64,7 +71,7 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
       ) : (
         <PageHeader
         title="Chaser"
-        subtitle="Polite follow ups, tracked to closure. Two unanswered nudges and it escalates."
+        subtitle="Polite follow ups on day 0, 3 and 7, tracked to closure. On day 10 it comes to you."
         action={<button className="v2-btn v2-btn-primary" onClick={openCreate}><Plus size={15} /> Create chase item</button>}
       />
       )}
@@ -185,7 +192,7 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
 
             {active.status === "Escalated" && (
               <div style={{ background: "rgba(169,56,56,.07)", border: "1px solid rgba(169,56,56,.25)", borderRadius: 14, padding: 14, fontSize: 13, color: V.maroon }}>
-                Two follow ups went unanswered. This item is with the partner now.
+                The follow ups went unanswered. This item is with the partner now.
               </div>
             )}
 
@@ -198,7 +205,12 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
                     <Lock size={14} /> WhatsApp on Firm plan
                   </Link>
                 )}
-                {active.phone && active.status !== "Resolved" && whatsappAllowed && (
+                {active.phone && active.status !== "Resolved" && whatsappAllowed && waSendReady && (
+                  <button className="v2-btn v2-btn-primary" onClick={() => { sendFollowUp(active.id, "WhatsApp"); }}>
+                    <MessageCircle size={15} /> Send WhatsApp
+                  </button>
+                )}
+                {active.phone && active.status !== "Resolved" && whatsappAllowed && !waSendReady && (
                   <a
                     className="v2-btn v2-btn-primary"
                     href={waLink(active)}
@@ -206,7 +218,7 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
                     rel="noreferrer"
                     onClick={() => { sendFollowUp(active.id, "WhatsApp"); }}
                   >
-                    <MessageCircle size={15} /> Send WhatsApp
+                    <MessageCircle size={15} /> Open WhatsApp
                   </a>
                 )}
                 {active.status !== "Resolved" && (() => {
@@ -236,8 +248,24 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
                   <button className="v2-btn v2-btn-ghost" onClick={() => { setChaseStatus(active.id, "Escalated", "Escalated to the partner by the team."); toast.success("Escalated to the partner. Automatic follow-ups have stopped."); }}>Escalate to partner</button>
                 )}
               </div>
+              {active.status !== "Escalated" && (
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <label className="v2-label" htmlFor="chase-promise" style={{ margin: 0 }}>Client promised it by</label>
+                  <input
+                    id="chase-promise" className="v2-input" type="date" style={{ width: 170 }}
+                    min={new Date(Date.now() + 864e5).toISOString().slice(0, 10)}
+                    value={promise} onChange={(e) => setPromise(e.target.value)}
+                  />
+                  <button
+                    className="v2-btn v2-btn-ghost" disabled={!promise}
+                    onClick={() => { snoozeChase(active.id, promise); setPromise(""); }}
+                  >
+                    Pause until then
+                  </button>
+                </div>
+              )}
               <div style={{ fontSize: 12.5, color: V.muted }}>
-                The chase stops automatically when the document arrives, on any channel.
+                The chase stops automatically when the document arrives, on any channel. Emails go out between 9:30 am and 6:30 pm IST, Monday to Saturday.
               </div>
               </div>
             )}

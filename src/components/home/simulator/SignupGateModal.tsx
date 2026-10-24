@@ -99,7 +99,7 @@ export default function SignupGateModal({ open, scenarioName, onClose, onUnlocke
               Get Your Personalized Financial Impact Report
             </h3>
             <p className="text-fyn-ink/65 text-sm mb-6" style={{ fontFamily: "'Roboto', sans-serif" }}>
-              See the exact numbers for your business, free for 30 days.
+              See the exact numbers for your business, free for 14 days.
             </p>
 
             <form onSubmit={submit} className="space-y-3" style={{ fontFamily: "'Roboto', sans-serif" }}>

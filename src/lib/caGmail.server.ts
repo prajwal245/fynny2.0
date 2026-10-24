@@ -16,6 +16,9 @@ export const GMAIL_SCOPES = [
   "https://www.googleapis.com/auth/userinfo.profile",
 ].join(" ");
 
+/** Extra permission, asked for only when a partner turns on sending chasers from Gmail. */
+export const GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send";
+
 const ALLOWED_ORIGINS = [
   "https://fynhelp.com",
   "https://www.fynhelp.com",

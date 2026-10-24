@@ -572,6 +572,16 @@ export const setPracticeChaseStatus = createServerFn({ method: "POST" })
     ),
   );
 
+/** The client promised the document by a date: pause follow-ups until the day after. */
+export const snoozePracticeChase = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: uuid, promised_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) =>
+      (await import("./chaser.server")).snoozeChase(db, ctx, data.id, data.promised_on),
+    ),
+  );
+
 /** Runs this firm's due follow-ups now (the scheduler does this every 15 minutes anyway). */
 export const runPracticeFollowUpsNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -591,6 +601,15 @@ export const getPracticeWhatsappStatus = createServerFn({ method: "GET" })
     ),
   );
 
+/** Checks token, number, webhook settings and the chase template, and says which fails. */
+export const checkPracticeWhatsapp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) =>
+    withFirm(context.userId, async (db, ctx) =>
+      (await import("./whatsapp.server")).whatsappHealth(db, ctx),
+    ),
+  );
+
 export const connectPracticeWhatsapp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) =>
@@ -598,6 +617,11 @@ export const connectPracticeWhatsapp = createServerFn({ method: "POST" })
       .object({
         phone_number_id: z.string().min(6).max(30),
         display_phone: z.string().max(30).optional(),
+        /** Only for a number on the firm's own Meta business account. Stored encrypted. */
+        access_token: z.string().min(20).max(1000).optional(),
+        waba_id: z.string().max(30).optional(),
+        /** The firm's own Meta app secret, so Meta's webhooks for that number can be verified. */
+        app_secret: z.string().min(10).max(200).optional(),
       })
       .parse(d),
   )
@@ -610,6 +634,7 @@ export const connectPracticeWhatsapp = createServerFn({ method: "POST" })
         ctx,
         data.phone_number_id,
         data.display_phone,
+        { accessToken: data.access_token, wabaId: data.waba_id, appSecret: data.app_secret },
       );
     }),
   );
@@ -996,4 +1021,50 @@ export const zohoBooksSync = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ linkId: uuid, month: z.string().regex(/^\d{4}-\d{2}$/) }).parse(d))
   .handler(async ({ data, context }) =>
     withWork(context.userId, async (db, ctx) => (await import("./zoho.server")).sync(db, ctx, data.linkId, data.month)),
+  );
+
+/* ── Tally connector ──────────────────────────────────── */
+
+export const tallyConnectors = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./tallyConnector.server")).listConnectors(db, ctx)),
+  );
+
+/** Creates a connector and returns its secret token once. */
+export const tallyConnectorCreate = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ name: z.string().min(1).max(60) }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      await asPartner(ctx, "connect Tally");
+      return (await import("./tallyConnector.server")).createConnector(db, ctx, data.name);
+    }),
+  );
+
+export const tallyConnectorRevoke = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: uuid }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      await asPartner(ctx, "remove a Tally connector");
+      return (await import("./tallyConnector.server")).revokeConnector(db, ctx, data.id);
+    }),
+  );
+
+export const tallyCompanyMap = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ company_id: uuid, business_id: uuid.nullable() }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      await asPartner(ctx, "link a Tally company to a client");
+      return (await import("./tallyConnector.server")).mapCompany(db, ctx, data.company_id, data.business_id);
+    }),
+  );
+
+export const tallySyncNow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: uuid }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./tallyConnector.server")).requestSync(db, ctx, data.id)),
   );

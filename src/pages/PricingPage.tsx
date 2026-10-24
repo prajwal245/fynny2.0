@@ -13,7 +13,6 @@ import {
   OVERAGE_BLOCK_PRICE,
   PLAN_ORDER,
   PLANS,
-  TRIAL_ACTIVATED_DAYS,
   TRIAL_DAYS,
   TRIAL_MAX_ACTIVE_CLIENTS,
   TRIAL_MAX_DOCUMENTS,
@@ -482,7 +481,7 @@ export default function PricingPage() {
           <Reveal delay={80}>
             <div className="fh-step">
               <h4>Close one real month</h4>
-              <p>Run one reconciliation and make one MIS on your own data, and the trial grows to {TRIAL_ACTIVATED_DAYS} days.</p>
+              <p>Run one reconciliation and make one MIS on your own data within the {TRIAL_DAYS} days, and see a full month-end before you pay.</p>
             </div>
           </Reveal>
           <Reveal delay={160}>

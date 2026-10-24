@@ -99,9 +99,8 @@ export const OVERAGE_BLOCK_PRICE = 499;
 
 /* ── trial ─────────────────────────────────────────────────── */
 
+/** The free trial is a flat 14 days from the first upload, everywhere (website, product, emails, terms). */
 export const TRIAL_DAYS = 14;
-/** The trial grows to this once the firm has run a reconciliation and made an MIS. */
-export const TRIAL_ACTIVATED_DAYS = 30;
 /** Trials get every Firm feature except the WhatsApp Chaser. */
 export const TRIAL_PLAN: PlanKey = "professional";
 export const TRIAL_MAX_ACTIVE_CLIENTS = 5;
@@ -117,7 +116,7 @@ export interface BillingRow {
   current_period_end: string | null;
   /** First upload; the trial clock runs from here. Null: not started yet. */
   trial_started_at?: string | null;
-  /** First reconciliation and first MIS done: the trial is 30 days. */
+  /** First reconciliation and first MIS done. A milestone only; it does not change the trial length. */
   activated_at?: string | null;
 }
 
@@ -144,8 +143,8 @@ export interface Access {
 
 const DAY = 86_400_000;
 
-export function trialEndFrom(start: Date, activated = false): Date {
-  return new Date(start.getTime() + (activated ? TRIAL_ACTIVATED_DAYS : TRIAL_DAYS) * DAY);
+export function trialEndFrom(start: Date): Date {
+  return new Date(start.getTime() + TRIAL_DAYS * DAY);
 }
 
 export const PAUSED_MESSAGE =

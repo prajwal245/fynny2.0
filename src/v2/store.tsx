@@ -40,6 +40,7 @@ import {
   runPracticeRecon,
   sendPracticeFollowUp,
   setPracticeChaseStatus,
+  snoozePracticeChase,
   signOffPracticeReport,
   updatePracticeClient,
 } from "@/lib/practice/practice.functions";
@@ -430,6 +431,8 @@ type Store = {
   ) => void;
   sendFollowUp: (id: string, channel: "Email" | "WhatsApp") => void;
   setChaseStatus: (id: string, status: Chase["status"], note?: string) => void;
+  /** The client promised the document by this date (YYYY-MM-DD): pause follow-ups until the day after. */
+  snoozeChase: (id: string, promisedOn: string) => void;
   clientName: (id: string) => string;
   clientTxns: (clientId: string) => Txn[];
   matchedTxns: (clientId: string) => Txn[];
@@ -1557,7 +1560,9 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
               ? "Recorded on the timeline. Email is not connected yet, so nothing was sent."
               : channel === "Email"
                 ? "Follow-up emailed and logged. The chase stops automatically when the document arrives."
-                : "WhatsApp follow-up logged on the timeline.",
+                : "via" in res && res.via === "api"
+                  ? "WhatsApp message sent and tracked. The chase stops automatically when the document arrives."
+                  : "WhatsApp follow-up logged on the timeline.",
         },
         () => sendPracticeFollowUp({ data: { id, channel } }),
       )
@@ -1567,6 +1572,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
               "Email service is not configured yet, so the follow up was recorded but not sent.",
             );
           else if (channel === "Email") toast.success("Email follow up sent");
+          else if ("via" in res && res.via === "api") toast.success("WhatsApp message sent");
           else toast.success("Follow up logged on the timeline");
         })
         .catch((e) => toast.error(errMsg(e)))
@@ -1585,6 +1591,18 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
         p.map((c) => (c.id === id ? { ...c, status: target } : c)),
       );
       void setPracticeChaseStatus({ data: { id, status: target, note } })
+        .catch((e) => toast.error(errMsg(e)))
+        .finally(() => {
+          void refresh();
+        });
+    },
+    [refresh],
+  );
+
+  const snoozeChase = useCallback(
+    (id: string, promisedOn: string) => {
+      void snoozePracticeChase({ data: { id, promised_on: promisedOn } })
+        .then(() => toast.success("Paused. Follow-ups resume the day after the promised date."))
         .catch((e) => toast.error(errMsg(e)))
         .finally(() => {
           void refresh();
@@ -1816,6 +1834,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       addChase,
       sendFollowUp,
       setChaseStatus,
+      snoozeChase,
       clientTxns,
       matchedTxns,
       signOffReport,
@@ -1889,6 +1908,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       addChase,
       sendFollowUp,
       setChaseStatus,
+      snoozeChase,
       clientTxns,
     ],
   );

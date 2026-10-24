@@ -19,7 +19,7 @@ interface Plan {
 const plans: Plan[] = [
   {
     name: "Starter",
-    priceMain: "FREE for 30 days",
+    priceMain: "FREE for 14 days",
     priceSub: "Then ₹30,000/year or ₹3,000/month",
     waitlistBadge: "For Waitlisters",
     target: "Businesses up to ₹5 Crore turnover",
@@ -36,7 +36,7 @@ const plans: Plan[] = [
       "Email support (within 8 hours)",
       "1 user account",
     ],
-    cta: "Start 30 Day Free Trial",
+    cta: "Start 14 Day Free Trial",
   },
   {
     name: "Pro",
@@ -61,7 +61,7 @@ const plans: Plan[] = [
       "3 user accounts + monthly CFO report",
     ],
     featured: true,
-    cta: "Start 30 Day Free Trial",
+    cta: "Start 14 Day Free Trial",
   },
   {
     name: "Enterprise",
@@ -169,7 +169,7 @@ export default function PricingSection() {
         </div>
 
         <p className="text-center text-white/50 text-sm mt-8">
-          All plans include a 30-day free trial. No credit card required. Cancel anytime.
+          All plans include a 14-day free trial. No credit card required. Cancel anytime.
         </p>
       </div>
     </section>

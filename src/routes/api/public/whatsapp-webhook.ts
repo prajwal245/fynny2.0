@@ -2,7 +2,8 @@
  * WhatsApp Business Cloud API webhook.
  *
  * GET  — Meta's subscription check (hub.verify_token must equal WHATSAPP_VERIFY_TOKEN).
- * POST — incoming messages, signed with X-Hub-Signature-256 using WHATSAPP_APP_SECRET.
+ * POST — incoming messages, signed with X-Hub-Signature-256 using WHATSAPP_APP_SECRET
+ *        (or, for a number on a firm's own Meta app, that app's secret).
  *        Documents and photos are stored and queued for the Extract agent;
  *        extraction runs on the next practice tick.
  */
@@ -32,21 +33,14 @@ export const Route = createFileRoute("/api/public/whatsapp-webhook")({
         return json({ error: "Verification failed" }, 403);
       },
       POST: async ({ request }) => {
-        const secret = process.env["WHATSAPP_APP_SECRET"];
-        if (!secret) return json({ error: "WhatsApp is not configured" }, 503);
         const raw = await request.text();
         if (raw.length > 1_000_000)
           return json({ error: "Payload too large" }, 413);
-        const { verifySignature, handleWhatsappWebhook } =
+        const { verifyWebhook, handleWhatsappWebhook } =
           await import("@/lib/practice/whatsapp.server");
-        if (
-          !(await verifySignature(
-            raw,
-            request.headers.get("x-hub-signature-256"),
-            secret,
-          ))
-        )
-          return json({ error: "Bad signature" }, 401);
+        const check = await verifyWebhook(raw, request.headers.get("x-hub-signature-256"));
+        if (!check.configured) return json({ error: "WhatsApp is not configured" }, 503);
+        if (!check.valid) return json({ error: "Bad signature" }, 401);
         let payload: unknown;
         try {
           payload = JSON.parse(raw);

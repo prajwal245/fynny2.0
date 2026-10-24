@@ -21,6 +21,9 @@ import { useV2 } from "../store";
 import { AgentSettings } from "../components/AgentSettings";
 import { BillingSection } from "../components/BillingSection";
 import { GmailHealth } from "../components/GmailHealth";
+import { ChaserSending } from "../components/ChaserSending";
+import { WhatsappChaser } from "../components/WhatsappChaser";
+import { TallyConnector } from "../components/TallyConnector";
 import { GmailIcon, WhatsAppIcon } from "../components/BrandIcons";
 import { ZohoBooksSection } from "../components/ZohoBooks";
 import { INTEGRATION_STYLES, IntegrationCard } from "../components/IntegrationCard";
@@ -85,7 +88,8 @@ export default function SettingsPage() {
     email: "",
     role: "junior" as Team["roles"][number],
   });
-  const [wa, setWa] = useState({ phoneNumberId: "", display: "" });
+  const [tallyOnline, setTallyOnline] = useState(false);
+  const [wa, setWa] = useState({ phoneNumberId: "", display: "", token: "", waba: "", secret: "" });
   const [profileName, setProfileName] = useState(session?.name ?? "");
   const [busy, setBusy] = useState<string | null>(null);
   const [gmailResult, setGmailResult] = useState<string | null>(null);
@@ -174,7 +178,7 @@ export default function SettingsPage() {
       .finally(() => void load());
   }, [justConnected, firmId, pollGmail, load]);
 
-  const connectGmail = () =>
+  const connectGmail = (enableSending = false) =>
     run("gmail", async () => {
       if (!firmId) throw new Error("Create your practice first");
       try {
@@ -183,7 +187,7 @@ export default function SettingsPage() {
         /* private mode */
       }
       const { url } = await startGmail({
-        data: { firmId, origin: window.location.origin },
+        data: { firmId, origin: window.location.origin, enableSending },
       });
       window.location.href = url;
     });
@@ -502,7 +506,7 @@ export default function SettingsPage() {
                         className="v2-btn v2-btn-primary"
                         style={{ padding: "8px 16px", fontSize: 13 }}
                         disabled={busy === "gmail"}
-                        onClick={connectGmail}
+                        onClick={() => void connectGmail()}
                       >
                         {busy === "gmail" ? <><span className="ic-spin" /> Opening Google…</> : "Connect"}
                       </button>
@@ -522,6 +526,9 @@ export default function SettingsPage() {
                       </div>
                     ))}
                   <GmailHealth firmId={firmId} lastResult={gmailResult} autoRun={justConnected} />
+                  {intg.gmail.connections.some((c) => c.is_active) && (
+                    <ChaserSending firmId={firmId} busy={busy === "gmail"} onAllow={() => void connectGmail(true)} />
+                  )}
                 </div>
               ) : undefined}
             </IntegrationCard>
@@ -576,6 +583,17 @@ export default function SettingsPage() {
                     value={wa.display}
                     onChange={(e) => setWa({ ...wa, display: e.target.value })}
                   />
+                  <details style={{ flex: "1 1 100%" }}>
+                    <summary style={{ cursor: "pointer", fontSize: 12.5, color: V.body }}>
+                      Number on your own Meta business account? Add its token and app secret
+                    </summary>
+                    <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+                      <input className="v2-input" type="password" autoComplete="off" placeholder="Permanent access token for this number" value={wa.token} onChange={(e) => setWa({ ...wa, token: e.target.value })} />
+                      <input className="v2-input" type="password" autoComplete="off" placeholder="App secret of your Meta app (verifies incoming messages)" value={wa.secret} onChange={(e) => setWa({ ...wa, secret: e.target.value })} />
+                      <input className="v2-input" placeholder="WhatsApp Business Account ID (checks your template)" value={wa.waba} onChange={(e) => setWa({ ...wa, waba: e.target.value })} />
+                      <div style={{ fontSize: 12, color: V.muted }}>Stored encrypted and never shown again. Leave empty for a number that is on FynHelp's Meta app.</div>
+                    </div>
+                  </details>
                   <button
                     className="v2-btn v2-btn-ghost"
                     disabled={!wa.phoneNumberId.trim() || busy === "wa"}
@@ -587,7 +605,13 @@ export default function SettingsPage() {
                             data: {
                               phone_number_id: wa.phoneNumberId.trim(),
                               display_phone: wa.display.trim() || undefined,
+                              access_token: wa.token.trim() || undefined,
+                              app_secret: wa.secret.trim() || undefined,
+                              waba_id: wa.waba.trim() || undefined,
                             },
+                          }).then((r) => {
+                            setWa({ phoneNumberId: "", display: "", token: "", waba: "", secret: "" });
+                            return r;
                           }),
                         "WhatsApp number linked to this practice",
                       )
@@ -596,6 +620,7 @@ export default function SettingsPage() {
                     Link number
                   </button>
                 </div>
+                {firmId && <WhatsappChaser firmId={firmId} />}
                 </div>
               ) : undefined}
             </IntegrationCard>
@@ -607,15 +632,18 @@ export default function SettingsPage() {
               tint="rgba(31,78,140,.08)"
               name="TallyPrime"
               tag={<span style={{ fontSize: 11, color: V.muted, fontWeight: 600 }}>VIA EXPORT</span>}
-              description="Export the client's bank ledger from Tally as XML and drop it on Documents. Works with Tally on office PCs and Tally on Cloud. Nothing to install."
-              status={{ tone: "good", label: "Ready" }}
+              description="Connect TallyPrime live with the FynHelp Connector, or export the bank ledger as XML and drop it on Documents. Works with Tally on office PCs and Tally on Cloud."
+              status={tallyOnline ? { tone: "good", label: "Connected", live: true } : { tone: "good", label: "Ready" }}
               actions={
                 <Link to="/app/documents" className="v2-btn v2-btn-ghost" style={{ padding: "8px 14px", fontSize: 13 }}>
                   <UploadCloud size={14} /> Upload export
                 </Link>
               }
             >
-              <div style={{ display: "grid", gap: 8, fontSize: 13, color: V.body }}>
+              <div style={{ display: "grid", gap: 14 }}>
+              <TallyConnector onChange={setTallyOnline} />
+              <div style={{ display: "grid", gap: 8, fontSize: 13, color: V.body, borderTop: `1px solid ${V.line}`, paddingTop: 12 }}>
+                <div style={{ fontWeight: 600, fontSize: 13.5, color: V.ink }}>Or upload an export by hand</div>
                 <div>
                   In TallyPrime: Display More Reports → Account Books → Ledger → the bank ledger, <span className="num">Alt+F2</span> for the month, then{" "}
                   <span className="num">Alt+E</span> → Current → XML (Data Interchange).
@@ -628,6 +656,7 @@ export default function SettingsPage() {
                     Tally on Cloud / Remote Desktop →
                   </a>
                 </div>
+              </div>
               </div>
             </IntegrationCard>
             </div>

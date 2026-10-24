@@ -6,7 +6,6 @@ import { cancelPracticePlan, changePracticePlan, confirmPracticeCheckout, getPra
 import { monthName } from "@/lib/practice/billing/arrears";
 import {
   PLANS,
-  TRIAL_ACTIVATED_DAYS,
   TRIAL_DAYS,
   TRIAL_MAX_ACTIVE_CLIENTS,
   TRIAL_MAX_DOCUMENTS,
@@ -165,7 +164,7 @@ export function BillingSection() {
         {a.state === "trial" &&
           (a.trialNotStarted
             ? `Your ${TRIAL_DAYS}-day free trial starts with your first upload. It covers up to ${TRIAL_MAX_ACTIVE_CLIENTS} active clients and ${TRIAL_MAX_DOCUMENTS} documents, with every Firm feature except the WhatsApp Chaser. No card needed.`
-            : `Free trial until ${formatDate(b.trial_ends_at)}${a.trialDaysLeft != null ? ` (${a.trialDaysLeft <= 1 ? "last day" : `${a.trialDaysLeft} days left`})` : ""}. ${b.activated ? `Extended to ${TRIAL_ACTIVATED_DAYS} days because you ran a reconciliation and made an MIS.` : `Run one reconciliation and make one MIS on your own data to extend it to ${TRIAL_ACTIVATED_DAYS} days.`} Choose a plan any time; you are charged only from the day you choose.`)}
+            : `Free trial until ${formatDate(b.trial_ends_at)}${a.trialDaysLeft != null ? ` (${a.trialDaysLeft <= 1 ? "last day" : `${a.trialDaysLeft} days left`})` : ""}. Choose a plan any time; you are charged only from the day you choose.`)}
         {a.state === "active" &&
           (b.cancelAtPeriodEnd || b.status === "cancelled"
             ? `${PLANS[b.plan].name}, billed ${b.cycle === "annual" ? "yearly" : "monthly"}. Cancelled: full access until ${formatDate(b.current_period_end ?? "")}, then it stops. You will not be charged again.`

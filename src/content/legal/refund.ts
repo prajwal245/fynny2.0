@@ -71,7 +71,7 @@ export const REFUND: LegalDoc = {
   {
    "t": "c",
    "n": "2.1",
-   "text": "The free trial runs for fourteen (14) days from the Customer’s first document upload, extended to thirty (30) days once the Customer completes its first reconciliation and first MIS report. It covers up to five (5) active Client Entities and two hundred (200) documents, and does not require a payment method. No charge is levied for it."
+   "text": "The free trial runs for fourteen (14) days from the Customer’s first document upload. It covers up to five (5) active Client Entities and two hundred (200) documents, and does not require a payment method. No charge is levied for it."
   },
   {
    "t": "c",

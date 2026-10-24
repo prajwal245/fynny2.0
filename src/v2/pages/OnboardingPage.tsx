@@ -335,7 +335,7 @@ export default function OnboardingPage() {
                 </p>
                 {mode === "signup" && (
                   <p className="onb-foot" style={{ textAlign: "center", marginTop: -6 }}>
-                    Free trial: 14 days from your first upload, 30 once you make your first MIS. No card needed. By creating an account you agree to the{" "}
+                    Free trial: 14 days from your first upload. No card needed. By creating an account you agree to the{" "}
                     <a className="v2-link" href="/terms" target="_blank" rel="noreferrer">Terms</a> and{" "}
                     <a className="v2-link" href="/privacy" target="_blank" rel="noreferrer">Privacy policy</a>.
                   </p>

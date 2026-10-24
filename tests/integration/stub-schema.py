@@ -48,7 +48,7 @@ for t in TABLES:
         cols.append(f"  {name} {ctype}{default}")
     out.append(f"CREATE TABLE public.{t} (\n" + ",\n".join(cols) + "\n);")
 # Constraints the migration relies on.
-out.append("""ALTER TABLE public.ca_chaser_events ADD CONSTRAINT ca_chaser_events_event_type_check CHECK (event_type IN ('created','sent','replied','escalated','resolved','skipped','auto_resolved','auto_escalated'));
+out.append("""ALTER TABLE public.ca_chaser_events ADD CONSTRAINT ca_chaser_events_event_type_check CHECK (event_type IN ('created','sent','replied','escalated','resolved','skipped','auto_resolved','auto_escalated','whatsapp_quick_send','reopened','snoozed','whatsapp_status','client_replied','client_stopped'));
 ALTER TABLE public.ca_document_extractions ALTER COLUMN review_state SET DEFAULT 'pending', ALTER COLUMN source_type SET DEFAULT 'upload', ALTER COLUMN classification SET DEFAULT 'unknown';
 ALTER TABLE public.ca_document_requests ALTER COLUMN status SET DEFAULT 'open';
 ALTER TABLE public.ca_exceptions ALTER COLUMN status SET DEFAULT 'open', ALTER COLUMN severity SET DEFAULT 'medium', ALTER COLUMN source SET DEFAULT 'reconciliation';

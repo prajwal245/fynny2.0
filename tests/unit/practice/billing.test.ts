@@ -81,10 +81,9 @@ describe("trial and plan access", () => {
     const a = accessFor(row({ trial_started_at: null }), now);
     expect(a).toMatchObject({ state: "trial", canWork: true, trialNotStarted: true, trialDaysLeft: null });
   });
-  it("runs 14 days from the first upload, 30 once activated, with trial limits and no WhatsApp Chaser", () => {
+  it("runs 14 days from the first upload, with trial limits and no WhatsApp Chaser", () => {
     const a = accessFor(row({}), now);
     expect(a).toMatchObject({ state: "trial", canWork: true, trialDaysLeft: 14, maxActiveClients: TRIAL_MAX_ACTIVE_CLIENTS, maxDocuments: TRIAL_MAX_DOCUMENTS, whatsappChaser: false, features: "professional" });
-    expect(accessFor(row({ trial_ends_at: trialEndFrom(now, true).toISOString() }), now).trialDaysLeft).toBe(30);
   });
   it("the last 24 hours count as the last day", () => {
     const a = accessFor(row({ trial_ends_at: new Date(now.getTime() + 3_600_000).toISOString() }), now);

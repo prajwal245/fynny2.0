@@ -23,8 +23,8 @@ const FAQS: Record<string, QA[]> = {
     { q: "Can I connect multiple bank accounts?", a: "Yes. Connect all your business accounts for a unified cash position view across banks." },
   ],
   "Pricing & Plans": [
-    { q: "Is FynHelp free?", a: "Early access users get 30 days free. After that, plans start at ₹999/month for startups and scale with your business." },
-    { q: "Is there a free trial?", a: "Yes — your first financial audit report is free, no credit card required." },
+    { q: "Is FynHelp free?", a: "Every new account gets a 14-day free trial, no card needed. After that, plans start at ₹999/month for startups and scale with your business." },
+    { q: "Is there a free trial?", a: "Yes — 14 days free from signup, no credit card required." },
   ],
   "Security & Privacy": [
     { q: "Is my financial data secure?", a: "Bank-grade encryption (AES-256), SOC 2 compliant infrastructure, data hosted in India (AWS Mumbai). We never sell or share your data." },

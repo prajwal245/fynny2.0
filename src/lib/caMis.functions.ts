@@ -11,6 +11,32 @@ import {
   type MisExtraction,
   type MisItcRow,
 } from "./caMis.server";
+import {
+  buildAging,
+  buildBalanceSheet,
+  buildBankRec,
+  buildCashBank,
+  buildPnl,
+  type AgingRow,
+  type BalanceSnapshot,
+  type BankTxn,
+  type BuiltReport,
+  type LinkedAccount,
+  type OpenException,
+  type PnlDoc,
+  type ReconRun,
+} from "./caMisBuilders.server";
+import {
+  misLabel,
+  monthLabel,
+  resolvePeriod,
+  TYPED_MIS_KINDS,
+  MIS_CATALOG,
+  type ComparisonMode,
+  type MisReportKind,
+  type ReportSource,
+  type TypedMisReport,
+} from "./caMisReports";
 
 export interface GenerateMisInput {
   firm_id: string;
@@ -230,4 +256,328 @@ export const generateMisReport = createServerFn({ method: "POST" })
     });
 
     return { ...report, report_id: logRow?.id ?? "" };
+  });
+
+export interface GenerateTypedMisInput {
+  firm_id: string;
+  business_id: string;
+  report_type: MisReportKind;
+  /** Reporting month, YYYY-MM. The financial year is derived from it. */
+  month: string;
+  comparison?: ComparisonMode;
+  /** false = preview only (nothing is saved). */
+  persist?: boolean;
+}
+
+const ROW_LIMIT = 5000;
+
+const BASIS_NOTES: Partial<Record<MisReportKind, string>> = {
+  pnl: "Prepared from reviewed documents uploaded to FynHelp, not from a ledger or books of account. Excludes depreciation, provisions and journal adjustments.",
+  balance_sheet: "Prepared from a recorded balance sheet snapshot, not from a trial balance or ledger.",
+};
+
+/**
+ * Builds one of the report-type MIS reports (P&L, Balance Sheet, Cash & Bank,
+ * Receivables/Payables Aging, Bank Reconciliation). All figures come from the
+ * deterministic builders in caMisBuilders.server.ts; the general MIS keeps using
+ * `generateMisReport`.
+ */
+export const generateTypedMis = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: GenerateTypedMisInput) => {
+    if (!input?.firm_id || !input?.business_id) throw new Error("firm_id and business_id are required");
+    const entry = MIS_CATALOG.find((c) => c.kind === input.report_type);
+    if (!entry) throw new Error("Unknown report type");
+    if (!TYPED_MIS_KINDS.includes(input.report_type)) {
+      throw new Error(`${entry.label} is not available yet.`);
+    }
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(input.month ?? "")) throw new Error("Pick a valid reporting month");
+    if (input.comparison && !["none", "prev_month", "prev_year"].includes(input.comparison)) {
+      throw new Error("Unknown comparison period");
+    }
+    return input;
+  })
+  .handler(async ({ data, context }): Promise<TypedMisReport> => {
+    const { supabase, userId } = context;
+    const kind = data.report_type;
+    const entry = MIS_CATALOG.find((c) => c.kind === kind)!;
+    const comparison: ComparisonMode = entry.supportsComparison ? (data.comparison ?? "none") : "none";
+    const period = resolvePeriod(data.month, comparison);
+
+    const { data: access } = await supabase
+      .from("ca_client_access")
+      .select("id")
+      .eq("ca_firm_id", data.firm_id)
+      .eq("business_id", data.business_id)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (!access) throw new Error("Access denied. This client is not in your portfolio.");
+
+    const { data: clientRow } = await supabase
+      .from("ca_clients")
+      .select("client_name")
+      .eq("ca_firm_id", data.firm_id)
+      .eq("business_id", data.business_id)
+      .maybeSingle();
+
+    const sources: ReportSource[] = [];
+    /** Records the outcome of a read so missing or failed sources are visible in the report. */
+    const track = <T,>(name: string, table: string, res: { data: T[] | null; error: { message: string } | null }, limit?: number): T[] => {
+      const rows = res.data ?? [];
+      if (res.error) {
+        sources.push({ name, table, records: 0, status: "error", note: res.error.message });
+        return [];
+      }
+      sources.push({
+        name, table, records: rows.length,
+        status: limit && rows.length >= limit ? "truncated" : rows.length ? "ok" : "empty",
+      });
+      return rows;
+    };
+
+    const bid = data.business_id;
+    const fid = data.firm_id;
+    let built: BuiltReport;
+
+    if (kind === "pnl") {
+      const [docsRes, pendingRes] = await Promise.all([
+        supabase.from("ca_document_extractions")
+          .select("id, original_filename, classification, confidence, extracted, corrected")
+          .eq("ca_firm_id", fid).eq("business_id", bid).eq("review_state", "posted").limit(ROW_LIMIT),
+        supabase.from("ca_document_extractions")
+          .select("id", { count: "exact", head: true })
+          .eq("ca_firm_id", fid).eq("business_id", bid).neq("review_state", "posted"),
+      ]);
+      const docs = track("Posted documents", "ca_document_extractions", docsRes as never, ROW_LIMIT) as unknown as PnlDoc[];
+      built = buildPnl({ docs, pendingReviewCount: pendingRes.count ?? 0, truncated: docs.length >= ROW_LIMIT }, period);
+    } else if (kind === "balance_sheet") {
+      const snapAt = (end: string) =>
+        supabase.from("balance_sheet_snapshots").select("*")
+          .eq("business_id", bid).lte("snapshot_date", end)
+          .order("snapshot_date", { ascending: false }).limit(1);
+      const [curRes, cmpRes] = await Promise.all([
+        snapAt(period.end),
+        period.comparison ? snapAt(period.comparison.end) : Promise.resolve(null),
+      ]);
+      const cur = track("Balance sheet snapshots", "balance_sheet_snapshots", curRes as never) as unknown as BalanceSnapshot[];
+      const prev = cmpRes ? (track("Comparison snapshot", "balance_sheet_snapshots", cmpRes as never) as unknown as BalanceSnapshot[]) : [];
+      built = buildBalanceSheet(cur[0] ?? null, prev[0] ?? null, period);
+    } else if (kind === "cash_bank") {
+      const cols = "id, date, description, category, amount, balance, type";
+      const txnsIn = (start: string, end: string) =>
+        supabase.from("bank_transactions").select(cols).eq("business_id", bid)
+          .gte("date", start).lte("date", end)
+          .order("date", { ascending: true }).order("created_at", { ascending: true }).limit(ROW_LIMIT);
+      const lastBefore = (start: string) =>
+        supabase.from("bank_transactions").select(cols).eq("business_id", bid).lt("date", start)
+          .order("date", { ascending: false }).order("created_at", { ascending: false }).limit(1);
+      const cmp = period.comparison;
+      const [curRes, priorRes, cmpRes, cmpPriorRes, acctRes, snapRes] = await Promise.all([
+        txnsIn(period.start, period.end),
+        lastBefore(period.start),
+        cmp ? txnsIn(cmp.start, cmp.end) : Promise.resolve(null),
+        cmp ? lastBefore(cmp.start) : Promise.resolve(null),
+        supabase.from("ca_bank_accounts_linked").select("id, masked_account_number, fip_name, account_type")
+          .eq("ca_firm_id", fid).eq("business_id", bid),
+        supabase.from("balance_sheet_snapshots").select("cash, snapshot_date")
+          .eq("business_id", bid).lte("snapshot_date", period.end)
+          .order("snapshot_date", { ascending: false }).limit(1),
+      ]);
+      const txns = track("Bank transactions", "bank_transactions", curRes as never, ROW_LIMIT) as unknown as BankTxn[];
+      const prior = ((priorRes as { data: BankTxn[] | null }).data ?? [])[0] ?? null;
+      const cmpTxns = cmpRes ? ((cmpRes as { data: BankTxn[] | null }).data ?? []) : null;
+      const cmpPrior = cmpPriorRes ? ((cmpPriorRes as { data: BankTxn[] | null }).data ?? [])[0] ?? null : null;
+      const accounts = track("Linked bank accounts", "ca_bank_accounts_linked", acctRes as never) as unknown as LinkedAccount[];
+      const snap = ((snapRes as { data: { cash: number; snapshot_date: string }[] | null }).data ?? [])[0];
+      built = buildCashBank({
+        txns, prior, cmpTxns, cmpPrior, accounts,
+        snapshotCash: snap ? { value: Number(snap.cash), date: snap.snapshot_date } : null,
+        truncated: txns.length >= ROW_LIMIT,
+      }, period);
+    } else if (kind === "receivables_aging") {
+      const res = await supabase.from("receivables")
+        .select("id, customer_name, invoice_number, invoice_date, due_date, amount, received, outstanding")
+        .eq("business_id", bid).limit(ROW_LIMIT);
+      const rows = track("Receivables ledger", "receivables", res as never, ROW_LIMIT) as unknown as {
+        id: string; customer_name: string; invoice_number: string | null; invoice_date: string | null;
+        due_date: string | null; amount: number; received: number | null; outstanding: number | null;
+      }[];
+      const aging: AgingRow[] = rows.map((r) => ({
+        id: r.id, party: r.customer_name, ref: r.invoice_number, date: r.invoice_date, due: r.due_date,
+        amount: Number(r.amount), settled: r.received, outstanding: r.outstanding,
+      }));
+      built = buildAging("receivable", aging, period);
+    } else if (kind === "payables_aging") {
+      const res = await supabase.from("payables")
+        .select("id, vendor_name, invoice_number, created_at, due_date, amount, paid, outstanding")
+        .eq("business_id", bid).limit(ROW_LIMIT);
+      const rows = track("Payables ledger", "payables", res as never, ROW_LIMIT) as unknown as {
+        id: string; vendor_name: string; invoice_number: string | null; created_at: string;
+        due_date: string | null; amount: number; paid: number | null; outstanding: number | null;
+      }[];
+      const aging: AgingRow[] = rows.map((r) => ({
+        id: r.id, party: r.vendor_name, ref: r.invoice_number, date: r.created_at.slice(0, 10), due: r.due_date,
+        amount: Number(r.amount), settled: r.paid, outstanding: r.outstanding,
+      }));
+      built = buildAging("payable", aging, period);
+    } else {
+      // bank_rec
+      const [txnRes, runRes, excRes] = await Promise.all([
+        supabase.from("bank_transactions")
+          .select("id, date, description, category, amount, balance, type, reconciled, source_reference")
+          .eq("business_id", bid).gte("date", period.start).lte("date", period.end)
+          .order("date", { ascending: true }).limit(ROW_LIMIT),
+        supabase.from("ca_recon_runs")
+          .select("id, recon_type, period, run_at, matched, unmatched, mismatched, total_at_risk")
+          .eq("ca_firm_id", fid).eq("business_id", bid).order("run_at", { ascending: false }).limit(50),
+        supabase.from("ca_exceptions")
+          .select("id, reason_code, severity, status, amount, description, created_at")
+          .eq("ca_firm_id", fid).eq("business_id", bid)
+          .not("status", "in", "(resolved,closed)")
+          .lte("created_at", `${period.end}T23:59:59Z`).limit(500),
+      ]);
+      const txns = track("Bank transactions", "bank_transactions", txnRes as never, ROW_LIMIT) as unknown as BankTxn[];
+      const allRuns = track("Reconciliation runs", "ca_recon_runs", runRes as never) as unknown as ReconRun[];
+      const exceptions = track("Open exceptions", "ca_exceptions", excRes as never) as unknown as OpenException[];
+      const needles = [period.month, period.label, monthLabel(period.month).replace(" ", "-")].map((x) => x.toLowerCase());
+      const runs = allRuns.filter((r) => needles.some((n) => String(r.period ?? "").toLowerCase().includes(n)));
+      built = buildBankRec({ txns, runs, exceptions, truncated: txns.length >= ROW_LIMIT }, period);
+    }
+
+    for (const s of sources) {
+      if (s.status === "error") {
+        built.issues.unshift({ level: "error", code: "source_error", message: `Could not read ${s.name.toLowerCase()}: ${s.note ?? "unknown error"}. Check that this client's data is shared with your firm.` });
+      } else if (s.status === "empty" && !built.issues.some((i) => i.level === "error")) {
+        built.issues.push({ level: "info", code: "source_empty", message: `${s.name}: no records found.` });
+      }
+    }
+
+    const hasError = built.issues.some((i) => i.level === "error");
+    const report: TypedMisReport = {
+      kind,
+      title: misLabel(kind),
+      client_name: clientRow?.client_name ?? "Client",
+      period_label: period.label,
+      financial_year: period.fy,
+      period_start: period.start,
+      period_end: period.end,
+      comparison_label: period.comparison?.label ?? null,
+      generated_at: new Date().toISOString(),
+      sections: hasError ? [] : built.sections,
+      issues: built.issues,
+      sources,
+      report_id: null,
+      basis_note: BASIS_NOTES[kind] ?? null,
+      sign_off: null,
+    };
+
+    if (!data.persist) return report;
+    if (hasError) {
+      throw new Error(built.issues.filter((i) => i.level === "error").map((i) => i.message).join(" "));
+    }
+
+    const { data: logRow, error: logErr } = await supabase
+      .from("ca_reports_log")
+      .insert({
+        ca_firm_id: fid,
+        business_id: bid,
+        report_type: `mis_${kind}`,
+        report_name: `${report.title} — ${report.client_name} — ${report.period_label}`,
+        period: report.period_label,
+        period_start: report.period_start,
+        period_end: report.period_end,
+        content: report as never,
+        generated_by_user_id: userId,
+        status: "ready",
+      })
+      .select("id")
+      .maybeSingle();
+    if (logErr) throw new Error(logErr.message);
+
+    await supabase.from("ca_audit_events").insert({
+      ca_firm_id: fid,
+      business_id: bid,
+      actor_id: userId,
+      entity_type: "report",
+      entity_id: logRow?.id ?? null,
+      action: "mis_generated",
+      detail: { period: report.period_label, report_type: `mis_${kind}`, issues: built.issues.length } as never,
+    });
+    return { ...report, report_id: logRow?.id ?? null };
+  });
+
+export interface SignOffTypedMisInput {
+  report_log_id: string;
+  notes?: string | null;
+}
+
+/**
+ * Records a CA's sign-off on a saved report-type MIS. Sharing a report with a
+ * client is refused until this has been done (see createReportShare).
+ */
+export const signOffTypedMis = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: SignOffTypedMisInput) => {
+    if (!input?.report_log_id) throw new Error("report_log_id is required");
+    if (input.notes && input.notes.length > 1000) throw new Error("Note is too long");
+    return input;
+  })
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: log, error } = await supabase
+      .from("ca_reports_log")
+      .select("id, ca_firm_id, business_id, report_type, period, content, signed_off_at")
+      .eq("id", data.report_log_id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!log || !String(log.report_type).startsWith("mis_")) throw new Error("Report not found");
+    if (log.signed_off_at) throw new Error("This report is already signed off.");
+
+    // Caller must be an active member (or owner) of the report's firm.
+    const [{ data: owner }, { data: member }] = await Promise.all([
+      supabase.from("ca_firms").select("id").eq("id", log.ca_firm_id).eq("user_id", userId).maybeSingle(),
+      supabase.from("ca_firm_members").select("id").eq("ca_firm_id", log.ca_firm_id)
+        .eq("user_id", userId).eq("status", "active").maybeSingle(),
+    ]);
+    if (!owner && !member) throw new Error("Only CA firm members can sign off reports.");
+
+    const content = (log.content ?? {}) as unknown as TypedMisReport;
+    if (content.issues?.some((i) => i.level === "error")) {
+      throw new Error("A report with blocking errors cannot be signed off.");
+    }
+    const { data: prof } = await supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle();
+    const by = prof?.full_name?.trim() || "CA";
+    const at = new Date().toISOString();
+    const note = data.notes?.trim() || null;
+
+    const { error: updErr } = await supabase
+      .from("ca_reports_log")
+      .update({
+        signed_off_by: userId,
+        signed_off_at: at,
+        status: "signed_off",
+        content: { ...content, sign_off: { by, at, note } } as never,
+      })
+      .eq("id", log.id)
+      .is("signed_off_at", null);
+    if (updErr) throw new Error(updErr.message);
+
+    await supabase.from("ca_mis_signoffs").insert({
+      ca_firm_id: log.ca_firm_id,
+      client_id: log.business_id,
+      period_id: log.period,
+      report_type: log.report_type,
+      signed_off_by: userId,
+      notes: note,
+    });
+    await supabase.from("ca_audit_events").insert({
+      ca_firm_id: log.ca_firm_id,
+      business_id: log.business_id,
+      actor_id: userId,
+      entity_type: "report",
+      entity_id: log.id,
+      action: "mis_signed_off",
+      detail: { report_type: log.report_type, period: log.period } as never,
+    });
+    return { by, at, note };
   });

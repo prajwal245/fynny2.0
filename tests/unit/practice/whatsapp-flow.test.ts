@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   advances,
   buildTemplateMessage,
@@ -158,5 +158,22 @@ describe("matching a first-time sender to a firm", () => {
     expect(phoneTail("919845012345")).toBe("9845012345");
     expect(phoneTail("12345")).toBeNull();
     expect(phoneTail(null)).toBeNull();
+  });
+});
+
+describe("shared number setting names", () => {
+  const keys = ["WHATSAPP_DEFAULT_PHONE_NUMBER_ID", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_PHONE_ID"];
+  const saved: Record<string, string | undefined> = {};
+  beforeEach(() => keys.forEach((k) => { saved[k] = process.env[k]; delete process.env[k]; }));
+  afterEach(() => keys.forEach((k) => { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }));
+  it("accepts the documented name, then the common alternatives, digits only", async () => {
+    const { sharedPhoneNumberId } = await import("@/lib/practice/whatsappSend.server");
+    expect(sharedPhoneNumberId()).toBeUndefined();
+    process.env["WHATSAPP_PHONE_ID"] = " 1234567890 ";
+    expect(sharedPhoneNumberId()).toBe("1234567890");
+    process.env["WHATSAPP_PHONE_NUMBER_ID"] = "555000111222";
+    expect(sharedPhoneNumberId()).toBe("555000111222");
+    process.env["WHATSAPP_DEFAULT_PHONE_NUMBER_ID"] = "999888777666";
+    expect(sharedPhoneNumberId()).toBe("999888777666");
   });
 });

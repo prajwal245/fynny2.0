@@ -544,6 +544,11 @@ export async function whatsappStatus(db: Db, ctx: FirmContext) {
     sender_pref: r.pref,
     shared: {
       configured: sharedConfigured,
+      // Which server settings are still missing, so Settings can say exactly what to add.
+      missing: [
+        ...(sharedPhoneNumberId() ? [] : ["WHATSAPP_DEFAULT_PHONE_NUMBER_ID"]),
+        ...(env("WHATSAPP_ACCESS_TOKEN") ? [] : ["WHATSAPP_ACCESS_TOKEN"]),
+      ],
       display: sharedDisplayNumber() ?? null,
       // The code clients send ("JOIN K7M2QX") to link their phone to this firm on the shared number.
       join_code: sharedConfigured ? await ensureJoinCode(db, ctx.firmId).catch(() => null) : null,

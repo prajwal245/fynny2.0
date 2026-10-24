@@ -553,7 +553,9 @@ export default function SettingsPage() {
               status={
                 intg.whatsapp.channels.some((c) => c.is_active)
                   ? { tone: "good", label: "Connected", live: true }
-                  : intg.whatsapp.available
+                  : intg.whatsapp.sharedReady
+                    ? { tone: "good", label: "Using FynHelp's number", live: true }
+                    : intg.whatsapp.available
                     ? { tone: "neutral", label: "Not connected" }
                     : { tone: "warn", label: "Not switched on yet" }
               }

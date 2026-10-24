@@ -76,7 +76,11 @@ export function WhatsappChaser({ firmId }: { firmId: string }) {
           <input type="radio" name="wa-sender" checked={using === "fynhelp"} disabled={!status?.shared.configured} onChange={() => void pickNumber("fynhelp")} style={{ marginTop: 3 }} />
           <span>
             <b>FynHelp's number</b>{status?.shared.display ? ` (${status.shared.display})` : ""}. Nothing to set up. Reminders show your firm's name in the message, and replies and documents reach you.
-            {!status?.shared.configured && <span style={{ color: V.muted }}> Not switched on yet.</span>}
+            {!status?.shared.configured && (
+              <span style={{ color: V.maroon }}>
+                {" "}Not switched on yet. Missing on the server: {status?.shared.missing.length ? status.shared.missing.join(", ") : "its settings"}.
+              </span>
+            )}
             {using === "fynhelp" && status?.shared.join_code && (
               <span style={{ display: "block", color: V.muted, marginTop: 4 }}>
                 To receive documents from a client who has not been chased yet, ask them to send <span className="num">JOIN {status.shared.join_code}</span> to this number once.

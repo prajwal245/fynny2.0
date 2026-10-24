@@ -207,6 +207,8 @@ export async function integrationStatus(db: Db, ctx: FirmContext) {
       // Always offered: a firm can link a number on its own Meta account even when FynHelp has no shared number.
       available: true,
       channels: wa ?? [],
+      // FynHelp's shared number can be used (its Phone number ID and the server token are both set).
+      sharedReady: Boolean(process.env["WHATSAPP_DEFAULT_PHONE_NUMBER_ID"]?.trim()) && env("WHATSAPP_ACCESS_TOKEN"),
     },
     email: { available: env("RESEND_API_KEY") },
     reading: {

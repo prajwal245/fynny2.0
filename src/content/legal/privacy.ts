@@ -3,8 +3,8 @@ import type { LegalDoc } from "./types";
 
 export const PRIVACY: LegalDoc = {
  "title": null,
- "updated": "13 October 2026",
- "version": "1.0",
+ "updated": "24 October 2026",
+ "version": "1.1",
  "blocks": [
   {
    "t": "p",
@@ -256,8 +256,8 @@ export const PRIVACY: LegalDoc = {
     ],
     [
      "Google (Gmail API)",
-     "Document intake from a connected mailbox, where enabled",
-     "Emails and attachments routed by the User"
+     "Document intake from a connected mailbox and, where the User enables it, sending document-request reminders from that mailbox",
+     "Emails and attachments routed by the User; the recipient’s email address and the text of reminders the User sends"
     ],
     [
      "PostHog",
@@ -279,7 +279,49 @@ export const PRIVACY: LegalDoc = {
   {
    "t": "c",
    "n": "5.3",
-   "text": "FynHelp’s use and transfer of information received from Google APIs adheres to the Google API Services User Data Policy, including the Limited Use requirements."
+   "text": "FynHelp’s use and transfer to any other app of information received from Google APIs will adhere to the Google API Services User Data Policy, including the Limited Use requirements. In particular, where a User connects a Gmail mailbox:"
+  },
+  {
+   "t": "c",
+   "n": "(a)",
+   "text": "we use Gmail data only to provide and improve the user-facing features the User has switched on, namely reading client emails and attachments routed to the firm in order to import documents, and, where the User separately allows it, sending document-request reminders from the User’s own mailbox;",
+   "sub": true
+  },
+  {
+   "t": "c",
+   "n": "(b)",
+   "text": "we ask for permission to send email (the gmail.send scope) only when a partner chooses to send reminders from the firm’s Gmail, and we send only reminders that the firm’s chase schedule or a team member has created, to the contact addresses the firm has recorded for its own clients;",
+   "sub": true
+  },
+  {
+   "t": "c",
+   "n": "(c)",
+   "text": "we do not transfer Gmail data to others except as necessary to provide or improve these features, to comply with applicable law, or as part of a merger, acquisition or sale of assets with notice to the User; the processors listed in clause 5.1 receive it only for that purpose;",
+   "sub": true
+  },
+  {
+   "t": "c",
+   "n": "(d)",
+   "text": "we do not use Gmail data for serving advertisements, including retargeting, personalised or interest-based advertising, and we do not sell it;",
+   "sub": true
+  },
+  {
+   "t": "c",
+   "n": "(e)",
+   "text": "we do not allow humans to read Gmail data unless the User has given us consent for specific messages, it is necessary for security purposes such as investigating abuse, it is needed to comply with applicable law, or the data has been aggregated and anonymised for internal operations;",
+   "sub": true
+  },
+  {
+   "t": "c",
+   "n": "(f)",
+   "text": "we do not use Gmail data to develop, improve or train generalised artificial intelligence or machine learning models; and",
+   "sub": true
+  },
+  {
+   "t": "c",
+   "n": "(g)",
+   "text": "Gmail access tokens are stored encrypted. A User may disconnect Gmail at any time from Settings, which revokes FynHelp’s access, or remove FynHelp in their Google Account permissions; sending by Gmail stops immediately and reminders revert to being sent from FynHelp’s address.",
+   "sub": true
   },
   {
    "t": "c",

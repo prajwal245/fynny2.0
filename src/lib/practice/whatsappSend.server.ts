@@ -22,8 +22,19 @@ const env = (n: string) => (process.env[n] ?? "").trim() || undefined;
 export const chaseTemplate = () => env("WHATSAPP_CHASE_TEMPLATE") ?? "document_request";
 export const chaseTemplateLang = () => env("WHATSAPP_TEMPLATE_LANG") ?? "en";
 
-/** FynHelp's own shared WhatsApp number (Phone number ID from Meta), if one is set up. */
-export const sharedPhoneNumberId = () => env("WHATSAPP_DEFAULT_PHONE_NUMBER_ID");
+/**
+ * FynHelp's own shared WhatsApp number (Phone number ID from Meta), if one is set up.
+ * The documented name is WHATSAPP_DEFAULT_PHONE_NUMBER_ID; the names people most often use for
+ * the same value are accepted too, so a differently named setting is not silently ignored.
+ */
+export const SHARED_ID_NAMES = ["WHATSAPP_DEFAULT_PHONE_NUMBER_ID", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_PHONE_ID"] as const;
+export const sharedPhoneNumberId = () => {
+  for (const n of SHARED_ID_NAMES) {
+    const v = env(n);
+    if (v) return v.replace(/\D/g, "") || undefined;
+  }
+  return undefined;
+};
 export const sharedDisplayNumber = () => env("WHATSAPP_DEFAULT_DISPLAY_NUMBER");
 
 export interface Sender {

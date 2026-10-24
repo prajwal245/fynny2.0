@@ -6,6 +6,7 @@
  * creating a new one.
  */
 import { PracticeError } from "./core";
+import { sharedPhoneNumberId } from "./whatsappSend.server";
 import { logActivity, type Db, type FirmContext } from "./db.server";
 import { isEmail, sendEmail } from "./email.server";
 
@@ -208,7 +209,7 @@ export async function integrationStatus(db: Db, ctx: FirmContext) {
       available: true,
       channels: wa ?? [],
       // FynHelp's shared number can be used (its Phone number ID and the server token are both set).
-      sharedReady: Boolean(process.env["WHATSAPP_DEFAULT_PHONE_NUMBER_ID"]?.trim()) && env("WHATSAPP_ACCESS_TOKEN"),
+      sharedReady: Boolean(sharedPhoneNumberId()) && env("WHATSAPP_ACCESS_TOKEN"),
     },
     email: { available: env("RESEND_API_KEY") },
     reading: {

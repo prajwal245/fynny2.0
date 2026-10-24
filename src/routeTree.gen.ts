@@ -116,6 +116,8 @@ import { Route as ApiPublicEmailPreferencesRouteImport } from './routes/api/publ
 import { Route as ApiPublicPracticeTickRouteImport } from './routes/api/public/practice-tick'
 import { Route as ApiPublicRazorpayWebhookRouteImport } from './routes/api/public/razorpay-webhook'
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp-webhook'
+import { Route as ApiPublicTallyHelloRouteImport } from './routes/api/public/tally-hello'
+import { Route as ApiPublicTallyLedgerRouteImport } from './routes/api/public/tally-ledger'
 import { Route as AppClientsIndexRouteImport } from './routes/app/clients.index'
 import { Route as AppClientsClientIdRouteImport } from './routes/app/clients.$clientId'
 import { Route as AppReportsIndexRouteImport } from './routes/app/reports.index'
@@ -769,6 +771,18 @@ const ApiPublicWhatsappWebhookRoute =
   ApiPublicWhatsappWebhookRouteImport.update({
     id: '/api/public/whatsapp-webhook',
     path: '/api/public/whatsapp-webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicTallyHelloRoute =
+  ApiPublicTallyHelloRouteImport.update({
+    id: '/api/public/tally-hello',
+    path: '/api/public/tally-hello',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicTallyLedgerRoute =
+  ApiPublicTallyLedgerRouteImport.update({
+    id: '/api/public/tally-ledger',
+    path: '/api/public/tally-ledger',
     getParentRoute: () => rootRouteImport,
   } as any)
 const AppClientsIndexRoute = AppClientsIndexRouteImport.update({
@@ -1455,6 +1469,8 @@ export interface FileRoutesByFullPath {
   '/api/public/practice-tick': typeof ApiPublicPracticeTickRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/whatsapp-webhook': typeof ApiPublicWhatsappWebhookRoute
+  '/api/public/tally-hello': typeof ApiPublicTallyHelloRoute
+  '/api/public/tally-ledger': typeof ApiPublicTallyLedgerRoute
   '/app/clients/$clientId': typeof AppClientsClientIdRoute
   '/app/reports/$reportId': typeof AppReportsReportIdRoute
   '/shared/mis/$token': typeof SharedMisTokenRoute
@@ -1655,6 +1671,8 @@ export interface FileRoutesByTo {
   '/api/public/practice-tick': typeof ApiPublicPracticeTickRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/whatsapp-webhook': typeof ApiPublicWhatsappWebhookRoute
+  '/api/public/tally-hello': typeof ApiPublicTallyHelloRoute
+  '/api/public/tally-ledger': typeof ApiPublicTallyLedgerRoute
   '/app/clients/$clientId': typeof AppClientsClientIdRoute
   '/app/reports/$reportId': typeof AppReportsReportIdRoute
   '/shared/mis/$token': typeof SharedMisTokenRoute
@@ -1866,6 +1884,8 @@ export interface FileRoutesById {
   '/api/public/practice-tick': typeof ApiPublicPracticeTickRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/whatsapp-webhook': typeof ApiPublicWhatsappWebhookRoute
+  '/api/public/tally-hello': typeof ApiPublicTallyHelloRoute
+  '/api/public/tally-ledger': typeof ApiPublicTallyLedgerRoute
   '/app/clients/$clientId': typeof AppClientsClientIdRoute
   '/app/reports/$reportId': typeof AppReportsReportIdRoute
   '/shared/mis/$token': typeof SharedMisTokenRoute
@@ -2073,6 +2093,8 @@ export interface FileRouteTypes {
     | '/api/public/practice-tick'
     | '/api/public/razorpay-webhook'
     | '/api/public/whatsapp-webhook'
+    | '/api/public/tally-hello'
+    | '/api/public/tally-ledger'
     | '/app/clients/$clientId'
     | '/app/reports/$reportId'
     | '/shared/mis/$token'
@@ -2273,6 +2295,8 @@ export interface FileRouteTypes {
     | '/api/public/practice-tick'
     | '/api/public/razorpay-webhook'
     | '/api/public/whatsapp-webhook'
+    | '/api/public/tally-hello'
+    | '/api/public/tally-ledger'
     | '/app/clients/$clientId'
     | '/app/reports/$reportId'
     | '/shared/mis/$token'
@@ -2483,6 +2507,8 @@ export interface FileRouteTypes {
     | '/api/public/practice-tick'
     | '/api/public/razorpay-webhook'
     | '/api/public/whatsapp-webhook'
+    | '/api/public/tally-hello'
+    | '/api/public/tally-ledger'
     | '/app/clients/$clientId'
     | '/app/reports/$reportId'
     | '/shared/mis/$token'
@@ -2618,6 +2644,8 @@ export interface RootRouteChildren {
   ApiPublicPracticeTickRoute: typeof ApiPublicPracticeTickRoute
   ApiPublicRazorpayWebhookRoute: typeof ApiPublicRazorpayWebhookRoute
   ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
+  ApiPublicTallyHelloRoute: typeof ApiPublicTallyHelloRoute
+  ApiPublicTallyLedgerRoute: typeof ApiPublicTallyLedgerRoute
   SharedMisTokenRoute: typeof SharedMisTokenRoute
   ApiIntegrationsZohoCallbackRoute: typeof ApiIntegrationsZohoCallbackRoute
   CaIntegrationsGmailCallbackRoute: typeof CaIntegrationsGmailCallbackRoute
@@ -3372,6 +3400,20 @@ declare module '@tanstack/react-router' {
       path: '/api/public/whatsapp-webhook'
       fullPath: '/api/public/whatsapp-webhook'
       preLoaderRoute: typeof ApiPublicWhatsappWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/tally-hello': {
+      id: '/api/public/tally-hello'
+      path: '/api/public/tally-hello'
+      fullPath: '/api/public/tally-hello'
+      preLoaderRoute: typeof ApiPublicTallyHelloRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/tally-ledger': {
+      id: '/api/public/tally-ledger'
+      path: '/api/public/tally-ledger'
+      fullPath: '/api/public/tally-ledger'
+      preLoaderRoute: typeof ApiPublicTallyLedgerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app/clients/': {
@@ -4590,6 +4632,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicPracticeTickRoute: ApiPublicPracticeTickRoute,
   ApiPublicRazorpayWebhookRoute: ApiPublicRazorpayWebhookRoute,
   ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,
+  ApiPublicTallyHelloRoute: ApiPublicTallyHelloRoute,
+  ApiPublicTallyLedgerRoute: ApiPublicTallyLedgerRoute,
   SharedMisTokenRoute: SharedMisTokenRoute,
   ApiIntegrationsZohoCallbackRoute: ApiIntegrationsZohoCallbackRoute,
   CaIntegrationsGmailCallbackRoute: CaIntegrationsGmailCallbackRoute,

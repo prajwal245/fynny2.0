@@ -1022,3 +1022,49 @@ export const zohoBooksSync = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) =>
     withWork(context.userId, async (db, ctx) => (await import("./zoho.server")).sync(db, ctx, data.linkId, data.month)),
   );
+
+/* ── Tally connector ──────────────────────────────────── */
+
+export const tallyConnectors = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./tallyConnector.server")).listConnectors(db, ctx)),
+  );
+
+/** Creates a connector and returns its secret token once. */
+export const tallyConnectorCreate = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ name: z.string().min(1).max(60) }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      await asPartner(ctx, "connect Tally");
+      return (await import("./tallyConnector.server")).createConnector(db, ctx, data.name);
+    }),
+  );
+
+export const tallyConnectorRevoke = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: uuid }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      await asPartner(ctx, "remove a Tally connector");
+      return (await import("./tallyConnector.server")).revokeConnector(db, ctx, data.id);
+    }),
+  );
+
+export const tallyCompanyMap = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ company_id: uuid, business_id: uuid.nullable() }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      await asPartner(ctx, "link a Tally company to a client");
+      return (await import("./tallyConnector.server")).mapCompany(db, ctx, data.company_id, data.business_id);
+    }),
+  );
+
+export const tallySyncNow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: uuid }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./tallyConnector.server")).requestSync(db, ctx, data.id)),
+  );

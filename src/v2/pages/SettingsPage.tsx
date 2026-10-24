@@ -23,6 +23,7 @@ import { BillingSection } from "../components/BillingSection";
 import { GmailHealth } from "../components/GmailHealth";
 import { ChaserSending } from "../components/ChaserSending";
 import { WhatsappChaser } from "../components/WhatsappChaser";
+import { TallyConnector } from "../components/TallyConnector";
 import { GmailIcon, WhatsAppIcon } from "../components/BrandIcons";
 import { ZohoBooksSection } from "../components/ZohoBooks";
 import { INTEGRATION_STYLES, IntegrationCard } from "../components/IntegrationCard";
@@ -87,6 +88,7 @@ export default function SettingsPage() {
     email: "",
     role: "junior" as Team["roles"][number],
   });
+  const [tallyOnline, setTallyOnline] = useState(false);
   const [wa, setWa] = useState({ phoneNumberId: "", display: "", token: "", waba: "", secret: "" });
   const [profileName, setProfileName] = useState(session?.name ?? "");
   const [busy, setBusy] = useState<string | null>(null);
@@ -630,15 +632,18 @@ export default function SettingsPage() {
               tint="rgba(31,78,140,.08)"
               name="TallyPrime"
               tag={<span style={{ fontSize: 11, color: V.muted, fontWeight: 600 }}>VIA EXPORT</span>}
-              description="Export the client's bank ledger from Tally as XML and drop it on Documents. Works with Tally on office PCs and Tally on Cloud. Nothing to install."
-              status={{ tone: "good", label: "Ready" }}
+              description="Connect TallyPrime live with the FynHelp Connector, or export the bank ledger as XML and drop it on Documents. Works with Tally on office PCs and Tally on Cloud."
+              status={tallyOnline ? { tone: "good", label: "Connected", live: true } : { tone: "good", label: "Ready" }}
               actions={
                 <Link to="/app/documents" className="v2-btn v2-btn-ghost" style={{ padding: "8px 14px", fontSize: 13 }}>
                   <UploadCloud size={14} /> Upload export
                 </Link>
               }
             >
-              <div style={{ display: "grid", gap: 8, fontSize: 13, color: V.body }}>
+              <div style={{ display: "grid", gap: 14 }}>
+              <TallyConnector onChange={setTallyOnline} />
+              <div style={{ display: "grid", gap: 8, fontSize: 13, color: V.body, borderTop: `1px solid ${V.line}`, paddingTop: 12 }}>
+                <div style={{ fontWeight: 600, fontSize: 13.5, color: V.ink }}>Or upload an export by hand</div>
                 <div>
                   In TallyPrime: Display More Reports → Account Books → Ledger → the bank ledger, <span className="num">Alt+F2</span> for the month, then{" "}
                   <span className="num">Alt+E</span> → Current → XML (Data Interchange).
@@ -651,6 +656,7 @@ export default function SettingsPage() {
                     Tally on Cloud / Remote Desktop →
                   </a>
                 </div>
+              </div>
               </div>
             </IntegrationCard>
             </div>

@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import { Send, Plus, MessageCircle, Mail, Lock } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { useBilling } from "../lib/billing";
+import { getPracticeWhatsappStatus } from "@/lib/practice/practice.functions";
 import { Badge, Card, Drawer, EmptyState, Modal, PageHeader, Tone, V, formatDate } from "../ui";
 import { AgentGlyph, AgentStatusBadge, AgentTimeline, ShimmerText } from "../agents";
 import { Chase, useV2 } from "../store";
@@ -17,6 +18,11 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
   const { chases: allChases, clients, clientName, addChase, sendFollowUp, setChaseStatus, snoozeChase, runs } = useV2();
   // WhatsApp chasing is on Firm and Scale (not Essential or the trial).
   const whatsappAllowed = useBilling()?.access.whatsappChaser ?? false;
+  // With a token and a linked number the message goes out itself; otherwise WhatsApp opens with it ready.
+  const [waSendReady, setWaSendReady] = useState(false);
+  useEffect(() => {
+    void getPracticeWhatsappStatus().then((s) => setWaSendReady(Boolean(s.send_ready))).catch(() => setWaSendReady(false));
+  }, []);
   const chases = scopedClient ? allChases.filter((c) => c.clientId === scopedClient) : allChases;
   const [creating, setCreating] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -199,7 +205,12 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
                     <Lock size={14} /> WhatsApp on Firm plan
                   </Link>
                 )}
-                {active.phone && active.status !== "Resolved" && whatsappAllowed && (
+                {active.phone && active.status !== "Resolved" && whatsappAllowed && waSendReady && (
+                  <button className="v2-btn v2-btn-primary" onClick={() => { sendFollowUp(active.id, "WhatsApp"); }}>
+                    <MessageCircle size={15} /> Send WhatsApp
+                  </button>
+                )}
+                {active.phone && active.status !== "Resolved" && whatsappAllowed && !waSendReady && (
                   <a
                     className="v2-btn v2-btn-primary"
                     href={waLink(active)}
@@ -207,7 +218,7 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
                     rel="noreferrer"
                     onClick={() => { sendFollowUp(active.id, "WhatsApp"); }}
                   >
-                    <MessageCircle size={15} /> Send WhatsApp
+                    <MessageCircle size={15} /> Open WhatsApp
                   </a>
                 )}
                 {active.status !== "Resolved" && (() => {

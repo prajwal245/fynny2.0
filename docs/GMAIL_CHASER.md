@@ -66,3 +66,17 @@ Gmail send when the firm connected Gmail and opted in; FynHelp domain otherwise.
 2. Send window and promise-to-send snooze.
 3. Gmail send (Option A) behind a per-firm switch, with the Resend fallback.
 4. Client upload page and chaser dashboard.
+
+## WhatsApp (official Cloud API)
+Set on the server: `WHATSAPP_ACCESS_TOKEN` (permanent system-user token), `WHATSAPP_APP_SECRET`,
+`WHATSAPP_VERIFY_TOKEN`; optional `WHATSAPP_WABA_ID` (lets Settings check the template),
+`WHATSAPP_CHASE_TEMPLATE` (default `document_request`) and `WHATSAPP_TEMPLATE_LANG` (default `en`).
+
+In Meta WhatsApp Manager create a **Utility** template named `document_request`, language English, body with four fields:
+`Hello {{1}}, this is {{4}}. For {{2}} we are still waiting for: {{3}}. Please reply here with the file attached. Thank you.`
+Point the webhook to `/api/public/whatsapp-webhook` and subscribe to `messages`.
+
+Behaviour: manual "Send WhatsApp" and the optional automatic reminder (second reminder on) go out as that template;
+delivered / read / failed receipts appear on the chase timeline; a text reply pauses the next nudge for two days and
+notifies the team; STOP turns reminders off for that client; a returning document closes the chase. Without a token
+and linked number the button falls back to opening WhatsApp with the message ready.

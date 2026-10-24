@@ -22,6 +22,7 @@ import { AgentSettings } from "../components/AgentSettings";
 import { BillingSection } from "../components/BillingSection";
 import { GmailHealth } from "../components/GmailHealth";
 import { ChaserSending } from "../components/ChaserSending";
+import { WhatsappChaser } from "../components/WhatsappChaser";
 import { GmailIcon, WhatsAppIcon } from "../components/BrandIcons";
 import { ZohoBooksSection } from "../components/ZohoBooks";
 import { INTEGRATION_STYLES, IntegrationCard } from "../components/IntegrationCard";
@@ -600,6 +601,7 @@ export default function SettingsPage() {
                     Link number
                   </button>
                 </div>
+                {firmId && intg.whatsapp.channels.length > 0 && <WhatsappChaser firmId={firmId} />}
                 </div>
               ) : undefined}
             </IntegrationCard>

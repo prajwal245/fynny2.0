@@ -267,6 +267,8 @@ export interface ChaserPrefs {
   viaGmail: boolean;
   sendGranted: boolean;
   tone: "gentle" | "standard" | "firm";
+  /** Also send a WhatsApp reminder from the second reminder on. */
+  whatsappAuto: boolean;
 }
 
 const readPrefs = (raw: unknown): ChaserPrefs => {
@@ -276,6 +278,7 @@ const readPrefs = (raw: unknown): ChaserPrefs => {
     sendGranted: p["gmail_send_granted"] === true,
     viaGmail: p["chaser_via_gmail"] === true && p["gmail_send_granted"] === true,
     tone: tone === "gentle" || tone === "firm" ? tone : "standard",
+    whatsappAuto: p["chaser_whatsapp_auto"] === true,
   };
 };
 
@@ -296,7 +299,7 @@ export const getChaserPrefs = createServerFn({ method: "POST" })
 /** Partner choice: send chasers from the firm's Gmail (needs Google's send permission) and the tone. */
 export const setChaserPrefs = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { firmId: string; viaGmail?: boolean; tone?: "gentle" | "standard" | "firm" }) => {
+  .inputValidator((input: { firmId: string; viaGmail?: boolean; tone?: "gentle" | "standard" | "firm"; whatsappAuto?: boolean }) => {
     if (!input?.firmId) throw new Error("firmId is required");
     if (input.tone !== undefined && !["gentle", "standard", "firm"].includes(input.tone)) throw new Error("Unknown tone");
     return input;
@@ -315,6 +318,7 @@ export const setChaserPrefs = createServerFn({ method: "POST" })
       ...prev,
       ...(data.viaGmail !== undefined ? { chaser_via_gmail: data.viaGmail } : {}),
       ...(data.tone ? { chaser_tone: data.tone } : {}),
+      ...(data.whatsappAuto !== undefined ? { chaser_whatsapp_auto: data.whatsappAuto } : {}),
     };
     const { error } = await db.from("ca_firms").update({ notification_prefs: next }).eq("id", data.firmId);
     if (error) throw new Error(error.message);

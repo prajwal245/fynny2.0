@@ -601,6 +601,15 @@ export const getPracticeWhatsappStatus = createServerFn({ method: "GET" })
     ),
   );
 
+/** Checks token, number, webhook settings and the chase template, and says which fails. */
+export const checkPracticeWhatsapp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) =>
+    withFirm(context.userId, async (db, ctx) =>
+      (await import("./whatsapp.server")).whatsappHealth(db, ctx),
+    ),
+  );
+
 export const connectPracticeWhatsapp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) =>

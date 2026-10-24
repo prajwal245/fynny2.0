@@ -7,9 +7,11 @@
  * the Extract agent. The sender's number is matched to a client; unknown
  * senders land as unassigned documents.
  */
-import { adminDb, logActivity, type Db, type FirmContext } from "./db.server";
+import { adminDb, chaserEvent, logActivity, type Db, type FirmContext } from "./db.server";
 import { BUCKET, registerDocument } from "./documents.server";
 import { PracticeError } from "./core";
+import { advances, classifyInbound, explainWaError, isWaDelivery, type WaDelivery } from "./whatsappFlow";
+import { chaseTemplate, chaseTemplateLang } from "./whatsappSend.server";
 
 // WHATSAPP_GRAPH_BASE exists only so tests and demos can use a stand-in Meta Graph API.
 const GRAPH = process.env["WHATSAPP_GRAPH_BASE"] || "https://graph.facebook.com/v21.0";
@@ -58,6 +60,14 @@ interface WaMessage {
     caption?: string;
   };
   image?: { id: string; mime_type?: string; caption?: string };
+  text?: { body?: string };
+}
+
+interface WaStatus {
+  id: string;
+  status: string;
+  recipient_id?: string;
+  errors?: { code?: number; title?: string; message?: string; error_data?: { details?: string } }[];
 }
 
 interface WaChange {
@@ -65,6 +75,7 @@ interface WaChange {
     metadata?: { phone_number_id?: string; display_phone_number?: string };
     contacts?: { wa_id?: string; profile?: { name?: string } }[];
     messages?: WaMessage[];
+    statuses?: WaStatus[];
   };
 }
 
@@ -150,6 +161,125 @@ async function matchClient(
   return chaseHits.length === 1 ? chaseHits[0] : null;
 }
 
+const snippet = (s: string) => (s.length > 140 ? `${s.slice(0, 137)}...` : s).replace(/\s+/g, " ");
+
+/** Delivery receipts for chases we sent: sent, delivered, read or failed. */
+async function handleStatuses(db: Db, firmId: string, statuses: WaStatus[]) {
+  for (const st of statuses) {
+    if (!isWaDelivery(st.status)) continue;
+    const { data: ev } = await db
+      .from("ca_chaser_events")
+      .select("id, chaser_id, business_id, metadata")
+      .eq("ca_firm_id", firmId)
+      .eq("event_type", "sent")
+      .eq("metadata->>wamid", st.id)
+      .limit(1)
+      .maybeSingle();
+    if (!ev) continue;
+    const meta = (ev.metadata ?? {}) as Record<string, unknown>;
+    const from = isWaDelivery(meta["delivery"]) ? (meta["delivery"] as WaDelivery) : null;
+    // Receipts can arrive out of order or twice; only ever move forward.
+    if (!advances(from, st.status)) continue;
+    const err = st.errors?.[0];
+    const why = st.status === "failed" ? explainWaError(err?.code, err?.error_data?.details ?? err?.message) : null;
+    await db
+      .from("ca_chaser_events")
+      .update({ metadata: { ...meta, delivery: st.status, ...(why ? { failure: why.message, code: err?.code ?? null } : {}) } })
+      .eq("id", ev.id);
+    if (st.status === "sent") continue;
+    await chaserEvent(db, {
+      chaser_id: ev.chaser_id as string,
+      ca_firm_id: firmId,
+      business_id: (ev.business_id as string | null) ?? null,
+      event_type: "whatsapp_status",
+      channel: "whatsapp",
+      note:
+        st.status === "failed"
+          ? `WhatsApp message not delivered: ${why!.message}`
+          : st.status === "read"
+            ? "WhatsApp message was read by the client"
+            : "WhatsApp message delivered",
+      metadata: { wamid: st.id, delivery: st.status },
+    });
+    if (st.status === "failed") {
+      await db.from("ca_notifications").insert({
+        ca_firm_id: firmId,
+        business_id: (ev.business_id as string | null) ?? null,
+        type: "whatsapp_failed",
+        severity: "warning",
+        title: "WhatsApp reminder not delivered",
+        message: why!.message,
+        is_read: false,
+        metadata: { chaser_id: ev.chaser_id },
+      });
+    }
+  }
+}
+
+/**
+ * A text from a client with an open chase. STOP ends all reminders for that
+ * client; anything else is logged for the team and gives the client two days
+ * before the next automatic nudge, so nobody is chased straight after replying.
+ */
+async function handleText(db: Db, firmId: string, m: WaMessage): Promise<string> {
+  const body = m.text?.body?.trim() ?? "";
+  if (!body) return "ignored empty text";
+  const businessId = await matchClient(db, firmId, m.from);
+  if (!businessId) return "text from a number not matched to a client";
+  const { data: seen } = await db
+    .from("ca_chaser_events")
+    .select("id")
+    .eq("ca_firm_id", firmId)
+    .eq("metadata->>wa_message_id", m.id)
+    .limit(1)
+    .maybeSingle();
+  if (seen) return "duplicate delivery";
+  const { data: chases } = await db
+    .from("ca_document_requests")
+    .select("id, next_follow_up_at")
+    .eq("ca_firm_id", firmId)
+    .eq("business_id", businessId)
+    .eq("status", "open")
+    .eq("managed_by", "practice");
+  if (!chases?.length) return "text, no open chase";
+
+  const kind = classifyInbound(body);
+  const pause = new Date(Date.now() + 2 * 86_400_000).toISOString();
+  if (kind === "stop") {
+    await db.from("ca_clients").update({ do_not_disturb: true }).eq("ca_firm_id", firmId).eq("business_id", businessId);
+  }
+  for (const c of chases) {
+    if (kind === "reply" && c.next_follow_up_at && c.next_follow_up_at > pause) {
+      /* already later than the pause */
+    } else if (kind === "reply") {
+      await db.from("ca_document_requests").update({ next_follow_up_at: pause }).eq("id", c.id);
+    }
+    await chaserEvent(db, {
+      chaser_id: c.id as string,
+      ca_firm_id: firmId,
+      business_id: businessId,
+      event_type: kind === "stop" ? "client_stopped" : "client_replied",
+      channel: "whatsapp",
+      note:
+        kind === "stop"
+          ? `Client asked to stop reminders on WhatsApp: "${snippet(body)}". Reminders are off for this client.`
+          : `Client replied on WhatsApp: "${snippet(body)}". Next automatic reminder is paused for two days.`,
+      metadata: { wa_message_id: m.id, wa_from: m.from },
+    });
+  }
+  await db.from("ca_notifications").insert({
+    ca_firm_id: firmId,
+    business_id: businessId,
+    type: kind === "stop" ? "whatsapp_stop" : "whatsapp_reply",
+    severity: kind === "stop" ? "warning" : "info",
+    title: kind === "stop" ? "Client asked to stop reminders" : "Client replied on WhatsApp",
+    message: `"${snippet(body)}"`,
+    is_read: false,
+    metadata: { wa_message_id: m.id },
+  });
+  return kind === "stop" ? "client opted out" : "reply logged";
+}
+
 export async function handleWhatsappWebhook(payload: {
   entry?: { changes?: WaChange[] }[];
 }) {
@@ -160,7 +290,7 @@ export async function handleWhatsappWebhook(payload: {
     for (const change of entry.changes ?? []) {
       const v = change.value ?? {};
       const phoneNumberId = v.metadata?.phone_number_id;
-      if (!phoneNumberId || !v.messages?.length) continue;
+      if (!phoneNumberId || (!v.messages?.length && !v.statuses?.length)) continue;
       const { data: channel } = await db
         .from("ca_whatsapp_channels")
         .select("ca_firm_id")
@@ -174,6 +304,9 @@ export async function handleWhatsappWebhook(payload: {
         });
         continue;
       }
+      // Receipts for what we already sent are recorded even when the firm is paused.
+      if (v.statuses?.length) await handleStatuses(db, channel.ca_firm_id, v.statuses).catch((e) => console.error(`[fyn:whatsapp] status: ${(e as Error).message}`));
+      if (!v.messages?.length) continue;
       if (!(await (await import("./billing.server")).firmCanWork(db, channel.ca_firm_id))) {
         results.push({ message: "-", status: "firm paused: trial or plan ended" });
         continue;
@@ -184,6 +317,15 @@ export async function handleWhatsappWebhook(payload: {
         .eq("phone_number_id", phoneNumberId);
 
       for (const m of v.messages) {
+        if (m.type === "text") {
+          try {
+            results.push({ message: m.id, status: await handleText(db, channel.ca_firm_id, m) });
+          } catch (e) {
+            console.error(`[fyn:whatsapp] ${m.id}: ${(e as Error).message}`);
+            results.push({ message: m.id, status: `failed: ${(e as Error).message}` });
+          }
+          continue;
+        }
         const media =
           m.type === "document"
             ? m.document
@@ -295,7 +437,57 @@ export async function whatsappStatus(db: Db, ctx: FirmContext) {
     },
     webhook_path: "/api/public/whatsapp-webhook",
     channels: data ?? [],
+    // Messages can go out through the API (not just open wa.me) when a token and an active number exist.
+    send_ready: Boolean(env("WHATSAPP_ACCESS_TOKEN")) && (data ?? []).some((c) => c.is_active),
   };
+}
+
+export interface WaHealthStep {
+  label: string;
+  ok: boolean | null;
+  detail: string;
+}
+
+/** Checks each link in the chain for real and says which one is broken. */
+export async function whatsappHealth(db: Db, ctx: FirmContext): Promise<{ ok: boolean; steps: WaHealthStep[] }> {
+  const steps: WaHealthStep[] = [];
+  const token = env("WHATSAPP_ACCESS_TOKEN");
+  steps.push({ label: "Access token", ok: Boolean(token), detail: token ? "Set on the server." : "WHATSAPP_ACCESS_TOKEN is not set." });
+  steps.push({ label: "Webhook secret", ok: Boolean(env("WHATSAPP_APP_SECRET")), detail: env("WHATSAPP_APP_SECRET") ? "Set." : "WHATSAPP_APP_SECRET is not set, so incoming messages and receipts are rejected." });
+  steps.push({ label: "Verify token", ok: Boolean(env("WHATSAPP_VERIFY_TOKEN")), detail: env("WHATSAPP_VERIFY_TOKEN") ? "Set." : "WHATSAPP_VERIFY_TOKEN is not set, so Meta cannot confirm the webhook." });
+  const { data: ch } = await db.from("ca_whatsapp_channels").select("phone_number_id, display_phone").eq("ca_firm_id", ctx.firmId).eq("is_active", true).limit(1).maybeSingle();
+  steps.push({ label: "Number linked", ok: Boolean(ch), detail: ch ? `Phone number ID ${ch.phone_number_id}.` : "Link the number's Phone number ID above." });
+  if (token && ch) {
+    try {
+      const r = await fetch(`${GRAPH}/${ch.phone_number_id}?fields=display_phone_number,verified_name,quality_rating`, { headers: { Authorization: `Bearer ${token}` } });
+      const b = (await r.json().catch(() => ({}))) as { display_phone_number?: string; verified_name?: string; quality_rating?: string; error?: { code?: number; message?: string } };
+      if (r.ok) {
+        steps.push({ label: "Meta accepts the token and number", ok: true, detail: `${b.verified_name ?? "Number"} ${b.display_phone_number ?? ""}${b.quality_rating ? ` · quality ${b.quality_rating}` : ""}`.trim() });
+      } else {
+        steps.push({ label: "Meta accepts the token and number", ok: false, detail: explainWaError(b.error?.code, b.error?.message).message });
+      }
+    } catch (e) {
+      steps.push({ label: "Meta accepts the token and number", ok: false, detail: `Could not reach Meta (${(e as Error).message}).` });
+    }
+  }
+  const waba = env("WHATSAPP_WABA_ID");
+  if (!waba) {
+    steps.push({ label: `Template "${chaseTemplate()}"`, ok: null, detail: "Set WHATSAPP_WABA_ID to check that the template is approved." });
+  } else if (token) {
+    try {
+      const r = await fetch(`${GRAPH}/${waba}/message_templates?name=${encodeURIComponent(chaseTemplate())}&fields=name,status,language`, { headers: { Authorization: `Bearer ${token}` } });
+      const b = (await r.json().catch(() => ({}))) as { data?: { status: string; language: string }[]; error?: { message?: string } };
+      const t = b.data?.find((x) => x.language === chaseTemplateLang()) ?? b.data?.[0];
+      steps.push({
+        label: `Template "${chaseTemplate()}"`,
+        ok: r.ok && t?.status === "APPROVED",
+        detail: !r.ok ? (b.error?.message ?? "Could not read templates.") : !t ? "No template with this name. Create it in WhatsApp Manager (4 body fields)." : `${t.status} (${t.language}).`,
+      });
+    } catch (e) {
+      steps.push({ label: `Template "${chaseTemplate()}"`, ok: false, detail: `Could not reach Meta (${(e as Error).message}).` });
+    }
+  }
+  return { ok: steps.every((s) => s.ok !== false), steps };
 }
 
 export async function connectWhatsappNumber(

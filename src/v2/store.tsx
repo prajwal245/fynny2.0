@@ -1560,7 +1560,9 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
               ? "Recorded on the timeline. Email is not connected yet, so nothing was sent."
               : channel === "Email"
                 ? "Follow-up emailed and logged. The chase stops automatically when the document arrives."
-                : "WhatsApp follow-up logged on the timeline.",
+                : "via" in res && res.via === "api"
+                  ? "WhatsApp message sent and tracked. The chase stops automatically when the document arrives."
+                  : "WhatsApp follow-up logged on the timeline.",
         },
         () => sendPracticeFollowUp({ data: { id, channel } }),
       )
@@ -1570,6 +1572,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
               "Email service is not configured yet, so the follow up was recorded but not sent.",
             );
           else if (channel === "Email") toast.success("Email follow up sent");
+          else if ("via" in res && res.via === "api") toast.success("WhatsApp message sent");
           else toast.success("Follow up logged on the timeline");
         })
         .catch((e) => toast.error(errMsg(e)))

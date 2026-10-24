@@ -32,6 +32,8 @@ import {
 } from "./chaser/rules";
 import { isEmail, sendEmail, type SendResult } from "./email.server";
 import { sendViaGmail } from "./gmailSend.server";
+import { sendChaseWhatsapp } from "./whatsappSend.server";
+import { chaseTemplateParams } from "./whatsappFlow";
 
 const DAY = 86_400_000;
 
@@ -113,6 +115,8 @@ async function templateInput(
 interface ChasePrefs {
   viaGmail: boolean;
   tone: ChaserTone;
+  /** Also nudge on WhatsApp from the second reminder on (Firm and Scale plans). */
+  whatsappAuto: boolean;
 }
 
 async function firmChasePrefs(db: Db, firmId: string): Promise<ChasePrefs> {
@@ -122,6 +126,7 @@ async function firmChasePrefs(db: Db, firmId: string): Promise<ChasePrefs> {
     // Both: the partner switched it on, and Google actually granted sending.
     viaGmail: p["chaser_via_gmail"] === true && p["gmail_send_granted"] === true,
     tone: parseTone(p["chaser_tone"]),
+    whatsappAuto: p["chaser_whatsapp_auto"] === true,
   };
 }
 
@@ -351,6 +356,49 @@ export async function sendFollowUp(
     const { accessFor } = await import("./billing/plans");
     if (!accessFor(await loadBilling(db, ctx.firmId)).whatsappChaser)
       throw new PracticeError("plan_feature", "Chasing by WhatsApp is on the Firm and Scale plans. Email follow-ups work on every plan.");
+    // Official API first: the message goes out itself, with delivery tracked.
+    const api = await sendChaseWhatsapp(
+      db,
+      ctx.firmId,
+      row.contact_phone || t.clientPhone,
+      chaseTemplateParams({
+        contactName: t.contactName,
+        clientName: t.clientName,
+        items: [`${t.item}${t.period ? ` (${t.period})` : ""}`],
+        firmName: ctx.firmName,
+      }),
+    );
+    if (api.ok) {
+      await db
+        .from("ca_document_requests")
+        .update({ chaser_count: count, last_chased_at: now.toISOString(), next_follow_up_at: nextSlot(row, count, now) })
+        .eq("id", row.id);
+      await chaserEvent(db, {
+        chaser_id: row.id,
+        ca_firm_id: ctx.firmId,
+        business_id: row.business_id,
+        event_type: "sent",
+        channel: "whatsapp",
+        template_id: "chase_whatsapp_template",
+        note: `WhatsApp follow up sent to +${api.to}`,
+        actor_id: ctx.userId,
+        metadata: { wamid: api.wamid, delivery: "sent" },
+      });
+      return { channel, via: "api" as const, to: api.to, follow_ups: count };
+    }
+    if (!api.unconfigured) {
+      await chaserEvent(db, {
+        chaser_id: row.id,
+        ca_firm_id: ctx.firmId,
+        business_id: row.business_id,
+        event_type: "skipped",
+        channel: "whatsapp",
+        note: `WhatsApp could not be sent: ${api.error}`,
+        actor_id: ctx.userId,
+      });
+      throw new PracticeError("whatsapp_failed", api.error);
+    }
+    // Not set up for the API on this server: fall back to opening WhatsApp with the message ready.
     const message = whatsappMessage(t);
     const link = whatsappLink(row.contact_phone || t.clientPhone, message);
     if (!link.url) throw new PracticeError("invalid_phone", link.error!);
@@ -373,7 +421,7 @@ export async function sendFollowUp(
       actor_id: ctx.userId,
       metadata: { message },
     });
-    return { channel, url: link.url, message, follow_ups: count };
+    return { channel, via: "link" as const, url: link.url, message, follow_ups: count };
   }
 
   const to = row.contact_email || t.clientEmail;
@@ -425,6 +473,7 @@ export async function sendFollowUp(
   });
   return {
     channel,
+    via: "email" as const,
     simulated: result.simulated,
     to,
     subject: delivered.subject,
@@ -532,7 +581,9 @@ export async function runDueFollowups(now = new Date(), firmId?: string) {
     skipped: 0,
     failed: 0,
     deferred: 0,
+    whatsapp: 0,
   };
+  const whatsappPlan = new Map<string, boolean>();
   const sendQueue: {
     row: ChaseRow;
     t: Awaited<ReturnType<typeof templateInput>>;
@@ -737,6 +788,42 @@ export async function runDueFollowups(now = new Date(), firmId?: string) {
           : `Automatic follow up ${n} emailed to ${to}${delivered.sentVia === "gmail" ? " from the firm's Gmail" : ""}${claimedItems.length > 1 ? ` together with ${claimedItems.length - 1} other item(s)` : ""}${delivered.note ? `. ${delivered.note}` : ""}`,
         metadata: sentMetadata(delivered),
       });
+    }
+
+    // From the second reminder on, also nudge on WhatsApp when the firm asked for it.
+    if (prefs.whatsappAuto && step >= 2 && !first.t.dnd) {
+      if (!whatsappPlan.has(first.row.ca_firm_id)) {
+        const { loadBilling } = await import("./billing.server");
+        const { accessFor } = await import("./billing/plans");
+        whatsappPlan.set(first.row.ca_firm_id, accessFor(await loadBilling(db, first.row.ca_firm_id)).whatsappChaser);
+      }
+      const phone = first.row.contact_phone || first.t.clientPhone;
+      if (whatsappPlan.get(first.row.ca_firm_id) && phone) {
+        const wa = await sendChaseWhatsapp(
+          db,
+          first.row.ca_firm_id,
+          phone,
+          chaseTemplateParams({
+            contactName: first.t.contactName,
+            clientName: first.t.clientName,
+            items: claimedItems.map((q) => `${q.t.item}${q.t.period ? ` (${q.t.period})` : ""}`),
+            firmName: first.firm.name,
+          }),
+        );
+        for (const q of claimedItems) {
+          await chaserEvent(db, {
+            chaser_id: q.row.id,
+            ca_firm_id: q.row.ca_firm_id,
+            business_id: q.row.business_id,
+            event_type: wa.ok ? "sent" : "skipped",
+            channel: "whatsapp",
+            template_id: "chase_whatsapp_template",
+            note: wa.ok ? `Automatic WhatsApp reminder sent to +${wa.to}` : `Automatic WhatsApp reminder not sent: ${wa.error}`,
+            metadata: wa.ok ? { wamid: wa.wamid, delivery: "sent" } : {},
+          });
+        }
+        if (wa.ok) summary.whatsapp++;
+      }
     }
   }
   return summary;

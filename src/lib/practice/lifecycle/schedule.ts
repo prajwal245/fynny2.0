@@ -5,8 +5,7 @@
  *
  * Trial: nudges to make the first upload, a welcome when the clock starts, a
  * push towards the first reconciliation, a recap of what was done, reminders
- * at 5 and 2 days left (day 10 and 12 of a 14-day trial, day 25 and 28 of a
- * 30-day one), and two after it ends.
+ * at 5 and 2 days left (day 10 and 12 of the 14-day trial), and two after it ends.
  * Paid plans: a monthly usage summary (with any extras billed for the month),
  * document allowance warnings, Essential's active-client cap, a check-in when
  * the firm goes quiet, and a month-end reminder for clients with nothing yet.

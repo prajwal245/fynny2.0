@@ -6,7 +6,7 @@
  * here is invented or estimated.
  */
 import { monthName, arrearsLines, type Arrears } from "../billing/arrears";
-import { PLANS, TRIAL_ACTIVATED_DAYS, TRIAL_MAX_ACTIVE_CLIENTS, TRIAL_MAX_DOCUMENTS, type Cycle, type PlanKey } from "../billing/plans";
+import { PLANS, TRIAL_MAX_ACTIVE_CLIENTS, TRIAL_MAX_DOCUMENTS, type Cycle, type PlanKey } from "../billing/plans";
 import type { LifecycleKind } from "./schedule";
 
 export interface EmailParts {
@@ -85,11 +85,11 @@ export function lifecycleEmail(kind: LifecycleKind, c: EmailContext): EmailParts
     case "trial_welcome":
       return {
         subject: "Your 14-day FynHelp trial has started",
-        preheader: `Run one reconciliation and one MIS to get ${TRIAL_ACTIVATED_DAYS} days.`,
+        preheader: "Close one real client within your 14 days.",
         heading: "Your trial is running",
         paragraphs: [
           `Your first document is in, so your free trial has started. It runs until ${date(c.trialEndsAt)}.`,
-          `Run one reconciliation and make one MIS on your own data and the trial grows to ${TRIAL_ACTIVATED_DAYS} days, so you can take a full month-end through FynHelp before you pay anything.`,
+          `You have 14 days. Run one reconciliation and make one MIS on your own data to take a real month-end through FynHelp before you pay anything.`,
         ],
         figures: [
           ["Active clients in the trial", `up to ${TRIAL_MAX_ACTIVE_CLIENTS}`],
@@ -100,11 +100,11 @@ export function lifecycleEmail(kind: LifecycleKind, c: EmailContext): EmailParts
       };
     case "trial_activated":
       return {
-        subject: `Your trial now runs ${TRIAL_ACTIVATED_DAYS} days`,
+        subject: "You closed your first client on FynHelp",
         preheader: "You ran a reconciliation and made an MIS. Here is what to try next.",
-        heading: `${TRIAL_ACTIVATED_DAYS} days to run a real month-end`,
+        heading: "Your first close is done",
         paragraphs: [
-          `You reconciled a client and made an MIS on your own data, so your trial now runs until ${date(c.trialEndsAt)}.`,
+          `You reconciled a client and made an MIS on your own data. Your free trial runs until ${date(c.trialEndsAt)}, so there is time to bring in your other clients.`,
           `Next, bring in your other clients for the month: forward client emails to your FynHelp Gmail intake, or let the Chaser ask clients for missing statements for you.`,
         ],
         cta: { label: "Add your next client", path: "/app/clients" },
@@ -116,7 +116,7 @@ export function lifecycleEmail(kind: LifecycleKind, c: EmailContext): EmailParts
         heading: "Your documents are in. Reconcile them.",
         paragraphs: [
           `You have ${plural(c.totals.documents, "document")} in FynHelp. Add the books side (a Tally export or Zoho Books) for the same client and month, then run Recon. Exact, fuzzy and your own rules run in turn, and you review only the lines left over.`,
-          `Do this and make one MIS, and your trial grows to ${TRIAL_ACTIVATED_DAYS} days.`,
+          `Then make one MIS from it to see a complete close before your trial ends.`,
         ],
         cta: { label: "Run a reconciliation", path: "/app" },
       };

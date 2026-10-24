@@ -94,7 +94,7 @@ export default function FynnySection() {
             </div>
 
             <Link to="/waitlist" className="inline-block bg-fyn-red text-white font-semibold px-8 py-3.5 rounded-lg mt-10 hover-btn-primary">
-              Talk to CFO Fynny, free for 30 days →
+              Talk to CFO Fynny, free for 14 days →
             </Link>
           </div>
         </div>

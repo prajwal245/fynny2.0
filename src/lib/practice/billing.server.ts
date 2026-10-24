@@ -24,7 +24,6 @@ import {
   GST_PERCENT,
   monthlyBill,
   TRIAL_DAYS,
-  TRIAL_ACTIVATED_DAYS,
   type BillBreakdown,
   type UsageWarning,
   PLANS,
@@ -241,7 +240,7 @@ export async function startTrialClock(db: Db, firmId: string, now: Date = new Da
     .is("trial_started_at", null);
 }
 
-/** One reconciliation run and one MIS on the firm's own data: the trial grows to 30 days. */
+/** One reconciliation run and one MIS on the firm's own data: recorded as a milestone; the trial stays 14 days. */
 export async function checkTrialActivation(db: Db, firmId: string): Promise<boolean> {
   const row = await loadBilling(db, firmId);
   if (row.status !== "trialing" || row.activated_at || !row.trial_started_at) return false;
@@ -250,10 +249,9 @@ export async function checkTrialActivation(db: Db, firmId: string): Promise<bool
     db.from("ca_agent_runs").select("id", { count: "exact", head: true }).eq("ca_firm_id", firmId).eq("agent", "narrate").eq("status", "succeeded"),
   ]);
   if (!(recon.count ?? 0) || !(mis.count ?? 0)) return false;
-  const ends = new Date(new Date(row.trial_started_at).getTime() + TRIAL_ACTIVATED_DAYS * 86_400_000);
   const { data } = await db
     .from("ca_billing")
-    .update({ activated_at: new Date().toISOString(), trial_ends_at: ends.toISOString() })
+    .update({ activated_at: new Date().toISOString() })
     .eq("ca_firm_id", firmId)
     .is("activated_at", null)
     .select("ca_firm_id")

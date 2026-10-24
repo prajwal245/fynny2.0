@@ -76,11 +76,9 @@ describe("trial emails", () => {
     expect(kinds(facts({ billing: { ...started(3), activated_at: new Date(now.getTime() - DAY).toISOString() } }))).toEqual(["trial_activated"]);
     expect(kinds(facts({ billing: started(6) }))).toEqual(["trial_recap"]);
   });
-  it("reminds at 5 and 2 days left: day 10 and 12 of 14, day 25 and 28 of 30", () => {
+  it("reminds at 5 and 2 days left: day 10 and 12 of the 14-day trial", () => {
     expect(kinds(facts({ billing: started(10) }))).toContain("trial_ending_5");
     expect(kinds(facts({ billing: started(12) }))).toContain("trial_ending_2");
-    expect(kinds(facts({ billing: { ...started(25, 30), activated_at: started(25).trial_started_at } }))).toContain("trial_ending_5");
-    expect(kinds(facts({ billing: { ...started(28, 30), activated_at: started(28).trial_started_at } }))).toContain("trial_ending_2");
   });
   it("after the trial: an ended notice, then one win-back", () => {
     expect(kinds(facts({ billing: started(16) }))).toEqual(["trial_ended"]);

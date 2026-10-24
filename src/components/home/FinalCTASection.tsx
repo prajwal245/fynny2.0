@@ -18,7 +18,7 @@ export default function FinalCTASection() {
         </h2>
 
         <p className="text-white/90 text-lg md:text-xl mt-4 leading-relaxed">
-          Be among the first 100 businesses to get 30 days FREE access to CFO Fynny
+          Be among the first 100 businesses to get 14 days FREE access to CFO Fynny
         </p>
 
         <div className="mt-8 text-left">
@@ -26,7 +26,7 @@ export default function FinalCTASection() {
         </div>
 
         <p className="text-white font-medium text-base mt-5">
-          (First 100 users get Pro Plan FREE for 30 days)
+          (First 100 users get Pro Plan FREE for 14 days)
         </p>
 
         <p className="text-white/70 text-sm mt-2">

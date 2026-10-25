@@ -27,7 +27,7 @@ interface PaidRow {
   razorpay_customer_id: string | null;
   first_paid_at: string | null;
   billing_name: string | null;
-  ca_firms: { firm_name: string; email: string | null; is_demo: boolean | null } | null;
+  ca_firms: { firm_name: string; email: string | null; is_demo: boolean | null; is_test?: boolean | null } | null;
 }
 
 export interface ArrearsRunResult {
@@ -49,7 +49,7 @@ export async function runArrearsBilling(db: Db, now: Date = new Date()): Promise
   const { start, end } = monthRange(month);
   const { data, error } = await db
     .from("ca_billing")
-    .select("ca_firm_id, plan, cycle, status, razorpay_subscription_id, razorpay_customer_id, first_paid_at, billing_name, ca_firms(firm_name, email, is_demo)")
+    .select("ca_firm_id, plan, cycle, status, razorpay_subscription_id, razorpay_customer_id, first_paid_at, billing_name, ca_firms(firm_name, email, is_demo, is_test)")
     .in("status", ["active", "past_due"])
     .not("razorpay_subscription_id", "is", null)
     .lt("first_paid_at", end)
@@ -66,7 +66,7 @@ export async function runArrearsBilling(db: Db, now: Date = new Date()): Promise
   const done = new Map((existing ?? []).map((e) => [String(e.ca_firm_id), e as { status: string; attempts: number }]));
 
   for (const r of rows) {
-    if (r.ca_firms?.is_demo) continue;
+    if (r.ca_firms?.is_demo || r.ca_firms?.is_test) continue; // never bill demo or test firms
     const prior = done.get(r.ca_firm_id);
     if (prior && !(prior.status === "failed" && prior.attempts < MAX_ATTEMPTS)) continue;
     result.checked++;

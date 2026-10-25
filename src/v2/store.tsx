@@ -205,6 +205,8 @@ export type Firm = {
   city: string;
   frn: string;
   gmailConnected: boolean;
+  /** A tester account: a sandbox that is never billed, reported or messaged for real. */
+  isTest?: boolean;
 };
 
 export type Chase = {
@@ -642,6 +644,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
         city: wf.city ?? "",
         frn: wf.frn ?? "",
         gmailConnected: Boolean(wf.gmailConnected),
+        isTest: Boolean((wf as { isTest?: boolean }).isTest),
       });
       apply(workspace);
     } else {

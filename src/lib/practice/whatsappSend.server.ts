@@ -15,6 +15,7 @@ import {
   type WaSenderChoice,
 } from "./whatsappFlow";
 import { DEFAULT_COUNTRY_CODE, normalisePhone, parseCountryCode } from "./chaser/rules";
+import { phoneAllowedInTest, sandboxId } from "./testMode";
 
 const GRAPH = process.env["WHATSAPP_GRAPH_BASE"] || "https://graph.facebook.com/v21.0";
 const env = (n: string) => (process.env[n] ?? "").trim() || undefined;
@@ -48,6 +49,8 @@ export interface Sender {
 
 export interface SenderResolution {
   sender: Sender | null;
+  /** The firm is a test firm: it sends only through Meta's sandbox number, or not at all. */
+  test: boolean;
   /** What the firm picked (or null), and what is actually in use. */
   pref: WaSenderChoice | null;
   hasOwn: boolean;
@@ -66,7 +69,7 @@ async function decryptStored(enc: string): Promise<string | null> {
 /** Which number this firm sends from, with the token to use for it. */
 export async function resolveSender(db: Db, firmId: string): Promise<SenderResolution> {
   const [{ data: firm }, { data: own }] = await Promise.all([
-    db.from("ca_firms").select("notification_prefs").eq("id", firmId).maybeSingle(),
+    db.from("ca_firms").select("notification_prefs, is_test").eq("id", firmId).maybeSingle(),
     db
       .from("ca_whatsapp_channels")
       .select("phone_number_id, access_token_enc, waba_id")
@@ -75,6 +78,16 @@ export async function resolveSender(db: Db, firmId: string): Promise<SenderResol
       .limit(1)
       .maybeSingle(),
   ]);
+  if (firm?.is_test) {
+    // Test firms never use a real firm's or FynHelp's live number: only Meta's free test number, if one is set.
+    const id = env("WHATSAPP_TEST_PHONE_NUMBER_ID");
+    const token = env("WHATSAPP_TEST_ACCESS_TOKEN");
+    return {
+      test: true, pref: null, hasOwn: false, sharedConfigured: false,
+      sender: id && token ? { choice: "fynhelp", phoneNumberId: id.replace(/\D/g, ""), token, shared: false, wabaId: env("WHATSAPP_TEST_WABA_ID") ?? null } : null,
+      reason: id && token ? null : "Test account: WhatsApp is simulated. Set WHATSAPP_TEST_PHONE_NUMBER_ID and WHATSAPP_TEST_ACCESS_TOKEN (Meta's free test number) to send to the numbers in TEST_RECIPIENTS.",
+    };
+  }
   const prefRaw = ((firm?.notification_prefs ?? {}) as Record<string, unknown>)["whatsapp_sender"];
   const pref: WaSenderChoice | null = prefRaw === "own" ? "own" : prefRaw === "fynhelp" ? "fynhelp" : null;
   const serverToken = env("WHATSAPP_ACCESS_TOKEN");
@@ -82,7 +95,7 @@ export async function resolveSender(db: Db, firmId: string): Promise<SenderResol
   const hasOwn = Boolean(own);
   const sharedConfigured = Boolean(sharedId && serverToken);
   const choice = chooseSender({ pref, hasOwn, sharedConfigured });
-  const base = { pref, hasOwn, sharedConfigured };
+  const base = { test: false, pref, hasOwn, sharedConfigured };
   if (!choice) {
     return {
       ...base,
@@ -118,7 +131,8 @@ export async function whatsappSendReady(
   firmId: string,
 ): Promise<{ ready: boolean; phoneNumberId: string | null; reason: string | null; shared: boolean }> {
   const r = await resolveSender(db, firmId);
-  return { ready: Boolean(r.sender), phoneNumberId: r.sender?.phoneNumberId ?? null, reason: r.reason, shared: r.sender?.shared ?? false };
+  // A test firm is always "ready": its messages are simulated when there is no sandbox number.
+  return { ready: Boolean(r.sender) || r.test, phoneNumberId: r.sender?.phoneNumberId ?? null, reason: r.test ? null : r.reason, shared: r.sender?.shared ?? false };
 }
 
 /** The firm's home country calling code (Settings), used for numbers saved without one. */
@@ -129,7 +143,7 @@ export async function firmCountryCode(db: Db, firmId: string): Promise<string> {
 }
 
 export type WaSendResult =
-  | { ok: true; wamid: string; to: string; mode: "text" | "template" }
+  | { ok: true; wamid: string; to: string; mode: "text" | "template"; /** A test firm's message: recorded, not sent. */ simulated?: boolean }
   | { ok: false; unconfigured: boolean; permanent: boolean; error: string };
 
 interface GraphReply {
@@ -179,7 +193,10 @@ export async function sendChaseWhatsapp(
   const cc = opts.cc ?? (await firmCountryCode(db, firmId));
   const to = normalisePhone(phone, cc);
   if (!to) return { ok: false, unconfigured: false, permanent: true, error: "The phone number is missing or not a valid mobile number. Add it with the country code, for example +91 98450 12345." };
-  const { sender, reason } = await resolveSender(db, firmId);
+  const { sender, reason, test } = await resolveSender(db, firmId);
+  // A test firm reaches only the numbers in TEST_RECIPIENTS, and only through Meta's test number. Anything else is recorded, not sent.
+  if (test && (!sender || !phoneAllowedInTest(to, process.env["TEST_RECIPIENTS"])))
+    return { ok: true, wamid: sandboxId(), to, mode: "template", simulated: true };
   if (!sender) return { ok: false, unconfigured: true, permanent: false, error: reason ?? "WhatsApp is not set up." };
   try {
     const { data: contact } = await db

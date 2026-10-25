@@ -21,7 +21,7 @@ interface FirmRow extends BillingRow {
   ca_firm_id: string;
   current_period_end: string | null;
   first_paid_at: string | null;
-  ca_firms: { firm_name: string; email: string | null; created_at: string; notification_prefs: unknown; is_demo: boolean | null } | null;
+  ca_firms: { firm_name: string; email: string | null; created_at: string; notification_prefs: unknown; is_demo: boolean | null; is_test?: boolean | null } | null;
 }
 
 export interface LifecycleResult {
@@ -47,12 +47,12 @@ export async function runLifecycle(db: Db, now: Date = new Date(), opts: { force
 
   let q = db
     .from("ca_billing")
-    .select("ca_firm_id, plan, cycle, status, trial_ends_at, trial_started_at, activated_at, current_period_end, first_paid_at, ca_firms!inner(firm_name, email, created_at, notification_prefs, is_demo)")
+    .select("ca_firm_id, plan, cycle, status, trial_ends_at, trial_started_at, activated_at, current_period_end, first_paid_at, ca_firms!inner(firm_name, email, created_at, notification_prefs, is_demo, is_test)")
     .limit(500);
   if (opts.firmIds?.length) q = q.in("ca_firm_id", opts.firmIds);
   const { data, error } = await q;
   if (error) throw new Error(error.message);
-  const firms = ((data ?? []) as unknown as FirmRow[]).filter((f) => f.ca_firms?.email && !f.ca_firms.is_demo);
+  const firms = ((data ?? []) as unknown as FirmRow[]).filter((f) => f.ca_firms?.email && !f.ca_firms.is_demo && !f.ca_firms.is_test);
   if (!firms.length) return out;
   const ids = firms.map((f) => f.ca_firm_id);
 

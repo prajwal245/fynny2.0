@@ -35,13 +35,14 @@ export async function dashboard(ctx: AdminCtx) {
   const now = Date.now();
   const since = new Date(now - 30 * DAY).toISOString();
   const [firms, billing, docs, runs, reports] = await Promise.all([
-    db.from("ca_firms").select("id, created_at, is_demo").limit(20000),
+    db.from("ca_firms").select("id, created_at, is_demo, is_test").limit(20000),
     db.from("ca_billing").select("ca_firm_id, plan, cycle, status, trial_ends_at, current_period_end, cancel_at_period_end, updated_at").limit(20000),
     db.from("ca_document_extractions").select("created_at").gte("created_at", since).limit(50000),
     db.from("ca_agent_runs").select("agent, status, started_at").gte("started_at", since).limit(50000),
     db.from("ca_reports_log").select("created_at").gte("created_at", since).limit(20000),
   ]);
-  const realFirms = (firms.data ?? []).filter((f) => !f.is_demo);
+  // Test (tester) and demo firms never count in the business's numbers.
+  const realFirms = (firms.data ?? []).filter((f) => !f.is_demo && !f.is_test);
   const real = new Set(realFirms.map((f) => f.id));
   const rows = ((billing.data ?? []) as BillingRow[]).filter((b) => real.has(b.ca_firm_id));
   const paid = rows.filter((b) => ["active", "past_due", "pending"].includes(b.status));
@@ -107,7 +108,7 @@ async function firmNames(ctx: AdminCtx, ids: string[]) {
 
 /* ── firms (the customers) ───────────────────────────────── */
 
-export type FirmFilter = { q?: string; status?: "active" | "suspended" | "flagged" | ""; plan?: "trial" | "paid" | "paused" | "cancelled" | ""; page?: number };
+export type FirmFilter = { q?: string; status?: "active" | "suspended" | "flagged" | ""; plan?: "trial" | "paid" | "paused" | "cancelled" | ""; page?: number; /** Show the test (tester) firms instead of the real ones. */ tests?: boolean };
 
 function planState(b: BillingRow | undefined, now = Date.now()): "trial" | "paid" | "paused" | "cancelled" {
   if (!b) return "trial";
@@ -120,7 +121,7 @@ function planState(b: BillingRow | undefined, now = Date.now()): "trial" | "paid
 export async function listFirms(ctx: AdminCtx, f: FirmFilter) {
   let q = ctx.db
     .from("ca_firms")
-    .select("id, firm_name, email, city, created_at, admin_status, user_id, is_demo")
+    .select("id, firm_name, email, city, created_at, admin_status, user_id, is_demo, is_test")
     .order("created_at", { ascending: false })
     .limit(2000);
   if (f.q?.trim()) {
@@ -130,7 +131,8 @@ export async function listFirms(ctx: AdminCtx, f: FirmFilter) {
   if (f.status) q = q.eq("admin_status", f.status);
   const { data, error } = await q;
   if (error) throw new PracticeError("db_error", error.message);
-  const firms = (data ?? []).filter((x) => !x.is_demo);
+  // Test firms are listed only when asked for (f.tests); they are never mixed in with real ones.
+  const firms = (data ?? []).filter((x) => !x.is_demo && Boolean(x.is_test) === Boolean(f.tests));
   const ids = firms.map((x) => x.id);
   const billing = new Map<string, BillingRow>();
   const clients = new Map<string, number>();

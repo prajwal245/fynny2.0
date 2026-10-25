@@ -7,7 +7,33 @@
  * a do-not-disturb client or a same-day repeat never sends anything.
  */
 
+/** How a chase reaches the client. */
+export type ChaseChannel = "email" | "whatsapp" | "both";
+export const parseChaseChannel = (v: unknown): ChaseChannel | null => (v === "email" || v === "whatsapp" || v === "both" ? v : null);
+
+/** The channel saved with a chase (in its notes). Null for chases made before channels existed. */
+export function channelFromNotes(notes: string | null | undefined): ChaseChannel | null {
+  try {
+    return parseChaseChannel((JSON.parse(notes ?? "{}") as { channels?: unknown }).channels);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * What goes out at a given reminder. A chase made before channels existed keeps its old behaviour (email,
+ * plus WhatsApp from the second reminder when the firm switched that on).
+ */
+export function stepChannels(channel: ChaseChannel | null, step: number, whatsappAuto: boolean): { email: boolean; whatsapp: boolean } {
+  if (channel === "email") return { email: true, whatsapp: false };
+  if (channel === "whatsapp") return { email: false, whatsapp: true };
+  if (channel === "both") return { email: true, whatsapp: true };
+  return { email: true, whatsapp: whatsappAuto && step >= 2 };
+}
+
 export interface ChaseState {
+  /** How this chase reaches the client; a WhatsApp-only chase needs no email address. */
+  channel?: ChaseChannel | null;
   status: "open" | "fulfilled" | "resolved" | "cancelled" | string;
   created_at: string; // ISO
   chaser_count: number;
@@ -78,7 +104,7 @@ export function decide(s: ChaseState, now: Date): ChaseDecision {
     return { action: "skip", reason: "already chased today" };
   }
   if (s.chaser_count >= s.max_follow_ups) return { action: "escalate" };
-  if (!s.contact_email) return { action: "skip", reason: "no contact email" };
+  if (!s.contact_email && s.channel !== "whatsapp") return { action: "skip", reason: "no contact email" };
   const next = slotAt(s.created_at, schedule, s.chaser_count + 1);
   // If the schedule has no further slot, escalate one schedule-gap later.
   const fallback = new Date(now.getTime() + 4 * DAY).toISOString();

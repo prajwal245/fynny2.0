@@ -1,6 +1,7 @@
 import posthog from "posthog-js";
 import { analyticsAllowed, GA_MEASUREMENT_ID, onConsentChange } from "./consent";
 import { campaignParams } from "./utm";
+import { applyQaFromUrl, isQaMode } from "./qa";
 
 // PostHog project keys are public (they ship in every browser bundle); env overrides.
 const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY || "phc_nLJ4KcJAWuV43cBi43Bqez9YBo2zB6RvC4SvVFXyuDSR";
@@ -49,6 +50,9 @@ let watching = false;
 
 /** Starts analytics only with the visitor's consent, and follows later changes of mind. */
 export function initAnalytics() {
+  applyQaFromUrl();
+  // QA mode and tester accounts stay out of production analytics entirely.
+  if (isQaMode()) return;
   if (!watching && typeof window !== "undefined") {
     watching = true;
     onConsentChange((c) => (c.analytics ? initAnalytics() : stopAnalytics()));
@@ -101,6 +105,7 @@ export function resetAnalytics() {
 }
 
 export function trackPageView(path: string, properties?: Record<string, unknown>) {
+  if (isQaMode()) return;
   const search = safeSearch(properties?.search as string | undefined);
   // GA4 counts route changes itself (enhanced measurement, browser history), so only PostHog is told here.
   if (!POSTHOG_KEY) return;
@@ -153,12 +158,18 @@ export function withCampaign(event: FynHelpEvent, properties?: Record<string, un
 
 export function track(event: FynHelpEvent, properties?: Record<string, unknown>) {
   const props = withCampaign(event, properties);
+  if (isQaMode()) {
+    // Visible to the tester, invisible to production reports.
+    console.debug("[qa] event not sent:", event, props);
+    return;
+  }
   if (typeof window !== "undefined" && window.gtag && GA_ID) window.gtag("event", GA_EVENT[event] ?? event, props);
   if (!POSTHOG_KEY) return;
   posthog.capture(event, { ...props, timestamp: new Date().toISOString() });
 }
 
 export function trackTiming(event: string, durationMs: number, properties?: Record<string, unknown>) {
+  if (isQaMode()) return;
   if (!POSTHOG_KEY) return;
   posthog.capture(event, { duration_ms: durationMs, ...properties });
 }

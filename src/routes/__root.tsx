@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import CookieConsent from "@/components/CookieConsent";
 import { GA_MEASUREMENT_ID } from "@/lib/consent";
+import { qaHeadScript } from "@/lib/qa";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   HeadContent,
@@ -91,7 +92,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       // live site reports, so previews and local runs never touch the property.
       { src: `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`, async: true },
       {
-        children: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',wait_for_update:500});try{var c=JSON.parse(localStorage.getItem('fynhelp.consent')||'null');if(c&&c.analytics===true)gtag('consent','update',{analytics_storage:'granted'});}catch(e){}gtag('js',new Date());if(/(^|\\.)fynhelp\\.com$/.test(location.hostname))gtag('config','${GA_MEASUREMENT_ID}');`,
+        children: `${qaHeadScript(GA_MEASUREMENT_ID)}window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',wait_for_update:500});try{var c=JSON.parse(localStorage.getItem('fynhelp.consent')||'null');if(c&&c.analytics===true)gtag('consent','update',{analytics_storage:'granted'});}catch(e){}gtag('js',new Date());if(/(^|\\.)fynhelp\\.com$/.test(location.hostname))gtag('config','${GA_MEASUREMENT_ID}');`,
       },
       // ported from main.tsx — force light theme before first paint (dark mode removed)
       {

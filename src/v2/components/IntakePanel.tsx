@@ -8,13 +8,14 @@ import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { UploadCloud } from "lucide-react";
-import { connectPracticeWhatsapp, getPracticeIntegrations } from "@/lib/practice/practice.functions";
+import { getPracticeIntegrations } from "@/lib/practice/practice.functions";
 import { pollGmailNow, startGmailConnect } from "@/lib/caGmail.functions";
 import { Badge, Card, V, formatDate } from "../ui";
 import { ShimmerText } from "../agents";
 import { GmailHealth } from "./GmailHealth";
 import { useV2 } from "../store";
 import { GmailIcon, WhatsAppIcon } from "./BrandIcons";
+import { WhatsappIntake } from "./WhatsappIntake";
 
 type Integrations = Awaited<ReturnType<typeof getPracticeIntegrations>>;
 type Channel = "upload" | "gmail" | "whatsapp";
@@ -65,21 +66,6 @@ export function IntakePanel({ upload, unassignedEmail, unassignedWhatsApp, onSho
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState<"connect" | "poll" | null>(null);
   const [lastResult, setLastResult] = useState<string | null>(null);
-  const [wa, setWa] = useState({ id: "", display: "" });
-  const [linking, setLinking] = useState(false);
-  const linkWhatsApp = async () => {
-    setLinking(true);
-    try {
-      await connectPracticeWhatsapp({ data: { phone_number_id: wa.id.trim(), display_phone: wa.display.trim() || undefined } });
-      toast.success("WhatsApp number linked. Documents clients send to it now arrive here.");
-      setWa({ id: "", display: "" });
-      await load();
-    } catch (e) {
-      toast.error(words(e));
-    } finally {
-      setLinking(false);
-    }
-  };
   const start = useServerFn(startGmailConnect);
   const poll = useServerFn(pollGmailNow);
 
@@ -237,56 +223,8 @@ export function IntakePanel({ upload, unassignedEmail, unassignedWhatsApp, onSho
           </div>
         )}
 
-        {channel === "whatsapp" && intg && (
-          <div style={{ display: "grid", gap: 14 }} data-testid="intake-whatsapp">
-            {intg.whatsapp.channels.some((c) => c.is_active) ? (
-              <>
-                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                  <Badge tone="good">Connected</Badge>
-                  <span style={{ fontSize: 14, fontWeight: 600 }}>{intg.whatsapp.channels.filter((c) => c.is_active).map((c) => c.display_phone ?? c.phone_number_id).join(", ")}</span>
-                </div>
-                <div style={{ fontSize: 13.5, color: V.body }}>Documents clients send to this number are matched to the client by phone number. Unknown numbers wait for you.</div>
-                {unassignedWhatsApp > 0 && (
-                  <button className="v2-btn v2-btn-ghost" style={{ justifySelf: "start" }} onClick={() => onShowUnassigned("Unassigned WhatsApp")}>
-                    File {unassignedWhatsApp} waiting for a client
-                  </button>
-                )}
-              </>
-            ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(260px,100%),1fr))", gap: 18, alignItems: "start" }}>
-                <div style={{ display: "grid", gap: 10 }}>
-                  <div style={{ fontSize: 15, fontWeight: 600 }}>Take documents on WhatsApp</div>
-                  <Steps items={["Link your firm's WhatsApp Business number here.", "Save each client's WhatsApp number on the client.", "Photos and PDFs they send are filed under the client and read like uploads."]} />
-                  <div style={{ fontSize: 12.5, color: V.muted }}>Already works without this: the Chaser opens WhatsApp with a ready message for any client with a number.</div>
-                </div>
-                {intg.whatsapp.available ? (
-                  <form
-                    style={{ display: "grid", gap: 10 }}
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      if (wa.id.trim()) void linkWhatsApp();
-                    }}
-                  >
-                    <label className="v2-label" htmlFor="wa-id">Phone number ID (from Meta's WhatsApp Manager)</label>
-                    <input id="wa-id" className="v2-input" value={wa.id} onChange={(e) => setWa({ ...wa, id: e.target.value })} placeholder="15-digit ID" inputMode="numeric" />
-                    <label className="v2-label" htmlFor="wa-display">Number your clients see</label>
-                    <input id="wa-display" className="v2-input" value={wa.display} onChange={(e) => setWa({ ...wa, display: e.target.value })} placeholder="+91 …" inputMode="tel" />
-                    <button className="v2-btn v2-btn-primary" type="submit" disabled={!wa.id.trim() || linking} data-busy={linking} style={{ justifySelf: "start" }}>
-                      <WhatsAppIcon size={16} /> Link WhatsApp number
-                    </button>
-                    <div style={{ fontSize: 12, color: V.muted }}>
-                      Webhook address for Meta: <span className="num" style={{ overflowWrap: "anywhere" }}>{typeof window === "undefined" ? "" : `${window.location.origin}/api/public/whatsapp-webhook`}</span>
-                    </div>
-                  </form>
-                ) : (
-                  <div style={{ display: "grid", gap: 8, fontSize: 13.5, color: V.body }}>
-                    <div style={{ fontWeight: 600, color: V.ink }}>WhatsApp Business isn't switched on for this workspace yet</div>
-                    <div>The person who set up FynHelp adds the three WhatsApp keys from Meta (verify token, app secret, access token). Then link the number here in one step.</div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+        {channel === "whatsapp" && (
+          <WhatsappIntake unassigned={unassignedWhatsApp} onShowUnassigned={() => onShowUnassigned("Unassigned WhatsApp")} onChanged={() => void load()} />
         )}
       </div>
     </Card>

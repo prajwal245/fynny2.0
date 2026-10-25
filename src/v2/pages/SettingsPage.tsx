@@ -19,6 +19,7 @@ import { RowSkeleton, ShimmerText } from "../agents";
 import { useV2 } from "../store";
 import { AgentSettings } from "../components/AgentSettings";
 import { BillingSection } from "../components/BillingSection";
+import { ReferralCard } from "../components/ReferralCard";
 import { GmailHealth } from "../components/GmailHealth";
 import { ChaserSending } from "../components/ChaserSending";
 import { WhatsappSetup } from "../components/WhatsappSetup";
@@ -242,6 +243,7 @@ export default function SettingsPage() {
       )}
 
       <BillingSection />
+      <ReferralCard />
 
       <Section
         title="Firm profile"

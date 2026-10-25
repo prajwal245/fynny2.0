@@ -76,7 +76,7 @@ export interface BillingView extends BillingRow {
 }
 
 const COLS =
-  "plan, cycle, status, trial_ends_at, current_period_end, trial_started_at, activated_at, razorpay_subscription_id, cancel_at_period_end, scheduled_plan, scheduled_cycle, billing_name, billing_gstin, first_payment_id, first_paid_at, first_paid_cycle, refund_used";
+  "plan, cycle, status, trial_ends_at, current_period_end, trial_started_at, activated_at, razorpay_subscription_id, cancel_at_period_end, scheduled_plan, scheduled_cycle, billing_name, billing_gstin, first_payment_id, first_paid_at, first_paid_cycle, refund_used, trial_bonus_days";
 
 type Row = BillingRow & {
   razorpay_subscription_id: string | null;
@@ -89,6 +89,8 @@ type Row = BillingRow & {
   first_paid_at?: string | null;
   first_paid_cycle?: string | null;
   refund_used?: boolean | null;
+  /** Days earned from referral rewards before the trial clock started. */
+  trial_bonus_days?: number | null;
 };
 
 /** The firm's billing row, created on first use with a trial from the firm's sign-up. */
@@ -235,7 +237,8 @@ export async function startTrialClock(db: Db, firmId: string, now: Date = new Da
   if (row.status !== "trialing" || row.trial_started_at) return;
   await db
     .from("ca_billing")
-    .update({ trial_started_at: now.toISOString(), trial_ends_at: new Date(now.getTime() + TRIAL_DAYS * 86_400_000).toISOString() })
+    // A bonus earned before the first upload (a referral reward) is added to the 14 days, not lost.
+    .update({ trial_started_at: now.toISOString(), trial_ends_at: new Date(now.getTime() + (TRIAL_DAYS + (row.trial_bonus_days ?? 0)) * 86_400_000).toISOString() })
     .eq("ca_firm_id", firmId)
     .is("trial_started_at", null);
 }

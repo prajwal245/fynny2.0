@@ -246,7 +246,7 @@ export function lifecycleEmail(kind: LifecycleKind, c: EmailContext): EmailParts
         heading: "Your firm is outgrowing Essential",
         paragraphs: [
           `You have worked on ${plural(c.usage.activeClients, "client")} this month. Essential covers up to ${PLANS.starter.maxActiveClients} active clients; past that, new clients need Firm.`,
-          `Firm is ${inr(firm.monthly)} a month for ${firm.clientsIncluded} active clients, then ${inr(firm.extraClient)} each, and adds the WhatsApp Chaser and your firm's branding on MIS exports. ${recLine}`,
+          `Firm is ${inr(firm.monthly)} a month for ${firm.clientsIncluded} active clients, then ${inr(firm.extraClient)} each, and adds 500 WhatsApp reminder credits a month and your firm's branding on MIS exports. ${recLine}`,
         ],
         cta: { label: "Compare plans", path: "/app/settings" },
       };

@@ -472,10 +472,27 @@ export async function confirmCheckout(
 export async function handleRazorpayWebhook(
   db: Db,
   eventId: string,
-  payload: { event?: string; payload?: { subscription?: { entity?: RzpSubscription }; invoice?: { entity?: { id?: string; notes?: Record<string, string> | null } } } },
+  payload: {
+    event?: string;
+    payload?: {
+      subscription?: { entity?: RzpSubscription };
+      invoice?: { entity?: { id?: string; notes?: Record<string, string> | null } };
+      payment?: { entity?: { id?: string; order_id?: string | null } };
+      order?: { entity?: { id?: string; notes?: Record<string, string> | null } };
+    };
+  },
 ) {
   const sub = payload.payload?.subscription?.entity;
   const invoice = payload.payload?.invoice?.entity;
+  // A paid credits order: add the credits even if the browser closed before it could confirm.
+  const order = payload.payload?.order?.entity;
+  const payment = payload.payload?.payment?.entity;
+  if (payload.event === "order.paid" && order?.id && order.notes?.kind === "credits" && payment?.id) {
+    const { error: seen } = await db.from("ca_billing_events").insert({ id: eventId, event: payload.event, ca_firm_id: order.notes.firm_id ?? null, payload });
+    if (seen) return { duplicate: true };
+    const done = await (await import("./billing/credits.server")).grantPaidOrder(db, order.id, payment.id);
+    return { duplicate: false, firmId: done?.firmId ?? null };
+  }
   let firmId: string | null = sub?.notes?.firm_id ?? (invoice?.notes?.kind === "usage" ? (invoice.notes.firm_id ?? null) : null);
   if (!firmId && sub?.id) {
     const { data } = await db.from("ca_billing").select("ca_firm_id").eq("razorpay_subscription_id", sub.id).maybeSingle();

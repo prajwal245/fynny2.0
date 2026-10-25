@@ -457,7 +457,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
 
   const events = evRes.data ?? [];
   const chases = (qRes.data ?? []).map((r) => {
-    let meta: { note?: string; contact?: string; phone?: string } = {};
+    let meta: { note?: string; contact?: string; phone?: string; channels?: string } = {};
     try {
       meta = JSON.parse(r.notes ?? "{}");
     } catch {
@@ -470,6 +470,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       contact: meta.contact || r.contact_name || r.contact_email || "",
       phone: r.contact_phone || meta.phone || "",
       email: r.contact_email ?? undefined,
+      channel: meta.channels === "email" || meta.channels === "whatsapp" || meta.channels === "both" ? meta.channels : undefined,
       due: r.due_date ?? String(r.created_at).slice(0, 10),
       note: meta.note ?? "",
       followUps: r.chaser_count ?? 0,

@@ -524,6 +524,7 @@ export const createPracticeChase = createServerFn({ method: "POST" })
         due: z.string().max(20).nullable().optional(),
         note: z.string().max(1000).optional(),
         period: z.string().max(40).nullable().optional(),
+        channels: z.enum(["email", "whatsapp", "both"]).optional(),
       })
       .parse(d),
   )
@@ -936,6 +937,39 @@ export const confirmPracticeCheckout = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) =>
     withFirm(context.userId, async (db, ctx) => (await import("./billing.server")).confirmCheckout(db, ctx, data)),
+  );
+
+/* ── WhatsApp credits ──────────────────────────────────── */
+
+export const getPracticeCredits = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./billing/credits.server")).creditsView(db, ctx)),
+  );
+
+export const startPracticeCreditTopUp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ pack: z.enum(["c500", "c2000", "c5000"]) }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./billing/credits.server")).createTopUpOrder(db, ctx, data.pack)),
+  );
+
+export const confirmPracticeCreditTopUp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z.object({ razorpay_order_id: z.string().min(4).max(64), razorpay_payment_id: z.string().min(4).max(64), razorpay_signature: z.string().min(16).max(256) }).parse(d),
+  )
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./billing/credits.server")).confirmTopUp(db, ctx, data)),
+  );
+
+export const savePracticeCreditSettings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z.object({ autoTopup: z.boolean(), autoPack: z.enum(["c500", "c2000", "c5000"]), autoMaxPerMonth: z.number().int().min(1).max(10) }).parse(d),
+  )
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./billing/credits.server")).saveSettings(db, ctx, data)),
   );
 
 /* ── Zoho Books (read-only) ────────────────────────────── */

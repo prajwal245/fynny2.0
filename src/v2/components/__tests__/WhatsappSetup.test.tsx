@@ -47,8 +47,8 @@ describe("WhatsApp setup", () => {
     expect(await screen.findByText(/Ready: 9606370717/)).toBeTruthy();
     expect(screen.getByText("JOIN K7M2QX")).toBeTruthy();
     expect(screen.queryByLabelText("Phone number ID")).toBeNull();
-    // Trial plan: the automatic-reminder switch is explained, not shown.
-    expect(screen.getByText(/Firm and Scale plans/)).toBeTruthy();
+    // No plan running: the automatic-reminder switch is explained, not shown.
+    expect(screen.getByText(/paused until you choose a plan/)).toBeTruthy();
     expect(screen.queryByRole("checkbox")).toBeNull();
   });
 

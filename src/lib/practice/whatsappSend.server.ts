@@ -144,7 +144,7 @@ export async function firmCountryCode(db: Db, firmId: string): Promise<string> {
 
 export type WaSendResult =
   | { ok: true; wamid: string; to: string; mode: "text" | "template"; /** A test firm's message: recorded, not sent. */ simulated?: boolean }
-  | { ok: false; unconfigured: boolean; permanent: boolean; error: string };
+  | { ok: false; unconfigured: boolean; permanent: boolean; error: string; /** The firm has no WhatsApp credits left. */ noCredits?: boolean };
 
 interface GraphReply {
   messages?: { id: string }[];
@@ -198,6 +198,12 @@ export async function sendChaseWhatsapp(
   if (test && (!sender || !phoneAllowedInTest(to, process.env["TEST_RECIPIENTS"])))
     return { ok: true, wamid: sandboxId(), to, mode: "template", simulated: true };
   if (!sender) return { ok: false, unconfigured: true, permanent: false, error: reason ?? "WhatsApp is not set up." };
+  // On FynHelp's shared number a reminder costs one credit, given back if it is not sent. Own numbers and test firms are free.
+  const credits = await import("./billing/credits.server");
+  const spend = await credits.spendForReminder(db, firmId, { sharedNumber: sender.shared });
+  if (!spend.ok)
+    return { ok: false, unconfigured: false, permanent: false, noCredits: true, error: "Out of WhatsApp credits. Add credits in Settings, Billing and the reminder goes out." };
+  const attempt = async (): Promise<WaSendResult> => {
   try {
     const { data: contact } = await db
       .from("ca_whatsapp_contacts")
@@ -229,6 +235,10 @@ export async function sendChaseWhatsapp(
   } catch (e) {
     return { ok: false, unconfigured: false, permanent: false, error: `Could not reach WhatsApp (${e instanceof Error ? e.message : "network error"}).` };
   }
+  };
+  const result = await attempt();
+  if (!result.ok) await credits.refundReminder(db, firmId, spend.ref);
+  return result;
 }
 
 /** Per firm, per day: stops a runaway schedule from hurting the number's quality rating. */

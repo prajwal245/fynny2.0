@@ -267,6 +267,11 @@ export async function createChase(
       period = input.period;
     }
   }
+  const wantsWhatsapp = input.channels === "whatsapp" || input.channels === "both";
+  if (wantsWhatsapp && !(input.phone?.trim() || client.client_phone))
+    throw new PracticeError("invalid", "Add the client's WhatsApp number (with country code) to chase on WhatsApp.");
+  if (input.channels !== "whatsapp" && !contactEmail && input.channels)
+    throw new PracticeError("invalid", "Add the client's email to chase by email, or choose WhatsApp only.");
   const now = new Date();
   const { data, error } = await db
     .from("ca_document_requests")
@@ -284,6 +289,7 @@ export async function createChase(
         note: input.note ?? "",
         contact: input.contact,
         phone: input.phone ?? "",
+        ...(input.channels ? { channels: input.channels } : {}),
       }),
       contact_name: contactName,
       contact_email: contactEmail,
@@ -363,7 +369,7 @@ export async function sendFollowUp(
     const { loadBilling } = await import("./billing.server");
     const { accessFor } = await import("./billing/plans");
     if (!accessFor(await loadBilling(db, ctx.firmId)).whatsappChaser)
-      throw new PracticeError("plan_feature", "Chasing by WhatsApp is on the Firm and Scale plans. Email follow-ups work on every plan.");
+      throw new PracticeError("plan_feature", "Your plan has ended, so WhatsApp reminders are paused. Choose a plan in Settings, Billing.");
     // Official API first: the message goes out itself, with delivery tracked.
     const api = await sendChaseWhatsapp(
       db,
@@ -404,7 +410,7 @@ export async function sendFollowUp(
         note: `WhatsApp could not be sent: ${api.error}`,
         actor_id: ctx.userId,
       });
-      throw new PracticeError("whatsapp_failed", api.error);
+      throw new PracticeError(api.noCredits ? "no_credits" : "whatsapp_failed", api.error);
     }
     // Not set up for the API on this server: fall back to opening WhatsApp with the message ready.
     const message = whatsappMessage(t);
@@ -826,7 +832,7 @@ export async function runDueFollowups(now = new Date(), firmId?: string) {
       }
       if (!whatsappPlan.get(firmId)) {
         // Email-and-WhatsApp chases carry on by email; a WhatsApp-only chase has nothing else to use.
-        if (onlyWhatsapp) await giveBack("WhatsApp reminders are on the Firm and Scale plans. Change the chase to email, or upgrade.", "whatsapp", "chase_whatsapp_template");
+        if (onlyWhatsapp) await giveBack("Your plan has ended, so WhatsApp reminders are paused. Choose a plan in Settings, Billing.", "whatsapp", "chase_whatsapp_template");
       } else if (!phone) {
         if (onlyWhatsapp) await giveBack("No WhatsApp number on this chase. Add one, or change the chase to email.", "whatsapp", "chase_whatsapp_template");
       } else if (waSentToday.get(firmId)! + claimedItems.length > whatsappDailyCap()) {

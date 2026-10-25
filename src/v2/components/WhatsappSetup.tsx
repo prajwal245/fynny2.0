@@ -223,7 +223,7 @@ export function WhatsappSetup({ firmId, webhook, onChanged }: { firmId: string; 
               <span>Also send a WhatsApp reminder automatically from the second reminder on, together with the email.</span>
             </label>
           ) : (
-            <div style={{ fontSize: 13, color: V.muted }}>WhatsApp reminders are on the Firm and Scale plans. Your trial includes email.</div>
+            <div style={{ fontSize: 13, color: V.muted }}>WhatsApp reminders are paused until you choose a plan in Settings, Billing.</div>
           )}
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", fontSize: 13 }}>
             <label htmlFor="wa-country">Phone numbers saved without a country code are in</label>

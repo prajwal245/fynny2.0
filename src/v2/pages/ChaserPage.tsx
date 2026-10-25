@@ -8,6 +8,15 @@ import { getPracticeWhatsappStatus } from "@/lib/practice/practice.functions";
 import { Badge, Card, Drawer, EmptyState, Modal, PageHeader, Tone, V, formatDate } from "../ui";
 import { AgentGlyph, AgentStatusBadge, AgentTimeline, ShimmerText } from "../agents";
 import { Chase, useV2 } from "../store";
+import { CreditsAlert, CreditsChip, TopUpModal } from "../components/CreditsPanel";
+
+type Channel = NonNullable<Chase["channel"]>;
+const CHANNELS: { key: Channel; label: string; hint: string }[] = [
+  { key: "email", label: "Email", hint: "Free. Day 0, 3, 7 and 10." },
+  { key: "whatsapp", label: "WhatsApp", hint: "1 credit per reminder from FynHelp's number." },
+  { key: "both", label: "Email + WhatsApp", hint: "Both on every reminder. WhatsApp uses 1 credit." },
+];
+const channelLabel = (c: Chase["channel"]) => (c === "whatsapp" ? "WhatsApp" : c === "both" ? "Email + WhatsApp" : "Email");
 
 const TONE: Record<Chase["status"], Tone> = { Open: "info", "Following Up": "warn", Escalated: "bad", Resolved: "good" };
 const TYPES = ["Missing bank statement", "Missing invoice", "Overdue receivable", "GST confirmation", "Custom"];
@@ -16,8 +25,9 @@ const FILTERS = ["All", "Open", "Following Up", "Escalated", "Resolved"] as cons
 /** Chaser. All follow-ups as a page; the client's Chaser tab when given a clientId. */
 export default function ChaserPage({ clientId: scopedClient }: { clientId?: string } = {}) {
   const { chases: allChases, clients, clientName, addChase, sendFollowUp, setChaseStatus, snoozeChase, runs } = useV2();
-  // WhatsApp chasing is on Firm and Scale (not Essential or the trial).
+  // WhatsApp chasing is on every plan and the trial; each reminder from FynHelp's number uses a credit.
   const whatsappAllowed = useBilling()?.access.whatsappChaser ?? false;
+  const [topUp, setTopUp] = useState(false);
   // With a token and a linked number the message goes out itself; otherwise WhatsApp opens with it ready.
   const [waSendReady, setWaSendReady] = useState(false);
   useEffect(() => {
@@ -28,7 +38,7 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
   const [openId, setOpenId] = useState<string | null>(null);
   const [promise, setPromise] = useState("");
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("All");
-  const [form, setForm] = useState({ clientId: scopedClient ?? clients[0]?.id ?? "", type: TYPES[0], contact: "", email: "", phone: "", due: "", note: "" });
+  const [form, setForm] = useState({ clientId: scopedClient ?? clients[0]?.id ?? "", type: TYPES[0], contact: "", email: "", phone: "", due: "", note: "", channel: "email" as Channel });
   // Chases go by email: start from the client's saved contact, editable.
   const forClient = (id: string) => {
     const c = clients.find((x) => x.id === id);
@@ -36,7 +46,7 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
     return { clientId: id, contact: c?.contactName || c?.name || "", email: c?.email ?? "", phone: c?.phone ?? "", due };
   };
   const openCreate = () => {
-    setForm((f) => ({ ...f, type: TYPES[0], note: "", ...forClient(f.clientId || scopedClient || clients[0]?.id || "") }));
+    setForm((f) => ({ ...f, type: TYPES[0], note: "", channel: "email" as Channel, ...forClient(f.clientId || scopedClient || clients[0]?.id || "") }));
     setCreating(true);
   };
 
@@ -48,8 +58,12 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
   const create = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.clientId || !form.contact.trim()) return;
-    if (!form.email.trim() && !form.phone.trim()) {
-      toast.error("Add an email (or a WhatsApp number) so the Chaser can reach the client.");
+    if (form.channel !== "whatsapp" && !form.email.trim()) {
+      toast.error(form.channel === "both" ? "Add the client's email, or choose WhatsApp only." : "Add the client's email, or choose WhatsApp.");
+      return;
+    }
+    if (form.channel !== "email" && !form.phone.trim()) {
+      toast.error("Add the client's WhatsApp number, with country code, or choose Email.");
       return;
     }
     addChase(form);
@@ -76,7 +90,8 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
       />
       )}
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+      <CreditsAlert onAdd={() => setTopUp(true)} />
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16, alignItems: "center" }}>
         {FILTERS.map((f) => (
           <button
             key={f}
@@ -88,7 +103,9 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
             <span style={{ opacity: 0.6 }}>{f === "All" ? chases.length : chases.filter((c) => c.status === f).length}</span>
           </button>
         ))}
+        <span style={{ marginLeft: "auto" }}><CreditsChip onAdd={() => setTopUp(true)} /></span>
       </div>
+      <TopUpModal open={topUp} onClose={() => setTopUp(false)} />
 
       {list.length === 0 ? (
         <EmptyState
@@ -126,6 +143,7 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      {c.status !== "Resolved" && c.channel && <Badge tone={c.channel === "email" ? "neutral" : "good"}>{channelLabel(c.channel)}</Badge>}
                       {c.status !== "Resolved" && <AgentStatusBadge agent="chaser" active={c.status === "Following Up"} label="Chaser" />}
                       <Badge tone={TONE[c.status]}>{c.status}</Badge>
                     </div>
@@ -151,18 +169,43 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
               {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
+          <div>
+            <label className="v2-label">How should the Chaser reach them?</label>
+            <div role="radiogroup" aria-label="Channel" style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit,minmax(min(150px, 100%), 1fr))" }} data-testid="chase-channel">
+              {CHANNELS.map((ch) => {
+                const on = form.channel === ch.key;
+                const locked = ch.key !== "email" && !whatsappAllowed;
+                return (
+                  <button
+                    key={ch.key}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    disabled={locked}
+                    onClick={() => setForm({ ...form, channel: ch.key })}
+                    style={{ textAlign: "left", padding: "10px 12px", borderRadius: 12, border: `1.5px solid ${on ? V.coral : V.line}`, background: on ? V.blue : V.card, cursor: locked ? "not-allowed" : "pointer", opacity: locked ? 0.5 : 1, font: "inherit", display: "grid", gap: 2 }}
+                  >
+                    <span style={{ fontWeight: 650, fontSize: 13.5, display: "flex", gap: 6, alignItems: "center" }}>
+                      {ch.key === "email" ? <Mail size={14} /> : <MessageCircle size={14} />} {ch.label}
+                    </span>
+                    <span style={{ fontSize: 11.5, color: V.muted, lineHeight: 1.4 }}>{ch.hint}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit,minmax(min(180px, 100%), 1fr))" }}>
             <div>
               <label className="v2-label" htmlFor="chase-contact">Contact name</label>
               <input id="chase-contact" className="v2-input" value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} required />
             </div>
             <div>
-              <label className="v2-label" htmlFor="chase-email">Email · follow-ups go here</label>
+              <label className="v2-label" htmlFor="chase-email">Email{form.channel === "whatsapp" ? " · not used" : " · follow-ups go here"}</label>
               <input id="chase-email" className="v2-input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="The client's email" />
             </div>
           </div>
           <div>
-            <label className="v2-label" htmlFor="chase-phone">WhatsApp number · optional</label>
+            <label className="v2-label" htmlFor="chase-phone">WhatsApp number{form.channel === "email" ? " · optional" : " · required"}</label>
             <input id="chase-phone" className="v2-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="With country code" inputMode="tel" />
           </div>
           <div>
@@ -187,6 +230,7 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
               <Badge tone={TONE[active.status]}>{active.status}</Badge>
               <Badge>{clientName(active.clientId)}</Badge>
               <Badge>Due {formatDate(active.due)}</Badge>
+              {active.channel && <Badge tone={active.channel === "email" ? "neutral" : "good"}>Reaches them by {channelLabel(active.channel)}</Badge>}
             </div>
             {active.note && <p style={{ fontSize: 13.5, color: V.body, lineHeight: 1.6, margin: 0 }}>{active.note}</p>}
 
@@ -201,8 +245,8 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
               <div style={{ background: V.gray, borderRadius: 12, padding: 14, fontSize: 13, lineHeight: 1.6 }}>{message(active)}</div>
               <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
                 {active.phone && active.status !== "Resolved" && !whatsappAllowed && (
-                  <Link to="/app/settings" hash="billing" className="v2-btn v2-btn-ghost" title="Chasing by WhatsApp is on the Firm and Scale plans" data-testid="whatsapp-locked">
-                    <Lock size={14} /> WhatsApp on Firm plan
+                  <Link to="/app/settings" hash="billing" className="v2-btn v2-btn-ghost" title="WhatsApp reminders are paused until you choose a plan" data-testid="whatsapp-locked">
+                    <Lock size={14} /> Choose a plan for WhatsApp
                   </Link>
                 )}
                 {active.phone && active.status !== "Resolved" && whatsappAllowed && waSendReady && (

@@ -46,7 +46,7 @@ export function TrialBanner({ partnerView }: { partnerView: boolean }) {
           <b>
             {a.trialDaysLeft <= 1 ? "Last day of your free trial." : `${a.trialDaysLeft} days left in your free trial.`}
           </b>{" "}
-          Every Firm feature except the WhatsApp Chaser, up to {a.maxActiveClients} active clients and {a.maxDocuments} documents. No card needed.
+          Every Firm feature with 25 free WhatsApp reminders, up to {a.maxActiveClients} active clients and {a.maxDocuments} documents. No card needed.
         </span>
         {action}
       </div>

@@ -20,6 +20,7 @@ import {
   monthlyBill,
   type PlanKey,
 } from "@/lib/practice/billing/plans";
+import { CREDIT_PACKS, PLAN_CREDITS, TRIAL_CREDITS } from "@/lib/practice/billing/credits";
 
 /* ================================================================
    FynHelp pricing (16 Oct 2026): per active client, unlimited users.
@@ -154,9 +155,9 @@ const gstNote = (cur: Currency) => (cur === "INR" ? `+ ${GST_PERCENT}% GST` : "+
 
 /** Features that differ between plans, shown on the cards. Only what works today. */
 const CARD_FEATURES: Record<PlanKey, string[]> = {
-  starter: ["Extraction, reconciliation and source-linked MIS", "Gmail intake and Chaser by email", "Roles for partner, manager and junior", "MIS exports with a “Prepared with FynHelp” footer"],
-  professional: ["Everything in Essential", "Chaser by WhatsApp", "MIS exports in your firm's name", "Help importing your clients"],
-  scale: ["Everything in Firm", "Priority WhatsApp support and a named contact", "Assisted import of up to 100 clients", "A quarterly review with us"],
+  starter: ["Extraction, reconciliation and source-linked MIS", "Gmail intake and Chaser by email, no limit", `${PLAN_CREDITS.starter} WhatsApp reminder credits a month`, "MIS exports with a “Prepared with FynHelp” footer"],
+  professional: ["Everything in Essential", `${PLAN_CREDITS.professional} WhatsApp reminder credits a month`, "MIS exports in your firm's name", "Help importing your clients"],
+  scale: ["Everything in Firm", `${PLAN_CREDITS.scale.toLocaleString("en-IN")} WhatsApp reminder credits a month`, "Priority WhatsApp support and a named contact", "Assisted import of up to 100 clients"],
 };
 
 type Cell = boolean | string | { soon: true };
@@ -166,7 +167,8 @@ const FEATURE_ROWS: [string, Cell, Cell, Cell][] = [
   ["Roles for partner, manager and junior", true, true, true],
   ["Gmail intake", true, true, true],
   ["Chaser by email", true, true, true],
-  ["Chaser by WhatsApp", false, true, true],
+  ["Chaser by WhatsApp (1 credit per reminder)", `${PLAN_CREDITS.starter} credits a month`, `${PLAN_CREDITS.professional} credits a month`, `${PLAN_CREDITS.scale.toLocaleString("en-IN")} credits a month`],
+  ["Extra WhatsApp credits", "From ₹1 each", "From ₹1 each", "Down to ₹0.80 each"],
   ["MIS exports (PDF and Excel)", "“Prepared with FynHelp” footer", "Firm branding", "Firm branding"],
   ["Shareable MIS links", { soon: true }, { soon: true }, { soon: true }],
   ["Team and branch permissions", false, false, { soon: true }],
@@ -318,6 +320,10 @@ export default function PricingPage() {
             </div>
           </Reveal>
           <Reveal delay={80}>
+            <div className="fh-def">
+              <h3>WhatsApp credit</h3>
+              <p>One credit sends one WhatsApp reminder from FynHelp's number. Email reminders cost nothing, and a firm that links its own WhatsApp number pays no credits. Every plan includes credits each month, and unused credits roll over for 12 months. More credits: {CREDIT_PACKS.map((p) => `${p.credits.toLocaleString("en-IN")} for ${m(p.price)}`).join(", ")}. Optional automatic top-up with a monthly limit you set, so a reminder never silently stops.</p>
+            </div>
             <div className="fh-def">
               <h3>Document</h3>
               <p>One uploaded file. A bank statement counts as one document however many lines it has; one invoice is one document. Past your pooled allowance, {m(OVERAGE_BLOCK_PRICE)} per {OVERAGE_BLOCK_DOCS} documents on the next invoice. Work is never blocked.</p>
@@ -487,7 +493,7 @@ export default function PricingPage() {
           <Reveal delay={160}>
             <div className="fh-step">
               <h4>Choose a plan, or don't</h4>
-              <p>The trial covers {TRIAL_MAX_ACTIVE_CLIENTS} active clients and {TRIAL_MAX_DOCUMENTS} documents with every Firm feature except the WhatsApp Chaser. Without a plan, your data stays readable for 30 days.</p>
+              <p>The trial covers {TRIAL_MAX_ACTIVE_CLIENTS} active clients and {TRIAL_MAX_DOCUMENTS} documents with every Firm feature, including {TRIAL_CREDITS} free WhatsApp reminder credits. Without a plan, your data stays readable for 30 days.</p>
             </div>
           </Reveal>
         </div>

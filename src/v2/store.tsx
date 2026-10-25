@@ -216,6 +216,8 @@ export type Chase = {
   contact: string;
   phone: string;
   email?: string;
+  /** How the Chaser reaches the client. Chases made before this option have none (email, with WhatsApp from the second reminder when switched on). */
+  channel?: "email" | "whatsapp" | "both";
   due: string;
   note: string;
   followUps: number;
@@ -1532,6 +1534,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
             due: c.due || null,
             note: c.note || undefined,
             period,
+            channels: c.channel,
           },
         });
       })()

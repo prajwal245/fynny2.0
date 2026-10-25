@@ -14,6 +14,7 @@ import { CommandMenu, useCommandMenu } from "./components/CommandMenu";
 import { V2StoreProvider, monthOf, useV2 } from "./store";
 import { openExceptionsIn } from "./lib/exceptions";
 import { TrialBanner } from "./components/TrialBanner";
+import { TestBanner } from "./components/TestBanner";
 import { FirstCloseLauncher, FirstRunWelcome } from "./components/FirstCloseGuide";
 
 
@@ -255,6 +256,7 @@ function ShellBody() {
           </header>
 
           <main style={{ padding: 24, flex: 1, maxWidth: 1280, width: "100%" }}>
+            <TestBanner />
             <TrialBanner partnerView={partnerView} />
             <FirstRunWelcome />
             <Outlet />

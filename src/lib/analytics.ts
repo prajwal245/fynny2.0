@@ -1,5 +1,6 @@
 import posthog from "posthog-js";
 import { analyticsAllowed, GA_MEASUREMENT_ID, onConsentChange } from "./consent";
+import { campaignParams } from "./utm";
 
 // PostHog project keys are public (they ship in every browser bundle); env overrides.
 const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY || "phc_nLJ4KcJAWuV43cBi43Bqez9YBo2zB6RvC4SvVFXyuDSR";
@@ -133,10 +134,28 @@ export type FynHelpEvent =
   | "subscription_upgraded"
   | "feature_blocked_upgrade_shown";
 
+/** Conversions that carry the visitor's campaign tags (utm_source, utm_medium, utm_campaign, utm_content, utm_term). */
+export const ATTRIBUTED_EVENTS: readonly FynHelpEvent[] = [
+  "sign_up",
+  "demo_requested",
+  "waitlist_signup",
+  "cta_click",
+  "onboarding_completed",
+  "subscription_upgraded",
+];
+
+/** An event's properties with the visitor's campaign tags added when the event is a conversion. */
+export function withCampaign(event: FynHelpEvent, properties?: Record<string, unknown>): Record<string, unknown> {
+  if (!ATTRIBUTED_EVENTS.includes(event)) return properties ?? {};
+  // Tags captured at the visitor's landing; anything the caller passes wins.
+  return { ...campaignParams(), ...properties };
+}
+
 export function track(event: FynHelpEvent, properties?: Record<string, unknown>) {
-  if (typeof window !== "undefined" && window.gtag && GA_ID) window.gtag("event", GA_EVENT[event] ?? event, properties ?? {});
+  const props = withCampaign(event, properties);
+  if (typeof window !== "undefined" && window.gtag && GA_ID) window.gtag("event", GA_EVENT[event] ?? event, props);
   if (!POSTHOG_KEY) return;
-  posthog.capture(event, { ...properties, timestamp: new Date().toISOString() });
+  posthog.capture(event, { ...props, timestamp: new Date().toISOString() });
 }
 
 export function trackTiming(event: string, durationMs: number, properties?: Record<string, unknown>) {

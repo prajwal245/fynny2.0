@@ -12,6 +12,21 @@ the tags, shorten them by hand, or reuse someone else's link. Change only the pa
 | Samiksha | https://fynhelp.com/?utm_source=linkedin&utm_medium=organic-social&utm_campaign=launch-oct26&utm_content=samiksha |
 | Company page | https://fynhelp.com/?utm_source=linkedin&utm_medium=organic-social&utm_campaign=launch-oct26&utm_content=company-page |
 
+## Instagram (organic)
+Instagram only makes links clickable in the **profile bio**, in a **story link sticker**, and in **ads**. Links in captions or comments are not clickable, so do not use them.
+
+| Where | Link |
+|---|---|
+| Company profile bio | https://fynhelp.com/?utm_source=instagram&utm_medium=organic-social&utm_campaign=launch-oct26&utm_content=bio |
+| A person's profile bio (change the name) | https://fynhelp.com/?utm_source=instagram&utm_medium=organic-social&utm_campaign=launch-oct26&utm_content=bio-**tarun** |
+| Story link sticker (change the name, or the story number) | https://fynhelp.com/?utm_source=instagram&utm_medium=organic-social&utm_campaign=launch-oct26&utm_content=story-**tarun** |
+| Reel, in a "link in bio" or link sticker (name the reel) | https://fynhelp.com/?utm_source=instagram&utm_medium=organic-social&utm_campaign=launch-oct26&utm_content=reel-**demo-1** |
+
+Instagram ads are bought in Meta Ads Manager, so use the Meta ads link below. To see Instagram separately from Facebook in the report,
+add `&utm_term={{placement}}` to the end of that link; Meta fills in the placement (for example Instagram Reels).
+
+Instagram opens links in its own browser. The cookie banner shows once more there: tap Accept, or the visit is not counted.
+
 ## WhatsApp
 | Use | Link |
 |---|---|
@@ -21,7 +36,8 @@ the tags, shorten them by hand, or reuse someone else's link. Change only the pa
 ## Paid ads
 | Use | Link |
 |---|---|
-| Meta ads (one link for all ads; Meta fills in the ad name) | https://fynhelp.com/?utm_source=meta&utm_medium=paid-social&utm_campaign=launch-oct26&utm_content={{ad.name}} |
+| Meta ads, Instagram and Facebook (one link for all ads; Meta fills in the ad name) | https://fynhelp.com/?utm_source=meta&utm_medium=paid-social&utm_campaign=launch-oct26&utm_content={{ad.name}} |
+| Same, with the placement so Instagram and Facebook show separately | https://fynhelp.com/?utm_source=meta&utm_medium=paid-social&utm_campaign=launch-oct26&utm_content={{ad.name}}&utm_term={{placement}} |
 | LinkedIn ads (change the number for each ad) | https://fynhelp.com/?utm_source=linkedin&utm_medium=paid-social&utm_campaign=launch-oct26&utm_content=ad-**1** |
 
 Meta: paste the Meta link into the ad's "URL parameters" field exactly as shown, with the braces. Give every ad a clear,

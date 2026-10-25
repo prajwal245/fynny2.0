@@ -1068,3 +1068,22 @@ export const tallySyncNow = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) =>
     withFirm(context.userId, async (db, ctx) => (await import("./tallyConnector.server")).requestSync(db, ctx, data.id)),
   );
+
+/* ── Referrals ────────────────────────────────────────── */
+
+export const referralOverview = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./referrals.server")).referralView(db, ctx)),
+  );
+
+/** A new firm uses someone's code. Only the owner of the firm can do this; nothing is rewarded until its first client. */
+export const referralApply = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ code: z.string().min(1).max(30) }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      await asPartner(ctx, "add a referral code");
+      return (await import("./referrals.server")).applyReferral(db, ctx, data.code);
+    }),
+  );

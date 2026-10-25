@@ -112,6 +112,8 @@ export async function createPracticeClient(
     "system",
     `${name} added to the portfolio.`,
   );
+  // A firm that joined with a referral code qualifies on its first client. Never blocks adding the client.
+  await (await import("./referrals.server")).onClientAdded(db, ctx.firmId).catch((e) => console.error(`[referrals] ${(e as Error).message}`));
   return { id: biz.id, row_id: client.id };
 }
 

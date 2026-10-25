@@ -19,7 +19,8 @@ import { ArrowRight, Building2, Check, Mail, UploadCloud, UserPlus, Users } from
 import { V } from "../ui";
 import { ProcessingCard } from "../agents";
 import { supabase } from "@/integrations/supabase/client";
-import { updatePracticePipelineSettings } from "@/lib/practice/practice.functions";
+import { referralApply, updatePracticePipelineSettings } from "@/lib/practice/practice.functions";
+import { clearReferralCode, getReferralCode } from "@/lib/referral";
 import { confirmPendingAccount, createAccount } from "@/lib/accountSignup.functions";
 import { ENTITY_TYPES, useV2 } from "../store";
 import { OnboardingPanel } from "../components/OnboardingPanel";
@@ -40,6 +41,7 @@ const DEFAULT_AUTONOMY = { auto_recon: true, auto_chase_day: 5 };
 export default function OnboardingPage() {
   const { session, saveFirm, addClient, addDoc, completeOnboarding, firm, firmIdReady, docs, runs } = useV2();
   const savePipeline = useServerFn(updatePracticePipelineSettings);
+  const applyReferralFn = useServerFn(referralApply);
   const createAccountFn = useServerFn(createAccount);
   const confirmPendingFn = useServerFn(confirmPendingAccount);
   const navigate = useNavigate();
@@ -105,7 +107,7 @@ export default function OnboardingPage() {
     }
     return { name: session?.name ?? "", email: session?.email ?? fromLink, password: "" };
   });
-  const [firmForm, setFirmForm] = useState({ name: firm?.name ?? "", city: firm?.city ?? "", frn: firm?.frn ?? "" });
+  const [firmForm, setFirmForm] = useState({ name: firm?.name ?? "", city: firm?.city ?? "", frn: firm?.frn ?? "", ref: getReferralCode() ?? "" });
   const [gstinErr, setGstinErr] = useState<string | null>(null);
   const [client, setClient] = useState({ name: "", entityType: ENTITY_TYPES[0], gstin: "", contactName: "", email: "", phone: "" });
   const [clientId, setClientId] = useState<string | null>(null);
@@ -180,8 +182,9 @@ export default function OnboardingPage() {
     e.preventDefault();
     settingUp.current = true;
     setBusy(true);
+    const { ref: referralCode, ...firmDetails } = firmForm;
     const ok = await saveFirm({
-      ...firmForm,
+      ...firmDetails,
       partnerName: account.name || session?.name || "",
       email: account.email || session?.email || "",
     });
@@ -192,6 +195,13 @@ export default function OnboardingPage() {
     }
     // Agents start with the usual defaults; the partner can change them in Settings.
     void savePipeline({ data: DEFAULT_AUTONOMY }).catch(() => undefined);
+    // A referral code (from a link, or typed here) is attached now; the reward comes with the first client.
+    if (referralCode.trim()) {
+      const res = await applyReferralFn({ data: { code: referralCode } }).catch(() => ({ ok: false as const, message: "We could not check the referral code just now. You can add it later by writing to support@fynhelp.com." }));
+      if (res.ok) toast.success(`Referral applied. You and ${res.referrerName} each get a free month when you add your first client.`);
+      else toast.info(res.message);
+      clearReferralCode();
+    }
     next();
   };
 
@@ -350,6 +360,7 @@ export default function OnboardingPage() {
                 <div className="onb-2col">
                   <Field label="City" optional><input className="v2-input" value={firmForm.city} onChange={(e) => setFirmForm({ ...firmForm, city: e.target.value })} placeholder="Bengaluru" /></Field>
                   <Field label="Firm registration number" optional><input className="v2-input" value={firmForm.frn} onChange={(e) => setFirmForm({ ...firmForm, frn: e.target.value })} placeholder="012345S" /></Field>
+                  <Field label="Referral code" optional><input className="v2-input" value={firmForm.ref} onChange={(e) => setFirmForm({ ...firmForm, ref: e.target.value.toUpperCase() })} placeholder="FHXXXXXX" autoComplete="off" /></Field>
                 </div>
                 <Actions>
                   <button className="v2-btn v2-btn-primary" type="submit" data-busy={busy} disabled={busy}>Create firm <ArrowRight size={15} /></button>

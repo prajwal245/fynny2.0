@@ -145,7 +145,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
         .order("created_at", { ascending: false })
         .limit(200),
       // Firm profile and Gmail status ride along, so the app opens in one round trip.
-      db.from("ca_firms").select("firm_name, ca_name, email, city, membership_number").eq("id", f).maybeSingle(),
+      db.from("ca_firms").select("firm_name, ca_name, email, city, membership_number, is_test").eq("id", f).maybeSingle(),
       db.from("ca_gmail_connections").select("id").eq("ca_firm_id", f).eq("is_active", true).limit(1),
       // Decisions the Recon agent learned from the Exception Queue, proposed again for the same lines.
       db
@@ -457,7 +457,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
 
   const events = evRes.data ?? [];
   const chases = (qRes.data ?? []).map((r) => {
-    let meta: { note?: string; contact?: string; phone?: string } = {};
+    let meta: { note?: string; contact?: string; phone?: string; channels?: string } = {};
     try {
       meta = JSON.parse(r.notes ?? "{}");
     } catch {
@@ -470,6 +470,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       contact: meta.contact || r.contact_name || r.contact_email || "",
       phone: r.contact_phone || meta.phone || "",
       email: r.contact_email ?? undefined,
+      channel: meta.channels === "email" || meta.channels === "whatsapp" || meta.channels === "both" ? meta.channels : undefined,
       due: r.due_date ?? String(r.created_at).slice(0, 10),
       note: meta.note ?? "",
       followUps: r.chaser_count ?? 0,
@@ -589,6 +590,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       city: (firmRes.data?.city as string | null) ?? "",
       frn: (firmRes.data?.membership_number as string | null) ?? "",
       gmailConnected: Boolean(gmailRes.data?.length),
+      isTest: Boolean(firmRes.data?.is_test),
     },
     clients,
     docs,

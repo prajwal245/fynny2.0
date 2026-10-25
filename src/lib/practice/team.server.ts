@@ -7,6 +7,7 @@
  */
 import { PracticeError } from "./core";
 import { sharedPhoneNumberId } from "./whatsappSend.server";
+import { sendFirmEmail } from "./testMode.server";
 import { logActivity, type Db, type FirmContext } from "./db.server";
 import { isEmail, sendEmail } from "./email.server";
 
@@ -96,7 +97,7 @@ export async function inviteMember(
 
   const link = `${appOrigin ?? process.env["PUBLIC_APP_URL"] ?? "https://fynhelp.com"}/app/onboarding`;
   const text = `You have been invited to join ${ctx.firmName} on FynHelp as ${role}.\n\nCreate your account with this email address (${email}) here:\n${link}\n\nYou will join the practice automatically.`;
-  const sent = await sendEmail({
+  const sent = await sendFirmEmail(db, ctx.firmId, {
     to: email,
     subject: `${ctx.firmName} invited you to FynHelp`,
     text,

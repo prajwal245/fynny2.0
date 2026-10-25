@@ -19,6 +19,7 @@ import { RowSkeleton, ShimmerText } from "../agents";
 import { useV2 } from "../store";
 import { AgentSettings } from "../components/AgentSettings";
 import { BillingSection } from "../components/BillingSection";
+import { CreditsPanel } from "../components/CreditsPanel";
 import { ReferralCard } from "../components/ReferralCard";
 import { GmailHealth } from "../components/GmailHealth";
 import { ChaserSending } from "../components/ChaserSending";
@@ -243,6 +244,7 @@ export default function SettingsPage() {
       )}
 
       <BillingSection />
+      <CreditsPanel />
       <ReferralCard />
 
       <Section

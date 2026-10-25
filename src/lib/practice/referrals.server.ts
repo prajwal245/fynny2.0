@@ -24,9 +24,9 @@ import {
 } from "./referrals";
 
 const firmFacts = async (db: Db, id: string): Promise<(FirmFacts & { name: string }) | null> => {
-  const { data } = await db.from("ca_firms").select("id, user_id, email, created_at, is_demo, firm_name").eq("id", id).maybeSingle();
+  const { data } = await db.from("ca_firms").select("id, user_id, email, created_at, is_demo, is_test, firm_name").eq("id", id).maybeSingle();
   return data
-    ? { id: data.id as string, userId: (data.user_id as string | null) ?? null, email: (data.email as string | null) ?? null, createdAt: String(data.created_at), isDemo: Boolean(data.is_demo), name: (data.firm_name as string) ?? "A firm" }
+    ? { id: data.id as string, userId: (data.user_id as string | null) ?? null, email: (data.email as string | null) ?? null, createdAt: String(data.created_at), isDemo: Boolean(data.is_demo) || Boolean(data.is_test), name: (data.firm_name as string) ?? "A firm" }
     : null;
 };
 

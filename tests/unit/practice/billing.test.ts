@@ -81,9 +81,9 @@ describe("trial and plan access", () => {
     const a = accessFor(row({ trial_started_at: null }), now);
     expect(a).toMatchObject({ state: "trial", canWork: true, trialNotStarted: true, trialDaysLeft: null });
   });
-  it("runs 14 days from the first upload, with trial limits and no WhatsApp Chaser", () => {
+  it("runs 14 days from the first upload, with trial limits and WhatsApp on the trial's free credits", () => {
     const a = accessFor(row({}), now);
-    expect(a).toMatchObject({ state: "trial", canWork: true, trialDaysLeft: 14, maxActiveClients: TRIAL_MAX_ACTIVE_CLIENTS, maxDocuments: TRIAL_MAX_DOCUMENTS, whatsappChaser: false, features: "professional" });
+    expect(a).toMatchObject({ state: "trial", canWork: true, trialDaysLeft: 14, maxActiveClients: TRIAL_MAX_ACTIVE_CLIENTS, maxDocuments: TRIAL_MAX_DOCUMENTS, whatsappChaser: true, features: "professional" });
   });
   it("the last 24 hours count as the last day", () => {
     const a = accessFor(row({ trial_ends_at: new Date(now.getTime() + 3_600_000).toISOString() }), now);
@@ -99,8 +99,8 @@ describe("trial and plan access", () => {
     const { trial_started_at: _drop, ...old } = row({});
     expect(accessFor(old, now).trialDaysLeft).toBe(14);
   });
-  it("paid plans: Essential caps active clients at 25 and has no WhatsApp Chaser; Firm has both", () => {
-    expect(accessFor(row({ status: "active" }), now)).toMatchObject({ canWork: true, maxActiveClients: 25, whatsappChaser: false, maxDocuments: null });
+  it("paid plans: Essential caps active clients at 25; WhatsApp runs on credits on every plan", () => {
+    expect(accessFor(row({ status: "active" }), now)).toMatchObject({ canWork: true, maxActiveClients: 25, whatsappChaser: true, maxDocuments: null });
     expect(accessFor(row({ status: "active", plan: "professional" }), now)).toMatchObject({ maxActiveClients: null, whatsappChaser: true });
   });
   it("a failed renewal keeps working while Razorpay retries, then pauses when halted", () => {

@@ -16,6 +16,7 @@
 import type { Db, FirmContext } from "./db.server";
 import { canSignOff, logActivity } from "./db.server";
 import { sendEmail } from "./email.server";
+import { assertNotTest, isTestFirm } from "./testMode.server";
 import { PracticeError } from "./core";
 import {
   accessFor,
@@ -93,10 +94,22 @@ type Row = BillingRow & {
   trial_bonus_days?: number | null;
 };
 
+const FAR_FUTURE = "2099-12-31T00:00:00.000Z";
+
+/** A test firm is always on a full plan with nothing to pay: every feature works, nothing is ever charged. */
+function testFirmBilling(row: Row): Row {
+  return { ...row, plan: "scale", cycle: "monthly", status: "active", trial_ends_at: FAR_FUTURE, current_period_end: FAR_FUTURE, cancel_at_period_end: false, razorpay_subscription_id: null, scheduled_plan: null, scheduled_cycle: null };
+}
+
 /** The firm's billing row, created on first use with a trial from the firm's sign-up. */
 export async function loadBilling(db: Db, firmId: string): Promise<Row> {
-  const { data } = await db.from("ca_billing").select(COLS).eq("ca_firm_id", firmId).maybeSingle();
-  if (data) return data as Row;
+  const { data } = await db.from("ca_billing").select(`${COLS}, ca_firms(is_test)`).eq("ca_firm_id", firmId).maybeSingle();
+  if (data) {
+    const { ca_firms: firm, ...row } = data as Row & { ca_firms?: { is_test?: boolean } | { is_test?: boolean }[] | null };
+    const isTest = Array.isArray(firm) ? Boolean(firm[0]?.is_test) : Boolean(firm?.is_test);
+    return isTest ? testFirmBilling(row as Row) : (row as Row);
+  }
+  if (await isTestFirm(db, firmId)) return testFirmBilling({ plan: "scale", cycle: "monthly", status: "active", trial_ends_at: FAR_FUTURE, current_period_end: FAR_FUTURE, razorpay_subscription_id: null });
   const { data: firm } = await db.from("ca_firms").select("created_at").eq("id", firmId).maybeSingle();
   const start = firm?.created_at ? new Date(String(firm.created_at)) : new Date();
   const row = { ca_firm_id: firmId, trial_ends_at: trialEndFrom(start).toISOString() };
@@ -310,6 +323,7 @@ export async function startCheckout(
   cycle: Cycle,
   details: { billingName?: string | null; gstin?: string | null; coupon?: string | null } = {},
 ) {
+  await assertNotTest(db, ctx.firmId);
   if (!canSignOff(ctx)) throw new PracticeError("forbidden", "Only a partner can choose the firm's plan.");
   auth(); // says "payments are being set up" when the keys are missing
   const row = await loadBilling(db, ctx.firmId);
@@ -458,10 +472,27 @@ export async function confirmCheckout(
 export async function handleRazorpayWebhook(
   db: Db,
   eventId: string,
-  payload: { event?: string; payload?: { subscription?: { entity?: RzpSubscription }; invoice?: { entity?: { id?: string; notes?: Record<string, string> | null } } } },
+  payload: {
+    event?: string;
+    payload?: {
+      subscription?: { entity?: RzpSubscription };
+      invoice?: { entity?: { id?: string; notes?: Record<string, string> | null } };
+      payment?: { entity?: { id?: string; order_id?: string | null } };
+      order?: { entity?: { id?: string; notes?: Record<string, string> | null } };
+    };
+  },
 ) {
   const sub = payload.payload?.subscription?.entity;
   const invoice = payload.payload?.invoice?.entity;
+  // A paid credits order: add the credits even if the browser closed before it could confirm.
+  const order = payload.payload?.order?.entity;
+  const payment = payload.payload?.payment?.entity;
+  if (payload.event === "order.paid" && order?.id && order.notes?.kind === "credits" && payment?.id) {
+    const { error: seen } = await db.from("ca_billing_events").insert({ id: eventId, event: payload.event, ca_firm_id: order.notes.firm_id ?? null, payload });
+    if (seen) return { duplicate: true };
+    const done = await (await import("./billing/credits.server")).grantPaidOrder(db, order.id, payment.id);
+    return { duplicate: false, firmId: done?.firmId ?? null };
+  }
   let firmId: string | null = sub?.notes?.firm_id ?? (invoice?.notes?.kind === "usage" ? (invoice.notes.firm_id ?? null) : null);
   if (!firmId && sub?.id) {
     const { data } = await db.from("ca_billing").select("ca_firm_id").eq("razorpay_subscription_id", sub.id).maybeSingle();
@@ -510,6 +541,7 @@ function requireLivePlan(row: Row) {
  * already paid for and does not renew.
  */
 export async function cancelSubscription(db: Db, ctx: FirmContext, reason: string) {
+  await assertNotTest(db, ctx.firmId);
   if (!canSignOff(ctx)) throw new PracticeError("forbidden", "Only a partner can cancel the firm's plan.");
   const row = await loadBilling(db, ctx.firmId);
   requireLivePlan(row);
@@ -572,6 +604,7 @@ export async function cancelSubscription(db: Db, ctx: FirmContext, reason: strin
  * pro-rated difference; a lower plan or another cycle from the next renewal.
  */
 export async function changePlan(db: Db, ctx: FirmContext, plan: PlanKey, cycle: Cycle) {
+  await assertNotTest(db, ctx.firmId);
   if (!canSignOff(ctx)) throw new PracticeError("forbidden", "Only a partner can change the firm's plan.");
   const row = await loadBilling(db, ctx.firmId);
   requireLivePlan(row);
@@ -704,6 +737,7 @@ export async function previewCoupon(db: Db, ctx: FirmContext, code: string, plan
 
 /** A trial-days code: adds days to a running or ended trial, no payment. */
 export async function redeemTrialCoupon(db: Db, ctx: FirmContext, code: string) {
+  await assertNotTest(db, ctx.firmId);
   if (!canSignOff(ctx)) throw new PracticeError("forbidden", "Only a partner can apply a code.");
   const c = await checkCoupon(db, ctx.firmId, code);
   if (c.kind !== "trial_days") throw new PracticeError("bad_coupon", "That code is a discount. Enter it when you choose a plan.");

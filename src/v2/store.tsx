@@ -205,6 +205,8 @@ export type Firm = {
   city: string;
   frn: string;
   gmailConnected: boolean;
+  /** A tester account: a sandbox that is never billed, reported or messaged for real. */
+  isTest?: boolean;
 };
 
 export type Chase = {
@@ -214,6 +216,8 @@ export type Chase = {
   contact: string;
   phone: string;
   email?: string;
+  /** How the Chaser reaches the client. Chases made before this option have none (email, with WhatsApp from the second reminder when switched on). */
+  channel?: "email" | "whatsapp" | "both";
   due: string;
   note: string;
   followUps: number;
@@ -642,6 +646,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
         city: wf.city ?? "",
         frn: wf.frn ?? "",
         gmailConnected: Boolean(wf.gmailConnected),
+        isTest: Boolean((wf as { isTest?: boolean }).isTest),
       });
       apply(workspace);
     } else {
@@ -1529,6 +1534,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
             due: c.due || null,
             note: c.note || undefined,
             period,
+            channels: c.channel,
           },
         });
       })()

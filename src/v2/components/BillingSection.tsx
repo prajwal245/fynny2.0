@@ -163,7 +163,7 @@ export function BillingSection() {
       <p style={{ fontSize: 13, color: V.muted, margin: "6px 0 16px", lineHeight: 1.6 }} data-testid="billing-summary">
         {a.state === "trial" &&
           (a.trialNotStarted
-            ? `Your ${TRIAL_DAYS}-day free trial starts with your first upload. It covers up to ${TRIAL_MAX_ACTIVE_CLIENTS} active clients and ${TRIAL_MAX_DOCUMENTS} documents, with every Firm feature except the WhatsApp Chaser. No card needed.`
+            ? `Your ${TRIAL_DAYS}-day free trial starts with your first upload. It covers up to ${TRIAL_MAX_ACTIVE_CLIENTS} active clients and ${TRIAL_MAX_DOCUMENTS} documents, with every Firm feature and 25 free WhatsApp reminders. No card needed.`
             : `Free trial until ${formatDate(b.trial_ends_at)}${a.trialDaysLeft != null ? ` (${a.trialDaysLeft <= 1 ? "last day" : `${a.trialDaysLeft} days left`})` : ""}. Choose a plan any time; you are charged only from the day you choose.`)}
         {a.state === "active" &&
           (b.cancelAtPeriodEnd || b.status === "cancelled"

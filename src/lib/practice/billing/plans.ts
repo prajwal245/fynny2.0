@@ -54,7 +54,7 @@ export const PLANS: Record<PlanKey, Plan> = {
     extraClient: 149,
     maxActiveClients: 25,
     docsPerClient: 40,
-    whatsappChaser: false,
+    whatsappChaser: true,
     firmBranding: false,
     support: "WhatsApp and email, next business day",
     onboarding: "Self-serve guides and a weekly live group session",
@@ -101,7 +101,7 @@ export const OVERAGE_BLOCK_PRICE = 499;
 
 /** The free trial is a flat 14 days from the first upload, everywhere (website, product, emails, terms). */
 export const TRIAL_DAYS = 14;
-/** Trials get every Firm feature except the WhatsApp Chaser. */
+/** Trials get every Firm feature; WhatsApp reminders run on the trial's free credits. */
 export const TRIAL_PLAN: PlanKey = "professional";
 export const TRIAL_MAX_ACTIVE_CLIENTS = 5;
 export const TRIAL_MAX_DOCUMENTS = 200;
@@ -188,7 +188,7 @@ export function accessFor(b: BillingRow, now: Date = new Date()): Access {
         features: TRIAL_PLAN,
         maxActiveClients: TRIAL_MAX_ACTIVE_CLIENTS,
         maxDocuments: TRIAL_MAX_DOCUMENTS,
-        whatsappChaser: false,
+        whatsappChaser: true,
         reason,
       });
       if (b.trial_started_at === null) return trial(true, null, true, null);

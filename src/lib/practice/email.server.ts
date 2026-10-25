@@ -5,6 +5,8 @@
 export interface SendResult {
   sent: boolean;
   simulated: boolean;
+  /** A test firm's message to someone outside the team: recorded, never sent. */
+  sandbox?: boolean;
   provider_id: string | null;
   error: string | null;
 }

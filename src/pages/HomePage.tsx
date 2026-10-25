@@ -366,7 +366,7 @@ const TRUST = [
 
 const PLANS = [
   { key: "starter" as const, adds: ["Extract, Recon and MIS reports", "Email Chaser follow-ups", "Full audit trail", "Unlimited users"], cta: "Start free, no card" },
-  { key: "professional" as const, adds: ["Everything in Essential", "WhatsApp Chaser follow-ups", "Your firm's branding on MIS exports", "Gmail intake for client documents"], cta: "Start free, no card", popular: true },
+  { key: "professional" as const, adds: ["Everything in Essential", "500 WhatsApp reminder credits a month", "Your firm's branding on MIS exports", "Gmail intake for client documents"], cta: "Start free, no card", popular: true },
   { key: "scale" as const, adds: ["Everything in Firm", "Guided onboarding with a founder", "Priority support"], cta: "Talk to us" },
 ].map((p) => {
   const b = BILLING_PLANS[p.key];

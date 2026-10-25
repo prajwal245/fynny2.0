@@ -157,7 +157,7 @@ export function WhatsappSetup({ firmId, webhook, onChanged }: { firmId: string; 
                 ✓ Ready{status.shared.display ? `: ${status.shared.display}` : ""}{using === "fynhelp" ? " · in use" : ""}
               </div>
               <div style={{ fontSize: 13, color: V.body, lineHeight: 1.6 }}>
-                Reminders go out from this number, and replies and documents come back to your firm. A client who writes first is matched to you automatically by the phone number saved in your client list. If that cannot be done (for example, the number is not saved, or the same number is a client of two firms), they can send this code to the number once:
+                Your reminders are sent from this number, and clients' replies and documents come back to you. Clients saved with a phone number are linked to you automatically. If a client isn't, ask them to send this code to the number once:
               </div>
               {status.shared.join_code && (
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -223,7 +223,7 @@ export function WhatsappSetup({ firmId, webhook, onChanged }: { firmId: string; 
               <span>Also send a WhatsApp reminder automatically from the second reminder on, together with the email.</span>
             </label>
           ) : (
-            <div style={{ fontSize: 13, color: V.muted }}>WhatsApp reminders are on the Firm and Scale plans. Your trial includes email.</div>
+            <div style={{ fontSize: 13, color: V.muted }}>WhatsApp reminders are paused until you choose a plan in Settings, Billing.</div>
           )}
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", fontSize: 13 }}>
             <label htmlFor="wa-country">Phone numbers saved without a country code are in</label>

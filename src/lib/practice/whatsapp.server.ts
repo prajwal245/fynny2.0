@@ -555,7 +555,9 @@ export async function whatsappStatus(db: Db, ctx: FirmContext) {
     // Never send the stored token to the browser; say only that one is saved.
     channels: (data ?? []).map(({ access_token_enc, app_secret_enc, ...c }) => ({ ...c, has_own_token: Boolean(access_token_enc), has_own_secret: Boolean(app_secret_enc) })),
     // Messages go out through the API (not just open wa.me) when a sender can be resolved.
-    send_ready: Boolean(r.sender),
+    send_ready: Boolean(r.sender) || r.test,
+    /** A test account: WhatsApp messages are simulated unless they go to the team's own numbers. */
+    test: r.test,
     /** The number in use: FynHelp's shared one or the firm's own. */
     sender: r.sender?.choice ?? null,
     sender_pref: r.pref,

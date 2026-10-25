@@ -25,6 +25,9 @@ import {
   whatsappMessage,
   DEFAULT_MAX_FOLLOW_UPS,
   DEFAULT_SCHEDULE,
+  channelFromNotes,
+  stepChannels,
+  type ChaseChannel,
   type ChaseState,
   type ChaserTone,
   type RenderedEmail,
@@ -33,6 +36,7 @@ import {
 import { isEmail, sendEmail, type SendResult } from "./email.server";
 import { sendViaGmail } from "./gmailSend.server";
 import { firmCountryCode, sendChaseWhatsapp, whatsappDailyCap } from "./whatsappSend.server";
+import { isTestFirm, sendFirmEmail } from "./testMode.server";
 import { chaseTemplateParams } from "./whatsappFlow";
 
 const DAY = 86_400_000;
@@ -148,7 +152,9 @@ async function deliver(
   chaseIds: string[],
 ): Promise<Delivered> {
   let note: string | null = null;
-  if (prefs.viaGmail) {
+  // A test firm never sends from a real mailbox.
+  const test = await isTestFirm(db, firm.id);
+  if (prefs.viaGmail && !test) {
     const { data: prev } = await db
       .from("ca_chaser_events")
       .select("metadata")
@@ -188,7 +194,7 @@ async function deliver(
         .eq("id", firm.id);
     }
   }
-  const result = await sendEmail({
+  const result = await sendFirmEmail(db, firm.id, {
     to,
     subject: email.subject,
     html: email.html,
@@ -228,6 +234,8 @@ export async function snoozeChase(db: Db, ctx: FirmContext, id: string, promised
 }
 
 export interface CreateChaseInput {
+  /** How to reach the client: email, WhatsApp or both. Default email. */
+  channels?: ChaseChannel;
   business_id: string;
   type: string;
   contact: string; // a name or an email address
@@ -259,6 +267,11 @@ export async function createChase(
       period = input.period;
     }
   }
+  const wantsWhatsapp = input.channels === "whatsapp" || input.channels === "both";
+  if (wantsWhatsapp && !(input.phone?.trim() || client.client_phone))
+    throw new PracticeError("invalid", "Add the client's WhatsApp number (with country code) to chase on WhatsApp.");
+  if (input.channels !== "whatsapp" && !contactEmail && input.channels)
+    throw new PracticeError("invalid", "Add the client's email to chase by email, or choose WhatsApp only.");
   const now = new Date();
   const { data, error } = await db
     .from("ca_document_requests")
@@ -276,6 +289,7 @@ export async function createChase(
         note: input.note ?? "",
         contact: input.contact,
         phone: input.phone ?? "",
+        ...(input.channels ? { channels: input.channels } : {}),
       }),
       contact_name: contactName,
       contact_email: contactEmail,
@@ -355,7 +369,7 @@ export async function sendFollowUp(
     const { loadBilling } = await import("./billing.server");
     const { accessFor } = await import("./billing/plans");
     if (!accessFor(await loadBilling(db, ctx.firmId)).whatsappChaser)
-      throw new PracticeError("plan_feature", "Chasing by WhatsApp is on the Firm and Scale plans. Email follow-ups work on every plan.");
+      throw new PracticeError("plan_feature", "Your plan has ended, so WhatsApp reminders are paused. Choose a plan in Settings, Billing.");
     // Official API first: the message goes out itself, with delivery tracked.
     const api = await sendChaseWhatsapp(
       db,
@@ -380,9 +394,9 @@ export async function sendFollowUp(
         event_type: "sent",
         channel: "whatsapp",
         template_id: "chase_whatsapp_template",
-        note: `WhatsApp follow up sent to +${api.to}${api.mode === "text" ? " (inside the client's 24-hour reply window)" : ""}`,
+        note: api.simulated ? `Test account: WhatsApp follow up recorded, nothing was sent to +${api.to}` : `WhatsApp follow up sent to +${api.to}${api.mode === "text" ? " (inside the client's 24-hour reply window)" : ""}`,
         actor_id: ctx.userId,
-        metadata: { wamid: api.wamid, delivery: "sent", mode: api.mode },
+        metadata: { wamid: api.wamid, delivery: "sent", mode: api.mode, ...(api.simulated ? { sandbox: true } : {}) },
       });
       return { channel, via: "api" as const, to: api.to, follow_ups: count };
     }
@@ -396,7 +410,7 @@ export async function sendFollowUp(
         note: `WhatsApp could not be sent: ${api.error}`,
         actor_id: ctx.userId,
       });
-      throw new PracticeError("whatsapp_failed", api.error);
+      throw new PracticeError(api.noCredits ? "no_credits" : "whatsapp_failed", api.error);
     }
     // Not set up for the API on this server: fall back to opening WhatsApp with the message ready.
     const message = whatsappMessage(t);
@@ -465,7 +479,9 @@ export async function sendFollowUp(
     event_type: "sent",
     channel: "email",
     template_id: email.template_id,
-    note: result.simulated
+    note: result.sandbox
+      ? `Test account: email follow up recorded, nothing was sent to ${to}`
+      : result.simulated
       ? `Email follow up recorded (email service not configured, nothing was sent) to ${to}`
       : `Email follow up sent to ${to}${delivered.sentVia === "gmail" ? " from the firm's Gmail" : ""}${delivered.note ? `. ${delivered.note}` : ""}`,
     actor_id: ctx.userId,
@@ -619,6 +635,7 @@ export async function runDueFollowups(now = new Date(), firmId?: string) {
     const t = await templateInput(db, row, firm.name);
     const state: ChaseState = {
       ...row,
+      channel: channelFromNotes(row.notes),
       do_not_disturb: t.dnd,
       contact_email: row.contact_email || t.clientEmail,
     };
@@ -697,7 +714,9 @@ export async function runDueFollowups(now = new Date(), firmId?: string) {
   // One email per client for everything due, sent only inside the send window.
   const groups = new Map<string, typeof sendQueue>();
   for (const q of sendQueue) {
-    const key = `${q.row.ca_firm_id}|${q.row.business_id}|${q.state.contact_email!.toLowerCase()}`;
+    // WhatsApp-only chases group by phone, the rest by email; chases with different channels are never merged.
+    const who = q.state.channel === "whatsapp" ? `wa:${q.row.contact_phone || q.t.clientPhone || q.row.id}` : (q.state.contact_email ?? q.row.id).toLowerCase();
+    const key = `${q.row.ca_firm_id}|${q.row.business_id}|${q.state.channel ?? "legacy"}|${who}`;
     groups.set(key, [...(groups.get(key) ?? []), q]);
   }
   const prefsByFirm = new Map<string, ChasePrefs>();
@@ -735,73 +754,72 @@ export async function runDueFollowups(now = new Date(), firmId?: string) {
     }
     if (!claimedItems.length) continue;
 
-    const to = first.state.contact_email!;
     const step = Math.max(...claimedItems.map((q) => (q.decision.action === "send" ? q.decision.follow_up_number : 1)));
-    const email = renderGroupedEmail(
-      step,
-      first.t,
-      claimedItems.map((q) => ({ item: q.t.item, period: q.t.period, dueDate: q.t.dueDate })),
-      prefs.tone,
-    );
-    const delivered = await deliver(
-      db,
-      { id: first.row.ca_firm_id, name: first.firm.name, email: first.firm.email },
-      prefs,
-      email,
-      to,
-      claimedItems.map((q) => q.row.id),
-    );
-    if (delivered.result.error) {
+    const want = stepChannels(first.state.channel ?? null, step, prefs.whatsappAuto);
+    const giveBack = async (why: string, channel: "email" | "whatsapp", templateId: string) => {
       summary.failed += claimedItems.length;
-      // Give the slots back and retry tomorrow.
       for (const q of claimedItems) {
         await db
           .from("ca_document_requests")
-          .update({
-            chaser_count: q.row.chaser_count,
-            last_chased_at: q.row.last_chased_at,
-            next_follow_up_at: new Date(now.getTime() + DAY).toISOString(),
-          })
+          .update({ chaser_count: q.row.chaser_count, last_chased_at: q.row.last_chased_at, next_follow_up_at: new Date(now.getTime() + DAY).toISOString() })
           .eq("id", q.row.id);
+        await chaserEvent(db, { chaser_id: q.row.id, ca_firm_id: q.row.ca_firm_id, business_id: q.row.business_id, event_type: "skipped", channel, template_id: templateId, note: why });
+      }
+    };
+
+    // ── email ──
+    if (want.email) {
+      const to = first.state.contact_email!;
+      const email = renderGroupedEmail(
+        step,
+        first.t,
+        claimedItems.map((q) => ({ item: q.t.item, period: q.t.period, dueDate: q.t.dueDate })),
+        prefs.tone,
+      );
+      const delivered = await deliver(
+        db,
+        { id: first.row.ca_firm_id, name: first.firm.name, email: first.firm.email },
+        prefs,
+        email,
+        to,
+        claimedItems.map((q) => q.row.id),
+      );
+      if (delivered.result.error) {
+        // Give the slots back and retry tomorrow.
+        await giveBack(`Automatic email failed: ${delivered.result.error}. Will retry tomorrow.`, "email", email.template_id);
+        continue;
+      }
+      if (delivered.result.simulated) summary.simulated += claimedItems.length;
+      else summary.sent += claimedItems.length;
+      for (const q of claimedItems) {
+        const n = q.decision.action === "send" ? q.decision.follow_up_number : step;
         await chaserEvent(db, {
           chaser_id: q.row.id,
           ca_firm_id: q.row.ca_firm_id,
           business_id: q.row.business_id,
-          event_type: "skipped",
+          event_type: "sent",
           channel: "email",
           template_id: email.template_id,
-          note: `Automatic email failed: ${delivered.result.error}. Will retry tomorrow.`,
+          note: delivered.result.sandbox
+            ? `Test account: follow up ${n} recorded, nothing was sent to ${to}`
+            : delivered.result.simulated
+            ? `Follow up ${n} recorded (email service not configured, nothing was sent)`
+            : `Automatic follow up ${n} emailed to ${to}${delivered.sentVia === "gmail" ? " from the firm's Gmail" : ""}${claimedItems.length > 1 ? ` together with ${claimedItems.length - 1} other item(s)` : ""}${delivered.note ? `. ${delivered.note}` : ""}`,
+          metadata: sentMetadata(delivered),
         });
       }
-      continue;
-    }
-    if (delivered.result.simulated) summary.simulated += claimedItems.length;
-    else summary.sent += claimedItems.length;
-    for (const q of claimedItems) {
-      const n = q.decision.action === "send" ? q.decision.follow_up_number : step;
-      await chaserEvent(db, {
-        chaser_id: q.row.id,
-        ca_firm_id: q.row.ca_firm_id,
-        business_id: q.row.business_id,
-        event_type: "sent",
-        channel: "email",
-        template_id: email.template_id,
-        note: delivered.result.simulated
-          ? `Follow up ${n} recorded (email service not configured, nothing was sent)`
-          : `Automatic follow up ${n} emailed to ${to}${delivered.sentVia === "gmail" ? " from the firm's Gmail" : ""}${claimedItems.length > 1 ? ` together with ${claimedItems.length - 1} other item(s)` : ""}${delivered.note ? `. ${delivered.note}` : ""}`,
-        metadata: sentMetadata(delivered),
-      });
     }
 
-    // From the second reminder on, also nudge on WhatsApp when the firm asked for it.
-    if (prefs.whatsappAuto && step >= 2 && !first.t.dnd) {
-      if (!whatsappPlan.has(first.row.ca_firm_id)) {
+    // ── WhatsApp ──
+    if (want.whatsapp && !first.t.dnd) {
+      const firmId = first.row.ca_firm_id;
+      const onlyWhatsapp = !want.email;
+      if (!whatsappPlan.has(firmId)) {
         const { loadBilling } = await import("./billing.server");
         const { accessFor } = await import("./billing/plans");
-        whatsappPlan.set(first.row.ca_firm_id, accessFor(await loadBilling(db, first.row.ca_firm_id)).whatsappChaser);
+        whatsappPlan.set(firmId, accessFor(await loadBilling(db, firmId)).whatsappChaser);
       }
       const phone = first.row.contact_phone || first.t.clientPhone;
-      const firmId = first.row.ca_firm_id;
       if (!waSentToday.has(firmId)) {
         const { count } = await db
           .from("ca_chaser_events")
@@ -812,14 +830,20 @@ export async function runDueFollowups(now = new Date(), firmId?: string) {
           .gte("created_at", new Date(Math.floor((now.getTime() + 19_800_000) / DAY) * DAY - 19_800_000).toISOString());
         waSentToday.set(firmId, count ?? 0);
       }
-      if (whatsappPlan.get(firmId) && phone && waSentToday.get(firmId)! + claimedItems.length > whatsappDailyCap()) {
-        // Over today's cap: the email already went; skip WhatsApp rather than risk the number's quality rating.
+      if (!whatsappPlan.get(firmId)) {
+        // Email-and-WhatsApp chases carry on by email; a WhatsApp-only chase has nothing else to use.
+        if (onlyWhatsapp) await giveBack("Your plan has ended, so WhatsApp reminders are paused. Choose a plan in Settings, Billing.", "whatsapp", "chase_whatsapp_template");
+      } else if (!phone) {
+        if (onlyWhatsapp) await giveBack("No WhatsApp number on this chase. Add one, or change the chase to email.", "whatsapp", "chase_whatsapp_template");
+      } else if (waSentToday.get(firmId)! + claimedItems.length > whatsappDailyCap()) {
+        // Over today's cap: protect the number's quality rating. A WhatsApp-only chase waits for tomorrow.
         summary.whatsappCapped++;
-      } else if (whatsappPlan.get(firmId) && phone) {
+        if (onlyWhatsapp) await giveBack("Today's WhatsApp limit for the firm is reached. Will retry tomorrow.", "whatsapp", "chase_whatsapp_template");
+      } else {
         if (!countryByFirm.has(firmId)) countryByFirm.set(firmId, await firmCountryCode(db, firmId));
         const wa = await sendChaseWhatsapp(
           db,
-          first.row.ca_firm_id,
+          firmId,
           phone,
           chaseTemplateParams({
             contactName: first.t.contactName,
@@ -830,7 +854,22 @@ export async function runDueFollowups(now = new Date(), firmId?: string) {
           { cc: countryByFirm.get(firmId) },
         );
         if (wa.ok) waSentToday.set(firmId, waSentToday.get(firmId)! + claimedItems.length);
+        if (!wa.ok && onlyWhatsapp) {
+          if (wa.permanent) {
+            // A number that cannot be reached will not start working tomorrow: hand it to a person.
+            for (const q of claimedItems) {
+              await db.from("ca_document_requests").update({ escalated_at: now.toISOString(), next_follow_up_at: null }).eq("id", q.row.id);
+              await chaserEvent(db, { chaser_id: q.row.id, ca_firm_id: q.row.ca_firm_id, business_id: q.row.business_id, event_type: "auto_escalated", channel: "whatsapp", note: `WhatsApp could not be sent: ${wa.error} Escalated to the team.` });
+              await db.from("ca_notifications").insert({ ca_firm_id: q.row.ca_firm_id, business_id: q.row.business_id, type: "chaser_escalated", severity: "critical", title: "WhatsApp chase needs you", message: `${q.t.clientName}: ${wa.error}`, is_read: false, metadata: { chaser_id: q.row.id } });
+            }
+            summary.escalated += claimedItems.length;
+          } else {
+            await giveBack(`WhatsApp could not be sent: ${wa.error} Will retry tomorrow.`, "whatsapp", "chase_whatsapp_template");
+          }
+          continue;
+        }
         for (const q of claimedItems) {
+          const n = q.decision.action === "send" ? q.decision.follow_up_number : step;
           await chaserEvent(db, {
             chaser_id: q.row.id,
             ca_firm_id: q.row.ca_firm_id,
@@ -838,11 +877,18 @@ export async function runDueFollowups(now = new Date(), firmId?: string) {
             event_type: wa.ok ? "sent" : "skipped",
             channel: "whatsapp",
             template_id: "chase_whatsapp_template",
-            note: wa.ok ? `Automatic WhatsApp reminder sent to +${wa.to}` : `Automatic WhatsApp reminder not sent: ${wa.error}`,
-            metadata: wa.ok ? { wamid: wa.wamid, delivery: "sent", mode: wa.mode } : {},
+            note: wa.ok
+              ? wa.simulated
+                ? `Test account: WhatsApp follow up ${n} recorded, nothing was sent to +${wa.to}`
+                : `Automatic WhatsApp follow up ${n} sent to +${wa.to}`
+              : `Automatic WhatsApp reminder not sent: ${wa.error}`,
+            metadata: wa.ok ? { wamid: wa.wamid, delivery: "sent", mode: wa.mode, ...(wa.simulated ? { sandbox: true } : {}) } : {},
           });
         }
-        if (wa.ok) summary.whatsapp++;
+        if (wa.ok) {
+          summary.whatsapp++;
+          if (onlyWhatsapp) summary.sent += claimedItems.length;
+        }
       }
     }
   }

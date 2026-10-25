@@ -10,8 +10,8 @@
 import { adminDb, chaserEvent, logActivity, type Db, type FirmContext } from "./db.server";
 import { BUCKET, registerDocument } from "./documents.server";
 import { PracticeError } from "./core";
-import { advances, buttonPayloadOf, CHASE_ACTION_RULES, classifyInbound, explainWaError, isWaDelivery, parseChasePayload, parseJoinCode, phoneTail, pickAutoRoute, type WaDelivery } from "./whatsappFlow";
-import { bindRoute, chaseTemplate, chaseTemplateLang, ensureJoinCode, firmCountryCode, resolveSender, sendPlainText, sharedDisplayNumber, sharedPhoneNumberId } from "./whatsappSend.server";
+import { advances, buttonPayloadOf, CHASE_ACTION_RULES, CHASE_BUTTON_LABEL, chasePayload, DATE_ACTIONS, classifyInbound, explainWaError, isWaDelivery, parseChasePayload, parseJoinCode, phoneTail, pickAutoRoute, type WaDelivery } from "./whatsappFlow";
+import { bindRoute, chaseTemplate, finalTemplate, followupTemplate, sendButtons, chaseTemplateLang, ensureJoinCode, firmCountryCode, resolveSender, sendPlainText, sharedDisplayNumber, sharedPhoneNumberId } from "./whatsappSend.server";
 import { samePhone } from "./chaser/rules";
 
 // WHATSAPP_GRAPH_BASE exists only so tests and demos can use a stand-in Meta Graph API.
@@ -347,7 +347,13 @@ async function handleText(db: Db, firmId: string, m: WaMessage, cc: string): Pro
  * the tap pauses (or ends) reminders for that client, is written to the timeline, and is answered at once.
  * The tap also opens the 24-hour window, so the answer and the files that follow cost nothing.
  */
-export async function handleButton(db: Db, firmId: string, m: WaMessage, reply: (text: string) => Promise<unknown>): Promise<string> {
+export async function handleButton(
+  db: Db,
+  firmId: string,
+  m: WaMessage,
+  reply: (text: string) => Promise<unknown>,
+  askDate?: (body: string, chaseId: string) => Promise<unknown>,
+): Promise<string> {
   const parsed = parseChasePayload(buttonPayloadOf(m));
   if (!parsed) return `ignored ${m.type} (not a chase button)`;
   const { data: seen } = await db.from("ca_chaser_events").select("id").eq("ca_firm_id", firmId).eq("metadata->>wa_message_id", m.id).limit(1).maybeSingle();
@@ -367,7 +373,8 @@ export async function handleButton(db: Db, firmId: string, m: WaMessage, reply: 
   const until = new Date(Date.now() + rule.pauseDays * 86_400_000).toISOString();
   if (rule.stop && businessId) await db.from("ca_clients").update({ do_not_disturb: true }).eq("ca_firm_id", firmId).eq("business_id", businessId);
   for (const c of chases) {
-    if (!rule.stop && (!c.next_follow_up_at || c.next_follow_up_at < until)) await db.from("ca_document_requests").update({ next_follow_up_at: until }).eq("id", c.id);
+    // A promised date replaces any other pause; a plain "more time" only ever extends one.
+    if (!rule.stop && (rule.exact || !c.next_follow_up_at || c.next_follow_up_at < until)) await db.from("ca_document_requests").update({ next_follow_up_at: until }).eq("id", c.id);
     await chaserEvent(db, {
       chaser_id: c.id,
       ca_firm_id: firmId,
@@ -383,13 +390,15 @@ export async function handleButton(db: Db, firmId: string, m: WaMessage, reply: 
     business_id: businessId,
     type: rule.stop ? "whatsapp_stop" : "whatsapp_reply",
     severity: rule.stop ? "warning" : "info",
-    title: rule.stop ? "Client asked to stop reminders" : parsed.action === "sending" ? "Client says it is on the way" : "Client asked for more time",
+    title: rule.stop ? "Client asked to stop reminders" : parsed.action === "sending" ? "Client says it is on the way" : rule.exact ? "Client promised a date" : "Client asked for more time",
     message: rule.note,
     is_read: false,
     metadata: { wa_message_id: m.id },
   });
-  const link = rule.stop ? null : await (await import("./uploadLinks.server")).createUploadLink(db, { firmId, businessId, requestId: parsed.chaseId });
-  await reply(rule.reply(link?.url ?? null));
+  const link = rule.stop || rule.askDate ? null : await (await import("./uploadLinks.server")).createUploadLink(db, { firmId, businessId, requestId: parsed.chaseId });
+  // "Need more time" asks for a date with three buttons; if the buttons cannot be sent, the plain question still goes.
+  if (rule.askDate && askDate) await askDate(rule.reply(null), parsed.chaseId);
+  else await reply(rule.reply(link?.url ?? null));
   return rule.stop ? "client opted out (button)" : `client tapped ${parsed.action}`;
 }
 
@@ -490,7 +499,9 @@ export async function handleWhatsappWebhook(payload: {
         if (m.type === "button" || m.type === "interactive") {
           try {
             const reply = (text: string) => (token ? sendPlainText({ phoneNumberId, token }, m.from, text) : Promise.resolve(false));
-            results.push({ message: m.id, status: await handleButton(db, channel.ca_firm_id, m, reply) });
+            const askDate = (body: string, chaseId: string) =>
+              token ? sendButtons({ phoneNumberId, token }, m.from, body, DATE_ACTIONS.map((a) => ({ id: chasePayload(chaseId, a), title: CHASE_BUTTON_LABEL[a] }))) : Promise.resolve(false);
+            results.push({ message: m.id, status: await handleButton(db, channel.ca_firm_id, m, reply, askDate) });
           } catch (e) {
             console.error(`[fyn:whatsapp] ${m.id}: ${(e as Error).message}`);
             results.push({ message: m.id, status: `failed: ${(e as Error).message}` });
@@ -685,20 +696,31 @@ export async function whatsappHealth(db: Db, ctx: FirmContext): Promise<{ ok: bo
     }
   }
   const waba = sender?.wabaId;
-  if (!waba) {
-    steps.push({ label: `Template "${chaseTemplate()}"`, ok: null, detail: "Add the WhatsApp Business Account ID to check that the template is approved." });
-  } else if (token) {
-    try {
-      const res = await fetch(`${GRAPH}/${waba}/message_templates?name=${encodeURIComponent(chaseTemplate())}&fields=name,status,language`, { headers: { Authorization: `Bearer ${token}` } });
-      const b = (await res.json().catch(() => ({}))) as { data?: { status: string; language: string }[]; error?: { message?: string } };
-      const t = b.data?.find((x) => x.language === chaseTemplateLang()) ?? b.data?.[0];
-      steps.push({
-        label: `Template "${chaseTemplate()}"`,
-        ok: res.ok && t?.status === "APPROVED",
-        detail: !res.ok ? (b.error?.message ?? "Could not read templates.") : !t ? "No template with this name. Create it in WhatsApp Manager (4 body fields)." : `${t.status} (${t.language}).`,
-      });
-    } catch (e) {
-      steps.push({ label: `Template "${chaseTemplate()}"`, ok: false, detail: `Could not reach Meta (${(e as Error).message}).` });
+  const names = [...new Set([chaseTemplate(), followupTemplate(), finalTemplate()])];
+  for (const name of names) {
+    if (!waba) {
+      steps.push({ label: `Template "${name}"`, ok: null, detail: "Add the WhatsApp Business Account ID to check that the template is approved." });
+    } else if (token) {
+      try {
+        const res = await fetch(`${GRAPH}/${waba}/message_templates?name=${encodeURIComponent(name)}&fields=name,status,language,category`, { headers: { Authorization: `Bearer ${token}` } });
+        const b = (await res.json().catch(() => ({}))) as { data?: { status: string; language: string; category?: string }[]; error?: { message?: string } };
+        const t = b.data?.find((x) => x.language === chaseTemplateLang()) ?? b.data?.[0];
+        // Marketing costs about six times as much as Utility: say so if Meta has moved a template.
+        const marketing = t?.category === "MARKETING";
+        steps.push({
+          label: `Template "${name}"`,
+          ok: res.ok && t?.status === "APPROVED" && !marketing,
+          detail: !res.ok
+            ? (b.error?.message ?? "Could not read templates.")
+            : !t
+              ? "No template with this name. Create it in WhatsApp Manager (4 body fields)."
+              : marketing
+                ? `${t.status} (${t.language}) but Meta has classed it as Marketing, which costs far more per message. Reword it to stay factual and resubmit as Utility.`
+                : `${t.status} (${t.language})${t.category ? `, ${t.category.toLowerCase()}` : ""}.`,
+        });
+      } catch (e) {
+        steps.push({ label: `Template "${name}"`, ok: false, detail: `Could not reach Meta (${(e as Error).message}).` });
+      }
     }
   }
   return { ok: steps.every((s) => s.ok !== false), steps };

@@ -5,6 +5,7 @@
  */
 import type { Db } from "./db.server";
 import {
+  buildButtons,
   buildReplyButtons,
   buildTemplateMessage,
   buildTextMessage,
@@ -13,6 +14,7 @@ import {
   chooseSender,
   explainWaError,
   inServiceWindow,
+  stageForStep,
   windowClosed,
   type ButtonLayout,
   type WaSenderChoice,
@@ -25,6 +27,14 @@ const env = (n: string) => (process.env[n] ?? "").trim() || undefined;
 
 export const chaseTemplate = () => env("WHATSAPP_CHASE_TEMPLATE") ?? "document_request";
 export const chaseTemplateLang = () => env("WHATSAPP_TEMPLATE_LANG") ?? "en";
+/**
+ * One approved template per stage of a chase, all with the same four body fields and the same buttons:
+ * the first request, a gentle follow-up (reminder 2), and the final reminder (3). A stage with no template
+ * of its own uses the first request's, so a firm can start with one and add the others later.
+ */
+export const followupTemplate = () => env("WHATSAPP_FOLLOWUP_TEMPLATE") ?? chaseTemplate();
+export const finalTemplate = () => env("WHATSAPP_FINAL_TEMPLATE") ?? followupTemplate();
+export const templateForStep = (step: number) => (stageForStep(step) === "request" ? chaseTemplate() : stageForStep(step) === "followup" ? followupTemplate() : finalTemplate());
 /** Null while the approved template has no buttons (the default). See docs/WHATSAPP_TEMPLATES.md. */
 export const chaseButtonLayout = (): ButtonLayout | null => {
   const v = (env("WHATSAPP_CHASE_BUTTONS") ?? "").toLowerCase();
@@ -169,6 +179,15 @@ async function post(sender: Pick<Sender, "phoneNumberId" | "token">, payload: un
   return { ok: res.ok && Boolean(body.messages?.[0]?.id), body };
 }
 
+/** Reply buttons inside the 24-hour window (for example "When can you send it?"). */
+export async function sendButtons(sender: Pick<Sender, "phoneNumberId" | "token">, to: string, body: string, buttons: { id: string; title: string }[]): Promise<boolean> {
+  try {
+    return (await post(sender, buildButtons(to, body, buttons))).ok;
+  } catch {
+    return false;
+  }
+}
+
 /** Plain text reply inside the 24-hour window (for example, confirming a JOIN code). */
 export async function sendPlainText(sender: Pick<Sender, "phoneNumberId" | "token">, to: string, body: string): Promise<boolean> {
   try {
@@ -201,7 +220,7 @@ export async function sendChaseWhatsapp(
   firmId: string,
   phone: string | null | undefined,
   params: string[],
-  opts: { cc?: string; chase?: { requestId: string; businessId: string | null } } = {},
+  opts: { cc?: string; step?: number; chase?: { requestId: string; businessId: string | null } } = {},
 ): Promise<WaSendResult> {
   const cc = opts.cc ?? (await firmCountryCode(db, firmId));
   const to = normalisePhone(phone, cc);
@@ -232,7 +251,7 @@ export async function sendChaseWhatsapp(
         .maybeSingle();
       let sent: { wamid: string; mode: "text" | "template" } | null = null;
       if (inServiceWindow(contact?.last_inbound_at as string | undefined)) {
-        const body = chaseTextWithLink(params, link?.url ?? null);
+        const body = chaseTextWithLink(params, link?.url ?? null, opts.step ?? 1);
         const t = await post(sender, opts.chase ? buildReplyButtons(to, body, opts.chase.requestId) : buildTextMessage(to, body));
         if (t.ok) sent = { wamid: t.body.messages![0].id, mode: "text" };
         // A bad token will fail the template too; any other failure (window closed, odd text rejection) falls back to it.
@@ -248,7 +267,7 @@ export async function sendChaseWhatsapp(
           return { ok: false, unconfigured: false, permanent: false, noCredits: true, error: "Out of WhatsApp credits. Add credits in Settings, Billing and the reminder goes out." };
         spendRef = spend.ref;
         const buttons = layout && link && opts.chase ? chaseButtonComponents(layout, link.token, opts.chase.requestId) : [];
-        const r = await post(sender, buildTemplateMessage(to, chaseTemplate(), chaseTemplateLang(), params, buttons));
+        const r = await post(sender, buildTemplateMessage(to, templateForStep(opts.step ?? 1), chaseTemplateLang(), params, buttons));
         if (!r.ok) {
           const why = explainWaError(r.body.error?.code, r.body.error?.error_data?.details ?? r.body.error?.message);
           return { ok: false, unconfigured: false, permanent: why.permanent, error: why.message };

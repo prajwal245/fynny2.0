@@ -48,36 +48,67 @@ export function buildTemplateMessage(to: string, template: string, language: str
  * the 24-hour window in which the client's files and our answers cost nothing.
  */
 
-export type ChaseAction = "sending" | "later" | "stop";
+export type ChaseAction = "sending" | "later" | "stop" | "in1" | "in3" | "in7";
+/** The three buttons on every reminder. The "in…" actions are the answers to "When can you send it?". */
 export const CHASE_ACTIONS: ChaseAction[] = ["sending", "later", "stop"];
-export const CHASE_BUTTON_LABEL: Record<ChaseAction, string> = { sending: "Sending today", later: "Need more time", stop: "Stop reminders" };
+export const DATE_ACTIONS: ChaseAction[] = ["in1", "in3", "in7"];
+export const CHASE_BUTTON_LABEL: Record<ChaseAction, string> = {
+  sending: "Sending today",
+  later: "Need more time",
+  stop: "Stop reminders",
+  in1: "Tomorrow",
+  in3: "In 3 days",
+  in7: "Next week",
+};
 export const UPLOAD_BUTTON_LABEL = "Upload documents";
 
 export const chasePayload = (chaseId: string, action: ChaseAction) => `chase:${chaseId}:${action}`;
 
-const PAYLOAD_RE = /^chase:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}):(sending|later|stop)$/i;
+const PAYLOAD_RE = /^chase:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}):(sending|later|stop|in1|in3|in7)$/i;
 export function parseChasePayload(p: string | null | undefined): { chaseId: string; action: ChaseAction } | null {
   const m = PAYLOAD_RE.exec(p ?? "");
   return m ? { chaseId: m[1].toLowerCase(), action: m[2].toLowerCase() as ChaseAction } : null;
 }
 
-/** What a tap does: how long the chase pauses, the note for the timeline, and the answer to the client. */
-export const CHASE_ACTION_RULES: Record<ChaseAction, { pauseDays: number; stop: boolean; note: string; reply: (uploadUrl: string | null) => string }> = {
+/**
+ * What a tap does. `pauseDays`: no reminder before then. `askDate`: follow up with "When can you send it?"
+ * `exact`: the pause is the client's promise, so it replaces any other pause instead of only extending it.
+ */
+export interface ChaseActionRule {
+  pauseDays: number;
+  stop: boolean;
+  askDate: boolean;
+  exact: boolean;
+  note: string;
+  reply: (uploadUrl: string | null) => string;
+}
+const sendHere = (u: string | null) => `Send it here whenever you are ready${u ? `, or upload it here: ${u}` : ""}.`;
+export const CHASE_ACTION_RULES: Record<ChaseAction, ChaseActionRule> = {
   sending: {
     pauseDays: 1,
     stop: false,
+    askDate: false,
+    exact: false,
     note: "Client said they are sending it today.",
-    reply: (u) => `Thank you. Send the file here whenever you are ready${u ? `, or upload it here: ${u}` : ""}. We will not remind you again until tomorrow.`,
+    reply: (u) => `Thank you. ${sendHere(u)} We will not remind you again until tomorrow.`,
   },
+  // Safe default first (3 days), then the client can say exactly when.
   later: {
     pauseDays: 3,
     stop: false,
+    askDate: true,
+    exact: false,
     note: "Client asked for more time.",
-    reply: (u) => `No problem, we will check back in 3 days. Send it here any time${u ? `, or upload it here: ${u}` : ""}.`,
+    reply: () => "No problem. When can you send it?",
   },
+  in1: { pauseDays: 2, stop: false, askDate: false, exact: true, note: "Client promised it for tomorrow.", reply: (u) => `Thank you, we will wait until tomorrow. ${sendHere(u)}` },
+  in3: { pauseDays: 4, stop: false, askDate: false, exact: true, note: "Client promised it within 3 days.", reply: (u) => `Thank you, we will check back in 3 days. ${sendHere(u)}` },
+  in7: { pauseDays: 8, stop: false, askDate: false, exact: true, note: "Client promised it by next week.", reply: (u) => `Thank you, we will check back next week. ${sendHere(u)}` },
   stop: {
     pauseDays: 0,
     stop: true,
+    askDate: false,
+    exact: false,
     note: "Client asked to stop reminders.",
     reply: () => "Understood. We have stopped the reminders. If you change your mind, just send the file here.",
   },
@@ -92,17 +123,25 @@ export function chaseButtonComponents(layout: ButtonLayout, uploadToken: string,
   return ordered.map((c, i) => ({ ...c, index: String(i) }));
 }
 
-/** Buttons for a free-form message inside the window (up to three reply buttons, titles up to 20 characters). */
-export const buildReplyButtons = (to: string, body: string, chaseId: string) => ({
+/** Reply buttons in a free-form message (WhatsApp allows three, titles up to 20 characters). */
+export const buildButtons = (to: string, body: string, buttons: { id: string; title: string }[]) => ({
   messaging_product: "whatsapp",
   to,
   type: "interactive",
   interactive: {
     type: "button",
     body: { text: body.slice(0, 1024) },
-    action: { buttons: CHASE_ACTIONS.map((a) => ({ type: "reply", reply: { id: chasePayload(chaseId, a), title: CHASE_BUTTON_LABEL[a] } })) },
+    action: { buttons: buttons.slice(0, 3).map((b) => ({ type: "reply", reply: { id: b.id, title: b.title.slice(0, 20) } })) },
   },
 });
+
+/** The three chase buttons inside the window. */
+export const buildReplyButtons = (to: string, body: string, chaseId: string) =>
+  buildButtons(to, body, CHASE_ACTIONS.map((a) => ({ id: chasePayload(chaseId, a), title: CHASE_BUTTON_LABEL[a] })));
+
+/** "When can you send it?" */
+export const buildDateButtons = (to: string, body: string, chaseId: string) =>
+  buildButtons(to, body, DATE_ACTIONS.map((a) => ({ id: chasePayload(chaseId, a), title: CHASE_BUTTON_LABEL[a] })));
 
 /** A tap on a button, whichever way Meta delivers it (template quick reply or interactive reply). */
 export function buttonPayloadOf(m: { type: string; button?: { payload?: string; text?: string }; interactive?: { button_reply?: { id?: string } } }): string | null {
@@ -112,8 +151,8 @@ export function buttonPayloadOf(m: { type: string; button?: { payload?: string; 
 }
 
 /** The free-form message inside the window: the same words, plus the upload link. */
-export const chaseTextWithLink = (p: string[], uploadUrl: string | null) =>
-  `${chaseText(p)}${uploadUrl ? `\n\nOr upload here, no login needed: ${uploadUrl}` : ""}`;
+export const chaseTextWithLink = (p: string[], uploadUrl: string | null, step = 1) =>
+  `${chaseText(p, step)}${uploadUrl ? `\n\nOr upload here, no login needed: ${uploadUrl}` : ""}`;
 
 export interface WaSendError {
   /** Retrying the same message will not help. */
@@ -175,9 +214,20 @@ export const inServiceWindow = (lastInboundAt: string | null | undefined, now: D
   return Number.isFinite(age) && age >= 0 && age < SERVICE_WINDOW_MS;
 };
 
-/** The same wording as the approved template, for free-form sends inside the window. */
-export const chaseText = (p: string[]) =>
-  `Hello ${p[0]}, this is ${p[3]}. For ${p[1]} we are still waiting for: ${p[2]}. Please reply here with the file attached. Thank you.`;
+/**
+ * The same wording as the three approved templates, for free-form sends inside the window.
+ * Step 1 asks, step 2 is a gentle reminder, step 3 is the last one before the partner is told.
+ */
+export const chaseText = (p: string[], step = 1) =>
+  step <= 1
+    ? `Hello ${p[0]}, this is ${p[3]}. For ${p[1]} we are still waiting for: ${p[2]}. Please reply here with the file attached. Thank you.`
+    : step === 2
+      ? `Hello ${p[0]}, a gentle reminder from ${p[3]}. For ${p[1]} we are still waiting for: ${p[2]}. Please reply here with the file attached, or use the buttons below. Thank you.`
+      : `Hello ${p[0]}, this is ${p[3]} with a final reminder. For ${p[1]} we still need: ${p[2]}. Please send it here, or tell us when you can, so we can complete the work on time. Thank you.`;
+
+/** Which approved template a reminder uses: the first request, a gentle follow-up, or the final one. */
+export type ChaseStage = "request" | "followup" | "final";
+export const stageForStep = (step: number): ChaseStage => (step <= 1 ? "request" : step === 2 ? "followup" : "final");
 
 export const buildTextMessage = (to: string, body: string) => ({
   messaging_product: "whatsapp",

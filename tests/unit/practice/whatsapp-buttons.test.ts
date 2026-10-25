@@ -4,8 +4,11 @@ import {
   buildReplyButtons,
   buildTemplateMessage,
   buttonPayloadOf,
+  buildDateButtons,
   CHASE_ACTION_RULES,
   CHASE_BUTTON_LABEL,
+  chaseText,
+  stageForStep,
   chaseButtonComponents,
   chasePayload,
   chaseTextWithLink,
@@ -67,6 +70,30 @@ describe("chase buttons", () => {
     expect(CHASE_ACTION_RULES.stop).toMatchObject({ stop: true });
     expect(CHASE_ACTION_RULES.sending.reply("https://x/u/1")).toContain("https://x/u/1");
     expect(CHASE_ACTION_RULES.stop.reply("https://x/u/1")).not.toContain("https://");
+  });
+});
+
+describe("the three stages of a reminder", () => {
+  const p = ["Asha", "Acme Traders", "Bank statement", "Rao & Co"];
+  it("step 1 asks, step 2 is a gentle reminder, step 3 is the final one", () => {
+    expect(stageForStep(1)).toBe("request");
+    expect(stageForStep(2)).toBe("followup");
+    expect(stageForStep(3)).toBe("final");
+    expect(stageForStep(4)).toBe("final");
+    expect(chaseText(p, 1)).toContain("we are still waiting for");
+    expect(chaseText(p, 2)).toContain("gentle reminder");
+    expect(chaseText(p, 3)).toContain("final reminder");
+    for (const step of [1, 2, 3]) for (const v of p) expect(chaseText(p, step)).toContain(v);
+  });
+
+  it("'Need more time' asks for a date with three buttons, and each date replaces the default pause", () => {
+    expect(CHASE_ACTION_RULES.later).toMatchObject({ askDate: true, pauseDays: 3, exact: false });
+    const m = buildDateButtons("919845012345", "When can you send it?", ID);
+    expect(m.interactive.action.buttons.map((b) => b.reply.title)).toEqual(["Tomorrow", "In 3 days", "Next week"]);
+    expect(parseChasePayload(m.interactive.action.buttons[1].reply.id)).toEqual({ chaseId: ID, action: "in3" });
+    expect(CHASE_ACTION_RULES.in1).toMatchObject({ pauseDays: 2, exact: true });
+    expect(CHASE_ACTION_RULES.in3).toMatchObject({ pauseDays: 4, exact: true });
+    expect(CHASE_ACTION_RULES.in7).toMatchObject({ pauseDays: 8, exact: true });
   });
 });
 
@@ -197,6 +224,28 @@ describe("sending the chase", () => {
     expect(credit.spent).toBe(1);
   });
 
+  it("each reminder uses the template for its stage, and falls back to the first request's", async () => {
+    credit.balance = 20;
+    const send = async (step: number) => {
+      sent.length = 0;
+      const { sendChaseWhatsapp } = await import("@/lib/practice/whatsappSend.server");
+      await sendChaseWhatsapp(world(false), "f1", "9845012345", params, { chase, step });
+      return (sent[0].body as { template: { name: string } }).template.name;
+    };
+    expect([await send(1), await send(2), await send(3)]).toEqual(["document_request", "document_request", "document_request"]);
+    process.env["WHATSAPP_FOLLOWUP_TEMPLATE"] = "document_followup_v2";
+    process.env["WHATSAPP_FINAL_TEMPLATE"] = "document_final_v2";
+    expect([await send(1), await send(2), await send(3)]).toEqual(["document_request", "document_followup_v2", "document_final_v2"]);
+    delete process.env["WHATSAPP_FOLLOWUP_TEMPLATE"];
+    delete process.env["WHATSAPP_FINAL_TEMPLATE"];
+  });
+
+  it("inside the window the wording follows the step", async () => {
+    const { sendChaseWhatsapp } = await import("@/lib/practice/whatsappSend.server");
+    await sendChaseWhatsapp(world(true), "f1", "9845012345", params, { chase, step: 3 });
+    expect((sent[0].body as { interactive: { body: { text: string } } }).interactive.body.text).toContain("final reminder");
+  });
+
   it("the old body-only template still works while buttons are off", async () => {
     const { sendChaseWhatsapp } = await import("@/lib/practice/whatsappSend.server");
     await sendChaseWhatsapp(world(false), "f1", "9845012345", params, { chase });
@@ -254,6 +303,21 @@ describe("tapping a button", () => {
     expect(tables.ca_chaser_events[0]).toMatchObject({ event_type: "client_replied", channel: "whatsapp" });
     expect(replies[0]).toMatch(/https:\/\/fynhelp\.com\/u\//);
     expect(tables.ca_upload_links).toHaveLength(1);
+  });
+
+  it("'Need more time' pauses 3 days, then asks when; the answer replaces the pause with the client's date", async () => {
+    const { handleButton } = await import("@/lib/practice/whatsapp.server");
+    const { db, tables } = setup();
+    const asked: string[] = [];
+    await handleButton(db, "f1", tap("later"), async () => undefined, async (body) => void asked.push(body));
+    expect(asked).toEqual(["No problem. When can you send it?"]);
+    const days = (iso: unknown) => Math.round((Date.parse(String(iso)) - Date.now()) / 86_400_000);
+    expect(days(tables.ca_document_requests[0].next_follow_up_at)).toBe(3);
+    const replies: string[] = [];
+    await handleButton(db, "f1", tap("in1", "wamid.tap2"), async (t) => void replies.push(t));
+    expect(days(tables.ca_document_requests[0].next_follow_up_at)).toBe(2);
+    expect(replies[0]).toContain("until tomorrow");
+    expect(tables.ca_chaser_events.map((e) => e.event_type)).toEqual(["client_replied", "client_replied"]);
   });
 
   it("'Stop reminders' switches reminders off for the client and says so", async () => {

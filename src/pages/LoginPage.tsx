@@ -10,6 +10,7 @@ import { setRememberMe } from "@/lib/sessionPolicy";
 import FynLogo from "@/components/FynLogo";
 import HCaptcha from "@/components/HCaptcha";
 import { checkAuthSecurity } from "@/hooks/useAuthSecurity";
+import { track } from "@/lib/analytics";
 import { RULES, COMMON_WEAK, evaluateStrength } from "@/lib/passwordRules";
 
 type Mode = "signin" | "signup";
@@ -158,6 +159,8 @@ const LoginPage = () => {
     });
     setSuSubmitting(false);
     if (error) { toast.error(error.message || "Could not sign up."); return; }
+    // A new account counts as a sign-up with the campaign it came from (also when it still has to confirm its email).
+    track("sign_up", { method: "email" });
 
     // If email confirmation is required, Supabase returns a user with no session.
     if (data.session) {

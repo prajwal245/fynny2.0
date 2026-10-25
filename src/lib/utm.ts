@@ -41,3 +41,16 @@ export function getAttribution(): Attribution {
     return {};
   }
 }
+
+const CAMPAIGN_KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"] as const;
+
+/**
+ * The campaign tags to send with a conversion, so reports can split sign-ups by source, campaign
+ * and ad or person (utm_content). Only the tags and the landing page: no personal data.
+ */
+export function campaignParams(attr: Attribution = getAttribution()): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const k of CAMPAIGN_KEYS) if (attr[k]) out[k] = attr[k]!;
+  if (Object.keys(out).length && attr.landing_page) out.landing_page = attr.landing_page;
+  return out;
+}

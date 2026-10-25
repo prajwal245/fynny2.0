@@ -10,7 +10,7 @@
 import { adminDb, chaserEvent, logActivity, type Db, type FirmContext } from "./db.server";
 import { BUCKET, registerDocument } from "./documents.server";
 import { PracticeError } from "./core";
-import { advances, classifyInbound, explainWaError, isWaDelivery, parseJoinCode, phoneTail, pickAutoRoute, type WaDelivery } from "./whatsappFlow";
+import { advances, buttonPayloadOf, CHASE_ACTION_RULES, classifyInbound, explainWaError, isWaDelivery, parseChasePayload, parseJoinCode, phoneTail, pickAutoRoute, type WaDelivery } from "./whatsappFlow";
 import { bindRoute, chaseTemplate, chaseTemplateLang, ensureJoinCode, firmCountryCode, resolveSender, sendPlainText, sharedDisplayNumber, sharedPhoneNumberId } from "./whatsappSend.server";
 import { samePhone } from "./chaser/rules";
 
@@ -119,6 +119,10 @@ interface WaMessage {
   };
   image?: { id: string; mime_type?: string; caption?: string };
   text?: { body?: string };
+  /** A tap on a template's quick-reply button. */
+  button?: { payload?: string; text?: string };
+  /** A tap on a reply button in a free-form message. */
+  interactive?: { type?: string; button_reply?: { id?: string; title?: string } };
 }
 
 interface WaStatus {
@@ -338,6 +342,57 @@ async function handleText(db: Db, firmId: string, m: WaMessage, cc: string): Pro
   return kind === "stop" ? "client opted out" : "reply logged";
 }
 
+/**
+ * A tap on a chase button ("Sending today", "Need more time", "Stop reminders"). The payload names the chase;
+ * the tap pauses (or ends) reminders for that client, is written to the timeline, and is answered at once.
+ * The tap also opens the 24-hour window, so the answer and the files that follow cost nothing.
+ */
+export async function handleButton(db: Db, firmId: string, m: WaMessage, reply: (text: string) => Promise<unknown>): Promise<string> {
+  const parsed = parseChasePayload(buttonPayloadOf(m));
+  if (!parsed) return `ignored ${m.type} (not a chase button)`;
+  const { data: seen } = await db.from("ca_chaser_events").select("id").eq("ca_firm_id", firmId).eq("metadata->>wa_message_id", m.id).limit(1).maybeSingle();
+  if (seen) return "duplicate delivery";
+  const { data: chase } = await db.from("ca_document_requests").select("id, business_id, status").eq("id", parsed.chaseId).eq("ca_firm_id", firmId).maybeSingle();
+  if (!chase) return "button for a chase of another firm or one that no longer exists";
+  const businessId = (chase.business_id as string | null) ?? null;
+  const rule = CHASE_ACTION_RULES[parsed.action];
+  const { data: open } = businessId
+    ? await db.from("ca_document_requests").select("id, next_follow_up_at").eq("ca_firm_id", firmId).eq("business_id", businessId).eq("status", "open").eq("managed_by", "practice")
+    : { data: [] as { id: string; next_follow_up_at: string | null }[] };
+  const chases = open?.length ? open : chase.status === "open" ? [{ id: chase.id as string, next_follow_up_at: null }] : [];
+  if (!chases.length) {
+    await reply("Thank you. This request is already complete, so there is nothing more to send.");
+    return "button on a chase that is already closed";
+  }
+  const until = new Date(Date.now() + rule.pauseDays * 86_400_000).toISOString();
+  if (rule.stop && businessId) await db.from("ca_clients").update({ do_not_disturb: true }).eq("ca_firm_id", firmId).eq("business_id", businessId);
+  for (const c of chases) {
+    if (!rule.stop && (!c.next_follow_up_at || c.next_follow_up_at < until)) await db.from("ca_document_requests").update({ next_follow_up_at: until }).eq("id", c.id);
+    await chaserEvent(db, {
+      chaser_id: c.id,
+      ca_firm_id: firmId,
+      business_id: businessId,
+      event_type: rule.stop ? "client_stopped" : "client_replied",
+      channel: "whatsapp",
+      note: `${rule.note} (tapped "${m.button?.text ?? m.interactive?.button_reply?.title ?? parsed.action}")${rule.stop ? " Reminders are off for this client." : ` Next reminder is paused for ${rule.pauseDays} day${rule.pauseDays === 1 ? "" : "s"}.`}`,
+      metadata: { wa_message_id: m.id, wa_from: m.from, action: parsed.action },
+    });
+  }
+  await db.from("ca_notifications").insert({
+    ca_firm_id: firmId,
+    business_id: businessId,
+    type: rule.stop ? "whatsapp_stop" : "whatsapp_reply",
+    severity: rule.stop ? "warning" : "info",
+    title: rule.stop ? "Client asked to stop reminders" : parsed.action === "sending" ? "Client says it is on the way" : "Client asked for more time",
+    message: rule.note,
+    is_read: false,
+    metadata: { wa_message_id: m.id },
+  });
+  const link = rule.stop ? null : await (await import("./uploadLinks.server")).createUploadLink(db, { firmId, businessId, requestId: parsed.chaseId });
+  await reply(rule.reply(link?.url ?? null));
+  return rule.stop ? "client opted out (button)" : `client tapped ${parsed.action}`;
+}
+
 export async function handleWhatsappWebhook(payload: {
   entry?: { changes?: WaChange[] }[];
 }) {
@@ -429,7 +484,19 @@ export async function handleWhatsappWebhook(payload: {
         )
         .then((r) => r.error && console.error(`[fyn:whatsapp] contact window: ${r.error.message}`));
 
+      // Files received in this delivery, per sender: acknowledged once each, free of charge (the client just wrote).
+      const received = new Map<string, number>();
       for (const m of messages) {
+        if (m.type === "button" || m.type === "interactive") {
+          try {
+            const reply = (text: string) => (token ? sendPlainText({ phoneNumberId, token }, m.from, text) : Promise.resolve(false));
+            results.push({ message: m.id, status: await handleButton(db, channel.ca_firm_id, m, reply) });
+          } catch (e) {
+            console.error(`[fyn:whatsapp] ${m.id}: ${(e as Error).message}`);
+            results.push({ message: m.id, status: `failed: ${(e as Error).message}` });
+          }
+          continue;
+        }
         if (m.type === "text") {
           try {
             results.push({ message: m.id, status: await handleText(db, channel.ca_firm_id, m, cc) });
@@ -518,6 +585,7 @@ export async function handleWhatsappWebhook(payload: {
               metadata: { extraction_id: res.extraction_id },
             });
           }
+          if (!res.duplicate) received.set(m.from, (received.get(m.from) ?? 0) + 1);
           results.push({
             message: m.id,
             status: res.duplicate ? "duplicate file" : "queued",
@@ -530,6 +598,9 @@ export async function handleWhatsappWebhook(payload: {
           });
         }
       }
+      if (token)
+        for (const [from, n] of received)
+          await sendPlainText({ phoneNumberId, token }, from, `Received ${n === 1 ? "your file" : `your ${n} files`}. Thank you. We will take it from here.`).catch(() => undefined);
       }
     }
   }

@@ -5,13 +5,16 @@
  */
 import type { Db } from "./db.server";
 import {
+  buildReplyButtons,
   buildTemplateMessage,
   buildTextMessage,
-  chaseText,
+  chaseButtonComponents,
+  chaseTextWithLink,
   chooseSender,
   explainWaError,
   inServiceWindow,
   windowClosed,
+  type ButtonLayout,
   type WaSenderChoice,
 } from "./whatsappFlow";
 import { DEFAULT_COUNTRY_CODE, normalisePhone, parseCountryCode } from "./chaser/rules";
@@ -22,6 +25,11 @@ const env = (n: string) => (process.env[n] ?? "").trim() || undefined;
 
 export const chaseTemplate = () => env("WHATSAPP_CHASE_TEMPLATE") ?? "document_request";
 export const chaseTemplateLang = () => env("WHATSAPP_TEMPLATE_LANG") ?? "en";
+/** Null while the approved template has no buttons (the default). See docs/WHATSAPP_TEMPLATES.md. */
+export const chaseButtonLayout = (): ButtonLayout | null => {
+  const v = (env("WHATSAPP_CHASE_BUTTONS") ?? "").toLowerCase();
+  return v === "qr_first" ? "qr_first" : v === "on" || v === "url_first" ? "url_first" : null;
+};
 
 /**
  * FynHelp's own shared WhatsApp number (Phone number ID from Meta), if one is set up.
@@ -179,16 +187,21 @@ export async function bindRoute(db: Db, phoneKey: string, firmId: string, via: "
 }
 
 /**
- * Sends the chase. Inside the 24-hour window after the client last wrote it goes as plain
- * text (no template needed); otherwise, or if WhatsApp says the window closed, as the
- * approved template.
+ * Sends the chase. Inside the 24-hour window after the client last wrote it goes as free text with
+ * reply buttons and an upload link (it costs the firm nothing); otherwise, or if WhatsApp says the
+ * window closed, as the approved template, which costs one credit on FynHelp's shared number and is
+ * given back if the message is not sent.
+ *
+ * With WHATSAPP_CHASE_BUTTONS set ("on" or "url_first" if the template lists the Upload button first,
+ * "qr_first" if the three quick replies come first) the template carries the buttons of
+ * "document_request_v2": Upload documents, Sending today, Need more time, Stop reminders.
  */
 export async function sendChaseWhatsapp(
   db: Db,
   firmId: string,
   phone: string | null | undefined,
   params: string[],
-  opts: { cc?: string } = {},
+  opts: { cc?: string; chase?: { requestId: string; businessId: string | null } } = {},
 ): Promise<WaSendResult> {
   const cc = opts.cc ?? (await firmCountryCode(db, firmId));
   const to = normalisePhone(phone, cc);
@@ -198,46 +211,59 @@ export async function sendChaseWhatsapp(
   if (test && (!sender || !phoneAllowedInTest(to, process.env["TEST_RECIPIENTS"])))
     return { ok: true, wamid: sandboxId(), to, mode: "template", simulated: true };
   if (!sender) return { ok: false, unconfigured: true, permanent: false, error: reason ?? "WhatsApp is not set up." };
-  // On FynHelp's shared number a reminder costs one credit, given back if it is not sent. Own numbers and test firms are free.
+
+  // The client's no-login upload link, for this chase.
+  const link = opts.chase
+    ? await (await import("./uploadLinks.server")).createUploadLink(db, { firmId, businessId: opts.chase.businessId, requestId: opts.chase.requestId })
+    : null;
+  const layout = chaseButtonLayout();
+  if (layout && opts.chase && !link)
+    return { ok: false, unconfigured: false, permanent: false, error: "Could not create the client's upload link. FynHelp will try again later." };
+
   const credits = await import("./billing/credits.server");
-  const spend = await credits.spendForReminder(db, firmId, { sharedNumber: sender.shared });
-  if (!spend.ok)
-    return { ok: false, unconfigured: false, permanent: false, noCredits: true, error: "Out of WhatsApp credits. Add credits in Settings, Billing and the reminder goes out." };
+  let spendRef: string | null = null;
   const attempt = async (): Promise<WaSendResult> => {
-  try {
-    const { data: contact } = await db
-      .from("ca_whatsapp_contacts")
-      .select("last_inbound_at")
-      .eq("ca_firm_id", firmId)
-      .eq("phone_key", to)
-      .maybeSingle();
-    let sent: { wamid: string; mode: "text" | "template" } | null = null;
-    if (inServiceWindow(contact?.last_inbound_at as string | undefined)) {
-      const t = await post(sender, buildTextMessage(to, chaseText(params)));
-      if (t.ok) sent = { wamid: t.body.messages![0].id, mode: "text" };
-      // A bad token will fail the template too; any other failure (window closed, odd text rejection) falls back to it.
-      else if (t.body.error?.code === 190 && !windowClosed(t.body.error.code)) {
-        const why = explainWaError(190, t.body.error.message);
-        return { ok: false, unconfigured: false, permanent: why.permanent, error: why.message };
+    try {
+      const { data: contact } = await db
+        .from("ca_whatsapp_contacts")
+        .select("last_inbound_at")
+        .eq("ca_firm_id", firmId)
+        .eq("phone_key", to)
+        .maybeSingle();
+      let sent: { wamid: string; mode: "text" | "template" } | null = null;
+      if (inServiceWindow(contact?.last_inbound_at as string | undefined)) {
+        const body = chaseTextWithLink(params, link?.url ?? null);
+        const t = await post(sender, opts.chase ? buildReplyButtons(to, body, opts.chase.requestId) : buildTextMessage(to, body));
+        if (t.ok) sent = { wamid: t.body.messages![0].id, mode: "text" };
+        // A bad token will fail the template too; any other failure (window closed, odd text rejection) falls back to it.
+        else if (t.body.error?.code === 190 && !windowClosed(t.body.error.code)) {
+          const why = explainWaError(190, t.body.error.message);
+          return { ok: false, unconfigured: false, permanent: why.permanent, error: why.message };
+        }
       }
-    }
-    if (!sent) {
-      const r = await post(sender, buildTemplateMessage(to, chaseTemplate(), chaseTemplateLang(), params));
-      if (!r.ok) {
-        const why = explainWaError(r.body.error?.code, r.body.error?.error_data?.details ?? r.body.error?.message);
-        return { ok: false, unconfigured: false, permanent: why.permanent, error: why.message };
+      if (!sent) {
+        // Only a template costs a credit.
+        const spend = await credits.spendForReminder(db, firmId, { sharedNumber: sender.shared });
+        if (!spend.ok)
+          return { ok: false, unconfigured: false, permanent: false, noCredits: true, error: "Out of WhatsApp credits. Add credits in Settings, Billing and the reminder goes out." };
+        spendRef = spend.ref;
+        const buttons = layout && link && opts.chase ? chaseButtonComponents(layout, link.token, opts.chase.requestId) : [];
+        const r = await post(sender, buildTemplateMessage(to, chaseTemplate(), chaseTemplateLang(), params, buttons));
+        if (!r.ok) {
+          const why = explainWaError(r.body.error?.code, r.body.error?.error_data?.details ?? r.body.error?.message);
+          return { ok: false, unconfigured: false, permanent: why.permanent, error: why.message };
+        }
+        sent = { wamid: r.body.messages![0].id, mode: "template" };
       }
-      sent = { wamid: r.body.messages![0].id, mode: "template" };
+      // One number serves many firms: note whose client this phone is, so the reply comes back to this firm.
+      if (sender.shared) await bindRoute(db, to, firmId, "chase");
+      return { ok: true, wamid: sent.wamid, to, mode: sent.mode };
+    } catch (e) {
+      return { ok: false, unconfigured: false, permanent: false, error: `Could not reach WhatsApp (${e instanceof Error ? e.message : "network error"}).` };
     }
-    // One number serves many firms: note whose client this phone is, so the reply comes back to this firm.
-    if (sender.shared) await bindRoute(db, to, firmId, "chase");
-    return { ok: true, wamid: sent.wamid, to, mode: sent.mode };
-  } catch (e) {
-    return { ok: false, unconfigured: false, permanent: false, error: `Could not reach WhatsApp (${e instanceof Error ? e.message : "network error"}).` };
-  }
   };
   const result = await attempt();
-  if (!result.ok) await credits.refundReminder(db, firmId, spend.ref);
+  if (!result.ok) await credits.refundReminder(db, firmId, spendRef);
   return result;
 }
 

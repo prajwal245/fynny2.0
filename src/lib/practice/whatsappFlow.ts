@@ -25,7 +25,9 @@ export function chaseTemplateParams(i: ChaseTemplateInput): string[] {
   return [waParam(i.contactName || "there", 60), waParam(i.clientName, 80), waParam(items, 300), waParam(i.firmName, 80)];
 }
 
-export function buildTemplateMessage(to: string, template: string, language: string, params: string[]) {
+export type TemplateComponent = Record<string, unknown>;
+
+export function buildTemplateMessage(to: string, template: string, language: string, params: string[], buttons: TemplateComponent[] = []) {
   return {
     messaging_product: "whatsapp",
     to,
@@ -33,10 +35,85 @@ export function buildTemplateMessage(to: string, template: string, language: str
     template: {
       name: template,
       language: { code: language },
-      components: [{ type: "body", parameters: params.map((text) => ({ type: "text", text })) }],
+      components: [{ type: "body", parameters: params.map((text) => ({ type: "text", text })) }, ...buttons],
     },
   };
 }
+
+/* ── buttons on the chase ──
+ * The approved template "document_request_v2" has four buttons:
+ *   URL          "Upload documents"  https://fynhelp.com/u/{{1}}   (one variable, at the end, as Meta requires)
+ *   Quick reply  "Sending today", "Need more time", "Stop reminders"
+ * A tap on a quick reply comes back as a payload "chase:<chase id>:<action>"; any tap also opens
+ * the 24-hour window in which the client's files and our answers cost nothing.
+ */
+
+export type ChaseAction = "sending" | "later" | "stop";
+export const CHASE_ACTIONS: ChaseAction[] = ["sending", "later", "stop"];
+export const CHASE_BUTTON_LABEL: Record<ChaseAction, string> = { sending: "Sending today", later: "Need more time", stop: "Stop reminders" };
+export const UPLOAD_BUTTON_LABEL = "Upload documents";
+
+export const chasePayload = (chaseId: string, action: ChaseAction) => `chase:${chaseId}:${action}`;
+
+const PAYLOAD_RE = /^chase:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}):(sending|later|stop)$/i;
+export function parseChasePayload(p: string | null | undefined): { chaseId: string; action: ChaseAction } | null {
+  const m = PAYLOAD_RE.exec(p ?? "");
+  return m ? { chaseId: m[1].toLowerCase(), action: m[2].toLowerCase() as ChaseAction } : null;
+}
+
+/** What a tap does: how long the chase pauses, the note for the timeline, and the answer to the client. */
+export const CHASE_ACTION_RULES: Record<ChaseAction, { pauseDays: number; stop: boolean; note: string; reply: (uploadUrl: string | null) => string }> = {
+  sending: {
+    pauseDays: 1,
+    stop: false,
+    note: "Client said they are sending it today.",
+    reply: (u) => `Thank you. Send the file here whenever you are ready${u ? `, or upload it here: ${u}` : ""}. We will not remind you again until tomorrow.`,
+  },
+  later: {
+    pauseDays: 3,
+    stop: false,
+    note: "Client asked for more time.",
+    reply: (u) => `No problem, we will check back in 3 days. Send it here any time${u ? `, or upload it here: ${u}` : ""}.`,
+  },
+  stop: {
+    pauseDays: 0,
+    stop: true,
+    note: "Client asked to stop reminders.",
+    reply: () => "Understood. We have stopped the reminders. If you change your mind, just send the file here.",
+  },
+};
+
+/** The component list for the template's buttons. `layout` is the order the buttons were created in. */
+export type ButtonLayout = "url_first" | "qr_first";
+export function chaseButtonComponents(layout: ButtonLayout, uploadToken: string, chaseId: string): TemplateComponent[] {
+  const url = { type: "button", sub_type: "url", parameters: [{ type: "text", text: uploadToken }] };
+  const qr = CHASE_ACTIONS.map((a) => ({ type: "button", sub_type: "quick_reply", parameters: [{ type: "payload", payload: chasePayload(chaseId, a) }] }));
+  const ordered = layout === "url_first" ? [url, ...qr] : [...qr, url];
+  return ordered.map((c, i) => ({ ...c, index: String(i) }));
+}
+
+/** Buttons for a free-form message inside the window (up to three reply buttons, titles up to 20 characters). */
+export const buildReplyButtons = (to: string, body: string, chaseId: string) => ({
+  messaging_product: "whatsapp",
+  to,
+  type: "interactive",
+  interactive: {
+    type: "button",
+    body: { text: body.slice(0, 1024) },
+    action: { buttons: CHASE_ACTIONS.map((a) => ({ type: "reply", reply: { id: chasePayload(chaseId, a), title: CHASE_BUTTON_LABEL[a] } })) },
+  },
+});
+
+/** A tap on a button, whichever way Meta delivers it (template quick reply or interactive reply). */
+export function buttonPayloadOf(m: { type: string; button?: { payload?: string; text?: string }; interactive?: { button_reply?: { id?: string } } }): string | null {
+  if (m.type === "button") return m.button?.payload ?? null;
+  if (m.type === "interactive") return m.interactive?.button_reply?.id ?? null;
+  return null;
+}
+
+/** The free-form message inside the window: the same words, plus the upload link. */
+export const chaseTextWithLink = (p: string[], uploadUrl: string | null) =>
+  `${chaseText(p)}${uploadUrl ? `\n\nOr upload here, no login needed: ${uploadUrl}` : ""}`;
 
 export interface WaSendError {
   /** Retrying the same message will not help. */
@@ -59,7 +136,7 @@ export function explainWaError(code: number | undefined, raw: string | undefined
       return { permanent: true, message: "The message template is not approved or does not exist in this language. Check the template name in Meta's WhatsApp Manager." };
     case 132000:
     case 132012:
-      return { permanent: true, message: "The template's fields do not match what FynHelp sends. The template needs four body fields." };
+      return { permanent: true, message: "The template's fields do not match what FynHelp sends. The template needs four body fields, and when buttons are switched on, the four buttons (Upload documents, Sending today, Need more time, Stop reminders)." };
     case 131056:
     case 130429:
     case 131048:

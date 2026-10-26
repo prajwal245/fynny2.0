@@ -11,6 +11,8 @@ You are testing FynHelp before it goes live. This guide tells you what to open, 
 2. Sign in with the email and password the team gave you. If you have not received them, ask the founder.
 3. You should see the blue **Test account** banner. **If you do not see it, stop and tell the founder.**
 
+> **Known for now:** photo and PDF *reading* is not switched on yet. Bank statements and ledgers as CSV or Excel are read fully. Please do not report "no fields on a PDF or photo" as a problem.
+
 ## 2. What you may use
 | You can | Notes |
 |---|---|
@@ -25,7 +27,8 @@ Use **made-up clients** (for example "Acme Traders"). Never type a real client's
 - [ ] The blue Test account banner is visible.
 - [ ] Dashboard, Clients, Documents, Reports, Chaser and Settings all open without an error.
 - [ ] Add a client. Refresh the page; it is still there.
-- [ ] Upload a small PDF or photo in Documents. It is read and fields appear.
+- [ ] In Documents, upload a **bank statement as a CSV or Excel file**. It is read and fields appear.
+  *Reading of PDFs and photos is not switched on yet: they are saved and shown under Documents, but no fields appear. That is expected, not a failure.*
 - [ ] Sign out and in again; your data is still there.
 
 ## 4. Chaser tests (when asked)
@@ -33,12 +36,12 @@ Create a chase with a made-up client, using **your own email and your own phone 
 
 - [ ] **Email only:** the email arrives in your inbox and the Activity shows it.
 - [ ] **WhatsApp only:** a WhatsApp message arrives on your phone. It has four buttons: **Upload documents**, **Sending today**, **Need more time**, **Stop reminders**.
-  - Tap **Upload documents**: a page opens with no login. Add a photo or PDF. You see "Received" and a thank-you. The document appears in the app under Documents.
+  - Tap **Upload documents**: a page opens with no login. Add a **CSV or Excel bank statement**. You see "Received" and a thank-you, and the file appears in the app under Documents with its fields read. (A photo or PDF also uploads and appears, but no fields are read yet.)
   - Tap **Sending today**: you get a thank-you reply. In the app, the chase's Activity says the client is sending it today.
   - Tap **Need more time**: you get "When can you send it?" with **Tomorrow / In 3 days / Next week**. Tap one; the Activity shows the promised date.
   - Tap **Stop reminders**: you get a confirmation. The Activity says reminders are off for this client.
 - [ ] **Email + WhatsApp:** both arrive.
-- [ ] Send a file on WhatsApp: you get "Received your file. Thank you."
+- [ ] Send a file on WhatsApp (use a CSV or Excel file if you want its fields read): you get "Received your file. Thank you."
 - [ ] A WhatsApp chase with **no phone number** is refused with a clear message.
 - [ ] Mark a chase **Resolved**: no more reminders arrive.
 - [ ] The next reminders (day 3 and day 7) use different wording: a gentle reminder, then a final reminder. The founder can speed this up for you.
@@ -46,7 +49,7 @@ Create a chase with a made-up client, using **your own email and your own phone 
 ## 5. Upload link tests
 Open the upload link from a reminder on your **phone**.
 - [ ] The page is easy to read and the buttons are easy to tap.
-- [ ] A PDF and a photo both upload. A made-up `.exe` or a renamed text file is refused with a clear message.
+- [ ] A CSV or Excel file, a PDF and a photo all upload (only CSV and Excel are read for now). A made-up `.exe` or a renamed text file is refused with a clear message.
 - [ ] A file over 15 MB is refused.
 - [ ] Open the link a day after the expiry date the page shows (founder can help): it says the link has expired.
 

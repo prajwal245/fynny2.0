@@ -75,6 +75,21 @@ The test number cannot carry buttons from your approved templates unless the tem
 | Buttons on the template | `document_request_v2` (and the follow-up and final templates) approved; see `docs/WHATSAPP_TEMPLATES.md` |
 | Day 3 / day 7 wording | wait, or change `next_follow_up_at` on the test chase in the database to now |
 
+## 4b. Confirm these are live before testers start (5 minutes, you)
+Do these on Production once the deploy is **Ready**. Testers will report anything here that is not ready as a failure.
+
+| # | Check | How | Expect |
+|---|---|---|---|
+| 1 | Upload page is deployed | Open `https://fynhelp.com/u/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa` | The page loads and says "This link is not valid". (Not a 404 or a blank page.) |
+| 2 | Upload API is deployed | Open `https://fynhelp.com/api/public/upload-link?token=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa` | `{"ok":false,"reason":"invalid"}` |
+| 3 | Upload links table exists | Send one WhatsApp chase from a test firm to your own number | The message arrives with an **Upload documents** button. "Could not create the client's upload link" means `20261029090000_upload_links.sql` is not applied. |
+| 4 | File limits | On that page upload a CSV, then a file over 15 MB, then a `.exe` renamed `.pdf` | CSV accepted; the large file says it is larger than 15 MB; the renamed file says we can read PDF, photos, Excel and CSV. A link takes up to 25 files and works 14 days. |
+| 5 | Templates approved with buttons | Settings → WhatsApp → Your reminder messages | Each stage says **Ready**, with buttons. "In review" means the older template is still being used and the buttons will not show yet. |
+| 6 | Button taps work | Tap **Sending today**, **Need more time** (then pick a date) and **Stop reminders** on your phone | A reply arrives each time and the chase Activity shows it. This needs the WhatsApp webhook live and `WHATSAPP_APP_SECRET` set. |
+| 7 | Reading is what the guide says | Upload a CSV bank statement, then a PDF | CSV shows fields. PDF is saved but shows no fields until reading is switched on (see below). |
+
+**Switching on PDF and photo reading** (optional, then update the tester guide): set `OCR_SPACE_API_KEY` for photos and scanned PDFs, and one of `GROQ_API_KEY`, `GEMINI_API_KEY` or `LOVABLE_API_KEY` for AI reading (do not set `PRACTICE_AI_DISABLED`). Settings → Integrations shows which of these the server sees. Redeploy after setting them, then change the tester guide's quick-test step back to "PDF or photo".
+
 ## 5. Payment and credit tests (separate from tester accounts)
 1. In Vercel, on the **Preview** environment only, set `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` to your `rzp_test_…` keys and a different `RAZORPAY_WEBHOOK_SECRET`.
 2. In Razorpay **Test mode**, add a webhook pointing at the preview URL (`/api/public/razorpay-webhook`) with the subscription events plus `invoice.paid` and `order.paid`.

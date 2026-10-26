@@ -47,6 +47,7 @@ import { Route as AppReviewRouteImport } from './routes/app/review'
 import { Route as AppSettingsRouteImport } from './routes/app/settings'
 import { Route as DemoIndexRouteImport } from './routes/demo.index'
 import { Route as DemoSplatRouteImport } from './routes/demo.$'
+import { Route as UTokenRouteImport } from './routes/u.$token'
 import { Route as AdminAuthAdminProtectedRouteImport } from './routes/_adminAuth/admin/_protected'
 import { Route as AdminAuthAdminLoginRouteImport } from './routes/_adminAuth/admin/login'
 import { Route as AdminAuthAdminSetupRouteImport } from './routes/_adminAuth/admin/setup'
@@ -115,9 +116,10 @@ import { Route as ApiPublicCaPollGmailRouteImport } from './routes/api/public/ca
 import { Route as ApiPublicEmailPreferencesRouteImport } from './routes/api/public/email-preferences'
 import { Route as ApiPublicPracticeTickRouteImport } from './routes/api/public/practice-tick'
 import { Route as ApiPublicRazorpayWebhookRouteImport } from './routes/api/public/razorpay-webhook'
-import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp-webhook'
 import { Route as ApiPublicTallyHelloRouteImport } from './routes/api/public/tally-hello'
 import { Route as ApiPublicTallyLedgerRouteImport } from './routes/api/public/tally-ledger'
+import { Route as ApiPublicUploadLinkRouteImport } from './routes/api/public/upload-link'
+import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp-webhook'
 import { Route as AppClientsIndexRouteImport } from './routes/app/clients.index'
 import { Route as AppClientsClientIdRouteImport } from './routes/app/clients.$clientId'
 import { Route as AppReportsIndexRouteImport } from './routes/app/reports.index'
@@ -403,6 +405,11 @@ const DemoIndexRoute = DemoIndexRouteImport.update({
 const DemoSplatRoute = DemoSplatRouteImport.update({
   id: '/demo/$',
   path: '/demo/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UTokenRoute = UTokenRouteImport.update({
+  id: '/u/$token',
+  path: '/u/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminAuthAdminProtectedRoute = AdminAuthAdminProtectedRouteImport.update({
@@ -767,22 +774,25 @@ const ApiPublicRazorpayWebhookRoute =
     path: '/api/public/razorpay-webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicTallyHelloRoute = ApiPublicTallyHelloRouteImport.update({
+  id: '/api/public/tally-hello',
+  path: '/api/public/tally-hello',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicTallyLedgerRoute = ApiPublicTallyLedgerRouteImport.update({
+  id: '/api/public/tally-ledger',
+  path: '/api/public/tally-ledger',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicUploadLinkRoute = ApiPublicUploadLinkRouteImport.update({
+  id: '/api/public/upload-link',
+  path: '/api/public/upload-link',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicWhatsappWebhookRoute =
   ApiPublicWhatsappWebhookRouteImport.update({
     id: '/api/public/whatsapp-webhook',
     path: '/api/public/whatsapp-webhook',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicTallyHelloRoute =
-  ApiPublicTallyHelloRouteImport.update({
-    id: '/api/public/tally-hello',
-    path: '/api/public/tally-hello',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicTallyLedgerRoute =
-  ApiPublicTallyLedgerRouteImport.update({
-    id: '/api/public/tally-ledger',
-    path: '/api/public/tally-ledger',
     getParentRoute: () => rootRouteImport,
   } as any)
 const AppClientsIndexRoute = AppClientsIndexRouteImport.update({
@@ -1402,6 +1412,7 @@ export interface FileRoutesByFullPath {
   '/app/review': typeof AppReviewRoute
   '/app/settings': typeof AppSettingsRoute
   '/demo/$': typeof DemoSplatRoute
+  '/u/$token': typeof UTokenRoute
   '/app/': typeof AppIndexRoute
   '/demo/': typeof DemoIndexRoute
   '/admin': typeof AdminAuthAdminProtectedRouteWithChildren
@@ -1468,9 +1479,10 @@ export interface FileRoutesByFullPath {
   '/api/public/email-preferences': typeof ApiPublicEmailPreferencesRoute
   '/api/public/practice-tick': typeof ApiPublicPracticeTickRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
-  '/api/public/whatsapp-webhook': typeof ApiPublicWhatsappWebhookRoute
   '/api/public/tally-hello': typeof ApiPublicTallyHelloRoute
   '/api/public/tally-ledger': typeof ApiPublicTallyLedgerRoute
+  '/api/public/upload-link': typeof ApiPublicUploadLinkRoute
+  '/api/public/whatsapp-webhook': typeof ApiPublicWhatsappWebhookRoute
   '/app/clients/$clientId': typeof AppClientsClientIdRoute
   '/app/reports/$reportId': typeof AppReportsReportIdRoute
   '/shared/mis/$token': typeof SharedMisTokenRoute
@@ -1607,6 +1619,7 @@ export interface FileRoutesByTo {
   '/app/review': typeof AppReviewRoute
   '/app/settings': typeof AppSettingsRoute
   '/demo/$': typeof DemoSplatRoute
+  '/u/$token': typeof UTokenRoute
   '/app': typeof AppIndexRoute
   '/demo': typeof DemoIndexRoute
   '/admin/login': typeof AdminAuthAdminLoginRoute
@@ -1670,9 +1683,10 @@ export interface FileRoutesByTo {
   '/api/public/email-preferences': typeof ApiPublicEmailPreferencesRoute
   '/api/public/practice-tick': typeof ApiPublicPracticeTickRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
-  '/api/public/whatsapp-webhook': typeof ApiPublicWhatsappWebhookRoute
   '/api/public/tally-hello': typeof ApiPublicTallyHelloRoute
   '/api/public/tally-ledger': typeof ApiPublicTallyLedgerRoute
+  '/api/public/upload-link': typeof ApiPublicUploadLinkRoute
+  '/api/public/whatsapp-webhook': typeof ApiPublicWhatsappWebhookRoute
   '/app/clients/$clientId': typeof AppClientsClientIdRoute
   '/app/reports/$reportId': typeof AppReportsReportIdRoute
   '/shared/mis/$token': typeof SharedMisTokenRoute
@@ -1816,6 +1830,7 @@ export interface FileRoutesById {
   '/app/review': typeof AppReviewRoute
   '/app/settings': typeof AppSettingsRoute
   '/demo/$': typeof DemoSplatRoute
+  '/u/$token': typeof UTokenRoute
   '/_main/': typeof MainIndexRoute
   '/app/': typeof AppIndexRoute
   '/demo/': typeof DemoIndexRoute
@@ -1883,9 +1898,10 @@ export interface FileRoutesById {
   '/api/public/email-preferences': typeof ApiPublicEmailPreferencesRoute
   '/api/public/practice-tick': typeof ApiPublicPracticeTickRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
-  '/api/public/whatsapp-webhook': typeof ApiPublicWhatsappWebhookRoute
   '/api/public/tally-hello': typeof ApiPublicTallyHelloRoute
   '/api/public/tally-ledger': typeof ApiPublicTallyLedgerRoute
+  '/api/public/upload-link': typeof ApiPublicUploadLinkRoute
+  '/api/public/whatsapp-webhook': typeof ApiPublicWhatsappWebhookRoute
   '/app/clients/$clientId': typeof AppClientsClientIdRoute
   '/app/reports/$reportId': typeof AppReportsReportIdRoute
   '/shared/mis/$token': typeof SharedMisTokenRoute
@@ -2026,6 +2042,7 @@ export interface FileRouteTypes {
     | '/app/review'
     | '/app/settings'
     | '/demo/$'
+    | '/u/$token'
     | '/app/'
     | '/demo/'
     | '/admin'
@@ -2092,9 +2109,10 @@ export interface FileRouteTypes {
     | '/api/public/email-preferences'
     | '/api/public/practice-tick'
     | '/api/public/razorpay-webhook'
-    | '/api/public/whatsapp-webhook'
     | '/api/public/tally-hello'
     | '/api/public/tally-ledger'
+    | '/api/public/upload-link'
+    | '/api/public/whatsapp-webhook'
     | '/app/clients/$clientId'
     | '/app/reports/$reportId'
     | '/shared/mis/$token'
@@ -2231,6 +2249,7 @@ export interface FileRouteTypes {
     | '/app/review'
     | '/app/settings'
     | '/demo/$'
+    | '/u/$token'
     | '/app'
     | '/demo'
     | '/admin/login'
@@ -2294,9 +2313,10 @@ export interface FileRouteTypes {
     | '/api/public/email-preferences'
     | '/api/public/practice-tick'
     | '/api/public/razorpay-webhook'
-    | '/api/public/whatsapp-webhook'
     | '/api/public/tally-hello'
     | '/api/public/tally-ledger'
+    | '/api/public/upload-link'
+    | '/api/public/whatsapp-webhook'
     | '/app/clients/$clientId'
     | '/app/reports/$reportId'
     | '/shared/mis/$token'
@@ -2439,6 +2459,7 @@ export interface FileRouteTypes {
     | '/app/review'
     | '/app/settings'
     | '/demo/$'
+    | '/u/$token'
     | '/_main/'
     | '/app/'
     | '/demo/'
@@ -2506,9 +2527,10 @@ export interface FileRouteTypes {
     | '/api/public/email-preferences'
     | '/api/public/practice-tick'
     | '/api/public/razorpay-webhook'
-    | '/api/public/whatsapp-webhook'
     | '/api/public/tally-hello'
     | '/api/public/tally-ledger'
+    | '/api/public/upload-link'
+    | '/api/public/whatsapp-webhook'
     | '/app/clients/$clientId'
     | '/app/reports/$reportId'
     | '/shared/mis/$token'
@@ -2627,6 +2649,7 @@ export interface RootRouteChildren {
   SamplesRoute: typeof SamplesRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   DemoSplatRoute: typeof DemoSplatRoute
+  UTokenRoute: typeof UTokenRoute
   DemoIndexRoute: typeof DemoIndexRoute
   ApiPublicCaAutoEscalateChasersRoute: typeof ApiPublicCaAutoEscalateChasersRoute
   ApiPublicCaAutoFollowupRoute: typeof ApiPublicCaAutoFollowupRoute
@@ -2643,9 +2666,10 @@ export interface RootRouteChildren {
   ApiPublicEmailPreferencesRoute: typeof ApiPublicEmailPreferencesRoute
   ApiPublicPracticeTickRoute: typeof ApiPublicPracticeTickRoute
   ApiPublicRazorpayWebhookRoute: typeof ApiPublicRazorpayWebhookRoute
-  ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
   ApiPublicTallyHelloRoute: typeof ApiPublicTallyHelloRoute
   ApiPublicTallyLedgerRoute: typeof ApiPublicTallyLedgerRoute
+  ApiPublicUploadLinkRoute: typeof ApiPublicUploadLinkRoute
+  ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
   SharedMisTokenRoute: typeof SharedMisTokenRoute
   ApiIntegrationsZohoCallbackRoute: typeof ApiIntegrationsZohoCallbackRoute
   CaIntegrationsGmailCallbackRoute: typeof CaIntegrationsGmailCallbackRoute
@@ -2917,6 +2941,13 @@ declare module '@tanstack/react-router' {
       path: '/demo/$'
       fullPath: '/demo/$'
       preLoaderRoute: typeof DemoSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/u/$token': {
+      id: '/u/$token'
+      path: '/u/$token'
+      fullPath: '/u/$token'
+      preLoaderRoute: typeof UTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_adminAuth/admin/_protected': {
@@ -3395,13 +3426,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicRazorpayWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/whatsapp-webhook': {
-      id: '/api/public/whatsapp-webhook'
-      path: '/api/public/whatsapp-webhook'
-      fullPath: '/api/public/whatsapp-webhook'
-      preLoaderRoute: typeof ApiPublicWhatsappWebhookRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/public/tally-hello': {
       id: '/api/public/tally-hello'
       path: '/api/public/tally-hello'
@@ -3414,6 +3438,20 @@ declare module '@tanstack/react-router' {
       path: '/api/public/tally-ledger'
       fullPath: '/api/public/tally-ledger'
       preLoaderRoute: typeof ApiPublicTallyLedgerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/upload-link': {
+      id: '/api/public/upload-link'
+      path: '/api/public/upload-link'
+      fullPath: '/api/public/upload-link'
+      preLoaderRoute: typeof ApiPublicUploadLinkRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/whatsapp-webhook': {
+      id: '/api/public/whatsapp-webhook'
+      path: '/api/public/whatsapp-webhook'
+      fullPath: '/api/public/whatsapp-webhook'
+      preLoaderRoute: typeof ApiPublicWhatsappWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app/clients/': {
@@ -4614,6 +4652,7 @@ const rootRouteChildren: RootRouteChildren = {
   SamplesRoute: SamplesRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   DemoSplatRoute: DemoSplatRoute,
+  UTokenRoute: UTokenRoute,
   DemoIndexRoute: DemoIndexRoute,
   ApiPublicCaAutoEscalateChasersRoute: ApiPublicCaAutoEscalateChasersRoute,
   ApiPublicCaAutoFollowupRoute: ApiPublicCaAutoFollowupRoute,
@@ -4631,9 +4670,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicEmailPreferencesRoute: ApiPublicEmailPreferencesRoute,
   ApiPublicPracticeTickRoute: ApiPublicPracticeTickRoute,
   ApiPublicRazorpayWebhookRoute: ApiPublicRazorpayWebhookRoute,
-  ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,
   ApiPublicTallyHelloRoute: ApiPublicTallyHelloRoute,
   ApiPublicTallyLedgerRoute: ApiPublicTallyLedgerRoute,
+  ApiPublicUploadLinkRoute: ApiPublicUploadLinkRoute,
+  ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,
   SharedMisTokenRoute: SharedMisTokenRoute,
   ApiIntegrationsZohoCallbackRoute: ApiIntegrationsZohoCallbackRoute,
   CaIntegrationsGmailCallbackRoute: CaIntegrationsGmailCallbackRoute,

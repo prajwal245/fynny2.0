@@ -5,7 +5,8 @@ One credit sends one WhatsApp reminder from **FynHelp's shared number**. Everyth
 | Action | Credits |
 |---|---|
 | Email reminder | 0 (fair use) |
-| WhatsApp reminder from FynHelp's number | 1 |
+| WhatsApp reminder from FynHelp's number, sent as the **template** (client has not written in the last 23 hours) | 1 |
+| WhatsApp reminder sent as **free text** inside the client's open 24-hour window | 0 (WhatsApp does not charge us either) |
 | WhatsApp reminder from the firm's **own** linked number | 0 (the firm pays Meta directly) |
 | Replies inside WhatsApp's 24-hour window, document intake | 0 |
 | Document reading | 0 credits (has its own monthly document allowance) |
@@ -29,7 +30,7 @@ Warnings: an in-app notice once a month when the balance drops to the last fifth
 ## How it works
 
 - Database: `supabase/migrations/20261028090000_credits.sql` — lots, ledger, orders, settings, and four service-role-only functions (`ca_credits_balance/grant/spend/refund`). Each takes a per-firm lock, so concurrent sends can never spend the same credit twice. Plan allowances and payments are granted idempotently (unique keys).
-- Server: `src/lib/practice/billing/credits.server.ts`. `sendChaseWhatsapp` spends 1 credit before sending on the shared number and **refunds it if the message is not sent**. With no credits the reminder is not sent and the Chaser reports "Out of WhatsApp credits"; a WhatsApp-only chase is retried the next day, an Email + WhatsApp chase carries on by email.
+- Server: `src/lib/practice/billing/credits.server.ts`. `sendChaseWhatsapp` spends 1 credit only when it is about to send the template on the shared number, and **refunds it if the message is not sent**. With no credits the reminder is not sent and the Chaser reports "Out of WhatsApp credits"; a WhatsApp-only chase is retried the next day, an Email + WhatsApp chase carries on by email.
 - Top-ups: a Razorpay Order is created, the credits are added after the payment signature is verified, or by the `order.paid` webhook if the browser closed first. A payment id is unique, so a repeat never adds twice.
 - Screens: Chaser (balance chip, low/out bar, channel choice), Settings → Billing (balance, history, auto top-up, Add credits).
 

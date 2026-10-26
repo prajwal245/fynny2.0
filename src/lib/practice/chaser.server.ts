@@ -381,6 +381,7 @@ export async function sendFollowUp(
         items: [`${t.item}${t.period ? ` (${t.period})` : ""}`],
         firmName: ctx.firmName,
       }),
+      { step: count, chase: { requestId: row.id, businessId: row.business_id } },
     );
     if (api.ok) {
       await db
@@ -851,7 +852,7 @@ export async function runDueFollowups(now = new Date(), firmId?: string) {
             items: claimedItems.map((q) => `${q.t.item}${q.t.period ? ` (${q.t.period})` : ""}`),
             firmName: first.firm.name,
           }),
-          { cc: countryByFirm.get(firmId) },
+          { cc: countryByFirm.get(firmId), step, chase: { requestId: first.row.id, businessId: first.row.business_id } },
         );
         if (wa.ok) waSentToday.set(firmId, waSentToday.get(firmId)! + claimedItems.length);
         if (!wa.ok && onlyWhatsapp) {

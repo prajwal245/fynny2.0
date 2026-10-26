@@ -11,7 +11,7 @@ import { useAdminAuth, type AdminRole } from "@/contexts/AdminAuthContext";
 import FynLogo from "@/components/FynLogo";
 import AdminSessionGate, { useAdminSession } from "./AdminSessionGate";
 import type { Permission } from "@/lib/admin/rbac";
-import { Building2, Cpu, Receipt, TicketPercent, UserCog, ScrollText } from "lucide-react";
+import { Building2, Cpu, HeartHandshake, Receipt, TicketPercent, UserCog, ScrollText } from "lucide-react";
 
 type NavItem =
   | { divider: true }
@@ -20,6 +20,7 @@ type NavItem =
 const NAV_ITEMS: NavItem[] = [
   { to: "/admin/control", label: "Control Center", icon: Gauge, roles: [], perm: "dashboard.view" },
   { to: "/admin/firms", label: "Firms", icon: Building2, roles: [], perm: "firms.view" },
+  { to: "/admin/follow-ups", label: "Follow-ups", icon: HeartHandshake, roles: [], perm: "support.manage" },
   { to: "/admin/operations", label: "Operations", icon: Cpu, roles: [], perm: "ops.view" },
   { to: "/admin/billing", label: "Billing & Ledger", icon: Receipt, roles: [], perm: "billing.view" },
   { to: "/admin/coupons", label: "Coupons", icon: TicketPercent, roles: [], perm: "coupons.manage" },

@@ -10,6 +10,10 @@ const accountSchema = z.object({
   name: z.string().trim().min(1).max(120),
   email: z.string().trim().toLowerCase().email().max(254),
   password: z.string().min(1).max(72),
+  /** Mobile number, collected so a person can help if setup stalls. */
+  phone: z.string().trim().min(1).max(24),
+  /** The person agreed to setup help and trial updates on WhatsApp. */
+  whatsappOk: z.boolean().optional(),
 });
 
 export type CreateAccountResult = { ok: true; existed: boolean } | { ok: false; message: string };
@@ -20,6 +24,9 @@ export const createAccount = createServerFn({ method: "POST" })
     const { checkPassword } = await import("@/lib/passwordPolicy");
     const weak = await checkPassword(data.password, data.email);
     if (weak) return { ok: false, message: weak };
+    const { parseMobile } = await import("@/lib/practice/mobile");
+    const mobile = parseMobile(data.phone);
+    if (!mobile) return { ok: false, message: "Enter a valid mobile number, for example 98200 11223." };
     const { adminDb } = await import("@/lib/practice/db.server");
     const db = await adminDb();
     // At most 10 sign-ups an hour from one network.
@@ -36,7 +43,7 @@ export const createAccount = createServerFn({ method: "POST" })
       email: data.email,
       password: data.password,
       email_confirm: true,
-      user_metadata: { full_name: data.name },
+      user_metadata: { full_name: data.name, phone: mobile.digits, whatsapp_ok: data.whatsappOk === true },
     });
     if (!error) return { ok: true, existed: false };
     if (/already|exists|registered/i.test(error.message)) {

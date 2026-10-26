@@ -571,3 +571,107 @@ export async function systemHealth(ctx: AdminCtx) {
     recentFailures: (failedRuns.data ?? []).map((r) => ({ ...r, firm: names.get(r.ca_firm_id) ?? "—" })),
   };
 }
+
+/* ── follow-ups: people who stalled on the way ───────────── */
+
+const IST_DAY = (iso: string) => new Date(new Date(iso).getTime() + 5.5 * 3600_000).toISOString().slice(0, 10);
+
+export async function followUps(ctx: AdminCtx, status: "open" | "closed") {
+  const { db } = ctx;
+  const now = new Date();
+  const thirty = new Date(now.getTime() - 30 * DAY).toISOString();
+  const q = db.from("ca_touchpoints").select("*");
+  const { data } = await (status === "open"
+    ? q.eq("status", "open").order("hot", { ascending: false }).order("due_at", { ascending: true }).limit(300)
+    : q.neq("status", "open").gte("created_at", thirty).order("created_at", { ascending: false }).limit(300));
+  const rows = (data ?? []).filter((r) => status === "closed" || !r.snoozed_until || new Date(String(r.snoozed_until)) <= now);
+  const { scriptFor } = await import("../practice/touchpoints/rules");
+
+  // The funnel for everyone who signed up in the last 30 days (test and demo firms never count).
+  const { data: firms } = await db.from("ca_firms").select("id, created_at, is_demo, is_test").gte("created_at", thirty).limit(5000);
+  const real = (firms ?? []).filter((f) => !f.is_demo && !f.is_test);
+  const ids = real.map((f) => String(f.id));
+  const [clients, docs, bills, unfinished] = ids.length
+    ? await Promise.all([
+        db.from("ca_clients").select("ca_firm_id").in("ca_firm_id", ids).limit(50000),
+        db.from("ca_document_extractions").select("ca_firm_id").in("ca_firm_id", ids).limit(50000),
+        db.from("ca_billing").select("ca_firm_id, activated_at, first_paid_at").in("ca_firm_id", ids).limit(5000),
+        db.from("ca_touchpoints").select("id", { count: "exact", head: true }).eq("kind", "signup_unfinished").gte("created_at", thirty),
+      ])
+    : [{ data: [] }, { data: [] }, { data: [] }, { count: 0 }];
+  const has = (r: { data: { ca_firm_id: unknown }[] | null }) => new Set((r.data ?? []).map((x) => String(x.ca_firm_id)));
+  const withClient = has(clients as never);
+  const withDoc = has(docs as never);
+  const activated = new Set(((bills.data ?? []) as { ca_firm_id: string; activated_at: string | null }[]).filter((b) => b.activated_at).map((b) => b.ca_firm_id));
+  const paying = new Set(((bills.data ?? []) as { ca_firm_id: string; first_paid_at: string | null }[]).filter((b) => b.first_paid_at).map((b) => b.ca_firm_id));
+  const count = (s: Set<string>) => ids.filter((i) => s.has(i)).length;
+  const funnel = [
+    { label: "Signed up", n: real.length + Number((unfinished as { count?: number }).count ?? 0) },
+    { label: "Firm created", n: real.length },
+    { label: "First client", n: count(withClient) },
+    { label: "First upload", n: count(withDoc) },
+    { label: "First reconciliation", n: count(activated) },
+    { label: "Paying", n: count(paying) },
+  ];
+
+  const { data: recent } = await db.from("ca_touchpoints").select("status, recovered, outcome, email_sent_at").gte("created_at", thirty).limit(5000);
+  const r = recent ?? [];
+  const stats = {
+    opened: r.length,
+    open: r.filter((x) => x.status === "open").length,
+    cameBack: r.filter((x) => x.status === "auto_resolved" && x.recovered).length,
+    movedOn: r.filter((x) => x.status === "auto_resolved" && !x.recovered).length,
+    reached: r.filter((x) => x.status === "done" && x.outcome === "reached").length,
+    emailed: r.filter((x) => x.email_sent_at).length,
+  };
+
+  return {
+    funnel,
+    stats,
+    rows: rows.map((t) => ({
+      id: String(t.id),
+      kind: String(t.kind),
+      headline: String(t.headline),
+      hot: Boolean(t.hot),
+      status: String(t.status),
+      name: (t.name as string | null) ?? null,
+      email: (t.email as string | null) ?? null,
+      phone: (t.phone as string | null) ?? null,
+      whatsappOk: Boolean(t.whatsapp_ok),
+      firmId: (t.ca_firm_id as string | null) ?? null,
+      since: IST_DAY(String(t.created_at)),
+      dueAt: String(t.due_at),
+      emailSentAt: (t.email_sent_at as string | null) ?? null,
+      outcome: (t.outcome as string | null) ?? null,
+      note: (t.note as string | null) ?? null,
+      doneBy: (t.done_by as string | null) ?? null,
+      recovered: Boolean(t.recovered),
+      script: scriptFor(t.kind as never, { name: (t.name as string | null) ?? null, firmName: ((t.detail ?? {}) as { firmName?: string }).firmName ?? null, clients: Number(((t.detail ?? {}) as { clients?: number }).clients ?? 0), documents: Number(((t.detail ?? {}) as { documents?: number }).documents ?? 0) }, ctx.email?.split("@")[0]),
+    })),
+  };
+}
+
+const OUTCOMES = ["reached", "no_answer", "not_interested", "needs_demo", "wrong_number", "other"] as const;
+
+export async function followUpAct(
+  ctx: AdminCtx,
+  id: string,
+  act: { action: "done" | "snooze" | "dismiss" | "reopen"; outcome?: (typeof OUTCOMES)[number]; note?: string },
+) {
+  const { db } = ctx;
+  const { data: t } = await db.from("ca_touchpoints").select("id, status, kind, ca_firm_id").eq("id", id).maybeSingle();
+  if (!t) throw new PracticeError("not_found", "That follow-up no longer exists.");
+  const note = act.note?.trim().slice(0, 500) || null;
+  const patch: Record<string, unknown> =
+    act.action === "done"
+      ? { status: "done", outcome: act.outcome ?? "other", note, done_by: ctx.email, done_at: new Date().toISOString() }
+      : act.action === "snooze"
+        ? { snoozed_until: new Date(Date.now() + 2 * DAY).toISOString(), ...(note ? { note } : {}) }
+        : act.action === "dismiss"
+          ? { status: "dismissed", note, done_by: ctx.email, done_at: new Date().toISOString() }
+          : { status: "open", snoozed_until: null, done_at: null };
+  const { error } = await db.from("ca_touchpoints").update(patch).eq("id", id);
+  if (error) throw new PracticeError("db_error", error.message);
+  await audit(ctx, `followup_${act.action}`, "ca_touchpoint", id, { kind: t.kind, outcome: act.outcome ?? null });
+  return { ok: true };
+}

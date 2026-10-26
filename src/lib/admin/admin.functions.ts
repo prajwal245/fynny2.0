@@ -205,3 +205,24 @@ export const adminAudit = createServerFn({ method: "POST" })
 export const adminSystemHealth = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => (await import("./admin.server")).systemHealth(await gate(context, "ops.view")));
+
+/* ── follow-ups ──────────────────────────────────────────── */
+
+export const adminFollowUps = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ status: z.enum(["open", "closed"]) }).parse(d))
+  .handler(async ({ data, context }) => (await import("./admin.server")).followUps(await gate(context, "support.manage"), data.status));
+
+export const adminFollowUpAct = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        action: z.enum(["done", "snooze", "dismiss", "reopen"]),
+        outcome: z.enum(["reached", "no_answer", "not_interested", "needs_demo", "wrong_number", "other"]).optional(),
+        note: z.string().max(500).optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => (await import("./admin.server")).followUpAct(await gate(context, "support.manage"), data.id, data));

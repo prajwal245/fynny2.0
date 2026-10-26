@@ -668,6 +668,9 @@ export const savePracticeFirm = createServerFn({ method: "POST" })
         frn: z.string().max(40).optional(),
         email: z.string().max(200).optional(),
         partnerName: z.string().max(120).optional(),
+        /** The partner's mobile number, and whether they agreed to WhatsApp help and trial updates. */
+        phone: z.string().max(24).optional(),
+        whatsappOk: z.boolean().optional(),
         /** Sent by the Settings page: an edit, not joining during onboarding. */
         settings: z.boolean().optional(),
       })
@@ -684,6 +687,12 @@ export const savePracticeFirm = createServerFn({ method: "POST" })
     if (data.email !== undefined) payload.email = data.email.trim();
     if (data.partnerName !== undefined)
       payload.ca_name = data.partnerName.trim();
+    if (data.phone !== undefined) {
+      const { parseMobile } = await import("./mobile");
+      const m = parseMobile(data.phone);
+      if (data.phone.trim() && !m) throw new Error("Enter a valid mobile number, for example 98200 11223.");
+      payload.phone = m?.digits ?? "";
+    }
 
     let existing: Awaited<ReturnType<typeof firmContext>> | null = null;
     try {
@@ -703,6 +712,14 @@ export const savePracticeFirm = createServerFn({ method: "POST" })
         joined: true,
         firmName: existing.firmName,
       };
+    }
+    if (data.whatsappOk !== undefined) {
+      let prefs: Record<string, unknown> = {};
+      if (firmId) {
+        const { data: cur } = await db.from("ca_firms").select("notification_prefs").eq("id", firmId).maybeSingle();
+        prefs = (cur?.notification_prefs ?? {}) as Record<string, unknown>;
+      }
+      payload.notification_prefs = { ...prefs, touch_whatsapp_ok: data.whatsappOk };
     }
     if (firmId) {
       if (Object.keys(payload).length) {

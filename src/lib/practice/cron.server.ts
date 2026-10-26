@@ -51,5 +51,9 @@ export async function practiceTick(
     .then((m) => m.runLifecycle(db, now))
     .then((r) => ({ ...r, sent: r.sent.length }))
     .catch((e) => ({ error: (e as Error).message }));
-  return { gmail, queue, autoChase, chaser, renewals, arrears, lifecycle, ms: Date.now() - started };
+  // People who stall on the way (no client, no upload, plan chosen but not paid): follow-ups and one email each.
+  const touchpoints = await import("./touchpoints/touchpoints.server")
+    .then((m) => m.runTouchpoints(db, now))
+    .catch((e) => ({ error: (e as Error).message }));
+  return { gmail, queue, autoChase, chaser, renewals, arrears, lifecycle, touchpoints, ms: Date.now() - started };
 }

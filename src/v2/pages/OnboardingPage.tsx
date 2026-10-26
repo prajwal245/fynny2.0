@@ -22,6 +22,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { referralApply, updatePracticePipelineSettings } from "@/lib/practice/practice.functions";
 import { clearReferralCode, getReferralCode } from "@/lib/referral";
 import { confirmPendingAccount, createAccount } from "@/lib/accountSignup.functions";
+import { MOBILE_HINT, parseMobile } from "@/lib/practice/mobile";
 import { ENTITY_TYPES, useV2 } from "../store";
 import { OnboardingPanel } from "../components/OnboardingPanel";
 import { GmailIcon } from "../components/BrandIcons";
@@ -105,9 +106,9 @@ export default function OnboardingPage() {
     } catch {
       /* ignore */
     }
-    return { name: session?.name ?? "", email: session?.email ?? fromLink, password: "" };
+    return { name: session?.name ?? "", email: session?.email ?? fromLink, password: "", phone: session?.phone ?? "", whatsappOk: false };
   });
-  const [firmForm, setFirmForm] = useState({ name: firm?.name ?? "", city: firm?.city ?? "", frn: firm?.frn ?? "", ref: getReferralCode() ?? "" });
+  const [firmForm, setFirmForm] = useState({ name: firm?.name ?? "", city: firm?.city ?? "", frn: firm?.frn ?? "", phone: firm?.phone ?? session?.phone ?? "", ref: getReferralCode() ?? "" });
   const [gstinErr, setGstinErr] = useState<string | null>(null);
   const [client, setClient] = useState({ name: "", entityType: ENTITY_TYPES[0], gstin: "", contactName: "", email: "", phone: "" });
   const [clientId, setClientId] = useState<string | null>(null);
@@ -160,7 +161,9 @@ export default function OnboardingPage() {
         setMode("signin");
         return;
       }
-      const created = await createAccountFn({ data: { name: account.name.trim(), email, password: account.password } }).catch(
+      const mobile = parseMobile(account.phone);
+      if (!mobile) { toast.error("Enter a valid mobile number, for example 98200 11223."); return; }
+      const created = await createAccountFn({ data: { name: account.name.trim(), email, password: account.password, phone: account.phone, whatsappOk: account.whatsappOk } }).catch(
         () => ({ ok: false as const, message: "We couldn't create your account just now. Check your connection and try again." }),
       );
       if (!created.ok) { toast.error(created.message); return; }
@@ -171,7 +174,10 @@ export default function OnboardingPage() {
         }
         return;
       }
-      if (!created.existed) track("sign_up", { method: "email" });
+      if (!created.existed) {
+        track("sign_up", { method: "email" });
+        setFirmForm((f) => ({ ...f, phone: f.phone || mobile.digits }));
+      }
       setStep((s) => Math.max(s, 1));
     } finally {
       setBusy(false);
@@ -183,8 +189,15 @@ export default function OnboardingPage() {
     settingUp.current = true;
     setBusy(true);
     const { ref: referralCode, ...firmDetails } = firmForm;
+    if (!parseMobile(firmForm.phone)) {
+      toast.error("Enter a valid mobile number, for example 98200 11223.");
+      settingUp.current = false;
+      setBusy(false);
+      return;
+    }
     const ok = await saveFirm({
       ...firmDetails,
+      whatsappOk: account.whatsappOk || session?.whatsappOk,
       partnerName: account.name || session?.name || "",
       email: account.email || session?.email || "",
     });
@@ -322,6 +335,17 @@ export default function OnboardingPage() {
                 {mode === "signup" && (
                   <Field label="Full name"><input className="v2-input" required autoFocus autoComplete="name" value={account.name} onChange={(e) => setAccount({ ...account, name: e.target.value })} placeholder="Priya Rao" /></Field>
                 )}
+                {mode === "signup" && (
+                  <>
+                    <Field label="Mobile number" hint={MOBILE_HINT}>
+                      <input className="v2-input" type="tel" inputMode="tel" required autoComplete="tel" value={account.phone} onChange={(e) => setAccount({ ...account, phone: e.target.value })} placeholder="98200 11223" aria-describedby="mobile-why" />
+                    </Field>
+                    <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 12.5, color: V.body, lineHeight: 1.5, marginTop: -6 }}>
+                      <input type="checkbox" checked={account.whatsappOk} onChange={(e) => setAccount({ ...account, whatsappOk: e.target.checked })} style={{ marginTop: 3 }} />
+                      <span id="mobile-why">Message me on WhatsApp to help me get set up and about my trial. (Optional. We never share your number.)</span>
+                    </label>
+                  </>
+                )}
                 <Field label="Work email"><input className="v2-input" type="email" required autoFocus={mode !== "signup"} autoComplete="email" value={account.email} onChange={(e) => setAccount({ ...account, email: e.target.value })} placeholder="you@firm.com" /></Field>
                 {mode !== "forgot" && (
                   <Field
@@ -357,6 +381,9 @@ export default function OnboardingPage() {
               <form onSubmit={submitFirm} style={{ display: "grid", gap: 16 }}>
                 <Intro icon={<Building2 size={20} />} title="Set up your firm" text="Your firm's name goes on every MIS and every message the Chaser sends." />
                 <Field label="Firm name"><input className="v2-input" required autoFocus value={firmForm.name} onChange={(e) => setFirmForm({ ...firmForm, name: e.target.value })} placeholder="Mehta and Associates" /></Field>
+                <Field label="Your mobile number" hint={MOBILE_HINT}>
+                  <input className="v2-input" type="tel" inputMode="tel" required autoComplete="tel" value={firmForm.phone} onChange={(e) => setFirmForm({ ...firmForm, phone: e.target.value })} placeholder="98200 11223" />
+                </Field>
                 <div className="onb-2col">
                   <Field label="City" optional><input className="v2-input" value={firmForm.city} onChange={(e) => setFirmForm({ ...firmForm, city: e.target.value })} placeholder="Bengaluru" /></Field>
                   <Field label="Firm registration number" optional><input className="v2-input" value={firmForm.frn} onChange={(e) => setFirmForm({ ...firmForm, frn: e.target.value })} placeholder="012345S" /></Field>
@@ -535,7 +562,7 @@ function Intro({ icon, title, text }: { icon: React.ReactNode; title: string; te
   );
 }
 
-function Field({ label, children, optional, aside }: { label: string; children: React.ReactNode; optional?: boolean; aside?: React.ReactNode }) {
+function Field({ label, children, optional, aside, hint }: { label: string; children: React.ReactNode; optional?: boolean; aside?: React.ReactNode; hint?: string }) {
   // Ties the label to its control so clicking it focuses the input and
   // screen readers announce the field name.
   const auto = useId();
@@ -551,6 +578,7 @@ function Field({ label, children, optional, aside }: { label: string; children: 
         {aside}
       </div>
       {child ? cloneElement(child, { id }) : children}
+      {hint && <div style={{ fontSize: 11.5, color: V.muted, marginTop: 4 }}>{hint}</div>}
     </div>
   );
 }

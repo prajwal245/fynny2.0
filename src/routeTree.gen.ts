@@ -141,6 +141,7 @@ import { Route as AdminAuthAdminProtectedCouponsRouteImport } from './routes/_ad
 import { Route as AdminAuthAdminProtectedDashboardRouteImport } from './routes/_adminAuth/admin/_protected/dashboard'
 import { Route as AdminAuthAdminProtectedFeatureFlagsRouteImport } from './routes/_adminAuth/admin/_protected/feature-flags'
 import { Route as AdminAuthAdminProtectedFirmsRouteImport } from './routes/_adminAuth/admin/_protected/firms'
+import { Route as AdminAuthAdminProtectedFollowUpsRouteImport } from './routes/_adminAuth/admin/_protected/follow-ups'
 import { Route as AdminAuthAdminProtectedInternalAccessRouteImport } from './routes/_adminAuth/admin/_protected/internal-access'
 import { Route as AdminAuthAdminProtectedMediaRouteImport } from './routes/_adminAuth/admin/_protected/media'
 import { Route as AdminAuthAdminProtectedOperationsRouteImport } from './routes/_adminAuth/admin/_protected/operations'
@@ -916,6 +917,12 @@ const AdminAuthAdminProtectedFirmsRoute =
     path: '/firms',
     getParentRoute: () => AdminAuthAdminProtectedRoute,
   } as any)
+const AdminAuthAdminProtectedFollowUpsRoute =
+  AdminAuthAdminProtectedFollowUpsRouteImport.update({
+    id: '/follow-ups',
+    path: '/follow-ups',
+    getParentRoute: () => AdminAuthAdminProtectedRoute,
+  } as any)
 const AdminAuthAdminProtectedInternalAccessRoute =
   AdminAuthAdminProtectedInternalAccessRouteImport.update({
     id: '/internal-access',
@@ -1507,6 +1514,7 @@ export interface FileRoutesByFullPath {
   '/admin/dashboard': typeof AdminAuthAdminProtectedDashboardRoute
   '/admin/feature-flags': typeof AdminAuthAdminProtectedFeatureFlagsRoute
   '/admin/firms': typeof AdminAuthAdminProtectedFirmsRoute
+  '/admin/follow-ups': typeof AdminAuthAdminProtectedFollowUpsRoute
   '/admin/internal-access': typeof AdminAuthAdminProtectedInternalAccessRoute
   '/admin/media': typeof AdminAuthAdminProtectedMediaRoute
   '/admin/operations': typeof AdminAuthAdminProtectedOperationsRoute
@@ -1711,6 +1719,7 @@ export interface FileRoutesByTo {
   '/admin/dashboard': typeof AdminAuthAdminProtectedDashboardRoute
   '/admin/feature-flags': typeof AdminAuthAdminProtectedFeatureFlagsRoute
   '/admin/firms': typeof AdminAuthAdminProtectedFirmsRoute
+  '/admin/follow-ups': typeof AdminAuthAdminProtectedFollowUpsRoute
   '/admin/internal-access': typeof AdminAuthAdminProtectedInternalAccessRoute
   '/admin/media': typeof AdminAuthAdminProtectedMediaRoute
   '/admin/operations': typeof AdminAuthAdminProtectedOperationsRoute
@@ -1926,6 +1935,7 @@ export interface FileRoutesById {
   '/_adminAuth/admin/_protected/dashboard': typeof AdminAuthAdminProtectedDashboardRoute
   '/_adminAuth/admin/_protected/feature-flags': typeof AdminAuthAdminProtectedFeatureFlagsRoute
   '/_adminAuth/admin/_protected/firms': typeof AdminAuthAdminProtectedFirmsRoute
+  '/_adminAuth/admin/_protected/follow-ups': typeof AdminAuthAdminProtectedFollowUpsRoute
   '/_adminAuth/admin/_protected/internal-access': typeof AdminAuthAdminProtectedInternalAccessRoute
   '/_adminAuth/admin/_protected/media': typeof AdminAuthAdminProtectedMediaRoute
   '/_adminAuth/admin/_protected/operations': typeof AdminAuthAdminProtectedOperationsRoute
@@ -2137,6 +2147,7 @@ export interface FileRouteTypes {
     | '/admin/dashboard'
     | '/admin/feature-flags'
     | '/admin/firms'
+    | '/admin/follow-ups'
     | '/admin/internal-access'
     | '/admin/media'
     | '/admin/operations'
@@ -2341,6 +2352,7 @@ export interface FileRouteTypes {
     | '/admin/dashboard'
     | '/admin/feature-flags'
     | '/admin/firms'
+    | '/admin/follow-ups'
     | '/admin/internal-access'
     | '/admin/media'
     | '/admin/operations'
@@ -2555,6 +2567,7 @@ export interface FileRouteTypes {
     | '/_adminAuth/admin/_protected/dashboard'
     | '/_adminAuth/admin/_protected/feature-flags'
     | '/_adminAuth/admin/_protected/firms'
+    | '/_adminAuth/admin/_protected/follow-ups'
     | '/_adminAuth/admin/_protected/internal-access'
     | '/_adminAuth/admin/_protected/media'
     | '/_adminAuth/admin/_protected/operations'
@@ -3601,6 +3614,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAuthAdminProtectedFirmsRouteImport
       parentRoute: typeof AdminAuthAdminProtectedRoute
     }
+    '/_adminAuth/admin/_protected/follow-ups': {
+      id: '/_adminAuth/admin/_protected/follow-ups'
+      path: '/follow-ups'
+      fullPath: '/admin/follow-ups'
+      preLoaderRoute: typeof AdminAuthAdminProtectedFollowUpsRouteImport
+      parentRoute: typeof AdminAuthAdminProtectedRoute
+    }
     '/_adminAuth/admin/_protected/internal-access': {
       id: '/_adminAuth/admin/_protected/internal-access'
       path: '/internal-access'
@@ -4180,6 +4200,7 @@ interface AdminAuthAdminProtectedRouteChildren {
   AdminAuthAdminProtectedDashboardRoute: typeof AdminAuthAdminProtectedDashboardRoute
   AdminAuthAdminProtectedFeatureFlagsRoute: typeof AdminAuthAdminProtectedFeatureFlagsRoute
   AdminAuthAdminProtectedFirmsRoute: typeof AdminAuthAdminProtectedFirmsRoute
+  AdminAuthAdminProtectedFollowUpsRoute: typeof AdminAuthAdminProtectedFollowUpsRoute
   AdminAuthAdminProtectedInternalAccessRoute: typeof AdminAuthAdminProtectedInternalAccessRoute
   AdminAuthAdminProtectedMediaRoute: typeof AdminAuthAdminProtectedMediaRoute
   AdminAuthAdminProtectedOperationsRoute: typeof AdminAuthAdminProtectedOperationsRoute
@@ -4226,6 +4247,8 @@ const AdminAuthAdminProtectedRouteChildren: AdminAuthAdminProtectedRouteChildren
     AdminAuthAdminProtectedFeatureFlagsRoute:
       AdminAuthAdminProtectedFeatureFlagsRoute,
     AdminAuthAdminProtectedFirmsRoute: AdminAuthAdminProtectedFirmsRoute,
+    AdminAuthAdminProtectedFollowUpsRoute:
+      AdminAuthAdminProtectedFollowUpsRoute,
     AdminAuthAdminProtectedInternalAccessRoute:
       AdminAuthAdminProtectedInternalAccessRoute,
     AdminAuthAdminProtectedMediaRoute: AdminAuthAdminProtectedMediaRoute,

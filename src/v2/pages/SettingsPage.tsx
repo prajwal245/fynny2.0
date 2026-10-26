@@ -24,6 +24,7 @@ import { ReferralCard } from "../components/ReferralCard";
 import { GmailHealth } from "../components/GmailHealth";
 import { ChaserSending } from "../components/ChaserSending";
 import { WhatsappSetup } from "../components/WhatsappSetup";
+import { parseMobile } from "@/lib/practice/mobile";
 import { TallyConnector } from "../components/TallyConnector";
 import { GmailIcon, TallyIcon, WhatsAppIcon } from "../components/BrandIcons";
 import { ZohoBooksSection } from "../components/ZohoBooks";
@@ -81,7 +82,7 @@ export const GMAIL_RETURN_KEY = "fynhelp.gmail.return";
 
 export default function SettingsPage() {
   const { firm, firmId, saveFirm, session, partnerView, canSignOff, setRole } = useV2();
-  const [form, setForm] = useState({ name: "", city: "", frn: "", email: "" });
+  const [form, setForm] = useState({ name: "", city: "", frn: "", email: "", phone: "" });
   const [team, setTeam] = useState<Team | null>(null);
   const [intg, setIntg] = useState<Integrations | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -110,6 +111,7 @@ export default function SettingsPage() {
         city: firm.city,
         frn: firm.frn,
         email: firm.email,
+        phone: firm.phone ?? "",
       });
   }, [firm]);
   useEffect(() => {
@@ -283,6 +285,18 @@ export default function SettingsPage() {
             />
           </div>
           <div>
+            <label className="v2-label" htmlFor="settings-mobile">Your mobile number</label>
+            <input id="settings-mobile"
+              className="v2-input"
+              type="tel"
+              inputMode="tel"
+              placeholder="98200 11223"
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            />
+            <div style={{ fontSize: 11.5, color: V.muted, marginTop: 4 }}>So a person at FynHelp can reach you if something needs help. Never shared.</div>
+          </div>
+          <div>
             <label className="v2-label" htmlFor="settings-reply-to-email">Reply-to email</label>
             <input id="settings-reply-to-email"
               className="v2-input"
@@ -297,12 +311,17 @@ export default function SettingsPage() {
           style={{ marginTop: 16 }}
           disabled={!form.name.trim()}
           onClick={async () => {
+            if (form.phone.trim() && !parseMobile(form.phone)) {
+              toast.error("Enter a valid mobile number, for example 98200 11223.");
+              return;
+            }
             const ok = await saveFirm(
               {
                 name: form.name.trim(),
                 city: form.city.trim(),
                 frn: form.frn.trim(),
                 email: form.email.trim(),
+                phone: form.phone.trim(),
               },
               { settings: true },
             );

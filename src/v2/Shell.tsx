@@ -15,6 +15,7 @@ import { V2StoreProvider, monthOf, useV2 } from "./store";
 import { openExceptionsIn } from "./lib/exceptions";
 import { TrialBanner } from "./components/TrialBanner";
 import { TestBanner } from "./components/TestBanner";
+import { PhonePrompt } from "./components/PhonePrompt";
 import { FirstCloseLauncher, FirstRunWelcome } from "./components/FirstCloseGuide";
 
 
@@ -257,6 +258,7 @@ function ShellBody() {
 
           <main style={{ padding: 24, flex: 1, maxWidth: 1280, width: "100%" }}>
             <TestBanner />
+            <PhonePrompt />
             <TrialBanner partnerView={partnerView} />
             <FirstRunWelcome />
             <Outlet />

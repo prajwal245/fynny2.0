@@ -204,6 +204,8 @@ export type Firm = {
   email: string;
   city: string;
   frn: string;
+  /** The partner's mobile number, digits with country code. Empty for firms that signed up before it was asked. */
+  phone?: string;
   gmailConnected: boolean;
   /** A tester account: a sandbox that is never billed, reported or messaged for real. */
   isTest?: boolean;
@@ -369,13 +371,13 @@ type Workspace = Awaited<ReturnType<typeof getPracticeWorkspace>>;
 
 type Store = {
   hydrated: boolean;
-  session: { name: string; email: string } | null;
+  session: { name: string; email: string; phone?: string; whatsappOk?: boolean } | null;
   firm: Firm | null;
   onboarded: boolean;
   signIn: (name: string, email: string) => void;
   signOut: () => void;
   /** Resolves true once the practice is saved on the server. */
-  saveFirm: (patch: Partial<Firm>, opts?: { settings?: boolean }) => Promise<boolean>;
+  saveFirm: (patch: Partial<Firm> & { whatsappOk?: boolean }, opts?: { settings?: boolean }) => Promise<boolean>;
   completeOnboarding: () => Promise<void>;
   refresh: () => Promise<void>;
   /** The practice id (null until onboarding creates it). */
@@ -601,10 +603,12 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
     } catch {
       /* private mode */
     }
-    const meta = (user.user_metadata ?? {}) as { full_name?: string };
+    const meta = (user.user_metadata ?? {}) as { full_name?: string; phone?: string; whatsapp_ok?: boolean };
     setSession({
       name: meta.full_name ?? user.email ?? "",
       email: user.email ?? "",
+      phone: meta.phone,
+      whatsappOk: meta.whatsapp_ok === true,
     });
     let workspace: Workspace | null = null;
     // Confirm the session is still live with the auth server, in parallel with
@@ -722,10 +726,10 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /** Creates or updates the real practice record for the signed in user. */
-  const saveFirm = useCallback((patch: Partial<Firm>, opts: { settings?: boolean } = {}): Promise<boolean> => {
+  const saveFirm = useCallback((patch: Partial<Firm> & { whatsappOk?: boolean }, opts: { settings?: boolean } = {}): Promise<boolean> => {
     if (opts.settings) {
       // An edit from Settings: the server decides who may change the firm's details.
-      return savePracticeFirm({ data: { name: patch.name, city: patch.city, frn: patch.frn, email: patch.email, settings: true } })
+      return savePracticeFirm({ data: { name: patch.name, city: patch.city, frn: patch.frn, email: patch.email, phone: patch.phone, settings: true } })
         .then(() => {
           setFirm((p) => (p ? { ...p, ...patch } : p));
           return true;
@@ -763,6 +767,8 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
             frn: patch.frn,
             email: patch.email,
             partnerName: patch.partnerName,
+            phone: patch.phone,
+            whatsappOk: patch.whatsappOk,
           },
         });
         firmId.current = res.id;

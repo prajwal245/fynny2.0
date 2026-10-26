@@ -611,6 +611,18 @@ export const checkPracticeWhatsapp = createServerFn({ method: "POST" })
     ),
   );
 
+/** What each stage of a chase will send (template name, status at Meta, buttons), for Settings. */
+export const getPracticeWhatsappTemplates = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      const { resolveSender } = await import("./whatsappSend.server");
+      const r = await resolveSender(db, ctx.firmId);
+      const { stagesView } = await import("./whatsappTemplates.server");
+      return { test: r.test, shared: r.sender?.shared ?? false, stages: r.sender ? await stagesView(r.sender) : await stagesView(null) };
+    }),
+  );
+
 export const connectPracticeWhatsapp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) =>

@@ -62,7 +62,20 @@ It pauses the chase for 3 days (the safe default) and immediately asks **"When c
 ### Keeping it a Utility template
 Meta can move a template to Marketing (about 6 times the price) if it reads like a nudge or promotion. This one stays factual: it names the person, the client, the specific document and who is asking. Do not add offers, emojis or urgency words. After approval, check the category shown in WhatsApp Manager; if it says Marketing, tell us, because the credit price assumes Utility.
 
-## Switching it on (Vercel)
+## It picks the right template by itself
+FynHelp reads your templates from Meta (every few minutes) and, for each reminder, uses the first one that is **approved, not Marketing**, and has either no buttons or exactly ours. The order it tries:
+
+| Reminder | Tries, in order |
+|---|---|
+| 1 | `document_request_v2`, then `document_request` |
+| 2 | `document_followup_v2`, then the reminder 1 list |
+| 3 | `document_final_v2`, then the reminder 2 list |
+
+So while a new template is **in review** the older approved one keeps sending, and the moment Meta approves the new one it takes over, with the button order read from the template itself. Nothing to flip. **This needs `WHATSAPP_WABA_ID`** (your WhatsApp Business Account ID, in Vercel) so FynHelp can read the list. Settings → WhatsApp → **Your reminder messages** shows each stage, its status and what it will send, plus a preview of what the client sees.
+
+Without `WHATSAPP_WABA_ID` it falls back to the settings below.
+
+## Switching it on by settings (only if you do not use the automatic way)
 
 | Variable | Value |
 |---|---|

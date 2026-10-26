@@ -1,3 +1,5 @@
+import { SiGoogle, SiRazorpay } from "react-icons/si";
+
 /**
  * The real Gmail and WhatsApp marks, so people recognise the channel at a
  * glance instead of reading a label. Decorative: pair with visible text or an
@@ -33,10 +35,34 @@ export function ZohoIcon({ size = 18, color = "#E42527" }: { size?: number; colo
   );
 }
 
+/** Razorpay's mark (Simple Icons), in Razorpay blue, for payment screens. */
+export function RazorpayIcon({ size = 18 }: { size?: number }) {
+  return <SiRazorpay size={size} color="#3395FF" aria-hidden focusable="false" style={{ flex: "0 0 auto" }} />;
+}
+
+/** Google's "G" in its own colours' brand tone, for Google sign-in and Google-hosted services. */
+export function GoogleIcon({ size = 18 }: { size?: number }) {
+  return <SiGoogle size={size} color="#4285F4" aria-hidden focusable="false" style={{ flex: "0 0 auto" }} />;
+}
+
+/**
+ * Tally. Tally Solutions has no mark in the open icon sets, so this is a plain "T" tile in Tally blue rather
+ * than a copy of their logo; swap in their official asset here if you have permission to use it.
+ */
+export function TallyIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false" style={{ flex: "0 0 auto" }}>
+      <rect width="24" height="24" rx="6" fill="#1F4E9C" />
+      <path fill="#fff" d="M6 6.5h12v2.6h-4.7V18h-2.6V9.1H6z" />
+    </svg>
+  );
+}
+
 /** Channel icon for a document source: Gmail, WhatsApp, Zoho Books, or a plain upload. */
 export function SourceIcon({ source, size = 16 }: { source: string; size?: number }) {
   if (source === "Gmail") return <GmailIcon size={size} />;
   if (source === "WhatsApp") return <WhatsAppIcon size={size} />;
   if (source === "Zoho Books") return <ZohoIcon size={size} />;
+  if (source === "Tally") return <TallyIcon size={size} />;
   return null;
 }

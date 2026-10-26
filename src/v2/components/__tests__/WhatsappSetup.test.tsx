@@ -9,7 +9,13 @@ vi.mock("@/lib/practice/practice.functions", () => ({
   getPracticeWhatsappStatus: () => status(),
   connectPracticeWhatsapp: vi.fn(),
   checkPracticeWhatsapp: vi.fn(),
+  getPracticeWhatsappTemplates: async () => ({
+    test: false,
+    shared: true,
+    stages: [{ stage: "request", label: "First request", using: "document_request", status: "approved", buttons: false, note: "Ready." }],
+  }),
 }));
+vi.mock("../../store", () => ({ useV2: () => ({ firm: { name: "Rao & Co" } }) }));
 vi.mock("@/lib/caGmail.functions", () => ({ getChaserPrefs: () => prefs(), setChaserPrefs: vi.fn() }));
 vi.mock("../../lib/billing", () => ({ useBilling: () => ({ access: { whatsappChaser: false } }) }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));

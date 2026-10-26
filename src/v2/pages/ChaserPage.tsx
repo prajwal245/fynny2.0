@@ -9,6 +9,8 @@ import { Badge, Card, Drawer, EmptyState, Modal, PageHeader, Tone, V, formatDate
 import { AgentGlyph, AgentStatusBadge, AgentTimeline, ShimmerText } from "../agents";
 import { Chase, useV2 } from "../store";
 import { CreditsAlert, CreditsChip, TopUpModal } from "../components/CreditsPanel";
+import { WhatsAppIcon } from "../components/BrandIcons";
+import { WhatsappPreview } from "../components/WhatsappPreview";
 
 type Channel = NonNullable<Chase["channel"]>;
 const CHANNELS: { key: Channel; label: string; hint: string }[] = [
@@ -24,7 +26,7 @@ const FILTERS = ["All", "Open", "Following Up", "Escalated", "Resolved"] as cons
 
 /** Chaser. All follow-ups as a page; the client's Chaser tab when given a clientId. */
 export default function ChaserPage({ clientId: scopedClient }: { clientId?: string } = {}) {
-  const { chases: allChases, clients, clientName, addChase, sendFollowUp, setChaseStatus, snoozeChase, runs } = useV2();
+  const { firm, chases: allChases, clients, clientName, addChase, sendFollowUp, setChaseStatus, snoozeChase, runs } = useV2();
   // WhatsApp chasing is on every plan and the trial; each reminder from FynHelp's number uses a credit.
   const whatsappAllowed = useBilling()?.access.whatsappChaser ?? false;
   const [topUp, setTopUp] = useState(false);
@@ -186,7 +188,8 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
                     style={{ textAlign: "left", padding: "10px 12px", borderRadius: 12, border: `1.5px solid ${on ? V.coral : V.line}`, background: on ? V.blue : V.card, cursor: locked ? "not-allowed" : "pointer", opacity: locked ? 0.5 : 1, font: "inherit", display: "grid", gap: 2 }}
                   >
                     <span style={{ fontWeight: 650, fontSize: 13.5, display: "flex", gap: 6, alignItems: "center" }}>
-                      {ch.key === "email" ? <Mail size={14} /> : <MessageCircle size={14} />} {ch.label}
+                      {ch.key === "email" ? <Mail size={15} /> : <WhatsAppIcon size={16} />}
+                      {ch.key === "both" && <Mail size={15} />} {ch.label}
                     </span>
                     <span style={{ fontSize: 11.5, color: V.muted, lineHeight: 1.4 }}>{ch.hint}</span>
                   </button>
@@ -194,6 +197,9 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
               })}
             </div>
           </div>
+          {form.channel !== "email" && (
+            <WhatsappPreview clientName={clients.find((c) => c.id === form.clientId)?.name ?? "your client"} contact={form.contact} item={form.type} firmName={firm?.name ?? "Your firm"} />
+          )}
           <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit,minmax(min(180px, 100%), 1fr))" }}>
             <div>
               <label className="v2-label" htmlFor="chase-contact">Contact name</label>

@@ -6,6 +6,7 @@
  *   4. A test that names anything still broken.
  */
 import { useCallback, useEffect, useState } from "react";
+import { WhatsappTemplates } from "./WhatsappTemplates";
 import { toast } from "sonner";
 import { Check, Copy } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
@@ -237,7 +238,13 @@ export function WhatsappSetup({ firmId, webhook, onChanged }: { firmId: string; 
         </Step>
       )}
 
-      <Step n={usable ? 4 : 3} title="Test the connection">
+      {usable && (
+        <Step n={4} title="Your reminder messages">
+          <WhatsappTemplates />
+        </Step>
+      )}
+
+      <Step n={usable ? 5 : 3} title="Test the connection">
         <div>
           <button className="v2-btn v2-btn-ghost" disabled={busy === "check"}
             onClick={() => void run("check", async () => setHealth(await check()))}>

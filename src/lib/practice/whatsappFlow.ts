@@ -282,3 +282,68 @@ export const phoneTail = (raw: string | null | undefined): string | null => {
   const d = String(raw ?? "").replace(/\D/g, "");
   return d.length >= 10 ? d.slice(-10) : null;
 };
+
+/* ── choosing the template from what Meta has approved ──
+ * The app reads the firm's templates from Meta and uses, for each stage of a chase, the first template
+ * that is approved, is not Marketing, and has either no buttons or exactly ours (one URL with a single
+ * trailing variable, plus three quick replies). While a new template is still in review, the older approved
+ * one keeps working, so nobody has to flip a setting at the right moment.
+ */
+export interface MetaTemplate {
+  name: string;
+  status: string;
+  language: string;
+  category?: string;
+  components?: { type: string; buttons?: { type: string; url?: string; text?: string }[] }[];
+}
+
+/** "none": no buttons. A layout: exactly our four buttons. "other": buttons we cannot fill in. */
+export function buttonLayoutOf(t: Pick<MetaTemplate, "components">): ButtonLayout | "none" | "other" {
+  const bar = (t.components ?? []).find((c) => c.type === "BUTTONS");
+  if (!bar?.buttons?.length) return "none";
+  const b = bar.buttons;
+  const urls = b.filter((x) => x.type === "URL");
+  const qrs = b.filter((x) => x.type === "QUICK_REPLY");
+  if (b.length !== 4 || urls.length !== 1 || qrs.length !== 3) return "other";
+  if (!/\{\{1\}\}$/.test(urls[0].url ?? "")) return "other";
+  if (b[0].type === "URL") return "url_first";
+  if (b[3].type === "URL") return "qr_first";
+  return "other";
+}
+
+export type TemplateStatus = "approved" | "review" | "rejected" | "paused" | "marketing" | "missing" | "unsupported";
+
+export function templateStatus(t: MetaTemplate | undefined): TemplateStatus {
+  if (!t) return "missing";
+  const s = t.status.toUpperCase();
+  if (s === "PENDING" || s === "IN_APPEAL") return "review";
+  if (s === "REJECTED" || s === "DISABLED") return "rejected";
+  if (s === "PAUSED") return "paused";
+  if (s !== "APPROVED") return "review";
+  if ((t.category ?? "").toUpperCase() === "MARKETING") return "marketing";
+  if (buttonLayoutOf(t) === "other") return "unsupported";
+  return "approved";
+}
+
+/** The names to try for a stage, best first, ending with the older template that is already approved. */
+export function templateCandidates(stage: ChaseStage, env: { request?: string; followup?: string; final?: string }): string[] {
+  const legacy = "document_request";
+  const list =
+    stage === "request"
+      ? [env.request ?? "document_request_v2", legacy]
+      : stage === "followup"
+        ? [env.followup ?? "document_followup_v2", env.request ?? "document_request_v2", legacy]
+        : [env.final ?? "document_final_v2", env.followup ?? "document_followup_v2", env.request ?? "document_request_v2", legacy];
+  return [...new Set(list)];
+}
+
+/** The first usable candidate, with the button layout to send it with. Null when none is approved. */
+export function pickTemplate(templates: MetaTemplate[], candidates: string[], language: string): { name: string; layout: ButtonLayout | null } | null {
+  for (const name of candidates) {
+    const t = templates.find((x) => x.name === name && x.language === language) ?? templates.find((x) => x.name === name && x.language.startsWith(language));
+    if (templateStatus(t) !== "approved") continue;
+    const layout = buttonLayoutOf(t!);
+    return { name, layout: layout === "none" || layout === "other" ? null : layout };
+  }
+  return null;
+}

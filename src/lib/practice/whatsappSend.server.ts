@@ -235,7 +235,9 @@ export async function sendChaseWhatsapp(
   const link = opts.chase
     ? await (await import("./uploadLinks.server")).createUploadLink(db, { firmId, businessId: opts.chase.businessId, requestId: opts.chase.requestId })
     : null;
-  const layout = chaseButtonLayout();
+  // Which approved template this reminder uses, and whether it carries our buttons (read from Meta; see whatsappTemplates.server.ts).
+  const template = await (await import("./whatsappTemplates.server")).resolveTemplate(sender, opts.step ?? 1);
+  const layout = template.layout;
   if (layout && opts.chase && !link)
     return { ok: false, unconfigured: false, permanent: false, error: "Could not create the client's upload link. FynHelp will try again later." };
 
@@ -267,7 +269,7 @@ export async function sendChaseWhatsapp(
           return { ok: false, unconfigured: false, permanent: false, noCredits: true, error: "Out of WhatsApp credits. Add credits in Settings, Billing and the reminder goes out." };
         spendRef = spend.ref;
         const buttons = layout && link && opts.chase ? chaseButtonComponents(layout, link.token, opts.chase.requestId) : [];
-        const r = await post(sender, buildTemplateMessage(to, templateForStep(opts.step ?? 1), chaseTemplateLang(), params, buttons));
+        const r = await post(sender, buildTemplateMessage(to, template.name, chaseTemplateLang(), params, buttons));
         if (!r.ok) {
           const why = explainWaError(r.body.error?.code, r.body.error?.error_data?.details ?? r.body.error?.message);
           return { ok: false, unconfigured: false, permanent: why.permanent, error: why.message };

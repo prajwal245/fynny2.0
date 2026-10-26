@@ -4,12 +4,13 @@
  */
 import { useState } from "react";
 import { toast } from "sonner";
-import { Coins, MessageCircle, Zap } from "lucide-react";
+import { Coins, Zap } from "lucide-react";
 import { Badge, Card, Modal, V, formatDate, type Tone } from "../ui";
 import { useV2 } from "../store";
 import { confirmPracticeCreditTopUp, savePracticeCreditSettings, startPracticeCreditTopUp } from "@/lib/practice/practice.functions";
 import { AUTO_MAX_CHOICES, lowThreshold, pricePerCredit, remindersLeft, type CreditLevel } from "@/lib/practice/billing/credits";
 import { loadRazorpay } from "../lib/billing";
+import { RazorpayIcon, WhatsAppIcon } from "./BrandIcons";
 import { refreshCredits, setCredits, useCredits, type Credits } from "../lib/credits";
 
 const inr = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
@@ -103,7 +104,7 @@ export function TopUpModal({ open, onClose }: { open: boolean; onClose: () => vo
           </div>
           {!c.paymentsReady && <div style={{ fontSize: 12.5, color: V.muted }}>Online payments are being set up. Email support@fynhelp.com and we will add credits for you.</div>}
           <AutoTopUp c={c} compact />
-          <div style={{ fontSize: 12, color: V.muted }}>Prices exclude {c.gstPercent}% GST. Email reminders are always free, and so are WhatsApp messages from your own linked number.</div>
+          <div style={{ fontSize: 12, color: V.muted, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}><RazorpayIcon size={14} /> Secure payment by Razorpay (UPI, cards, netbanking). Prices exclude {c.gstPercent}% GST. Email reminders are always free, and so are WhatsApp messages from your own linked number.</div>
         </div>
       )}
     </Modal>
@@ -213,7 +214,7 @@ export function CreditsPanel() {
     <Card style={{ marginBottom: 16 }} data-testid="credits-panel">
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
         <div style={{ display: "grid", gap: 4 }}>
-          <h3 style={{ fontSize: 15.5, margin: 0, display: "flex", gap: 8, alignItems: "center" }}><MessageCircle size={16} /> WhatsApp credits</h3>
+          <h3 style={{ fontSize: 15.5, margin: 0, display: "flex", gap: 8, alignItems: "center" }}><WhatsAppIcon size={18} /> WhatsApp credits</h3>
           <div style={{ fontSize: 13, color: V.body, maxWidth: 520, lineHeight: 1.6 }}>
             1 credit = 1 WhatsApp reminder from FynHelp's number. Email reminders, WhatsApp replies and your own linked number cost nothing.
           </div>

@@ -25,7 +25,7 @@ import { GmailHealth } from "../components/GmailHealth";
 import { ChaserSending } from "../components/ChaserSending";
 import { WhatsappSetup } from "../components/WhatsappSetup";
 import { TallyConnector } from "../components/TallyConnector";
-import { GmailIcon, WhatsAppIcon } from "../components/BrandIcons";
+import { GmailIcon, TallyIcon, WhatsAppIcon } from "../components/BrandIcons";
 import { ZohoBooksSection } from "../components/ZohoBooks";
 import { INTEGRATION_STYLES, IntegrationCard } from "../components/IntegrationCard";
 import { Link } from "@tanstack/react-router";
@@ -564,7 +564,7 @@ export default function SettingsPage() {
             <IntegrationCard
               index={3}
               testId="tally-card"
-              icon={<FileSpreadsheet size={24} color="#1F4E8C" strokeWidth={1.8} />}
+              icon={<TallyIcon size={26} />}
               tint="rgba(31,78,140,.08)"
               name="TallyPrime"
               tag={<span style={{ fontSize: 11, color: V.muted, fontWeight: 600 }}>VIA EXPORT</span>}

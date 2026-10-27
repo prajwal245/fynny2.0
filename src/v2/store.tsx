@@ -206,6 +206,8 @@ export type Firm = {
   frn: string;
   /** The partner's mobile number, digits with country code. Empty for firms that signed up before it was asked. */
   phone?: string;
+  /** Agreed to WhatsApp help and trial updates from FynHelp. */
+  whatsappOk?: boolean;
   gmailConnected: boolean;
   /** A tester account: a sandbox that is never billed, reported or messaged for real. */
   isTest?: boolean;
@@ -729,7 +731,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
   const saveFirm = useCallback((patch: Partial<Firm> & { whatsappOk?: boolean }, opts: { settings?: boolean } = {}): Promise<boolean> => {
     if (opts.settings) {
       // An edit from Settings: the server decides who may change the firm's details.
-      return savePracticeFirm({ data: { name: patch.name, city: patch.city, frn: patch.frn, email: patch.email, phone: patch.phone, settings: true } })
+      return savePracticeFirm({ data: { name: patch.name, city: patch.city, frn: patch.frn, email: patch.email, phone: patch.phone, whatsappOk: patch.whatsappOk, settings: true } })
         .then(() => {
           setFirm((p) => (p ? { ...p, ...patch } : p));
           return true;

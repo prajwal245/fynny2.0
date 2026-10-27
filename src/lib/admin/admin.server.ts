@@ -614,7 +614,7 @@ export async function followUps(ctx: AdminCtx, status: "open" | "closed") {
     { label: "Paying", n: count(paying) },
   ];
 
-  const { data: recent } = await db.from("ca_touchpoints").select("status, recovered, outcome, email_sent_at").gte("created_at", thirty).limit(5000);
+  const { data: recent } = await db.from("ca_touchpoints").select("status, recovered, outcome, email_sent_at, whatsapp_sent_at, callback_requested_at").gte("created_at", thirty).limit(5000);
   const r = recent ?? [];
   const stats = {
     opened: r.length,
@@ -623,11 +623,31 @@ export async function followUps(ctx: AdminCtx, status: "open" | "closed") {
     movedOn: r.filter((x) => x.status === "auto_resolved" && !x.recovered).length,
     reached: r.filter((x) => x.status === "done" && x.outcome === "reached").length,
     emailed: r.filter((x) => x.email_sent_at).length,
+    whatsapped: r.filter((x) => x.whatsapp_sent_at).length,
+    asked: r.filter((x) => x.callback_requested_at).length,
+  };
+
+  // Is WhatsApp ready for follow-ups? One line per template, in words.
+  const { touchSender } = await import("../practice/touchpoints/whatsapp.server");
+  const { listTemplates } = await import("../practice/whatsappTemplates.server");
+  const { TOUCH_TEMPLATES, templateNameFor, touchTemplateUsable } = await import("../practice/touchpoints/whatsapp");
+  const sender = touchSender();
+  const metaList = sender?.wabaId ? await listTemplates({ wabaId: sender.wabaId, token: sender.token }) : null;
+  const names = { setup: process.env["WHATSAPP_TOUCH_SETUP_TEMPLATE"], trial: process.env["WHATSAPP_TOUCH_TRIAL_TEMPLATE"], plan: process.env["WHATSAPP_TOUCH_PLAN_TEMPLATE"] };
+  const whatsapp = {
+    ready: Boolean(sender?.wabaId && metaList),
+    problem: !sender ? "FynHelp's WhatsApp number or token is not set up." : !sender.wabaId ? "Add WHATSAPP_WABA_ID so FynHelp can check the templates." : !metaList ? "Could not read the templates from Meta." : null,
+    templates: (["setup", "trial", "plan"] as const).map((k) => {
+      const name = templateNameFor(k, names);
+      const u = metaList ? touchTemplateUsable(metaList.find((t) => t.name === name && t.language.startsWith("en"))) : { ok: false, why: "not checked" };
+      return { key: k, name, ok: u.ok, why: u.why ?? null, body: TOUCH_TEMPLATES[k].body };
+    }),
   };
 
   return {
     funnel,
     stats,
+    whatsapp,
     rows: rows.map((t) => ({
       id: String(t.id),
       kind: String(t.kind),
@@ -642,6 +662,10 @@ export async function followUps(ctx: AdminCtx, status: "open" | "closed") {
       since: IST_DAY(String(t.created_at)),
       dueAt: String(t.due_at),
       emailSentAt: (t.email_sent_at as string | null) ?? null,
+      whatsappSentAt: (t.whatsapp_sent_at as string | null) ?? null,
+      whatsappError: (t.whatsapp_error as string | null) ?? null,
+      callbackRequested: Boolean(t.callback_requested_at),
+      replied: Boolean(t.replied_at),
       outcome: (t.outcome as string | null) ?? null,
       note: (t.note as string | null) ?? null,
       doneBy: (t.done_by as string | null) ?? null,

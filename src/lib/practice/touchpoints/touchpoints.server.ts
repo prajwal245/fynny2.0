@@ -34,11 +34,12 @@ export interface TouchpointRun {
   resolved: number;
   recovered: number;
   emailed: number;
+  whatsapped: number;
   errors: number;
 }
 
 export async function runTouchpoints(db: Db, now: Date = new Date(), opts: { force?: boolean } = {}): Promise<TouchpointRun> {
-  const out: TouchpointRun = { ran: false, opened: 0, resolved: 0, recovered: 0, emailed: 0, errors: 0 };
+  const out: TouchpointRun = { ran: false, opened: 0, resolved: 0, recovered: 0, emailed: 0, whatsapped: 0, errors: 0 };
   const t = istParts(now);
   if (!opts.force) {
     if (!(await claimJob(db, "touchpoints", t.hourKey))) return { ...out, skipped: "already ran this hour" };
@@ -76,7 +77,11 @@ export async function runTouchpoints(db: Db, now: Date = new Date(), opts: { for
     }
 
     // The automatic emails, 9 am to 8 pm IST only.
-    if (t.hour >= 9 && t.hour < 20) out.emailed = await sendEmails(db, subjects, now);
+    if (t.hour >= 9 && t.hour < 20) {
+      out.emailed = await sendEmails(db, subjects, now);
+      // WhatsApp, to people who agreed to it, about their own account; see whatsapp.ts for the rules.
+      out.whatsapped = (await (await import("./whatsapp.server")).sendTouchWhatsapps(db, subjects, now, t.hour)).sent;
+    }
   } catch (e) {
     out.errors++;
     console.error(`[touchpoints] ${(e as Error).message}`);

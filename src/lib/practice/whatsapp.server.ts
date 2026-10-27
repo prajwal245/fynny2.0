@@ -444,6 +444,16 @@ export async function handleWhatsappWebhook(payload: {
         groups.set(ownChannel.ca_firm_id as string, v.messages);
       } else {
         for (const m of v.messages) {
+          // A tap on a button of a FynHelp follow-up (Call me / Not now / Stop messages) is for FynHelp, not for a firm.
+          const sayBack = (text: string) => (token ? sendPlainText({ phoneNumberId, token }, m.from, text) : Promise.resolve(false));
+          if (m.type === "button" || m.type === "interactive") {
+            const tp = await import("./touchpoints/whatsapp.server");
+            const st = await tp.handleTouchButton(db, m, sayBack).catch((e) => `failed: ${(e as Error).message}`);
+            if (st !== "not a follow-up button") {
+              results.push({ message: m.id, status: st });
+              continue;
+            }
+          }
           const code = m.type === "text" ? parseJoinCode(m.text?.body) : null;
           if (code) {
             const { data: f } = await db.from("ca_firms").select("id, firm_name").eq("whatsapp_join_code", code).maybeSingle();
@@ -459,7 +469,10 @@ export async function handleWhatsappWebhook(payload: {
           const { data: route } = await db.from("ca_whatsapp_routes").select("ca_firm_id").eq("phone_key", m.from).maybeSingle();
           const fid = (route?.ca_firm_id as string | undefined) ?? (await autoRoute(db, m.from));
           if (!fid) {
-            results.push({ message: m.id, status: "sender not linked to a firm on the shared number" });
+            // Not a client of any firm: it may be a person FynHelp wrote to, answering.
+            const sayBack = (text: string) => (token ? sendPlainText({ phoneNumberId, token }, m.from, text) : Promise.resolve(false));
+            const hit = await (await import("./touchpoints/whatsapp.server")).noteTouchReply(db, m, sayBack).catch(() => false);
+            results.push({ message: m.id, status: hit ? "reply logged on a FynHelp follow-up" : "sender not linked to a firm on the shared number" });
             continue;
           }
           groups.set(fid, [...(groups.get(fid) ?? []), m]);

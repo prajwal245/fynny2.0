@@ -12,6 +12,7 @@ import { MOBILE_HINT, parseMobile } from "@/lib/practice/mobile";
 export function PhonePrompt() {
   const { firm, firmRole, saveFirm } = useV2();
   const [value, setValue] = useState("");
+  const [wa, setWa] = useState(false);
   const [hidden, setHidden] = useState(() => {
     try {
       return sessionStorage.getItem("fynhelp.phone.dismissed") === "1";
@@ -29,7 +30,7 @@ export function PhonePrompt() {
       return;
     }
     setBusy(true);
-    const ok = await saveFirm({ phone: value.trim() }, { settings: true });
+    const ok = await saveFirm({ phone: value.trim(), whatsappOk: wa }, { settings: true });
     setBusy(false);
     if (ok) toast.success("Thank you. We will only use it to help you.");
   };
@@ -45,6 +46,9 @@ export function PhonePrompt() {
         <span style={{ display: "block", fontSize: 11.5, color: V.muted }}>{MOBILE_HINT}</span>
       </span>
       <input className="v2-input" type="tel" inputMode="tel" aria-label="Mobile number" placeholder="98200 11223" value={value} onChange={(e) => setValue(e.target.value)} style={{ width: 180 }} />
+      <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12, flexBasis: "100%" }}>
+        <input type="checkbox" checked={wa} onChange={(e) => setWa(e.target.checked)} /> Message me on WhatsApp about my set-up, trial and plan. Reply STOP any time.
+      </label>
       <button className="v2-btn v2-btn-primary" type="submit" disabled={busy}>Save</button>
       <button
         type="button"

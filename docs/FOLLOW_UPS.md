@@ -32,7 +32,13 @@ The cron tick (hourly, 9 am to 8 pm IST) finds people who stalled, opens one fol
 - Buttons: **WhatsApp** (opens WhatsApp with the message ready), **Call**, **Copy message**, **Mark done** (with how it went and a note), **Snooze 2 days**, **Not needed**. Closed follow-ups can be reopened.
 - Permission: `support.manage` (support agents, ops admins and above). Every action is written to the audit log.
 
-### Why WhatsApp from the admin page is a link, not an automatic send
+### WhatsApp (automatic, with consent)
+Follow-ups about a person's own set-up, trial or plan are also sent on WhatsApp from FynHelp's number, to people who ticked the WhatsApp box, with **Call me / Not now / Stop messages** buttons. A tap or a reply lands on the follow-up (hot, due now); STOP is honoured for good. Templates, rules and set-up are in `docs/WHATSAPP_FOLLOWUP_TEMPLATES.md`. Migration `20261031090000_touch_whatsapp.sql`.
+
+### Why the admin page's WhatsApp button is still a link
+A person's own WhatsApp message is warmer than any template and needs no consent record, so the **WhatsApp** button on each card remains for personal follow-up.
+
+### (Earlier note) Why WhatsApp from the admin page is a link, not an automatic send
 A message to a sign-up is not a reply to anything, so on WhatsApp it needs an approved template and the person's consent. Until you have a template for it, a person sends it from their own WhatsApp: warmer, and nothing goes out without a person choosing it.
 
 ## Setup

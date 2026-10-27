@@ -82,7 +82,7 @@ export const GMAIL_RETURN_KEY = "fynhelp.gmail.return";
 
 export default function SettingsPage() {
   const { firm, firmId, saveFirm, session, partnerView, canSignOff, setRole } = useV2();
-  const [form, setForm] = useState({ name: "", city: "", frn: "", email: "", phone: "" });
+  const [form, setForm] = useState({ name: "", city: "", frn: "", email: "", phone: "", whatsappOk: false });
   const [team, setTeam] = useState<Team | null>(null);
   const [intg, setIntg] = useState<Integrations | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -112,6 +112,7 @@ export default function SettingsPage() {
         frn: firm.frn,
         email: firm.email,
         phone: firm.phone ?? "",
+        whatsappOk: Boolean(firm.whatsappOk),
       });
   }, [firm]);
   useEffect(() => {
@@ -295,6 +296,10 @@ export default function SettingsPage() {
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
             />
             <div style={{ fontSize: 11.5, color: V.muted, marginTop: 4 }}>So a person at FynHelp can reach you if something needs help. Never shared.</div>
+            <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 12.5, marginTop: 8, lineHeight: 1.5 }}>
+              <input type="checkbox" checked={form.whatsappOk} onChange={(e) => setForm({ ...form, whatsappOk: e.target.checked })} style={{ marginTop: 3 }} />
+              <span>Message me on WhatsApp about my set-up, my trial and my plan. You can reply STOP at any time.</span>
+            </label>
           </div>
           <div>
             <label className="v2-label" htmlFor="settings-reply-to-email">Reply-to email</label>
@@ -322,6 +327,7 @@ export default function SettingsPage() {
                 frn: form.frn.trim(),
                 email: form.email.trim(),
                 phone: form.phone.trim(),
+                whatsappOk: form.whatsappOk,
               },
               { settings: true },
             );

@@ -10,6 +10,7 @@ import {
   buildTemplateMessage,
   buildTextMessage,
   chaseButtonComponents,
+  cleanMetaId,
   chaseTextWithLink,
   chooseSender,
   explainWaError,
@@ -102,7 +103,7 @@ export async function resolveSender(db: Db, firmId: string): Promise<SenderResol
     const token = env("WHATSAPP_TEST_ACCESS_TOKEN");
     return {
       test: true, pref: null, hasOwn: false, sharedConfigured: false,
-      sender: id && token ? { choice: "fynhelp", phoneNumberId: id.replace(/\D/g, ""), token, shared: false, wabaId: env("WHATSAPP_TEST_WABA_ID") ?? null } : null,
+      sender: id && token ? { choice: "fynhelp", phoneNumberId: id.replace(/\D/g, ""), token, shared: false, wabaId: cleanMetaId(env("WHATSAPP_TEST_WABA_ID")) } : null,
       reason: id && token ? null : "Test account: WhatsApp is simulated. Set WHATSAPP_TEST_PHONE_NUMBER_ID and WHATSAPP_TEST_ACCESS_TOKEN (Meta's free test number) to send to the numbers in TEST_RECIPIENTS.",
     };
   }
@@ -124,7 +125,7 @@ export async function resolveSender(db: Db, firmId: string): Promise<SenderResol
     };
   }
   if (choice === "fynhelp") {
-    return { ...base, sender: { choice, phoneNumberId: sharedId!, token: serverToken!, shared: true, wabaId: env("WHATSAPP_WABA_ID") ?? null }, reason: null };
+    return { ...base, sender: { choice, phoneNumberId: sharedId!, token: serverToken!, shared: true, wabaId: cleanMetaId(env("WHATSAPP_WABA_ID")) }, reason: null };
   }
   const token = own!.access_token_enc ? await decryptStored(own!.access_token_enc as string) : serverToken;
   if (!token) {
@@ -138,7 +139,7 @@ export async function resolveSender(db: Db, firmId: string): Promise<SenderResol
   }
   return {
     ...base,
-    sender: { choice, phoneNumberId: own!.phone_number_id as string, token, shared: false, wabaId: (own!.waba_id as string | null) ?? env("WHATSAPP_WABA_ID") ?? null },
+    sender: { choice, phoneNumberId: own!.phone_number_id as string, token, shared: false, wabaId: cleanMetaId(own!.waba_id as string | null) ?? cleanMetaId(env("WHATSAPP_WABA_ID")) },
     reason: null,
   };
 }
@@ -169,7 +170,7 @@ interface GraphReply {
   error?: { code?: number; message?: string; error_data?: { details?: string } };
 }
 
-async function post(sender: Pick<Sender, "phoneNumberId" | "token">, payload: unknown): Promise<{ ok: boolean; body: GraphReply }> {
+export async function post(sender: Pick<Sender, "phoneNumberId" | "token">, payload: unknown): Promise<{ ok: boolean; body: GraphReply }> {
   const res = await fetch(`${GRAPH}/${sender.phoneNumberId}/messages`, {
     method: "POST",
     headers: { Authorization: `Bearer ${sender.token}`, "Content-Type": "application/json" },

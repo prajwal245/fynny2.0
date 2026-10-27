@@ -145,7 +145,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
         .order("created_at", { ascending: false })
         .limit(200),
       // Firm profile and Gmail status ride along, so the app opens in one round trip.
-      db.from("ca_firms").select("firm_name, ca_name, email, city, membership_number, phone, is_test").eq("id", f).maybeSingle(),
+      db.from("ca_firms").select("firm_name, ca_name, email, city, membership_number, phone, is_test, notification_prefs").eq("id", f).maybeSingle(),
       db.from("ca_gmail_connections").select("id").eq("ca_firm_id", f).eq("is_active", true).limit(1),
       // Decisions the Recon agent learned from the Exception Queue, proposed again for the same lines.
       db
@@ -590,6 +590,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       city: (firmRes.data?.city as string | null) ?? "",
       frn: (firmRes.data?.membership_number as string | null) ?? "",
       phone: (firmRes.data?.phone as string | null) ?? "",
+      whatsappOk: Boolean(((firmRes.data?.notification_prefs ?? {}) as Record<string, unknown>)["touch_whatsapp_ok"]),
       gmailConnected: Boolean(gmailRes.data?.length),
       isTest: Boolean(firmRes.data?.is_test),
     },

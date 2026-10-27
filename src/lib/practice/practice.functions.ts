@@ -530,7 +530,7 @@ export const createPracticeChase = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) =>
     withWork(context.userId, async (db, ctx) =>
-      (await import("./chaser.server")).createChase(db, ctx, data),
+      (await import("./chaser.server")).createChase(db, ctx, data, { sendNow: true }),
     ),
   );
 

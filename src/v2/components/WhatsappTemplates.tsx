@@ -31,6 +31,10 @@ export const readyCount = (v: TemplatesView | null) => (v ? v.stages.filter((s) 
 /** Stages that can send something now, their own template or an older one standing in. */
 export const sendableCount = (v: TemplatesView | null) => (v ? v.stages.filter((s) => s.using).length : 0);
 
+/** Reminder numbers (1, 2, 3) whose own template Meta has approved: the only ones worth previewing. Null while loading. */
+export const approvedSteps = (v: TemplatesView | null): number[] | null =>
+  v ? v.stages.filter((s) => s.status === "approved").map((s) => ({ request: 1, followup: 2, final: 3 })[s.stage] ?? 0).filter(Boolean) : null;
+
 export function useTemplatesView(): TemplatesView | null {
   const [v, setV] = useState<TemplatesView | null>(null);
   useEffect(() => {
@@ -98,7 +102,7 @@ export function WhatsappTemplates({ view }: { view?: TemplatesView | null }) {
             );
           })}
         </ol>
-        <WhatsappPreview clientName="Acme Traders" contact="Asha" item="Bank statement (Sep 2026)" firmName={firm?.name ?? "Your firm"} />
+        <WhatsappPreview clientName="Acme Traders" contact="Asha" item="Bank statement (Sep 2026)" firmName={firm?.name ?? "Your firm"} steps={approvedSteps(v)} />
       </div>
       {v.shared && (
         <div style={{ fontSize: 12, color: V.muted }}>

@@ -1532,7 +1532,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       setChases((p) => [temp, ...p]);
       void (async () => {
         await waitForClient(c.clientId);
-        await createPracticeChase({
+        const made = await createPracticeChase({
           data: {
             business_id: c.clientId,
             type: c.type,
@@ -1545,6 +1545,11 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
             channels: c.channel,
           },
         });
+        // The Chaser starts straight away: say what it did.
+        const f = (made as { firstSend?: { sent: boolean; waiting: boolean; failed: boolean } | null }).firstSend;
+        if (f?.sent) toast.success("The Chaser sent the first reminder.");
+        else if (f?.failed) toast.error("The first reminder could not be sent. The chase timeline says why.");
+        else if (f?.waiting) toast.info("The Chaser will send the first reminder when the sending window opens: 9:30 am to 6:30 pm IST, Monday to Saturday.");
       })()
         .catch((e) => {
           setChases((p) => p.filter((x) => x.id !== temp.id));

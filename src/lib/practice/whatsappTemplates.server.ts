@@ -49,6 +49,10 @@ export async function listTemplates(sender: Pick<Sender, "wabaId" | "token">, no
 export interface ResolvedTemplate {
   name: string;
   layout: ButtonLayout | null;
+  /** The language code to send with: the one Meta approved it in. */
+  language: string;
+  /** Meta was asked and none of the candidate templates is approved: sending one would only fail. */
+  none?: boolean;
 }
 
 /** The legacy rule, used when Meta cannot be asked. */
@@ -57,7 +61,7 @@ function legacy(step: number): ResolvedTemplate {
   const stage = stageForStep(step);
   const name = stage === "request" ? (e.request ?? "document_request") : stage === "followup" ? (e.followup ?? e.request ?? "document_request") : (e.final ?? e.followup ?? e.request ?? "document_request");
   const v = (env("WHATSAPP_CHASE_BUTTONS") ?? "").toLowerCase();
-  return { name, layout: v === "qr_first" ? "qr_first" : v === "on" || v === "url_first" ? "url_first" : null };
+  return { name, layout: v === "qr_first" ? "qr_first" : v === "on" || v === "url_first" ? "url_first" : null, language: language() };
 }
 
 /**
@@ -67,10 +71,10 @@ function legacy(step: number): ResolvedTemplate {
 export async function resolveTemplate(sender: Pick<Sender, "wabaId" | "token">, step: number): Promise<ResolvedTemplate> {
   const list = await listTemplates(sender);
   const picked = list ? pickTemplate(list, templateCandidates(stageForStep(step), templateEnv()), language()) : null;
-  if (!picked) return legacy(step);
+  if (!picked) return { ...legacy(step), ...(list ? { none: true } : {}) };
   const forced = (env("WHATSAPP_CHASE_BUTTONS") ?? "").toLowerCase();
-  if (forced === "off") return { name: picked.name, layout: null };
-  if (picked.layout && (forced === "qr_first" || forced === "url_first")) return { name: picked.name, layout: forced };
+  if (forced === "off") return { name: picked.name, layout: null, language: picked.language };
+  if (picked.layout && (forced === "qr_first" || forced === "url_first")) return { name: picked.name, layout: forced, language: picked.language };
   return picked;
 }
 

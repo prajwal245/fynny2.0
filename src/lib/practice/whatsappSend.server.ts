@@ -264,13 +264,16 @@ export async function sendChaseWhatsapp(
         }
       }
       if (!sent) {
+        // No approved template: say so plainly, before a credit is taken, instead of letting WhatsApp refuse it.
+        if (template.none)
+          return { ok: false, unconfigured: false, permanent: false, error: "No WhatsApp message template is approved yet, so this reminder cannot be sent. It goes out by itself as soon as one is approved (Settings, WhatsApp, Messages). A client who wrote to you in the last 23 hours can still be messaged." };
         // Only a template costs a credit.
         const spend = await credits.spendForReminder(db, firmId, { sharedNumber: sender.shared });
         if (!spend.ok)
           return { ok: false, unconfigured: false, permanent: false, noCredits: true, error: "Out of WhatsApp credits. Add credits in Settings, Billing and the reminder goes out." };
         spendRef = spend.ref;
         const buttons = layout && link && opts.chase ? chaseButtonComponents(layout, link.token, opts.chase.requestId) : [];
-        const r = await post(sender, buildTemplateMessage(to, template.name, chaseTemplateLang(), params, buttons));
+        const r = await post(sender, buildTemplateMessage(to, template.name, template.language || chaseTemplateLang(), params, buttons));
         if (!r.ok) {
           const why = explainWaError(r.body.error?.code, r.body.error?.error_data?.details ?? r.body.error?.message);
           return { ok: false, unconfigured: false, permanent: why.permanent, error: why.message };

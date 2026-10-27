@@ -309,7 +309,7 @@ ${LIQUID_BUTTON_CSS}
 
 /* ── problem visuals: realistic miniatures ── */
 .fh-viz { position:relative; border-radius:14px; background:${C.pageAlt}; margin-bottom:18px; overflow:hidden; font-size:11px; color:${C.ink}; }
-.fh-wa { background:#EFE9DE; height:244px; display:flex; flex-direction:column; }
+.fh-wa { background:#EFE9DE; min-height:244px; display:flex; flex-direction:column; }
 .fh-wa .wa-head { display:flex; align-items:center; gap:8px; padding:8px 12px; background:#F7F1E6; border-bottom:1px solid ${C.line}; }
 .fh-wa .wa-head small { margin-left:auto; color:${C.muted}; font-size:10px; }
 .fh-wa .wa-av { width:24px; height:24px; border-radius:99px; display:grid; place-items:center; background:#D9B8A6; font-size:9.5px; font-weight:700; }

@@ -4,7 +4,7 @@
 
 FynHelp works on top of the ledger a firm already uses; it does not replace Tally or Zoho. Four agents run each client's month: Extract reads bank statements (PDF, Excel, CSV, scans and photos), Tally or Zoho exports, and GST, TDS, payroll and payment-gateway reports, checking GSTIN check digits and TDS rates; Recon matches bank to books (exact matches, same-day matches, close matches, the firm's own rules, then split payments); Narrate drafts the monthly MIS from matched transactions only, with every figure linked to its source lines; Chaser follows up with clients for missing documents by email and WhatsApp and stops when they arrive. Unsure lines and unmatched transactions always go to a person, and only a partner can sign off a report.
 
-Pricing is per active client entity with unlimited users and a 14-day free trial of Starter (no card): Starter ₹2,999/month (15 clients), Professional ₹5,999/month (40 clients) and Scale ₹12,999/month (100 clients), GST included. Yearly billing saves 15%. Payments run through Razorpay.
+Pricing is per active client with unlimited users, and every price excludes GST: Essential ₹1,999/month (10 clients included), Firm ₹4,499/month (30) and Scale ₹9,999/month (75), with extra clients priced per client and yearly billing at ten months for twelve. The free trial is 14 days from the first upload with no card; the first 100 firms get 30 days free through https://www.fynhelp.com/launch. Payments run through Razorpay.
 
 ## Product
 
@@ -26,3 +26,16 @@ Pricing is per active client entity with unlimited users and a 14-day free trial
 - [Contact](https://www.fynhelp.com/contact): support@fynhelp.com.
 - [Privacy](https://www.fynhelp.com/privacy), [Terms](https://www.fynhelp.com/terms) and [Refunds](https://www.fynhelp.com/refund-policy).
 - [Product guide](https://www.fynhelp.com/guide): Every agent, workflow and rule explained.
+
+## Guides
+
+- [Bank reconciliation in TallyPrime](https://www.fynhelp.com/blog/bank-reconciliation-in-tally-prime): Step by step, and where it breaks for a CA firm.
+- [Bank reconciliation statement: format and example](https://www.fynhelp.com/blog/bank-reconciliation-statement-format-example): A worked BRS with the usual differences.
+- [GSTR-2A vs GSTR-2B](https://www.fynhelp.com/blog/gstr-2a-vs-gstr-2b-difference): The difference, and which to use for input tax credit.
+- [ITC mismatch between books and GSTR-2B](https://www.fynhelp.com/blog/itc-mismatch-gstr-2b-books-reasons): Eight causes and a fix for each.
+- [What is an MIS report?](https://www.fynhelp.com/blog/what-is-mis-report-format-for-small-business): Format, contents and a monthly template.
+- [Client document reminder templates](https://www.fynhelp.com/blog/client-document-collection-reminder-templates-ca-firms): WhatsApp and email templates for CA firms.
+- [Tally vs Zoho Books for CA firms](https://www.fynhelp.com/blog/tally-vs-zoho-books-for-ca-firms): How to choose and how to work with both.
+- [Virtual CFO services in India](https://www.fynhelp.com/blog/virtual-cfo-services-india-ca-firm-how-to-start): How a CA firm can start.
+- [Software for CA firms in India: a buyer's checklist](https://www.fynhelp.com/blog/practice-management-software-ca-firms-india): What to ask before choosing.
+- [Growing a CA practice without hiring](https://www.fynhelp.com/blog/how-ca-firms-grow-without-hiring): Where the month-end hours go.

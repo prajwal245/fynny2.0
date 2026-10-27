@@ -307,6 +307,55 @@ ${LIQUID_BUTTON_CSS}
 .fh-foot-bottom { border-top:1px solid ${C.line}; margin-top:38px; padding-top:18px; display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; font-size:12.5px; }
 .fh-wordmark { font-weight:700; letter-spacing:-0.05em; font-size:clamp(70px,17vw,230px); line-height:.78; color:rgba(23,18,8,.055); text-align:center; margin-top:18px; user-select:none; }
 
+/* ── problem visuals: realistic miniatures ── */
+.fh-viz { position:relative; border-radius:14px; background:${C.pageAlt}; margin-bottom:18px; overflow:hidden; font-size:11px; color:${C.ink}; }
+.fh-wa { background:#EFE9DE; height:244px; display:flex; flex-direction:column; }
+.fh-wa .wa-head { display:flex; align-items:center; gap:8px; padding:8px 12px; background:#F7F1E6; border-bottom:1px solid ${C.line}; }
+.fh-wa .wa-head small { margin-left:auto; color:${C.muted}; font-size:10px; }
+.fh-wa .wa-av { width:24px; height:24px; border-radius:99px; display:grid; place-items:center; background:#D9B8A6; font-size:9.5px; font-weight:700; }
+.fh-wa .wa-body { padding:8px 12px; display:grid; gap:6px; align-content:start; }
+.fh-wa .wa-day { justify-self:center; font-size:9.5px; padding:2px 8px; border-radius:99px; background:rgba(255,255,255,.7); color:${C.muted}; }
+.fh-wa .wa-msg { max-width:78%; padding:6px 9px 4px; border-radius:9px; line-height:1.35; box-shadow:0 1px 0 rgba(0,0,0,.08); }
+.fh-wa .wa-msg span { display:inline-flex; gap:4px; align-items:center; margin-left:8px; font-size:9px; color:#7A736A; float:right; margin-top:5px; }
+.fh-wa .wa-msg.out { justify-self:end; background:#DCF3C9; border-top-right-radius:2px; }
+.fh-wa .wa-msg.in { justify-self:start; background:#fff; border-top-left-radius:2px; }
+.fh-wa .pulse { animation:fh-viz-pulse 2.6s ease-in-out infinite; }
+.fh-rc { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; padding:12px; height:244px; align-content:start; }
+.fh-rc .rc-col { background:${C.card}; border:1px solid ${C.line}; border-radius:10px; overflow:hidden; }
+.fh-rc .rc-h { padding:6px 8px; font-size:9.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:${C.muted}; background:#F7F1E6; border-bottom:1px solid ${C.line}; }
+.fh-rc .rc-r { display:grid; gap:1px; padding:9px 8px; border-bottom:1px solid ${C.line}; font-size:9.5px; line-height:1.3; }
+.fh-rc .rc-r:last-child { border-bottom:0; }
+.fh-rc .rc-r span { color:${C.body}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.fh-rc .rc-r b { font-size:11px; font-variant-numeric:tabular-nums; }
+.fh-rc .rc-r.bad { background:#FBE9E1; box-shadow:inset 3px 0 0 ${C.coral}; }
+.fh-rc .rc-r.bad b { color:${C.maroon}; }
+.fh-th { height:244px; padding:12px; display:grid; gap:8px; align-content:start; }
+.fh-th .th-r { display:flex; gap:9px; align-items:flex-start; background:${C.card}; border:1px solid ${C.line}; border-radius:10px; padding:7px 9px; }
+.fh-th .th-av { flex:0 0 22px; width:22px; height:22px; border-radius:99px; display:grid; place-items:center; font-size:10px; font-weight:700; }
+.fh-th b { font-size:10.5px; } .fh-th p { margin:1px 0 0; font-size:10.5px; line-height:1.35; color:${C.body}; }
+.fh-pl { height:244px; padding:14px; display:grid; gap:9px; align-content:start; background:${C.card}; border:1px solid ${C.line}; }
+.fh-pl .pl-h { display:flex; justify-content:space-between; align-items:center; font-size:12px; padding-bottom:8px; border-bottom:1px solid ${C.line}; }
+.fh-pl .pl-h span { font-size:9.5px; padding:3px 8px; border-radius:99px; background:#EFE3D2; font-weight:600; }
+.fh-pl .pl-r { display:flex; justify-content:space-between; font-size:11.5px; color:${C.body}; font-variant-numeric:tabular-nums; }
+.fh-pl .pl-r b { color:${C.ink}; }
+.fh-pl .pl-r.net { padding-top:7px; border-top:1px dashed ${C.line}; font-size:13px; } .fh-pl .pl-r.net b { font-size:14px; }
+.fh-pl .pl-q { display:flex; gap:8px; align-items:center; font-size:10.5px; padding:7px 9px; border-radius:9px; background:#FBE9E1; color:${C.maroon}; }
+.fh-pl .pl-q i { flex:0 0 8px; height:8px; border-radius:99px; background:${C.coral}; animation:fh-viz-pulse 2.4s ease-in-out infinite; }
+.fh-pl .pl-sign { margin-top:2px; height:24px; border-bottom:1px dashed ${C.muted}; font-size:9.5px; color:${C.muted}; display:flex; align-items:flex-end; }
+@keyframes fh-viz-pulse { 0%,100% { transform:scale(1); opacity:1; } 50% { transform:scale(1.03); opacity:.78; } }
+@media (prefers-reduced-motion: reduce){ .fh-wa .pulse, .fh-pl .pl-q i { animation:none; } }
+@media (max-width:520px){ .fh-rc { grid-template-columns:1fr; height:auto; } .fh-rc .rc-col:nth-child(n+2) { display:none; } }
+/* revenue tile */
+.fh-tile.g { min-height:210px; }
+.fh-rev { display:grid; gap:10px; }
+.fh-rev .row { display:flex; align-items:flex-end; justify-content:space-between; gap:10px; }
+.fh-rev .unit { font-size:12px; opacity:.85; line-height:1.35; text-align:right; }
+.fh-rev .bars { display:flex; align-items:flex-end; gap:4px; height:30px; }
+.fh-rev .bars span { flex:1; border-radius:4px 4px 0 0; background:rgba(255,255,255,.28); transition:height .6s cubic-bezier(.16,1,.3,1); }
+.fh-rev .bars span:last-child { background:#fff; }
+.fh-rev .chips { display:flex; gap:6px; flex-wrap:wrap; }
+.fh-rev .chips span { font-size:10.5px; font-weight:600; padding:4px 9px; border-radius:99px; background:rgba(255,255,255,.16); }
+
 /* reveal */
 .fh-rv { opacity:0; transform:translateY(22px); transition:opacity .9s cubic-bezier(.16,1,.3,1), transform .9s cubic-bezier(.16,1,.3,1); }
 .fh-rv.in { opacity:1; transform:none; }
@@ -331,8 +380,73 @@ const TILES = [
   { cls: "m", badge: "Time saved", fig: "< 1 sec", cap: "To reconcile a client-month and draft its MIS figures, from file to numbers. Measured on our sample files: under 0.4 s each." },
   { cls: "d", badge: "Automation", fig: "4 agents", cap: "Collect, read, reconcile and draft the MIS on their own, in 5 matching passes. Your team only sees the exceptions, each with a reason." },
   { cls: "c", badge: "AI-native", fig: "100%", cap: "of MIS figures computed in code and linked to the bank and book lines behind them. AI reads the documents and writes the commentary." },
-  { cls: "g", badge: "More revenue", fig: "PRICE", cap: "a client a month on Scale, GST included. Offer a monthly MIS to every client and grow fees without adding staff." },
+  { cls: "g", badge: "More revenue", fig: "PRICE", cap: "a client a month on Scale, plus GST. Offer a monthly MIS to every client and grow fees without adding staff." },
 ];
+
+/** A realistic miniature of each problem, drawn in the page's own colours. Illustrative sample content, not data. */
+const Tick = () => (
+  <svg width="14" height="9" viewBox="0 0 16 10" fill="none" stroke="#4FA3D8" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M1 5.5 4.5 9 10 1.5M6 8.5 8 9 14.5 1.5" /></svg>
+);
+
+function ProblemViz({ kind }: { kind: string }) {
+  if (kind === "chase")
+    return (
+      <div className="fh-viz fh-wa" aria-hidden="true">
+        <div className="wa-head"><span className="wa-av">ST</span><b>Sharma Traders</b><small>last seen yesterday</small></div>
+        <div className="wa-body">
+          <div className="wa-day">Mon</div>
+          <div className="wa-msg out">Hi Ramesh ji, where&rsquo;s the August bank statement? <span>10:02 <Tick /></span></div>
+          <div className="wa-day">Wed</div>
+          <div className="wa-msg out">Gentle reminder for the August statement 🙏 <span>11:40 <Tick /></span></div>
+          <div className="wa-msg in">Will send tomorrow sir <span>18:15</span></div>
+          <div className="wa-day">Fri</div>
+          <div className="wa-msg out pulse">Following up again. Still waiting. <span>09:30 <Tick /></span></div>
+        </div>
+      </div>
+    );
+  if (kind === "recon") {
+    const cols: [string, [string, string, boolean?][]][] = [
+      ["Bank statement", [["12 Aug · NEFT RAMESH", "45,000"], ["13 Aug · UPI FRESHMART", "8,240"], ["14 Aug · CHQ 004812", "1,20,000", true], ["16 Aug · IMPS AGARWAL", "17,500"]]],
+      ["Tally books", [["12 Aug · Ramesh Traders", "45,000"], ["13 Aug · Fresh Mart", "8,240"], ["14 Aug · Cheque 4812", "1,02,000", true], ["16 Aug · Agarwal & Co", "17,500"]]],
+      ["GSTR-2B", [["Ramesh Traders · 18%", "7,627"], ["Fresh Mart · 5%", "392"], ["Vendor missing", "—", true], ["Agarwal & Co · 18%", "2,670"]]],
+    ];
+    return (
+      <div className="fh-viz fh-rc" aria-hidden="true">
+        {cols.map(([h, rows]) => (
+          <div key={h} className="rc-col">
+            <div className="rc-h">{h}</div>
+            {rows.map(([l, v, bad]) => (
+              <div key={l} className={`rc-r${bad ? " bad" : ""}`}><span>{l}</span><b>{v}</b></div>
+            ))}
+          </div>
+        ))}
+      </div>
+    );
+  }
+  if (kind === "rework")
+    return (
+      <div className="fh-viz fh-th" aria-hidden="true">
+        {[
+          ["J", "Junior", "Matched and sent for review ✔", "#E8D9C4"],
+          ["M", "Manager", "Why was this line flagged? Sending back.", "#F3C9B8"],
+          ["J", "Junior", "Not sure, it was flagged last month too…", "#E8D9C4"],
+          ["P", "Partner", "Back to the manager. No note on this.", "#D9B8A6"],
+        ].map(([i, n, t, c], k) => (
+          <div key={k} className="th-r"><span className="th-av" style={{ background: c }}>{i}</span><div><b>{n}</b><p>{t}</p></div></div>
+        ))}
+      </div>
+    );
+  return (
+    <div className="fh-viz fh-pl" aria-hidden="true">
+      <div className="pl-h"><b>Profit &amp; Loss · August</b><span>Ready to sign</span></div>
+      <div className="pl-r"><span>Revenue</span><b>24,10,000</b></div>
+      <div className="pl-r"><span>Expenses</span><b>19,28,000</b></div>
+      <div className="pl-r net"><span>Net profit</span><b>4,82,000</b></div>
+      <div className="pl-q"><i />No trail to the bank or book lines behind these numbers</div>
+      <div className="pl-sign">Signature</div>
+    </div>
+  );
+}
 
 const PROBLEMS = [
   ["Document chasing", "\u201cWhere\u2019s the August statement?\u201d on WhatsApp, then email, then WhatsApp again. Across 30 clients, that\u2019s a junior\u2019s week."],
@@ -485,10 +599,28 @@ export default function HomePage() {
               <Reveal key={t.fig} delay={i * 70}>
                 <div className={`fh-tile ${t.cls}`}>
                   <span className="badge">{t.badge}</span>
-                  <div>
-                    <div className="fig num">{t.fig === "PRICE" ? money(PER_CLIENT_FROM, cur) : t.fig}</div>
-                    <div className="cap" style={{ marginTop: 8 }}>{t.cap}</div>
-                  </div>
+                  {t.fig === "PRICE" ? (
+                    <div className="fh-rev">
+                      <div className="row">
+                        <div className="fig num">{money(PER_CLIENT_FROM, cur)}</div>
+                        <div className="unit">per client,<br />per month on Scale</div>
+                      </div>
+                      <div className="bars" aria-hidden="true">
+                        {BARS.map((h, k) => <span key={k} style={{ height: `${Math.round(h * 0.4)}px` }} />)}
+                      </div>
+                      <div className="chips">
+                        <span>{BILLING_PLANS.scale.clientsIncluded} clients</span>
+                        <span>{money(BILLING_PLANS.scale.monthly, cur)}/mo flat</span>
+                        <span>plus GST</span>
+                      </div>
+                      <div className="cap">Offer a monthly MIS to every client and grow fees without adding staff.</div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="fig num">{t.fig}</div>
+                      <div className="cap" style={{ marginTop: 8 }}>{t.cap}</div>
+                    </div>
+                  )}
                 </div>
               </Reveal>
             ))}
@@ -626,6 +758,7 @@ export default function HomePage() {
             {PROBLEMS.map(([t, d], i) => (
               <Reveal key={t} delay={i * 70}>
                 <div className="fh-card">
+                  <ProblemViz kind={["chase", "recon", "rework", "signoff"][i]} />
                   <h3>{t}</h3>
                   <p>{d}</p>
                 </div>

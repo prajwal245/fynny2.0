@@ -8,20 +8,8 @@ import { LAUNCH_CODE, LAUNCH_DAYS, captureLaunchCode } from "@/lib/launchCode";
 import { CALENDLY_URL } from "@/components/site/cta";
 import { track } from "@/lib/analytics";
 import FynLogo from "@/components/FynLogo";
-
-/** Writes a style the way the design does ("a: b; c: d") and returns the React object. */
-const css = (text: string): CSSProperties => {
-  const out: Record<string, string> = {};
-  for (const part of text.split(";")) {
-    const i = part.indexOf(":");
-    if (i < 0) continue;
-    const k = part.slice(0, i).trim();
-    const v = part.slice(i + 1).trim();
-    if (!k) continue;
-    out[k.startsWith("--") ? k : k.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase())] = v;
-  }
-  return out as CSSProperties;
-};
+import { css } from "./css";
+import { AgentFlow, Integrations, MonthStory, PainValue, STORY_STYLES } from "./LaunchStory";
 
 const SIGNUP = `/app/onboarding?mode=signup&code=${LAUNCH_CODE}`;
 const FONT = "'Geist', ui-sans-serif, system-ui, sans-serif";
@@ -131,7 +119,7 @@ export default function LaunchPage() {
 
   return (
     <div className="lp">
-      <style>{STYLES}</style>
+      <style>{STYLES + STORY_STYLES}</style>
 
       {/* ANNOUNCEMENT BAR */}
       <div style={css("background:#D92B2B;color:#FFFFFF;font-size:14px;padding:10px 16px;text-align:center;line-height:1.4")}>
@@ -195,6 +183,11 @@ export default function LaunchPage() {
           </div>
         </div>
       </section>
+
+      <AgentFlow />
+      <PainValue />
+      <Integrations />
+      <MonthStory />
 
       {/* OUTCOMES */}
       <section id="outcomes" style={css("padding:112px 0 96px")}>

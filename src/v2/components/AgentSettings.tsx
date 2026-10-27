@@ -10,6 +10,7 @@ import {
 import { Badge, Card, V, formatDate } from "../ui";
 import { RowSkeleton } from "../agents";
 import { SettingRow, Toggle } from "./Controls";
+import { ExpandCard, Slider } from "./MotionKit";
 import { useV2 } from "../store";
 
 type MemoryData = Awaited<ReturnType<typeof getPracticeMemory>>;
@@ -37,12 +38,14 @@ export function AgentSettings() {
   const [memory, setMemory] = useState<MemoryData | null>(null);
   const [pipeline, setPipeline] = useState<Pipeline | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [day, setDay] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     try {
       const [m, p] = await Promise.all([getMemory(), getPipeline()]);
       setMemory(m);
       setPipeline(p);
+      setDay(p.auto_chase_day ?? null);
     } catch (e) {
       toast.error(errMsg(e));
     }
@@ -55,7 +58,9 @@ export function AgentSettings() {
   const save = async (patch: { auto_recon?: boolean; auto_chase_day?: number | null }) => {
     setBusy("pipeline");
     try {
-      setPipeline(await savePipeline({ data: patch }));
+      const next = await savePipeline({ data: patch });
+      setPipeline(next);
+      setDay(next.auto_chase_day ?? null);
       toast.success("Automation saved");
     } catch (e) {
       toast.error(errMsg(e));
@@ -81,6 +86,11 @@ export function AgentSettings() {
 
   return (
     <>
+      <div style={{ marginBottom: 16 }}>
+        <ExpandCard title="How your agents work together" summary="Four agents hand the month to each other. A person decides at the end.">
+          <b>Extract</b> reads each document. <b>Recon</b> matches the bank to the books and lists what is left. <b>Narrate</b> drafts the MIS from the matched lines. <b>Chaser</b> asks clients for what is missing. Nothing is signed off until a partner has reviewed it.
+        </ExpandCard>
+      </div>
       <Card style={{ marginBottom: 16 }}>
         <h3 style={{ fontSize: 15.5, marginBottom: 4 }}>Automation</h3>
         <p style={{ fontSize: 12.5, color: V.muted, margin: "0 0 14px" }}>
@@ -95,21 +105,17 @@ export function AgentSettings() {
               <Toggle label="Run Recon automatically" checked={pipeline.auto_recon} disabled={!partner || busy === "pipeline"} onChange={(v) => save({ auto_recon: v })} />
             </SettingRow>
             <SettingRow title="Chase missing bank statements" description="If a client has not sent last month's statement by this day, the Chaser opens a chase and follows up for you.">
-              <select
-                className="v2-input"
-                aria-label="Chase day"
-                style={{ width: "auto" }}
-                value={pipeline.auto_chase_day ?? ""}
-                disabled={!partner || busy === "pipeline"}
-                onChange={(e) => save({ auto_chase_day: e.target.value ? Number(e.target.value) : null })}
-              >
-                <option value="">Off</option>
-                {[3, 5, 7, 10, 15].map((d) => (
-                  <option key={d} value={d}>
-                    By the {d}{d % 10 === 1 && d !== 11 ? "st" : d % 10 === 2 && d !== 12 ? "nd" : d % 10 === 3 && d !== 13 ? "rd" : "th"}
-                  </option>
-                ))}
-              </select>
+              <Toggle label="Chase missing bank statements" checked={pipeline.auto_chase_day != null} disabled={!partner || busy === "pipeline"} onChange={(v) => { setDay(v ? 5 : null); void save({ auto_chase_day: v ? 5 : null }); }} />
+              <Slider
+                label="Chase day of the month"
+                min={3}
+                max={15}
+                value={day ?? 5}
+                disabled={!partner || busy === "pipeline" || day == null}
+                onChange={setDay}
+                onCommit={(n) => void save({ auto_chase_day: n })}
+                format={(n) => `By the ${n}${n % 10 === 1 && n !== 11 ? "st" : n % 10 === 2 && n !== 12 ? "nd" : n % 10 === 3 && n !== 13 ? "rd" : "th"}`}
+              />
             </SettingRow>
             {!partner && (
               <div style={{ fontSize: 12.5, color: V.muted, paddingTop: 8 }}>Only a partner can change these. Switch to Partner under "Working as" if you are one.</div>

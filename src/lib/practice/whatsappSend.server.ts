@@ -171,14 +171,40 @@ interface GraphReply {
   error?: { code?: number; message?: string; error_data?: { details?: string } };
 }
 
+/**
+ * Sends stay under WhatsApp's per-number throughput: one number's messages are spaced a few milliseconds apart, and a
+ * rate-limit answer is retried after a short wait instead of failing the reminder. Many firms share one number, so
+ * a burst of reminders at 9:30 would otherwise trip the limit.
+ */
+const SEND_GAP_MS = 20;
+const lanes = new Map<string, Promise<unknown>>();
+const RATE_LIMITED = new Set([130429, 131056, 131048, 80007]);
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 export async function post(sender: Pick<Sender, "phoneNumberId" | "token">, payload: unknown): Promise<{ ok: boolean; body: GraphReply }> {
-  const res = await fetch(`${GRAPH}/${sender.phoneNumberId}/messages`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${sender.token}`, "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  const body = (await res.json().catch(() => ({}))) as GraphReply;
-  return { ok: res.ok && Boolean(body.messages?.[0]?.id), body };
+  const lane = lanes.get(sender.phoneNumberId) ?? Promise.resolve();
+  let release!: () => void;
+  const mine = new Promise<void>((r) => (release = r));
+  lanes.set(sender.phoneNumberId, lane.then(() => mine));
+  await lane;
+  try {
+    for (let attempt = 0; ; attempt++) {
+      const res = await fetch(`${GRAPH}/${sender.phoneNumberId}/messages`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${sender.token}`, "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const body = (await res.json().catch(() => ({}))) as GraphReply;
+      const limited = res.status === 429 || (body.error?.code !== undefined && RATE_LIMITED.has(body.error.code));
+      if (limited && attempt < 2) {
+        await wait(800 * 2 ** attempt);
+        continue;
+      }
+      return { ok: res.ok && Boolean(body.messages?.[0]?.id), body };
+    }
+  } finally {
+    setTimeout(release, SEND_GAP_MS);
+  }
 }
 
 /** Reply buttons inside the 24-hour window (for example "When can you send it?"). */

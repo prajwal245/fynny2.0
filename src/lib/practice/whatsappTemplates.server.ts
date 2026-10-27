@@ -21,29 +21,44 @@ const GRAPH = process.env["WHATSAPP_GRAPH_BASE"] || "https://graph.facebook.com/
 const env = (n: string) => (process.env[n] ?? "").trim() || undefined;
 const TTL_MS = 5 * 60_000;
 const cache = new Map<string, { at: number; list: MetaTemplate[] }>();
+/** One read of Meta per account at a time: a burst of reminders for many firms shares a single request. */
+const inflight = new Map<string, Promise<MetaTemplate[] | null>>();
 
 export const templateEnv = () => ({ request: env("WHATSAPP_CHASE_TEMPLATE"), followup: env("WHATSAPP_FOLLOWUP_TEMPLATE"), final: env("WHATSAPP_FINAL_TEMPLATE") });
 const language = () => env("WHATSAPP_TEMPLATE_LANG") ?? "en";
 
 /** Clears the kept list (tests, and after a firm changes its number). */
-export const forgetTemplates = () => cache.clear();
+export const forgetTemplates = () => {
+  cache.clear();
+  inflight.clear();
+};
 
 export async function listTemplates(sender: Pick<Sender, "wabaId" | "token">, now = Date.now()): Promise<MetaTemplate[] | null> {
   if (!sender.wabaId) return null;
   const hit = cache.get(sender.wabaId);
   if (hit && now - hit.at < TTL_MS) return hit.list;
-  try {
-    const res = await fetch(`${GRAPH}/${sender.wabaId}/message_templates?fields=name,status,language,category,components&limit=200`, {
-      headers: { Authorization: `Bearer ${sender.token}` },
-    });
-    if (!res.ok) return hit?.list ?? null;
-    const body = (await res.json()) as { data?: MetaTemplate[] };
-    const list = body.data ?? [];
-    cache.set(sender.wabaId, { at: now, list });
-    return list;
-  } catch {
-    return hit?.list ?? null;
-  }
+  const waiting = inflight.get(sender.wabaId);
+  if (waiting) return waiting;
+  const wabaId = sender.wabaId;
+  const read = (async () => {
+    try {
+      const res = await fetch(`${GRAPH}/${wabaId}/message_templates?fields=name,status,language,category,components&limit=200`, {
+        headers: { Authorization: `Bearer ${sender.token}` },
+      });
+      // If Meta cannot be asked, the last good list keeps reminders going.
+      if (!res.ok) return hit?.list ?? null;
+      const body = (await res.json()) as { data?: MetaTemplate[] };
+      const list = body.data ?? [];
+      cache.set(wabaId, { at: now, list });
+      return list;
+    } catch {
+      return hit?.list ?? null;
+    } finally {
+      inflight.delete(wabaId);
+    }
+  })();
+  inflight.set(wabaId, read);
+  return read;
 }
 
 export interface ResolvedTemplate {

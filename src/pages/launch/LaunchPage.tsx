@@ -175,9 +175,9 @@ export default function LaunchPage() {
             <div style={css("background:#FAF7F2;color:#141210;border-radius:14px;overflow:hidden")}>
               <div style={css("display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid #E8E1D7;flex-wrap:wrap;gap:12px")}>
                 <div style={css("font-size:13px;font-weight:500")}>FynHelp portfolio</div>
-                <div style={css("font-size:12px;color:#5E5953")}>The product, on sample files</div>
+                <div style={css("font-size:12px;color:#5E5953")}>The product, with sample data</div>
               </div>
-              <img src="/guide/19-portfolio.jpg" alt="FynHelp portfolio: every client with its status for the month" width={1600} height={900} style={css("display:block;width:100%;height:auto")} />
+              <img src="/launch/portfolio.jpg" alt="FynHelp portfolio: the four agents at work, open exceptions, and what needs the partner today" width={1440} height={620} style={css("display:block;width:100%;height:auto")} />
             </div>
           </div>
 

@@ -18,6 +18,8 @@ import { TestBanner } from "./components/TestBanner";
 import { PhonePrompt } from "./components/PhonePrompt";
 import { FirstRunWelcome } from "./components/FirstCloseGuide";
 import { SIDENAV_STYLES, SideNav } from "./components/SideNav";
+import { CONTROLS_STYLES } from "./components/Controls";
+import { MOTION_STYLES } from "./components/MotionKit";
 
 
 
@@ -35,7 +37,7 @@ const TITLES: Record<string, string> = {
 export default function V2Shell() {
   return (
     <V2StoreProvider>
-      <style>{V2_STYLES + AGENT_STYLES + SIDENAV_STYLES}</style>
+      <style>{V2_STYLES + AGENT_STYLES + SIDENAV_STYLES + CONTROLS_STYLES + MOTION_STYLES}</style>
       <ShellBody />
     </V2StoreProvider>
   );

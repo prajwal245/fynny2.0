@@ -141,3 +141,24 @@ describe("account IDs pasted with extra characters", () => {
     delete process.env["WHATSAPP_DEFAULT_PHONE_NUMBER_ID"];
   });
 });
+
+describe("the connection check", () => {
+  it("is red only for a stage that has nothing to send, and plain about the rest", async () => {
+    const m = await import("@/lib/practice/whatsappTemplates.server");
+    // What the customer saw: request still in review, follow-up approved, final not created.
+    metaList = [t("document_request_v2", "PENDING", { components: OURS("url_first") }), t("document_followup_v2", "APPROVED", { components: OURS("url_first") })];
+    const lines = (await m.stagesView(sender)).map((s) => ({ stage: s.stage, ...m.stageHealth(s) }));
+    // No older template exists here, so reminder 1 truly has nothing to send until the new one is approved.
+    expect(lines[0]).toMatchObject({ stage: "request", ok: false });
+    expect(lines[0].detail).toContain("in review");
+    // The follow-up is ready, and the final reminder borrows it: not a failure.
+    expect(lines[1]).toMatchObject({ stage: "followup", ok: true });
+    expect(lines[2]).toMatchObject({ stage: "final", ok: null });
+    expect(lines[2].detail).toContain("document_followup_v2");
+    // With the older template approved, reminder 1 is also fine while the new one is in review.
+    metaList.push(t("document_request", "APPROVED"));
+    m.forgetTemplates();
+    const again = (await m.stagesView(sender)).map((s) => m.stageHealth(s));
+    expect(again[0].ok).toBeNull();
+  });
+});

@@ -341,6 +341,8 @@ export interface CouponInput {
   kind: "percent" | "flat" | "trial_days";
   value: number;
   razorpayOfferId?: string | null;
+  /** Money codes: the first payment only (default), or every payment. */
+  duration?: "first" | "forever";
   plans?: PlanKey[] | null;
   cycles?: Cycle[] | null;
   expiresAt?: string | null;
@@ -378,15 +380,28 @@ export async function listCoupons(ctx: AdminCtx) {
 export async function createCoupon(ctx: AdminCtx, c: CouponInput) {
   const code = c.code.trim().toUpperCase();
   if (!/^[A-Z0-9_-]{3,32}$/.test(code)) throw new PracticeError("bad_code", "Codes are 3 to 32 letters, digits, - or _.");
-  if (c.kind === "percent" && (c.value <= 0 || c.value > 100)) throw new PracticeError("bad_value", "A percentage is between 1 and 100.");
-  if (c.kind === "trial_days" && (!Number.isInteger(c.value) || c.value > 90)) throw new PracticeError("bad_value", "Trial codes add 1 to 90 whole days.");
-  if (c.kind !== "trial_days" && !c.razorpayOfferId?.trim())
-    throw new PracticeError("offer_required", "Money discounts are applied by Razorpay. Create the Offer in Razorpay (Subscriptions → Offers) and paste its offer_… ID here.");
+  if (c.kind === "trial_days" && (!Number.isInteger(c.value) || c.value < 1 || c.value > 90)) throw new PracticeError("bad_value", "Trial codes add 1 to 90 whole days.");
+  const { couponAmountPaise, PLAN_ORDER } = await import("../practice/billing/plans");
+  const plans = c.plans?.length ? c.plans : PLAN_ORDER;
+  const cycles = c.cycles?.length ? c.cycles : (["monthly", "annual"] as Cycle[]);
+  if (c.kind === "percent") {
+    if (!(c.value >= 1 && c.value <= 90)) throw new PracticeError("bad_value", "A percentage is between 1 and 90. For a free first month or longer, use free trial days.");
+  } else if (c.kind === "flat") {
+    if (!(c.value >= 1)) throw new PracticeError("bad_value", "Enter how many rupees the code takes off.");
+  }
+  // A money code must leave every plan it covers with a price of at least ₹1.
+  if (c.kind !== "trial_days") {
+    const { gstPercent } = await import("../practice/billing.server");
+    const tooBig = plans.flatMap((p) => cycles.map((y) => ({ p, y }))).find(({ p, y }) => couponAmountPaise(p, y, gstPercent(), { kind: c.kind, value: c.value }) === null);
+    if (tooBig) throw new PracticeError("bad_value", `That is more than the ${PLANS[tooBig.p].name} ${tooBig.y === "annual" ? "yearly" : "monthly"} plan costs. Lower it, or limit the code to bigger plans.`);
+  }
   const { error } = await ctx.db.from("ca_coupons").insert({
     code,
     kind: c.kind,
     value: c.value,
-    razorpay_offer_id: c.kind === "trial_days" ? null : c.razorpayOfferId!.trim(),
+    // Older codes carry a Razorpay offer made by hand; new ones do not need one.
+    razorpay_offer_id: c.kind === "trial_days" ? null : c.razorpayOfferId?.trim() || null,
+    duration: c.duration === "forever" ? "forever" : "first",
     plans: c.plans?.length ? c.plans : null,
     cycles: c.cycles?.length ? c.cycles : null,
     expires_at: c.expiresAt || null,
@@ -396,8 +411,28 @@ export async function createCoupon(ctx: AdminCtx, c: CouponInput) {
     created_by: ctx.userId,
   });
   if (error) throw new PracticeError("db_error", /duplicate/i.test(error.message) ? "That code already exists." : error.message);
-  await audit(ctx, "coupon_created", "coupon", code, { ...c, code });
-  return { code };
+
+  // Set it up in Razorpay now, so a problem shows here and the first customer is not the one who finds it.
+  let prepared = 0;
+  let warning: string | null = null;
+  if (c.kind !== "trial_days" && !c.razorpayOfferId?.trim()) {
+    const billing = await import("../practice/billing.server");
+    if (!billing.razorpayReady()) {
+      warning = "Payments are not connected yet, so the Razorpay plans will be created the first time someone uses the code.";
+    } else {
+      try {
+        for (const p of plans) for (const y of cycles) {
+          await billing.discountedPlanId(ctx.db, p, y, { code, kind: c.kind, value: c.value });
+          prepared++;
+        }
+      } catch (e) {
+        await ctx.db.from("ca_coupons").delete().eq("code", code);
+        throw new PracticeError("razorpay_error", `Razorpay would not set the code up (${(e as Error).message}). Nothing was created. Try again in a minute.`);
+      }
+    }
+  }
+  await audit(ctx, "coupon_created", "coupon", code, { ...c, code, prepared });
+  return { code, prepared, warning };
 }
 
 export async function setCouponActive(ctx: AdminCtx, code: string, active: boolean) {

@@ -60,7 +60,7 @@ export const AGENTS: Agent[] = [
       { t: "Learns from your decisions", d: "Lines your team ignores or marks reconciled are remembered for that client, with who decided and why." },
     ],
     outputs: ["Match report with reasons", "Exception queue", "Decisions remembered per client"],
-    inputs: ["Extracted bank lines", "Book lines from Tally or Zoho exports", "Your firm's past decisions"],
+    inputs: ["Extracted bank lines", "Book lines from Tally exports or a connected Zoho Books", "Your firm's past decisions"],
   },
   {
     slug: "narrate",
@@ -121,7 +121,7 @@ export const AGENT_SEO: Record<string, { title: string; description: string; key
     h1Italic: "for CA firms",
     title: "Bank statement & Tally export extraction for CA firms",
     description:
-      "Convert client bank statements (PDF, Excel, scans) and Tally or Zoho exports into dated transactions. Lines below 75% confidence go to review first.",
+      "Convert client bank statements (PDF, Excel, scans) and Tally exports or a connected Zoho Books ledger into dated transactions. Lines below 75% confidence go to review first.",
     keyword: "Bank statement extraction",
   },
   recon: {
@@ -129,7 +129,7 @@ export const AGENT_SEO: Record<string, { title: string; description: string; key
     h1Italic: "for CA firms",
     title: "Bank reconciliation software for CA firms",
     description:
-      "Bank reconciliation software for CA firms in India: exact, same-day, close and split-payment matches to Tally or Zoho. Only real exceptions reach you.",
+      "Bank reconciliation software for CA firms in India: exact, same-day, close and split-payment matches to Tally or a connected Zoho Books. Only real exceptions reach you.",
     keyword: "Bank reconciliation",
   },
   narrate: {

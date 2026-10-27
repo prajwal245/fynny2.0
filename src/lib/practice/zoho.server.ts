@@ -3,7 +3,9 @@
  * clients' organisations; each client is linked to one Zoho bank account; a
  * sync reads that account's ledger for a month and files it as a books-side
  * document, so Extract, Recon and the MIS treat it like a Tally export.
- * FynHelp never writes to Zoho.
+ * Read-only by default. Posting (a bank charge, or a receipt for one named invoice) exists but is
+ * off until the platform switch, the firm's write consent and the client's own switch are all on,
+ * and then only for an entry a partner has previewed and approved. See docs/ZOHO_SETUP.md.
  */
 import { PracticeError } from "./core";
 import type { Db, FirmContext } from "./db.server";

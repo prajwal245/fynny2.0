@@ -474,7 +474,7 @@ const STEPS = [
 const TRUST = [
   { icon: ShieldCheck, t: "No dummy numbers, ever", d: "If we don\u2019t have the data, the space stays empty. Never a placeholder figure dressed as real." },
   { icon: Link2, t: "Every match is explainable", d: "Each matched or flagged line names the rule behind it. Never \u201cAI decided\u201d." },
-  { icon: Lock, t: "Read-only, revocable", d: "We read; we never write to your ledger. Revoke any connection at any time." },
+  { icon: Lock, t: "Read-only by default, revocable", d: "We read your ledger and never write to Tally. In Zoho Books, only an entry a partner approves. Revoke any connection at any time." },
   { icon: ScrollText, t: "Full audit trail", d: "Every decision is logged with who made it and why, so a review can be reconstructed months later." },
   { icon: Server, t: "Private storage", d: "Files sit in private storage, shared only through short-lived links. We publish certifications only once they are verified." },
   { icon: EyeOff, t: "No training on your data", d: "Learning is scoped to your firm and the client it came from. We never train shared models on it." },

@@ -188,7 +188,7 @@ export function PainValue() {
 /** Tools whose real marks we show, with what FynHelp does with each. */
 const TOOLS: { icon: ReactNode; name: string; line: string; tag: string }[] = [
   { icon: <TallyIcon size={34} />, name: "TallyPrime", line: "Reads your exports, including Tally on Cloud", tag: "Books" },
-  { icon: <ZohoIcon size={34} />, name: "Zoho Books", line: "Connects to your organisation", tag: "Books" },
+  { icon: <ZohoIcon size={34} />, name: "Zoho Books", line: "Connect once, pull any month", tag: "Books" },
   { icon: <WhatsAppIcon size={34} />, name: "WhatsApp", line: "Asks clients and receives their files", tag: "Clients" },
   { icon: <GmailIcon size={34} />, name: "Gmail", line: "Statements emailed to the firm inbox come in", tag: "Inbox" },
 ];

@@ -102,7 +102,7 @@ export const PRIVACY: LegalDoc = {
     [
      "Customer Data",
      "Bank account numbers and transactions, counterparty names, ledger entries, PAN, GSTIN, TDS details, invoices, and names, email addresses and telephone numbers of client contacts",
-     "Uploaded by the customer, received through Gmail intake, or exported from Tally or Zoho Books"
+     "Uploaded by the customer, received through Gmail intake, exported from Tally or Zoho Books, or read from Zoho Books (bank ledger and open invoices) when a partner connects it"
     ],
     [
      "Usage and device data",

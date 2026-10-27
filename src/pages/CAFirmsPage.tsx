@@ -88,7 +88,7 @@ function Hero() {
             className="mt-4 max-w-xl text-[17px] leading-relaxed"
             style={{ color: "rgba(23,18,8,0.72)" }}
           >
-            Works alongside Tally and Zoho: upload their exports, keep your ledger where it is.
+            Works alongside Tally and Zoho: upload exports or connect Zoho Books, and keep your ledger where it is.
           </p>
 
           <div className="mt-9 flex flex-wrap items-center gap-5">

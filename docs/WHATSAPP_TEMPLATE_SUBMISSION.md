@@ -96,3 +96,15 @@ If Meta shows the quick replies **above** the Upload button in the preview, it h
 | "The message template is not approved or does not exist in this language" | Name in Vercel does not match, or not approved yet. |
 | "The template's fields do not match…" | The template does not have exactly 4 body fields and the four buttons above, or `WHATSAPP_CHASE_BUTTONS` is on for a template that has no buttons. |
 | "Could not create the client's upload link" | The `20261029090000_upload_links.sql` migration has not been applied. |
+
+---
+
+## The quick way: list and create them from your computer
+`document_request_v2` and `document_followup_v2` are already live. The app also looks for `document_final_v2`, `fh_setup_help`, `fh_trial_update` and `fh_plan_help`. One script checks your account and creates only what is missing, with those exact names:
+
+```
+WHATSAPP_ACCESS_TOKEN=<your token> node scripts/whatsapp-templates.mjs           # list what is there and what is missing
+WHATSAPP_ACCESS_TOKEN=<your token> node scripts/whatsapp-templates.mjs --apply   # create the missing ones
+```
+
+Your WhatsApp Business Account ID is the `asset_id` in the WhatsApp Manager address: `1142917261543611`. Set `WHATSAPP_WABA_ID=1142917261543611` in Vercel (digits only), then redeploy. Templates already on the account are never changed.

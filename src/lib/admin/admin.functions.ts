@@ -154,6 +154,7 @@ export const adminCreateCoupon = createServerFn({ method: "POST" })
         kind: z.enum(["percent", "flat", "trial_days"]),
         value: z.number().positive().max(1_000_000),
         razorpayOfferId: z.string().max(60).nullable().optional(),
+        duration: z.enum(["first", "forever"]).optional(),
         plans: z.array(z.enum(["starter", "professional", "scale"])).nullable().optional(),
         cycles: z.array(z.enum(["monthly", "annual"])).nullable().optional(),
         expiresAt: z.string().max(40).nullable().optional(),

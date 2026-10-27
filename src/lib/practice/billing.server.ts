@@ -23,6 +23,7 @@ import {
   changeTiming,
   documentWarning,
   GST_PERCENT,
+  couponAmountPaise,
   monthlyBill,
   TRIAL_DAYS,
   type BillBreakdown,
@@ -313,6 +314,61 @@ interface RzpSubscription {
 }
 
 /**
+ * The Razorpay plan for a plan, cycle and money coupon, made by FynHelp the first time it is needed and remembered.
+ * It costs the discounted price with GST, and carries the coupon code in its name so it is recognisable in Razorpay.
+ */
+export async function discountedPlanId(db: Db, plan: PlanKey, cycle: Cycle, coupon: Pick<CouponRow, "code" | "kind" | "value">): Promise<string> {
+  const amount = couponAmountPaise(plan, cycle, gstPercent(), coupon);
+  if (!amount) throw new PracticeError("bad_coupon", "That code takes the price below ₹1 for this plan. Use it as a free-trial code instead.");
+  const keyId = env("RAZORPAY_KEY_ID") ?? "";
+  const { data: known } = await db.from("ca_billing_plans").select("razorpay_plan_id").eq("key_id", keyId).eq("plan", plan).eq("cycle", cycle).eq("amount_paise", amount).maybeSingle();
+  if (known?.razorpay_plan_id) return String(known.razorpay_plan_id);
+  const period = cycle === "annual" ? "yearly" : "monthly";
+  const made = await rzp<RzpPlan>("POST", "/plans", {
+    period,
+    interval: 1,
+    item: { name: `FynHelp ${PLANS[plan].name} (${period}) ${coupon.code}`.slice(0, 100), amount, currency: "INR", description: `${PLANS[plan].clientsIncluded} active clients included, unlimited users, GST extra. Code ${coupon.code}.` },
+    notes: { fynhelp_plan: plan, cycle, coupon: coupon.code },
+  });
+  await db.from("ca_billing_plans").upsert({ key_id: keyId, plan, cycle, amount_paise: amount, razorpay_plan_id: made.id }, { onConflict: "key_id,plan,cycle,amount_paise" });
+  return made.id;
+}
+
+/** Which Razorpay plan (and offer, for older codes) a checkout uses. */
+export async function checkoutPlan(db: Db, plan: PlanKey, cycle: Cycle, coupon: CouponRow | null): Promise<{ planId: string; offerId: string | null }> {
+  if (coupon && coupon.kind !== "trial_days") {
+    if (coupon.razorpay_offer_id) return { planId: await planIdFor(db, plan, cycle), offerId: coupon.razorpay_offer_id };
+    return { planId: await discountedPlanId(db, plan, cycle, coupon), offerId: null };
+  }
+  return { planId: await planIdFor(db, plan, cycle), offerId: null };
+}
+
+/**
+ * Codes that give a discount on the first payment only: once the first payment is in, the subscription is moved back to the
+ * normal plan from the next period. Tried again every hour until Razorpay accepts it (UPI mandates can take a day to activate).
+ */
+export async function settleCouponReverts(db: Db, firmId?: string): Promise<{ moved: number; waiting: number }> {
+  let q = db.from("ca_billing").select("ca_firm_id, plan, cycle, status, razorpay_subscription_id").eq("coupon_revert_pending", true).not("razorpay_subscription_id", "is", null).limit(50);
+  if (firmId) q = q.eq("ca_firm_id", firmId);
+  const { data } = await q;
+  let moved = 0;
+  let waiting = 0;
+  for (const r of data ?? []) {
+    try {
+      const planId = await planIdFor(db, r.plan as PlanKey, r.cycle as Cycle);
+      await rzp("PATCH", `/subscriptions/${encodeURIComponent(String(r.razorpay_subscription_id))}`, { plan_id: planId, schedule_change_at: "cycle_end", customer_notify: 0 }, "Razorpay could not move the plan back yet.");
+      await db.from("ca_billing").update({ coupon_revert_pending: false, updated_at: new Date().toISOString() }).eq("ca_firm_id", r.ca_firm_id);
+      await db.from("ca_billing_events").insert({ id: `coupon_revert:${r.razorpay_subscription_id}`, event: "app.coupon_revert_scheduled", ca_firm_id: r.ca_firm_id, payload: { plan: r.plan, cycle: r.cycle } }).then(() => undefined);
+      moved++;
+    } catch (e) {
+      waiting++;
+      console.error(`[billing] coupon revert for ${r.ca_firm_id} waits: ${(e as Error).message}`);
+    }
+  }
+  return { moved, waiting };
+}
+
+/**
  * Creates a Razorpay subscription for the chosen plan and returns what
  * Razorpay Checkout needs. The plan only changes once the payment is verified.
  */
@@ -334,7 +390,7 @@ export async function startCheckout(
   const billingName = details.billingName?.trim().slice(0, 120) || row.billing_name || ctx.firmName;
   const coupon = details.coupon?.trim() ? await checkCoupon(db, ctx.firmId, details.coupon, plan, cycle) : null;
   if (coupon?.kind === "trial_days") throw new PracticeError("trial_code", "That code adds free trial days. Apply it on its own, before choosing a plan.");
-  const planId = await planIdFor(db, plan, cycle);
+  const { planId, offerId } = await checkoutPlan(db, plan, cycle, coupon);
   // A Razorpay customer carries the GSTIN and name onto every invoice Razorpay sends.
   let customerId: string | undefined;
   if (ctx.firmEmail) {
@@ -353,7 +409,7 @@ export async function startCheckout(
     total_count: cycle === "annual" ? 10 : 120,
     customer_notify: 1,
     ...(customerId ? { customer_id: customerId } : {}),
-    ...(coupon?.razorpay_offer_id ? { offer_id: coupon.razorpay_offer_id } : {}),
+    ...(offerId ? { offer_id: offerId } : {}),
     notes: { firm_id: ctx.firmId, plan, cycle, billing_name: billingName, ...(gstin ? { gstin } : {}), ...(coupon ? { coupon: coupon.code } : {}) },
   });
   await db
@@ -464,6 +520,14 @@ export async function confirmCheckout(
   const { data: withCode } = await db.from("ca_billing").select("coupon_code").eq("ca_firm_id", ctx.firmId).maybeSingle();
   if (withCode?.coupon_code)
     await db.from("ca_coupon_redemptions").insert({ code: withCode.coupon_code, ca_firm_id: ctx.firmId, subscription_id: p.razorpay_subscription_id, plan: fresh.plan, cycle: fresh.cycle });
+  if (withCode?.coupon_code) {
+    // A first-payment code that FynHelp applied itself: the plan goes back to the normal price after this period.
+    const { data: used } = await db.from("ca_coupons").select("kind, razorpay_offer_id, duration").eq("code", withCode.coupon_code).maybeSingle();
+    if (used && isAutoCoupon(used as CouponRow) && used.duration !== "forever") {
+      await db.from("ca_billing").update({ coupon_revert_pending: true }).eq("ca_firm_id", ctx.firmId);
+      await settleCouponReverts(db, ctx.firmId).catch(() => undefined);
+    }
+  }
   await logActivity(db, ctx.firmId, null, "system", `Plan started: ${PLANS[fresh.plan].name}, ${fresh.cycle === "annual" ? "yearly" : "monthly"} (payment ${p.razorpay_payment_id}).`);
   return billingView(db, ctx);
 }
@@ -705,7 +769,13 @@ export interface CouponRow {
   max_redemptions: number | null;
   per_firm_limit: number;
   active: boolean;
+  /** Money codes made without a Razorpay offer: the discount applies to "first" payment only or "forever". */
+  duration?: "first" | "forever";
 }
+
+/** A money code that FynHelp applies itself, through a discounted Razorpay plan, instead of a hand-made Razorpay offer. */
+export const isAutoCoupon = (c: Pick<CouponRow, "kind" | "razorpay_offer_id"> | null | undefined): boolean =>
+  !!c && c.kind !== "trial_days" && !c.razorpay_offer_id;
 
 /** A code this firm may use now, for this plan and cycle (if given). */
 export async function checkCoupon(db: Db, firmId: string, raw: string, plan?: PlanKey, cycle?: Cycle): Promise<CouponRow> {
@@ -726,8 +796,9 @@ export async function checkCoupon(db: Db, firmId: string, raw: string, plan?: Pl
 
 export function describeCoupon(c: CouponRow): string {
   if (c.kind === "trial_days") return `${c.value} more days of free trial`;
-  if (c.kind === "percent") return `${c.value}% off`;
-  return `₹${Number(c.value).toLocaleString("en-IN")} off`;
+  const what = c.kind === "percent" ? `${c.value}% off` : `₹${Number(c.value).toLocaleString("en-IN")} off`;
+  // Older codes made with a Razorpay offer say nothing about how long; codes made in the admin panel do.
+  return isAutoCoupon(c) ? `${what} ${c.duration === "forever" ? "every payment" : "your first payment"}` : what;
 }
 
 export async function previewCoupon(db: Db, ctx: FirmContext, code: string, plan?: PlanKey, cycle?: Cycle) {

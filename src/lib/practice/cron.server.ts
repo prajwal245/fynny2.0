@@ -43,6 +43,8 @@ export async function practiceTick(
   const arrears = await claimJob(db, "arrears", istParts(now).hourKey)
     .then(async (mine) => (mine ? (await import("./billing/arrears.server")).runArrearsBilling(db, now) : { skipped: "already ran this hour" }))
     .catch((e) => ({ error: (e as Error).message }));
+  // First-payment coupons: move the plan back to the normal price once Razorpay lets us.
+  await import("./billing.server").then((b) => b.settleCouponReverts(db)).catch(() => undefined);
   // Once a day: drop WhatsApp reply-window rows older than a week.
   await claimJob(db, "wa_contacts_prune", istParts(now).date)
     .then(async (mine) => mine && (await import("./whatsappSend.server")).pruneWhatsappContacts(db, now))

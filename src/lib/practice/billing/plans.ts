@@ -299,6 +299,22 @@ export function planAmountPaise(plan: PlanKey, cycle: Cycle, gstPercent = GST_PE
   return Math.round(rupees * 100 * (1 + gst / 100));
 }
 
+/**
+ * What one billing period costs after a money coupon, in paise, GST added on top of the discounted price. Null when
+ * the coupon is not a money discount, or would take the price below ₹1 (Razorpay's smallest plan): such a code should
+ * be a free-trial code instead.
+ */
+export function couponAmountPaise(plan: PlanKey, cycle: Cycle, gstPercent: number, coupon: { kind: string; value: number }): number | null {
+  const list = cycle === "annual" ? PLANS[plan].annual : PLANS[plan].monthly;
+  let rupees: number;
+  if (coupon.kind === "percent") rupees = list * (1 - Number(coupon.value) / 100);
+  else if (coupon.kind === "flat") rupees = list - Number(coupon.value);
+  else return null;
+  const gst = Number.isFinite(gstPercent) && gstPercent > 0 ? gstPercent : 0;
+  const paise = Math.round(rupees * 100 * (1 + gst / 100));
+  return paise >= 100 ? paise : null;
+}
+
 const RANK: Record<PlanKey, number> = { starter: 0, professional: 1, scale: 2 };
 
 /**

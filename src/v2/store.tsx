@@ -708,11 +708,35 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
 
   // Documents from Gmail / WhatsApp and scheduled chaser emails arrive in the
   // background, so the workspace refreshes itself while the tab is open.
+  // Quick (5s) while an agent or a document is mid-work so results appear as they land, calm (20s) otherwise, and
+  // at once when the person comes back to the tab. A refresh never runs twice at the same time.
   useEffect(() => {
+    let busy = false;
+    let tick = 0;
+    const go = async () => {
+      if (busy || document.visibilityState !== "visible") return;
+      busy = true;
+      try {
+        await refresh();
+      } finally {
+        busy = false;
+      }
+    };
     const t = setInterval(() => {
-      if (document.visibilityState === "visible") void refresh();
-    }, 60_000);
-    return () => clearInterval(t);
+      tick++;
+      const working =
+        runsRef.current.some((r) => r.status === "running") ||
+        docsRef.current.some((d) => d.status === "Uploading" || d.status === "Processing" || d.status === "Queued");
+      if (working || tick % 4 === 0) void go();
+    }, 5_000);
+    const onShow = () => void go();
+    document.addEventListener("visibilitychange", onShow);
+    window.addEventListener("focus", onShow);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", onShow);
+      window.removeEventListener("focus", onShow);
+    };
   }, [refresh]);
 
   const signIn = useCallback(() => {

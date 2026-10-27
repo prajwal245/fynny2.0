@@ -12,7 +12,10 @@ import {
   zohoBooksDisconnect,
   zohoBooksLink,
   zohoBooksOrganizations,
+  zohoBooksPostings,
+  zohoBooksSetPosting,
   zohoBooksStatus,
+  zohoBooksUndoPost,
   zohoBooksSync,
   zohoBooksUnlink,
 } from "@/lib/practice/practice.functions";
@@ -24,6 +27,7 @@ import { IntegrationCard } from "./IntegrationCard";
 type Status = Awaited<ReturnType<typeof zohoBooksStatus>>;
 type Org = Awaited<ReturnType<typeof zohoBooksOrganizations>>[number];
 type Account = Awaited<ReturnType<typeof zohoBooksBankAccounts>>[number];
+type Posting = Awaited<ReturnType<typeof zohoBooksPostings>>[number];
 
 const errMsg = (e: unknown) => (e instanceof Error && e.message ? e.message : "Something went wrong. Please try again.");
 
@@ -45,10 +49,13 @@ export function ZohoBooksSection({ index = 0 }: { index?: number }) {
   const [done, setDone] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [justConnected, setJustConnected] = useState(false);
+  const [postings, setPostings] = useState<Posting[]>([]);
 
   const load = useCallback(async () => {
     try {
-      setSt(await zohoBooksStatus());
+      const status = await zohoBooksStatus();
+      setSt(status);
+      if (status.writeEnabled) setPostings(await zohoBooksPostings().catch(() => []));
     } catch (e) {
       toast.error(errMsg(e));
     }
@@ -60,6 +67,9 @@ export function ZohoBooksSection({ index = 0 }: { index?: number }) {
     if (outcome === "connected") {
       setJustConnected(true);
       toast.success("Zoho Books connected. Link each client to its bank account.");
+    } else if (outcome === "write_granted") {
+      setJustConnected(true);
+      toast.success("Zoho Books can now create entries you approve. Switch it on for each client below.");
     } else if (outcome) toast.error(q.get("zoho_msg") ?? "Zoho Books could not be connected.");
     if (outcome) {
       q.delete("zoho");
@@ -146,11 +156,13 @@ export function ZohoBooksSection({ index = 0 }: { index?: number }) {
       icon={<ZohoIcon size={36} />}
       tint="rgba(228,37,39,.08)"
       name="Zoho Books"
-      tag={<span style={{ fontSize: 11, color: V.muted, fontWeight: 600 }}>READ-ONLY</span>}
+      tag={<span style={{ fontSize: 11, color: V.muted, fontWeight: 600 }}>{st.writeEnabled ? "READ + APPROVED ENTRIES" : "READ-ONLY"}</span>}
       description={
         st.error ??
         (st.available
-          ? "Pull each client's bank ledger from Zoho Books as the books side for Recon. FynHelp never changes anything in Zoho."
+          ? st.writeEnabled
+            ? "Pull each client's bank ledger for Recon. FynHelp creates an entry in Zoho only when a partner approves that exact entry, and it can be undone."
+            : "Pull each client's bank ledger from Zoho Books as the books side for Recon. FynHelp never changes anything in Zoho."
           : "Zoho Books isn't switched on for FynHelp yet.")
       }
       status={status}
@@ -238,6 +250,18 @@ export function ZohoBooksSection({ index = 0 }: { index?: number }) {
                   >
                     {pulling ? <><span className="ic-spin" /> Pulling…</> : <><RefreshCw size={14} /> Pull month</>}
                   </button>
+                  {canSignOff && st.postingAvailable && st.writeEnabled && (
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: V.body, cursor: "pointer" }}>
+                      <input
+                        type="checkbox"
+                        checked={!!l.posting_enabled}
+                        disabled={busy === `post:${l.id}`}
+                        data-testid="zoho-posting-toggle"
+                        onChange={(e) => void act(`post:${l.id}`, () => zohoBooksSetPosting({ data: { linkId: l.id, enabled: e.target.checked } }), e.target.checked ? "Posting is on for this client" : "Posting is off for this client")}
+                      />
+                      Allow approved entries
+                    </label>
+                  )}
                   {canSignOff && (
                     <button
                       className="v2-btn v2-btn-quiet"
@@ -253,6 +277,39 @@ export function ZohoBooksSection({ index = 0 }: { index?: number }) {
               </div>
             );
           })}
+
+          {canSignOff && st.postingAvailable && !st.writeEnabled && st.links.length > 0 && (
+            <div className="ic-row" style={{ border: `1px solid ${V.line}`, borderRadius: 14, padding: 14, display: "grid", gap: 8 }} data-testid="zoho-write-consent">
+              <div style={{ fontSize: 13.5, fontWeight: 650 }}>Let FynHelp create entries you approve (optional)</div>
+              <div style={{ fontSize: 12.5, color: V.body }}>
+                Off by default. Once allowed, a partner can approve a single bank charge or a receipt for one named invoice from the exception drawer. Each one is previewed first, tagged &ldquo;Created by FynHelp&rdquo;, logged here and can be undone. Zoho will ask you to approve the extra permission.
+              </div>
+              <button className="v2-btn v2-btn-ghost" style={{ justifySelf: "start", padding: "8px 14px", fontSize: 13 }} disabled={busy === "write"}
+                onClick={() => void act("write", async () => { const { url } = await zohoBooksConnect({ data: { write: true } }); window.location.href = url; })}>
+                Allow approved entries
+              </button>
+            </div>
+          )}
+
+          {st.writeEnabled && postings.length > 0 && (
+            <div className="ic-row" style={{ border: `1px solid ${V.line}`, borderRadius: 14, padding: 14, display: "grid", gap: 6 }} data-testid="zoho-postings">
+              <div style={{ fontSize: 13.5, fontWeight: 650 }}>Entries FynHelp created</div>
+              {postings.slice(0, 8).map((p) => (
+                <div key={p.id} style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 12.5, color: V.body, alignItems: "center" }}>
+                  <span style={{ minWidth: 0 }}>
+                    {formatDate(p.txn_date)} · {clientName(p.business_id)} · {p.summary} · ₹{Number(p.amount).toLocaleString("en-IN")} ·{" "}
+                    <strong style={{ color: p.status === "posted" ? "#1F6B45" : V.muted }}>{p.status === "pending" ? "check Zoho" : p.status}</strong>
+                  </span>
+                  {canSignOff && p.status === "posted" && (
+                    <button className="v2-btn v2-btn-quiet" style={{ padding: "4px 10px", fontSize: 12 }} disabled={busy === `undo:${p.id}`}
+                      onClick={() => void act(`undo:${p.id}`, () => zohoBooksUndoPost({ data: { postingId: p.id } }), "Entry removed from Zoho Books")}>
+                      Undo
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
 
           {canSignOff && !picking && (
             <button
@@ -300,7 +357,7 @@ export function ZohoBooksSection({ index = 0 }: { index?: number }) {
                     <select className="v2-input" style={{ width: "100%" }} aria-label="Bank account" disabled={!accounts} value={pick.account} onChange={(e) => setPick({ ...pick, account: e.target.value })} data-testid="zoho-account">
                       <option value="">{busy === "accounts" ? "Loading accounts…" : "Choose a bank account…"}</option>
                       {(accounts ?? []).map((a) => (
-                        <option key={a.id} value={a.id}>{a.name}{a.number ? ` · ${a.number}` : ""}</option>
+                        <option key={a.id} value={a.id}>{a.name}{a.number ? ` · ${a.number}` : ""}{a.kind !== "bank" ? ` (${a.kind === "card" ? "credit card" : "cash account"})` : ""}</option>
                       ))}
                     </select>
                   </label>
@@ -309,6 +366,11 @@ export function ZohoBooksSection({ index = 0 }: { index?: number }) {
               {orgs && orgs.length === 0 && (
                 <div style={{ fontSize: 12.5, color: V.body, marginTop: 10 }}>
                   This Zoho login can't see any Zoho Books organisation. Ask the client to add it as a user (Zoho Books → Settings → Users &amp; Roles).
+                </div>
+              )}
+              {(accounts ?? []).find((a) => a.id === pick.account)?.hint && (
+                <div style={{ fontSize: 12.5, color: V.body, marginTop: 10 }} data-testid="zoho-cash-hint">
+                  {(accounts ?? []).find((a) => a.id === pick.account)?.hint}
                 </div>
               )}
               <div style={{ display: "flex", gap: 8, marginTop: 14 }}>

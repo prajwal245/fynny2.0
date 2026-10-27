@@ -15,6 +15,7 @@ import {
 import { AgentStatusBadge } from "../agents";
 import { EXCEPTION_REASONS, Exception, monthOf, useV2 } from "../store";
 import { openExceptions } from "../lib/exceptions";
+import { ZohoPostPanel } from "../components/ZohoPost";
 
 /**
  * Exception Queue. Cross-client as a page; the client's Exceptions tab when
@@ -366,6 +367,8 @@ export default function ExceptionsPage({
                 </div>
               )}
             </div>
+
+            {active.status === "open" && <ZohoPostPanel clientId={active.clientId} txnId={active.txnId} side={active.side} open={!!active} />}
 
             <div>
               <label className="v2-label">Suggested by the Recon agent</label>

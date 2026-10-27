@@ -1,0 +1,54 @@
+# Zoho Books: setup, safety and a go-live check
+
+## What it does
+
+| | Default | Needs |
+|---|---|---|
+| Pull a client's bank ledger for Recon | on | Connect (partner) |
+| Read open invoices (sent, overdue, part-paid) | on | the `invoices.READ` scope; older connections reconnect once |
+| Create one approved entry (bank charge, or a receipt naming one open invoice) | **off** | platform switch + a second Zoho consent + a per-client switch |
+
+FynHelp never edits or deletes anything it did not create. Every entry it creates is tagged "Created by FynHelp", logged in Settings → Zoho Books, and can be undone there.
+
+## 1. Zoho API Console (api-console.zoho.in, or your region)
+
+1. Add a **Server-based Application**.
+2. Authorised redirect URI: `https://www.fynhelp.com/api/integrations/zoho/callback`
+3. Copy the Client ID and Client Secret.
+
+## 2. Vercel environment variables (Production), then redeploy
+
+| Variable | Value |
+|---|---|
+| `ZOHO_CLIENT_ID` / `ZOHO_CLIENT_SECRET` | from step 1 |
+| `GMAIL_ENCRYPTION_KEY` | already set; also encrypts Zoho tokens |
+| `ZOHO_ACCOUNTS_URL` | optional, default `https://accounts.zoho.in` |
+| `ZOHO_REDIRECT_URI` | optional, default the URL above |
+| `ZOHO_POSTING` | leave **unset** to keep posting off for everyone. Set to `on` to allow firms to opt in. Setting it back to anything else switches posting off at once. |
+
+## 3. Database (Supabase SQL editor)
+
+Run `supabase/migrations/20261103090000_zoho_posting.sql` once. It only adds columns and one table, and everything defaults to off.
+
+## 4. Scopes FynHelp asks for
+
+Read (always): `ZohoBooks.settings.READ`, `ZohoBooks.banking.READ`, `ZohoBooks.accountants.READ`, `ZohoBooks.invoices.READ`
+Write (only when a partner clicks "Allow approved entries"): `ZohoBooks.expenses.CREATE`, `ZohoBooks.expenses.DELETE`, `ZohoBooks.customerpayments.CREATE`, `ZohoBooks.customerpayments.DELETE`
+
+## 5. Safety rules built in
+
+- Posting needs all three: `ZOHO_POSTING=on`, the firm's write consent, and the client's switch.
+- Only a partner can approve; the bank line's amount, date and narration are read from FynHelp's database, never from the browser.
+- Bank charges only, up to ₹5,000, booked to the "Bank Fees and Charges" expense account (FynHelp will not create accounts).
+- Receipts only when the narration names exactly one open invoice and the amount does not exceed what is due.
+- One live entry per bank line (database-enforced), so a double click or retry cannot post twice.
+- A write is never retried automatically. If Zoho does not answer, the line is held as "check Zoho" until a person looks.
+
+## 6. Go-live check (do this once on a Zoho test organisation before turning `ZOHO_POSTING` on)
+
+1. Connect Zoho in Settings; link a client to its bank account; pull a month.
+2. Open a bank charge in Exceptions → "Post to Zoho Books…" is hidden until all three switches are on. Switch them on.
+3. Preview shows the right account, amount and date; approve; confirm the expense appears in Zoho with the "Created by FynHelp" note.
+4. Click Undo; confirm the expense is gone in Zoho.
+5. Click approve twice quickly; confirm only one expense exists.
+6. Post a receipt whose narration names one open invoice; confirm the payment is applied to it, then undo.

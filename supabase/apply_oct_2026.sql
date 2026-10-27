@@ -444,4 +444,13 @@ ALTER TABLE public.ca_coupons ADD CONSTRAINT ca_coupons_duration CHECK (duration
 ALTER TABLE public.ca_billing ADD COLUMN IF NOT EXISTS coupon_revert_pending boolean NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS ca_billing_coupon_revert_idx ON public.ca_billing (ca_firm_id) WHERE coupon_revert_pending;
 
+-- ============================================================
+-- 20261102090000_launch_code
+-- ============================================================
+-- Launch offer: the first 100 firms get 30 days of free trial. The trial is 14 days from the first upload, so the code
+-- adds 16. People arriving from the launch page get it applied automatically when they create their firm.
+INSERT INTO public.ca_coupons (code, kind, value, max_redemptions, per_firm_limit, active, note)
+VALUES ('FYNLAUNCH30', 'trial_days', 16, 100, 1, true, 'Launch offer: 30 days free for the first 100 firms (14 + 16).')
+ON CONFLICT (code) DO NOTHING;
+
 COMMIT;

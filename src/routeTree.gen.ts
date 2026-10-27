@@ -16,6 +16,7 @@ import { Route as InternalAdminRouteImport } from './routes/_internalAdmin'
 import { Route as MainRouteImport } from './routes/_main'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as GuideRouteImport } from './routes/guide'
+import { Route as LaunchRouteImport } from './routes/launch'
 import { Route as SamplesRouteImport } from './routes/samples'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as MainIndexRouteImport } from './routes/_main/index'
@@ -251,6 +252,11 @@ const AppRoute = AppRouteImport.update({
 const GuideRoute = GuideRouteImport.update({
   id: '/guide',
   path: '/guide',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LaunchRoute = LaunchRouteImport.update({
+  id: '/launch',
+  path: '/launch',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SamplesRoute = SamplesRouteImport.update({
@@ -1391,6 +1397,7 @@ export interface FileRoutesByFullPath {
   '/': typeof MainIndexRoute
   '/app': typeof AppRouteWithChildren
   '/guide': typeof GuideRoute
+  '/launch': typeof LaunchRoute
   '/samples': typeof SamplesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/about': typeof MainAboutRoute
@@ -1600,6 +1607,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof MainIndexRoute
   '/guide': typeof GuideRoute
+  '/launch': typeof LaunchRoute
   '/samples': typeof SamplesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/about': typeof MainAboutRoute
@@ -1811,6 +1819,7 @@ export interface FileRoutesById {
   '/_main': typeof MainRouteWithChildren
   '/app': typeof AppRouteWithChildren
   '/guide': typeof GuideRoute
+  '/launch': typeof LaunchRoute
   '/samples': typeof SamplesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_main/about': typeof MainAboutRoute
@@ -2024,6 +2033,7 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/guide'
+    | '/launch'
     | '/samples'
     | '/sitemap.xml'
     | '/about'
@@ -2233,6 +2243,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/guide'
+    | '/launch'
     | '/samples'
     | '/sitemap.xml'
     | '/about'
@@ -2443,6 +2454,7 @@ export interface FileRouteTypes {
     | '/_main'
     | '/app'
     | '/guide'
+    | '/launch'
     | '/samples'
     | '/sitemap.xml'
     | '/_main/about'
@@ -2659,6 +2671,7 @@ export interface RootRouteChildren {
   MainRoute: typeof MainRouteWithChildren
   AppRoute: typeof AppRouteWithChildren
   GuideRoute: typeof GuideRoute
+  LaunchRoute: typeof LaunchRoute
   SamplesRoute: typeof SamplesRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   DemoSplatRoute: typeof DemoSplatRoute
@@ -2737,6 +2750,13 @@ declare module '@tanstack/react-router' {
       path: '/guide'
       fullPath: '/guide'
       preLoaderRoute: typeof GuideRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/launch': {
+      id: '/launch'
+      path: '/launch'
+      fullPath: '/launch'
+      preLoaderRoute: typeof LaunchRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/samples': {
@@ -4672,6 +4692,7 @@ const rootRouteChildren: RootRouteChildren = {
   MainRoute: MainRouteWithChildren,
   AppRoute: AppRouteWithChildren,
   GuideRoute: GuideRoute,
+  LaunchRoute: LaunchRoute,
   SamplesRoute: SamplesRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   DemoSplatRoute: DemoSplatRoute,

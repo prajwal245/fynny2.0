@@ -19,7 +19,8 @@ import { ArrowRight, Building2, Check, Mail, UploadCloud, UserPlus, Users } from
 import { V, V2_STYLES, useV2Theme } from "../ui";
 import { ProcessingCard } from "../agents";
 import { supabase } from "@/integrations/supabase/client";
-import { referralApply, updatePracticePipelineSettings } from "@/lib/practice/practice.functions";
+import { redeemPracticeTrialCode, referralApply, updatePracticePipelineSettings } from "@/lib/practice/practice.functions";
+import { LAUNCH_CODE, LAUNCH_DAYS, captureLaunchCode, clearLaunchCode } from "@/lib/launchCode";
 import { clearReferralCode, getReferralCode } from "@/lib/referral";
 import { confirmPendingAccount, createAccount } from "@/lib/accountSignup.functions";
 import { MOBILE_HINT, parseMobile } from "@/lib/practice/mobile";
@@ -44,6 +45,9 @@ export default function OnboardingPage() {
   const { session, saveFirm, addClient, addDoc, completeOnboarding, firm, firmIdReady, docs, runs } = useV2();
   const savePipeline = useServerFn(updatePracticePipelineSettings);
   const applyReferralFn = useServerFn(referralApply);
+  const redeemTrialFn = useServerFn(redeemPracticeTrialCode);
+  // Arrived from the launch page (or a link with ?code=): the 30-day offer is applied for them.
+  const [launch] = useState(() => (typeof window === "undefined" ? null : captureLaunchCode()));
   const createAccountFn = useServerFn(createAccount);
   const confirmPendingFn = useServerFn(confirmPendingAccount);
   const navigate = useNavigate();
@@ -107,9 +111,13 @@ export default function OnboardingPage() {
     } catch {
       /* ignore */
     }
-    return { name: session?.name ?? "", email: session?.email ?? fromLink, password: "", phone: session?.phone ?? "", whatsappOk: false };
+    let fromName = "";
+    try {
+      if (typeof window !== "undefined") fromName = new URLSearchParams(window.location.search).get("name")?.trim().slice(0, 120) ?? "";
+    } catch { /* no address to read */ }
+    return { name: session?.name ?? fromName, email: session?.email ?? fromLink, password: "", phone: session?.phone ?? "", whatsappOk: false };
   });
-  const [firmForm, setFirmForm] = useState({ name: firm?.name ?? "", city: firm?.city ?? "", frn: firm?.frn ?? "", phone: firm?.phone ?? session?.phone ?? "", ref: getReferralCode() ?? "" });
+  const [firmForm, setFirmForm] = useState({ name: firm?.name ?? (typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("firm")?.trim().slice(0, 120) ?? ""), city: firm?.city ?? "", frn: firm?.frn ?? "", phone: firm?.phone ?? session?.phone ?? "", ref: getReferralCode() ?? "" });
   const [gstinErr, setGstinErr] = useState<string | null>(null);
   const [client, setClient] = useState({ name: "", entityType: ENTITY_TYPES[0], gstin: "", contactName: "", email: "", phone: "" });
   const [clientId, setClientId] = useState<string | null>(null);
@@ -209,6 +217,13 @@ export default function OnboardingPage() {
     }
     // Agents start with the usual defaults; the partner can change them in Settings.
     void savePipeline({ data: DEFAULT_AUTONOMY }).catch(() => undefined);
+    if (launch) {
+      const done = await redeemTrialFn({ data: { code: LAUNCH_CODE } }).then(() => true, () => false);
+      if (done) {
+        toast.success(`Launch offer applied: ${LAUNCH_DAYS} days free, counted from your first upload.`);
+        clearLaunchCode();
+      } else toast.info("We could not apply the launch code just now. Write to support@fynhelp.com and we will add it.");
+    }
     // A referral code (from a link, or typed here) is attached now; the reward comes with the first client.
     if (referralCode.trim()) {
       const res = await applyReferralFn({ data: { code: referralCode } }).catch(() => ({ ok: false as const, message: "We could not check the referral code just now. You can add it later by writing to support@fynhelp.com." }));
@@ -333,6 +348,11 @@ export default function OnboardingPage() {
                   </div>
                 )}
                 {mode !== "forgot" && <div><GoogleSignIn label={mode === "signup" ? "Sign up with Google" : "Continue with Google"} /></div>}
+                {mode === "signup" && launch && (
+                  <div role="status" data-testid="launch-chip" style={{ fontSize: 13, padding: "10px 12px", borderRadius: 12, background: V.blue, color: V.ink, display: "flex", gap: 8, alignItems: "center" }}>
+                    <span className="v2-mono" style={{ fontWeight: 700 }}>{LAUNCH_CODE}</span> applied. {LAUNCH_DAYS} days free, no card needed.
+                  </div>
+                )}
                 {mode === "signup" && (
                   <Field label="Full name"><input className="v2-input" required autoFocus autoComplete="name" value={account.name} onChange={(e) => setAccount({ ...account, name: e.target.value })} placeholder="Priya Rao" /></Field>
                 )}

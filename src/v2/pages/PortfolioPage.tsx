@@ -5,10 +5,10 @@ import { Link } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { Users, Plus } from "lucide-react";
 import { Badge, Card, EmptyState, PageHeader, Stat, V, formatDate, Tone } from "../ui";
-import { AgentStatusBadge, AnimatedCounter } from "../agents";
+import { AnimatedCounter } from "../agents";
 import { monthOf, useV2 } from "../store";
 import { CloseProgress } from "../components/CloseProgress";
-import { AgentActivity, NeedsYou, SetupChecklist, TODAY_STYLES, agentSummary, greeting, useNeedsYou } from "../components/Today";
+import { AgentActivity, AgentStrip, NeedsYou, SetupChecklist, TODAY_STYLES, agentSummary, greeting, useNeedsYou } from "../components/Today";
 import AddClientModal from "../components/AddClientModal";
 import { openExceptionsIn } from "../lib/exceptions";
 
@@ -22,6 +22,14 @@ export default function PortfolioPage() {
   const openEx = openExceptionsIn(exceptions, monthOf, period);
   const openRev = review.filter((r) => r.status === "open");
   const openChase = chases.filter((c) => c.status !== "Resolved");
+  const live = Object.fromEntries(
+    (["extract", "recon", "narrate", "chaser"] as const).map((a) => {
+      const on = runs.filter((r) => r.agent === a && r.status === "running");
+      return [a, { count: on.length, what: on[0]?.stage }];
+    }),
+  ) as Record<"extract" | "recon" | "narrate" | "chaser", { count: number; what?: string }>;
+  const lastRun: Partial<Record<"extract" | "recon" | "narrate" | "chaser", string>> = {};
+  for (const r of agentRuns) if (r.status === "succeeded" && (r.agent === "extract" || r.agent === "recon" || r.agent === "narrate" || r.agent === "chaser") && !lastRun[r.agent]) lastRun[r.agent] = r.at;
 
   return (
     <>
@@ -32,12 +40,7 @@ export default function PortfolioPage() {
         action={<button className="v2-btn v2-btn-primary" onClick={() => setAdding(true)}><Plus size={15} /> Add client</button>}
       />
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }} aria-label="Agent status">
-        {(["extract", "recon", "narrate", "chaser"] as const).map((a) => {
-          const busy = runs.some((r) => r.agent === a && r.status === "running");
-          return <AgentStatusBadge key={a} agent={a} active={busy} label={busy ? `${a[0].toUpperCase() + a.slice(1)} working` : `${a[0].toUpperCase() + a.slice(1)} ready`} />;
-        })}
-      </div>
+      <AgentStrip live={live} last={lastRun} />
 
       {clients.length === 0 ? (
         <EmptyState

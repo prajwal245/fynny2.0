@@ -3,13 +3,13 @@
  * person (each item with its one action), and how far setup has come. Every
  * line is derived from real workspace state.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import { AlertTriangle, ArrowRight, Check, CheckCircle2, FileWarning, ListChecks, PhoneCall, PenLine, Sparkles, X } from "lucide-react";
 import { Card, V } from "../ui";
-import { AGENTS, type AgentKey } from "../agents";
+import { AGENTS, AgentGlyph, ShimmerText, type AgentKey } from "../agents";
 import { useV2, type AgentRunRecord, monthOf } from "../store";
 import { openExceptions } from "../lib/exceptions";
 
@@ -45,6 +45,16 @@ export function ago(iso: string) {
   if (s < 3600) return `${Math.floor(s / 60)}m ago`;
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
   return `${Math.floor(s / 86400)}d ago`;
+}
+
+/** Re-renders every half minute so "3m ago" keeps counting without a refresh. */
+export function useNow(everyMs = 30_000) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), everyMs);
+    return () => clearInterval(t);
+  }, [everyMs]);
+  return now;
 }
 
 /** Everything that is waiting on a person, most urgent first. */
@@ -222,34 +232,86 @@ const TRIGGER: Record<string, string> = { user: "by your team", pipeline: "autom
 
 export function AgentActivity({ runs }: { runs: AgentRunRecord[] }) {
   const { clientName } = useV2();
+  useNow();
   const recent = runs.slice(0, 7);
   return (
     <Card data-testid="agent-activity">
-      <h3 style={{ fontSize: 15.5, marginBottom: 12 }}>Agent activity</h3>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <h3 style={{ fontSize: 15.5 }}>Agent activity</h3>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: V.muted }} title="Updates by itself">
+          <span className="v2-dot" style={{ background: V.green }} /> Live
+        </span>
+      </div>
       {recent.length === 0 ? (
         <p style={{ fontSize: 13, color: V.muted, margin: 0 }}>Upload a document and each agent's work shows up here as it happens.</p>
       ) : (
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 12 }}>
-          {recent.map((r) => {
-            const a = AGENTS[(r.agent in AGENTS ? r.agent : "extract") as AgentKey];
-            return (
-              <li key={r.id} style={{ display: "grid", gridTemplateColumns: "auto minmax(0,1fr)", gap: 10 }}>
-                <span style={{ marginTop: 6, width: 8, height: 8, borderRadius: 999, background: r.status === "failed" ? V.maroon : a.dot }} />
-                <span style={{ minWidth: 0 }}>
-                  <span style={{ display: "block", fontSize: 13, lineHeight: 1.45 }}>
-                    <b>{a.name}</b> · {r.status === "failed" ? (r.error ?? r.summary) : r.summary}
+          <AnimatePresence initial={false}>
+            {recent.map((r) => {
+              const a = AGENTS[(r.agent in AGENTS ? r.agent : "extract") as AgentKey];
+              return (
+                <motion.li
+                  key={r.id}
+                  layout="position"
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ type: "spring", stiffness: 420, damping: 36 }}
+                  style={{ display: "grid", gridTemplateColumns: "auto minmax(0,1fr)", gap: 10 }}
+                >
+                  <span style={{ marginTop: 6, width: 8, height: 8, borderRadius: 999, background: r.status === "failed" ? V.maroon : a.dot }} />
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: "block", fontSize: 13, lineHeight: 1.45 }}>
+                      <b>{a.name}</b> · {r.status === "failed" ? (r.error ?? r.summary) : r.summary}
+                    </span>
+                    <span style={{ display: "block", fontSize: 11.5, color: V.muted, marginTop: 2 }}>
+                      {r.clientId ? `${clientName(r.clientId)} · ` : ""}
+                      {TRIGGER[r.trigger] ?? r.trigger} · {ago(r.at)}
+                    </span>
                   </span>
-                  <span style={{ display: "block", fontSize: 11.5, color: V.muted, marginTop: 2 }}>
-                    {r.clientId ? `${clientName(r.clientId)} · ` : ""}
-                    {TRIGGER[r.trigger] ?? r.trigger} · {ago(r.at)}
-                  </span>
-                </span>
-              </li>
-            );
-          })}
+                </motion.li>
+              );
+            })}
+          </AnimatePresence>
         </ul>
       )}
     </Card>
+  );
+}
+
+const AGENT_ORDER: AgentKey[] = ["extract", "recon", "narrate", "chaser"];
+
+/**
+ * The four agents at a glance. Quiet when idle (a dim dot and when they last worked); when one is working it
+ * glows, shows what it is on, and settles back by itself when it finishes. Widths are fixed so nothing jumps.
+ */
+export function AgentStrip({ live, last }: { live: Record<AgentKey, { count: number; what?: string }>; last: Partial<Record<AgentKey, string>> }) {
+  useNow();
+  return (
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }} aria-label="Agent status" role="status" aria-live="polite">
+      {AGENT_ORDER.map((k) => {
+        const a = AGENTS[k];
+        const busy = live[k].count > 0;
+        return (
+          <motion.div
+            key={k}
+            animate={{ boxShadow: busy ? `0 0 0 1px ${a.dot}55, 0 10px 26px -14px ${a.dot}` : `0 0 0 1px var(--v2-line), 0 0 0 0 transparent` }}
+            transition={{ duration: 0.4 }}
+            style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "6px 14px 6px 7px", borderRadius: 999, background: V.card, minWidth: 168 }}
+          >
+            <AgentGlyph agent={k} state={busy ? "running" : "idle"} size={26} />
+            <span style={{ display: "grid", lineHeight: 1.25, minWidth: 0 }}>
+              <span style={{ fontSize: 12.5, fontWeight: 600 }}>
+                {busy ? <ShimmerText text={`${a.name} working`} agent={k} duration={1.8} /> : a.name}
+              </span>
+              <span className="truncate" style={{ fontSize: 11, color: V.muted, maxWidth: 150 }}>
+                {busy ? (live[k].what ?? a.verb) : last[k] ? `Last run ${ago(last[k] as string)}` : "Ready"}
+              </span>
+            </span>
+          </motion.div>
+        );
+      })}
+    </div>
   );
 }
 

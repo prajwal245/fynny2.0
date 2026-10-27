@@ -343,7 +343,7 @@ export default function OnboardingPage() {
                     </Field>
                     <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 12.5, color: V.body, lineHeight: 1.5, marginTop: -6 }}>
                       <input type="checkbox" checked={account.whatsappOk} onChange={(e) => setAccount({ ...account, whatsappOk: e.target.checked })} style={{ marginTop: 3 }} />
-                      <span id="mobile-why">Message me on WhatsApp to help me get set up and about my trial. (Optional. We never share your number.)</span>
+                      <span id="mobile-why">Setup tips and trial alerts on WhatsApp. Reply STOP anytime to opt out. (Optional. We never share your number.)</span>
                     </label>
                   </>
                 )}

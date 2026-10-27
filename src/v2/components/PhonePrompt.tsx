@@ -47,7 +47,7 @@ export function PhonePrompt() {
       </span>
       <input className="v2-input" type="tel" inputMode="tel" aria-label="Mobile number" placeholder="98200 11223" value={value} onChange={(e) => setValue(e.target.value)} style={{ width: 180 }} />
       <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12, flexBasis: "100%" }}>
-        <input type="checkbox" checked={wa} onChange={(e) => setWa(e.target.checked)} /> Message me on WhatsApp about my set-up, trial and plan. Reply STOP any time.
+        <input type="checkbox" checked={wa} onChange={(e) => setWa(e.target.checked)} /> Setup tips and trial alerts on WhatsApp. Reply STOP anytime to opt out.
       </label>
       <button className="v2-btn v2-btn-primary" type="submit" disabled={busy}>Save</button>
       <button

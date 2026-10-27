@@ -1,18 +1,31 @@
 import { Link } from "@tanstack/react-router";
 import { V } from "../ui";
 import { useBilling } from "../lib/billing";
+import { CALENDLY_URL } from "@/components/site/cta";
+
+/** A plain link to the booking page: opens in a new tab, no pop-up needed. */
+const demoLink = (
+  <a href={CALENDLY_URL} target="_blank" rel="noreferrer" className="v2-link" style={{ fontSize: 12.5, whiteSpace: "nowrap" }} data-testid="book-demo">
+    Book a demo
+  </a>
+);
 
 /** One line above every page: days left in the trial, or why new work is paused. */
 export function TrialBanner({ partnerView }: { partnerView: boolean }) {
   const b = useBilling();
   if (!b) return null;
   const a = b.access;
-  const action = partnerView ? (
-    <Link to="/app/settings" hash="billing" className="v2-btn v2-btn-sm v2-btn-primary" style={{ flexShrink: 0 }}>
-      Choose a plan
-    </Link>
-  ) : (
-    <span style={{ fontSize: 12.5, color: V.muted }}>A partner can choose a plan in Settings.</span>
+  const action = (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 14, flexShrink: 0, flexWrap: "wrap" }}>
+      {demoLink}
+      {partnerView ? (
+        <Link to="/app/settings" hash="billing" className="v2-btn v2-btn-sm v2-btn-primary">
+          Choose a plan
+        </Link>
+      ) : (
+        <span style={{ fontSize: 12.5, color: V.muted }}>A partner can choose a plan in Settings.</span>
+      )}
+    </span>
   );
   if (a.state === "paused")
     return (
@@ -37,6 +50,7 @@ export function TrialBanner({ partnerView }: { partnerView: boolean }) {
         <span style={{ minWidth: 0 }}>
           <b>Your free trial starts with your first upload.</b> 14 days, no card needed.
         </span>
+        {demoLink}
       </div>
     );
   if (a.state === "trial" && a.trialDaysLeft != null)

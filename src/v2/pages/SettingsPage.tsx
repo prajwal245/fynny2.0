@@ -298,7 +298,7 @@ export default function SettingsPage() {
             <div style={{ fontSize: 11.5, color: V.muted, marginTop: 4 }}>So a person at FynHelp can reach you if something needs help. Never shared.</div>
             <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 12.5, marginTop: 8, lineHeight: 1.5 }}>
               <input type="checkbox" checked={form.whatsappOk} onChange={(e) => setForm({ ...form, whatsappOk: e.target.checked })} style={{ marginTop: 3 }} />
-              <span>Message me on WhatsApp about my set-up, my trial and my plan. You can reply STOP at any time.</span>
+              <span>Setup tips and trial alerts on WhatsApp. Reply STOP anytime to opt out.</span>
             </label>
           </div>
           <div>

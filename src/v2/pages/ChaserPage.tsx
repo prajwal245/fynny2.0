@@ -11,7 +11,6 @@ import { Chase, useV2 } from "../store";
 import { CreditsAlert, CreditsChip, TopUpModal } from "../components/CreditsPanel";
 import { WhatsAppIcon } from "../components/BrandIcons";
 import { WhatsappPreview } from "../components/WhatsappPreview";
-import { approvedSteps, useTemplatesView } from "../components/WhatsappTemplates";
 
 type Channel = NonNullable<Chase["channel"]>;
 const CHANNELS: { key: Channel; label: string; hint: string }[] = [
@@ -31,7 +30,6 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
   // WhatsApp chasing is on every plan and the trial; each reminder from FynHelp's number uses a credit.
   const whatsappAllowed = useBilling()?.access.whatsappChaser ?? false;
   const [topUp, setTopUp] = useState(false);
-  const templatesView = useTemplatesView();
   // With a token and a linked number the message goes out itself; otherwise WhatsApp opens with it ready.
   const [waSendReady, setWaSendReady] = useState(false);
   useEffect(() => {
@@ -195,7 +193,7 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
             </div>
           </div>
           {form.channel !== "email" && (
-            <WhatsappPreview clientName={clients.find((c) => c.id === form.clientId)?.name ?? "your client"} contact={form.contact} item={form.type} firmName={firm?.name ?? "Your firm"} steps={approvedSteps(templatesView)} />
+            <WhatsappPreview clientName={clients.find((c) => c.id === form.clientId)?.name ?? "your client"} contact={form.contact} item={form.type} firmName={firm?.name ?? "Your firm"} />
           )}
           <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit,minmax(min(180px, 100%), 1fr))" }}>
             <div>

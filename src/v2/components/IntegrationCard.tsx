@@ -33,6 +33,7 @@ export const INTEGRATION_STYLES = `
 .ic-body[data-open="true"] { grid-template-rows: 1fr; opacity:1; }
 .ic-body > div { overflow:hidden; min-height:0; }
 .ic-body-inner { padding-top:14px; margin-top:14px; border-top:1px dashed ${V.line}; }
+.ic-next { display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; margin-top:12px; padding:10px 12px; border-radius:12px; background:${V.blue}; font-size:13px; color:${V.ink}; }
 .ic-row { animation: ic-in .35s cubic-bezier(.16,1,.3,1) both; }
 .ic-steps { display:flex; gap:6px; margin-bottom:12px; }
 .ic-steps span { flex:1; height:4px; border-radius:4px; background:${V.gray}; overflow:hidden; position:relative; }
@@ -76,6 +77,7 @@ export function IntegrationCard({
   children,
   defaultOpen = false,
   testId,
+  nextStep,
 }: {
   index?: number;
   icon: ReactNode;
@@ -88,6 +90,8 @@ export function IntegrationCard({
   children?: ReactNode;
   defaultOpen?: boolean;
   testId?: string;
+  /** The one thing to do next, shown inline while the integration is not working. Without onClick it opens the card. */
+  nextStep?: { text: string; cta: string; onClick?: () => void; busy?: boolean };
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const bodyId = useId();
@@ -117,6 +121,14 @@ export function IntegrationCard({
           )}
         </div>
       </div>
+      {nextStep && (
+        <div className="ic-next" role="status">
+          <span>{nextStep.text}</span>
+          <button type="button" className="v2-btn v2-btn-primary v2-btn-sm" disabled={nextStep.busy} data-busy={nextStep.busy ? "true" : undefined} onClick={nextStep.onClick ?? (() => setOpen(true))}>
+            {nextStep.cta}
+          </button>
+        </div>
+      )}
       {children && (
         <div className="ic-body" data-open={open} id={bodyId} inert={!open}>
           <div>

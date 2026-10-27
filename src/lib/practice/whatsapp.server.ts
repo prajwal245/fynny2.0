@@ -708,14 +708,7 @@ export async function whatsappHealth(db: Db, ctx: FirmContext): Promise<{ ok: bo
       steps.push({ label: "Meta accepts the token and number", ok: false, detail: `Could not reach Meta (${(e as Error).message}).` });
     }
   }
-  const waba = sender?.wabaId;
-  if (!waba) {
-    steps.push({ label: "Reminder templates", ok: null, detail: "Add the WhatsApp Business Account ID (WHATSAPP_WABA_ID) so FynHelp can check that each template is approved." });
-  } else if (token && sender) {
-    // The same view as Settings: what each stage will really send, with the fallback in plain words.
-    const { stagesView, stageHealth } = await import("./whatsappTemplates.server");
-    for (const st of await stagesView(sender)) steps.push({ label: `${st.label} template`, ...stageHealth(st) });
-  }
+  // The reminder wording is FynHelp's to run, so its approval status is checked in the admin panel, not shown to firms.
   return { ok: steps.every((s) => s.ok !== false), steps };
 }
 

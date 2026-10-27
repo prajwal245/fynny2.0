@@ -9,6 +9,7 @@ import {
 } from "@/lib/practice/practice.functions";
 import { Badge, Card, V, formatDate } from "../ui";
 import { RowSkeleton } from "../agents";
+import { SettingRow, Toggle } from "./Controls";
 import { useV2 } from "../store";
 
 type MemoryData = Awaited<ReturnType<typeof getPracticeMemory>>;
@@ -83,37 +84,17 @@ export function AgentSettings() {
       <Card style={{ marginBottom: 16 }}>
         <h3 style={{ fontSize: 15.5, marginBottom: 4 }}>Automation</h3>
         <p style={{ fontSize: 12.5, color: V.muted, margin: "0 0 14px" }}>
-          How the agents hand work to each other. Narrate always waits for a person, and matching never uses AI.
+          What the agents do on their own. Nothing is signed off without a person.
         </p>
         {!pipeline ? (
           <RowSkeleton />
         ) : (
-          <div style={{ display: "grid", gap: 10 }}>
-            <div style={row}>
-              <div>
-                <div style={{ fontWeight: 600 }}>Run Recon automatically</div>
-                <div style={{ fontSize: 12.5, color: V.body, marginTop: 3 }}>
-                  As soon as a month has both the bank statement and the books, Recon matches it without anyone pressing a button.
-                </div>
-              </div>
-              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                <input
-                  type="checkbox"
-                  aria-label="Run Recon automatically"
-                  checked={pipeline.auto_recon}
-                  disabled={!partner || busy === "pipeline"}
-                  onChange={(e) => save({ auto_recon: e.target.checked })}
-                />
-                {pipeline.auto_recon ? "On" : "Off"}
-              </label>
-            </div>
-            <div style={row}>
-              <div>
-                <div style={{ fontWeight: 600 }}>Chase missing bank statements</div>
-                <div style={{ fontSize: 12.5, color: V.body, marginTop: 3 }}>
-                  If a client has not sent last month's bank statement by this day, Chaser opens a chase and emails them on the usual Day 0, 3, 7 schedule.
-                </div>
-              </div>
+          <div>
+            <SettingRow title="Run Recon automatically" description="As soon as a month has its bank statement and its books, Recon matches it without anyone pressing a button." tip="Matching never uses AI, and the MIS always waits for a person to review it.">
+              <span style={{ fontSize: 12.5, color: V.muted }}>{pipeline.auto_recon ? "On" : "Off"}</span>
+              <Toggle label="Run Recon automatically" checked={pipeline.auto_recon} disabled={!partner || busy === "pipeline"} onChange={(v) => save({ auto_recon: v })} />
+            </SettingRow>
+            <SettingRow title="Chase missing bank statements" description="If a client has not sent last month's statement by this day, the Chaser opens a chase and follows up for you.">
               <select
                 className="v2-input"
                 aria-label="Chase day"
@@ -129,9 +110,9 @@ export function AgentSettings() {
                   </option>
                 ))}
               </select>
-            </div>
+            </SettingRow>
             {!partner && (
-              <div style={{ fontSize: 12.5, color: V.muted }}>Only a partner can change these. Switch to Partner under "Working as" if you are one.</div>
+              <div style={{ fontSize: 12.5, color: V.muted, paddingTop: 8 }}>Only a partner can change these. Switch to Partner under "Working as" if you are one.</div>
             )}
           </div>
         )}

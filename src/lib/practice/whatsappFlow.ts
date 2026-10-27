@@ -157,36 +157,42 @@ export const chaseTextWithLink = (p: string[], uploadUrl: string | null, step = 
 export interface WaSendError {
   /** Retrying the same message will not help. */
   permanent: boolean;
-  /** What to tell the person, in plain words. */
+  /** What to tell the firm, in plain words. Never mentions templates, Meta or tokens: those are FynHelp's to run. */
   message: string;
+  /** The technical reason, for FynHelp's logs and the admin panel only. Set when the fault is on FynHelp's side. */
+  internal?: string;
 }
 
-/** Meta error codes the Chaser can hit, in words a CA firm can act on. */
+/** Shown when the fault is on FynHelp's side (template, token, number setup). The firm can still use email. */
+export const PLATFORM_FAILURE_MESSAGE = "Failed: this WhatsApp reminder could not be sent. FynHelp has been alerted and will try again by itself. You can send it by email meanwhile.";
+
+/** Meta error codes the Chaser can hit. What the firm can act on is explained; what only FynHelp can fix is not shown. */
 export function explainWaError(code: number | undefined, raw: string | undefined): WaSendError {
   const detail = raw ? ` (${raw})` : "";
+  const ours = (permanent: boolean, internal: string): WaSendError => ({ permanent, message: PLATFORM_FAILURE_MESSAGE, internal });
   switch (code) {
     case 131026:
       return { permanent: true, message: "That number is not on WhatsApp or cannot receive this message. Use email or call the client." };
     case 131030:
-      return { permanent: true, message: "The number is not on the allowed list for this WhatsApp test number. Add it in Meta's WhatsApp Manager, or move to a live number." };
+      return ours(true, "The number is not on the allowed list for this WhatsApp test number. Add it in Meta's WhatsApp Manager, or move to a live number.");
     case 131047:
-      return { permanent: true, message: "More than 24 hours since the client last wrote, so only an approved template can be sent. Check that the template is approved." };
+      return ours(true, "More than 24 hours since the client last wrote, so only an approved template can be sent. Check that the template is approved.");
     case 132001:
-      return { permanent: true, message: "The message template is not approved or does not exist in this language. Check the template name in Meta's WhatsApp Manager." };
+      return ours(true, "The message template is not approved or does not exist in this language. Check the template name and language in Meta's WhatsApp Manager.");
     case 132000:
     case 132012:
-      return { permanent: true, message: "The template's fields do not match what FynHelp sends. The template needs four body fields, and when buttons are switched on, the four buttons (Upload documents, Sending today, Need more time, Stop reminders)." };
+      return ours(true, "The template's fields do not match what FynHelp sends: four body fields and, when buttons are on, the four buttons.");
     case 131056:
     case 130429:
     case 131048:
       return { permanent: false, message: "WhatsApp is limiting messages right now. FynHelp will try again later." };
     case 190:
     case 102:
-      return { permanent: true, message: "The WhatsApp access token has expired or is invalid. Create a new permanent token and update it." };
+      return ours(true, "The WhatsApp access token has expired or is invalid. Create a new permanent token and update it.");
     case 100:
-      return { permanent: true, message: `WhatsApp rejected the request${detail}. Check the phone number ID.` };
+      return ours(true, `WhatsApp rejected the request${detail}. Check the phone number ID.`);
     default:
-      return { permanent: false, message: `WhatsApp could not send this message${detail}.` };
+      return { permanent: false, message: `WhatsApp could not send this message. FynHelp will try again later.`, internal: `WhatsApp error ${code ?? "unknown"}${detail}` };
   }
 }
 

@@ -53,6 +53,26 @@ async function main() {
     for (const t of TEMPLATES) console.log(`- ${t.name}: ${t.components[0].text}`);
     return;
   }
+  // 1. Is this the right account? The number FynHelp sends from must belong to it, or templates made here can never be sent.
+  const get = async (path) => {
+    const r = await fetch(`${GRAPH}/${path}`, { headers: { Authorization: `Bearer ${TOKEN}` } });
+    return { ok: r.ok, body: await r.json().catch(() => ({})) };
+  };
+  const acct = await get(`${WABA}?fields=name`);
+  if (!acct.ok) throw new Error(`This token cannot read account ${WABA}: ${acct.body.error?.message ?? "no access"}. Use a token for the account that owns your number, and check the account id (see docs/WHATSAPP_SETUP_STEPS.md).`);
+  const nums = await get(`${WABA}/phone_numbers?fields=id,display_phone_number,verified_name`);
+  console.log(`Account name: ${acct.body.name ?? "(none)"}`);
+  console.log("Numbers on this account:");
+  for (const n of nums.body.data ?? []) console.log(`  ${n.display_phone_number}  id ${n.id}  ${n.verified_name ?? ""}`);
+  const sendFrom = (process.env.WHATSAPP_DEFAULT_PHONE_NUMBER_ID ?? "").replace(/\D/g, "");
+  if (sendFrom) {
+    const ok = (nums.body.data ?? []).some((n) => n.id === sendFrom);
+    console.log(ok ? `\n✓ Your sending number (id ${sendFrom}) is on this account.` : `\n✗ Your sending number (id ${sendFrom}) is NOT on this account. These templates would belong to the wrong account. Find the account that owns the number and use its id.`);
+    if (!ok) process.exit(2);
+  } else {
+    console.log("\n(Set WHATSAPP_DEFAULT_PHONE_NUMBER_ID to check that your sending number is on this account.)");
+  }
+
   const res = await fetch(`${GRAPH}/${WABA}/message_templates?fields=name,status,language,category&limit=200`, { headers: { Authorization: `Bearer ${TOKEN}` } });
   const body = await res.json();
   if (!res.ok) throw new Error(`Meta said: ${body.error?.message ?? res.status}`);
@@ -60,10 +80,13 @@ async function main() {
   for (const t of body.data ?? []) have.set(t.name, `${t.status}, ${String(t.category).toLowerCase()}, ${t.language}`);
 
   console.log("\nOn your account now:");
-  for (const [n, s] of have) console.log(`  ${n.padEnd(26)} ${s}`);
+  for (const [n, s] of have) console.log(`  ${n.padEnd(26)} ${s}${/marketing/i.test(s) ? "   <- Marketing: FynHelp never uses it" : ""}`);
   const missing = TEMPLATES.filter((t) => !have.has(t.name));
   console.log("\nThe app needs:");
-  for (const t of TEMPLATES) console.log(`  ${t.name.padEnd(26)} ${have.has(t.name) ? `already there (${have.get(t.name)})` : "MISSING"}`);
+  for (const t of TEMPLATES) {
+    const st = have.get(t.name);
+    console.log(`  ${t.name.padEnd(26)} ${st ? `already there (${st})${/marketing/i.test(st) ? "  <- NOT Utility: reword and submit under a new name, e.g. " + t.name.replace(/_v\d+$/, "") + "_v3" : ""}` : "MISSING"}`);
+  }
   if (!missing.length) return console.log("\nNothing to create.");
   if (!APPLY) return console.log(`\n${missing.length} to create. Run again with --apply to submit them.`);
 

@@ -4,7 +4,7 @@
  * Primary buttons fill with cream; quiet buttons get a soft wash. Switched off for people who ask for less motion.
  */
 export const LIQUID_BUTTON_CSS = `
-.v2-btn-primary, .v2-btn-ghost, .fh-btn-primary, .fh-btn-coral, .fh-btn-ghost, .sh-primary { position:relative; overflow:hidden; isolation:isolate; --lq:#FFEBB9; --lq-ink:#090B11; }
+.v2-btn-primary, .v2-btn-ghost, .fh-btn-primary, .fh-btn-coral, .fh-btn-ghost, .sh-primary { position:relative; overflow:hidden; isolation:isolate; --lq:var(--v2-lq, #FFEBB9); --lq-ink:var(--v2-lq-ink, #090B11); }
 .v2-btn-ghost, .fh-btn-ghost { --lq:rgba(249,16,58,.12); --lq-ink:currentColor; }
 .v2-btn-primary::after, .v2-btn-ghost::after, .fh-btn-primary::after, .fh-btn-coral::after, .fh-btn-ghost::after, .sh-primary::after {
   content:""; position:absolute; z-index:-1; left:50%; top:100%; width:150%; aspect-ratio:1; pointer-events:none;

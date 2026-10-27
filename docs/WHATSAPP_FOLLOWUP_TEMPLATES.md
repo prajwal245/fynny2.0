@@ -4,7 +4,7 @@ These are the messages FynHelp sends **to its own customers (the firms)** from F
 
 ## The rules the system follows
 - **Only about the person's own account:** their set-up, their trial, their plan or their payment. Messages with nothing of theirs in them (a pure "checking in") are **not** sent on WhatsApp: Meta treats them as Marketing, and a person decides to call.
-- **Only with consent.** The sign-up box and the Settings box ("Message me on WhatsApp about my set-up, my trial and my plan") are unticked by default. Nothing goes to anyone who has not ticked it.
+- **Only with consent.** The sign-up box and the Settings box ("Setup tips and trial alerts on WhatsApp. Reply STOP anytime to opt out.") are unticked by default. Nothing goes to anyone who has not ticked it.
 - **Daytime only** (9 am to 8 pm IST), **at most one message to a number every 3 days**, once per follow-up.
 - **Stop is honoured at once.** The "Stop messages" button, or replying STOP, switches WhatsApp off for that number for good.
 - **FynHelp pays**: these do not use a firm's credits.

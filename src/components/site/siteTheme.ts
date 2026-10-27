@@ -1,4 +1,5 @@
 // Shared FynHelp marketing design system (extracted from HomePage).
+import { LIQUID_BUTTON_CSS } from "@/lib/liquidButton";
 
 export const C = {
   page: "#F2EEE7",
@@ -49,6 +50,7 @@ export const SITE_STYLES = `
 .fh-dark .fh-btn-ghost, .fh-maroon .fh-btn-ghost { border-color:rgba(247,241,230,.26); color:${C.onDark}; }
 .fh-btn-ghost:hover { transform:translateY(-2px); background:rgba(23,18,8,.05); }
 .fh-dark .fh-btn-ghost:hover, .fh-maroon .fh-btn-ghost:hover { background:rgba(255,255,255,.08); }
+${LIQUID_BUTTON_CSS}
 
 /* ── HERO ── */
 .fh-hero { padding:118px 0 46px; text-align:center; position:relative; }

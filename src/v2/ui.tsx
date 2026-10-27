@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { ReactNode, CSSProperties, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, useIsPresent } from "framer-motion";
 import { X } from "lucide-react";
+import { LIQUID_BUTTON_CSS } from "@/lib/liquidButton";
 
 /** Palette: red #F9103A and #F96246, cream #FFEBB9, ink #090B11, mist #F4F6FA. Green and amber are for status only. */
 /**
@@ -67,6 +68,7 @@ export function useV2Theme(): [ThemeMode, () => void] {
 
 export const V2_STYLES = `
 ${THEME_VARS}
+${LIQUID_BUTTON_CSS}
 .v2 { background:${V.bg}; background-image:var(--v2-glow); background-attachment:fixed; color:${V.ink}; color-scheme:var(--v2-scheme); font-family:${V.font}; -webkit-font-smoothing:antialiased; font-size:15px; }
 .v2 *, .v2 *::before, .v2 *::after { box-sizing:border-box; }
 .v2 h1,.v2 h2,.v2 h3,.v2 h4 { font-family:${V.font}; margin:0; letter-spacing:-0.02em; font-weight:600; color:${V.ink}; }

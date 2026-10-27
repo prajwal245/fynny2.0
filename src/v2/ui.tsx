@@ -90,6 +90,11 @@ ${LIQUID_BUTTON_CSS}
 .v2-icon-btn { display:inline-grid; place-items:center; width:34px; height:34px; border-radius:999px; border:1px solid transparent; background:transparent; color:${V.body}; cursor:pointer; transition:background .15s ease, color .15s ease; }
 .v2-icon-btn:hover { background:${V.gray}; color:${V.ink}; }
 .v2-icon-btn:focus-visible { outline:2px solid ${V.brand}; outline-offset:2px; }
+/* Buttons and menus never break out of their row: labels stay on one line, icons keep their size, long text is cut. */
+.v2-btn { white-space:nowrap; max-width:100%; }
+.v2-btn > svg { flex:none; }
+.v2 select.v2-input { appearance:none; -webkit-appearance:none; padding-right:30px; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 11px center; }
+.v2 select.v2-input option { color:#141210; background:#fff; }
 .v2-btn:disabled, .v2-btn[aria-disabled="true"] { opacity:.5; cursor:not-allowed; transform:none !important; }
 .v2-btn:focus-visible, .v2-link:focus-visible, .v2-nav a:focus-visible { outline:2px solid ${V.brand}; outline-offset:2px; }
 .v2-btn-sm { padding:6px 12px; font-size:13px; }
@@ -134,10 +139,6 @@ ${LIQUID_BUTTON_CSS}
   .v2-page-header { grid-template-columns:minmax(0,1fr) !important; }
   .v2-page-header h1 { font-size:21px !important; overflow-wrap:anywhere; }
 }
-@media (max-width:900px){
-  /* The sidebar's inline sticky position must not keep it in the layout on phones. */
-  .v2-sidebar { position:fixed !important; left:0; top:0; z-index:60; transform:translateX(-100%); }
-  .v2-sidebar.open { transform:translateX(0); }
 }
 @media (max-width:640px){
   .v2 main { padding:16px !important; }

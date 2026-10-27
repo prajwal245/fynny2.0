@@ -16,19 +16,10 @@ import { openExceptionsIn } from "./lib/exceptions";
 import { TrialBanner } from "./components/TrialBanner";
 import { TestBanner } from "./components/TestBanner";
 import { PhonePrompt } from "./components/PhonePrompt";
-import { FirstCloseLauncher, FirstRunWelcome } from "./components/FirstCloseGuide";
+import { FirstRunWelcome } from "./components/FirstCloseGuide";
+import { SIDENAV_STYLES, SideNav } from "./components/SideNav";
 
 
-const NAV = [
-  { to: "/app", label: "Portfolio", icon: LayoutGrid, exact: true },
-  { to: "/app/clients", label: "Clients", icon: Users },
-  { to: "/app/documents", label: "Documents", icon: FileText },
-  { to: "/app/review", label: "Review Queue", icon: ListChecks },
-  { to: "/app/exceptions", label: "Exception Queue", icon: AlertTriangle },
-  { to: "/app/chaser", label: "Chaser", icon: Send },
-  { to: "/app/reports", label: "MIS and Reports", icon: BarChart3 },
-  { to: "/app/settings", label: "Settings", icon: Settings, partnerOnly: true },
-] as const;
 
 const TITLES: Record<string, string> = {
   "/app": "Portfolio",
@@ -44,7 +35,7 @@ const TITLES: Record<string, string> = {
 export default function V2Shell() {
   return (
     <V2StoreProvider>
-      <style>{V2_STYLES + AGENT_STYLES}</style>
+      <style>{V2_STYLES + AGENT_STYLES + SIDENAV_STYLES}</style>
       <ShellBody />
     </V2StoreProvider>
   );
@@ -95,7 +86,6 @@ function ShellBody() {
 
   // Working as Partner: reviewer and approver, plus firm settings. Working as Junior: the preparer's tabs.
   const partnerView = canSignOff && role === "Partner";
-  const nav = NAV.filter((n) => !("partnerOnly" in n) || partnerView);
   const COUNTS: Record<string, number> = {
     // Partner: reports waiting for sign-off. Junior: reports sent back for correction.
     "/app/reports": partnerView
@@ -148,73 +138,18 @@ function ShellBody() {
         {open && (
           <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, background: "var(--v2-overlay)", zIndex: 55 }} />
         )}
-        <aside
-          className={`v2-sidebar${open ? " open" : ""}`}
-          style={{
-            width: 244, flex: "0 0 244px", background: "var(--v2-side)", backdropFilter: "blur(18px)", borderRight: `1px solid ${V.line}`,
-            padding: "22px 14px", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh",
-            transition: "transform .22s ease",
-          }}
-        >
-          <div style={{ padding: "0 8px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div>
-              <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: "-0.03em" }}>FynHelp</div>
-              <div style={{ fontSize: 10.5, letterSpacing: ".16em", textTransform: "uppercase", color: V.muted, marginTop: 3 }}>{firm?.name || "Practice OS"}</div>
-            </div>
-            <button className="v2-btn v2-btn-quiet" style={{ display: "none" }} onClick={() => setOpen(false)}><X size={15} /></button>
-          </div>
-
-          {canSignOff && (
-          <div style={{ padding: "0 8px 14px" }}>
-            <div style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: V.muted, fontWeight: 700, marginBottom: 6 }}>Working as</div>
-            <div style={{ display: "flex", gap: 4, background: V.gray, padding: 3, borderRadius: 999 }}>
-              {(["Partner", "Junior"] as const).map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setRole(r)}
-                  style={{
-                    flex: 1, border: 0, cursor: "pointer", borderRadius: 999, padding: "6px 0", fontSize: 12, fontWeight: 600,
-                    fontFamily: "inherit", background: role === r ? "var(--v2-seg)" : "transparent", color: role === r ? V.ink : V.muted,
-                    boxShadow: role === r ? "0 6px 14px -8px rgba(217,43,43,.7)" : "none",
-                  }}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-            <div style={{ fontSize: 11, color: V.muted, marginTop: 6, lineHeight: 1.4 }} data-testid="role-hint">
-              {role === "Partner" ? "Reviews, signs off MIS and manages the firm." : "Prepares: documents, review, exceptions and MIS drafts."}
-            </div>
-          </div>
-          )}
-
-          <nav className="v2-nav" style={{ flex: 1, overflowY: "auto" }}>
-            {nav.map(({ to, label, icon: Icon, ...rest }) => (
-              <Link
-                key={to}
-                to={to}
-                onClick={() => setOpen(false)}
-                activeOptions={{ exact: "exact" in rest ? true : false }}
-              >
-                <Icon size={16} />
-                <span>{label}</span>
-                {COUNTS[to] !== undefined && COUNTS[to] > 0 && (
-                  <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, background: V.beige, borderRadius: 999, padding: "1px 7px" }}>{COUNTS[to]}</span>
-                )}
-              </Link>
-            ))}
-          </nav>
-
-          <div style={{ borderTop: `1px solid ${V.line}`, paddingTop: 14, fontSize: 11.5, color: V.muted, padding: "14px 8px 0", display: "grid", gap: 6, justifyItems: "start" }}>
-            <FirstCloseLauncher />
-            <a className="v2-btn v2-btn-quiet" href="/guide" target="_blank" rel="noreferrer" data-testid="guide-link">
-              <BookOpen size={14} /> Resource &amp; Product Guide
-            </a>
-            <button className="v2-btn v2-btn-quiet" onClick={() => { signOut(); navigate({ to: "/app/onboarding" }); }}>
-              <LogOut size={14} /> Sign out
-            </button>
-          </div>
-        </aside>
+        <SideNav
+          pathname={pathname}
+          partnerView={partnerView}
+          counts={COUNTS}
+          open={open}
+          onClose={() => setOpen(false)}
+          firmName={firm?.name || ""}
+          canSignOff={canSignOff}
+          role={role}
+          setRole={setRole}
+          onSignOut={() => { signOut(); navigate({ to: "/app/onboarding" }); }}
+        />
 
         <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
           <header
@@ -252,7 +187,7 @@ function ShellBody() {
               <label className="v2-hide-sm" style={{ fontSize: 11.5, color: V.muted }}>Period</label>
               <select
                 className="v2-input"
-                style={{ width: "auto", padding: "7px 10px", fontSize: 12.5 }}
+                style={{ width: "auto", maxWidth: 150, padding: "7px 28px 7px 10px", fontSize: 12.5 }}
                 value={period}
                 onChange={(e) => setPeriod(e.target.value)}
               >

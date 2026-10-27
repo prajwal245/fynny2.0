@@ -248,7 +248,7 @@ export function FirstCloseCard() {
 }
 
 /** The guide from anywhere: a button in the menu that opens it in a side panel, and a cheer when the first MIS is signed off. */
-export function FirstCloseLauncher() {
+export function FirstCloseLauncher({ compact = false }: { compact?: boolean } = {}) {
   const { done, steps } = useFirstCloseSteps();
   const [open, setOpen] = useState(false);
   const prev = useRef(done);
@@ -264,13 +264,15 @@ export function FirstCloseLauncher() {
     <>
       <button
         type="button"
-        className="v2-btn v2-btn-quiet"
-        style={{ width: "100%", justifyContent: "flex-start", gap: 10, borderRadius: 14, border: `1px solid ${V.line}`, padding: "10px 12px" }}
+        className={compact ? "v2-rail-btn" : "v2-btn v2-btn-quiet"}
+        title={compact ? `Your first MIS: step ${Math.min(done + 1, steps.length)} of ${steps.length}` : undefined}
+        aria-label={compact ? "Your first MIS, step by step" : undefined}
+        style={compact ? undefined : { width: "100%", justifyContent: "flex-start", gap: 10, borderRadius: 14, border: `1px solid ${V.line}`, padding: "10px 12px" }}
         onClick={() => setOpen(true)}
         data-testid="first-close-launcher"
       >
-        <Compass size={16} />
-        <span style={{ textAlign: "left", lineHeight: 1.25 }}>
+        <Compass size={compact ? 18 : 16} />
+        <span style={{ textAlign: "left", lineHeight: 1.25, display: compact ? "none" : undefined }}>
           <span style={{ display: "block", fontSize: 13, fontWeight: 600 }}>Your first MIS</span>
           <span style={{ display: "block", fontSize: 11.5, color: V.muted }}>
             Step {Math.min(done + 1, steps.length)} of {steps.length}

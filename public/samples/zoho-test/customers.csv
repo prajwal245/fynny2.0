@@ -1,0 +1,6 @@
+Customer ID,Display Name,GST Treatment,GST Identification Number (GSTIN),Place of Contact,Email,Currency Code
+CUST-01,Kaveri Textiles Pvt Ltd,business_gst,29AABCK4821M1Z9,Karnataka,accounts@kaveritextiles.example,INR
+CUST-02,Mehta Foods LLP,business_gst,24AAFFM7310Q1Z1,Gujarat,finance@mehtafoods.example,INR
+CUST-03,Sundar Auto Components,business_gst,33AAHFS5562K1ZW,Tamil Nadu,accounts@sundarauto.example,INR
+CUST-04,Orion IT Services Pvt Ltd,business_gst,27AACCO9084D1ZA,Maharashtra,ap@orionit.example,INR
+CUST-05,Bharat Stationers,business_gst,07AAEPB3376R1ZC,Delhi,bharatstationers@example.com,INR

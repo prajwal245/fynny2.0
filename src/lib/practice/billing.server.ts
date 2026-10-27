@@ -814,6 +814,13 @@ export async function redeemTrialCoupon(db: Db, ctx: FirmContext, code: string) 
   if (c.kind !== "trial_days") throw new PracticeError("bad_coupon", "That code is a discount. Enter it when you choose a plan.");
   const row = await loadBilling(db, ctx.firmId);
   if (row.status !== "trialing") throw new PracticeError("bad_coupon", "Trial codes apply only during or right after the free trial.");
+  if (!row.trial_started_at) {
+    // The clock has not started (it starts at the first upload): the days wait and are added to the 14 then.
+    await db.from("ca_billing").update({ trial_bonus_days: (row.trial_bonus_days ?? 0) + Number(c.value), updated_at: new Date().toISOString() }).eq("ca_firm_id", ctx.firmId);
+    await db.from("ca_coupon_redemptions").insert({ code: c.code, ca_firm_id: ctx.firmId });
+    await logActivity(db, ctx.firmId, null, "system", `Code ${c.code} applied: ${c.value} extra free days, added when the trial starts with the first upload.`);
+    return billingView(db, ctx);
+  }
   const from = Math.max(Date.now(), new Date(row.trial_ends_at).getTime());
   const ends = new Date(from + Number(c.value) * 86_400_000).toISOString();
   await db.from("ca_billing").update({ trial_ends_at: ends, updated_at: new Date().toISOString() }).eq("ca_firm_id", ctx.firmId);

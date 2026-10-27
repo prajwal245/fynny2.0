@@ -350,7 +350,7 @@ export default function OnboardingPage() {
                 {mode !== "forgot" && <div><GoogleSignIn label={mode === "signup" ? "Sign up with Google" : "Continue with Google"} /></div>}
                 {mode === "signup" && launch && (
                   <div role="status" data-testid="launch-chip" style={{ fontSize: 13, padding: "10px 12px", borderRadius: 12, background: V.blue, color: V.ink, display: "flex", gap: 8, alignItems: "center" }}>
-                    <span className="v2-mono" style={{ fontWeight: 700 }}>{LAUNCH_CODE}</span> applied. {LAUNCH_DAYS} days free, no card needed.
+                    <b>Launch offer applied.</b> {LAUNCH_DAYS} days free, no card needed.
                   </div>
                 )}
                 {mode === "signup" && (

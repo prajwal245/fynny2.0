@@ -21,7 +21,8 @@ import { V } from "../ui";
 import { WhatsAppIcon } from "./BrandIcons";
 import { AgentTabs, type TabDef } from "./AgentTabs";
 import { AgentRunSteps } from "./AgentRunSteps";
-import { WhatsappTemplates, readyCount, sendableCount, useTemplatesView } from "./WhatsappTemplates";
+import { WhatsappPreview } from "./WhatsappPreview";
+import { useV2 } from "../store";
 
 type Status = Awaited<ReturnType<typeof getPracticeWhatsappStatus>>;
 type Health = Awaited<ReturnType<typeof checkPracticeWhatsapp>>;
@@ -60,6 +61,19 @@ const Block = ({ title, children }: { title?: string; children: React.ReactNode 
   </section>
 );
 
+/** What the client sees. The wording is managed by FynHelp, so this shows the messages and nothing about their set-up. */
+function MessagesTab() {
+  const { firm } = useV2();
+  return (
+    <Block title="What your clients receive">
+      <div style={{ fontSize: 13, color: V.body, lineHeight: 1.6 }}>
+        Each reminder is a short WhatsApp message with four buttons: upload documents without logging in, sending today, need more time, or stop reminders. FynHelp looks after the wording and keeps it working.
+      </div>
+      <WhatsappPreview clientName="Acme Traders" contact="Asha" item="Bank statement" firmName={firm?.name ?? "Your firm"} />
+    </Block>
+  );
+}
+
 /** A figure in the header that also takes you to the tab it belongs to. */
 function Stat({ label, children, onClick }: { label: string; children: React.ReactNode; onClick?: () => void }) {
   const inner = (
@@ -84,7 +98,6 @@ export function WhatsappSetup({ firmId, webhook, onChanged }: { firmId: string; 
   const savePrefs = useServerFn(setChaserPrefs);
   const planAllows = useBilling()?.access.whatsappChaser ?? false;
   const credits = useCredits();
-  const templates = useTemplatesView();
   const reduce = useReducedMotion();
 
   const [status, setStatus] = useState<Status | null>(null);
@@ -124,21 +137,17 @@ export function WhatsappSetup({ firmId, webhook, onChanged }: { firmId: string; 
   const sharedOk = Boolean(status?.shared.configured);
   const usable = mode === "fynhelp" ? sharedOk : Boolean(own);
   const using = status?.sender ?? null;
-  const ready = readyCount(templates);
-  const sendable = sendableCount(templates);
-
-  // Open on the first thing that needs doing: the number, then the messages. Otherwise the messages tab.
-  const first: Tab = !status ? "number" : !usable ? "number" : templates && sendable === 0 ? "messages" : "number";
-  const active: Tab = tab ?? first;
+  // Opens on the number; the message wording is managed by FynHelp.
+  const active: Tab = tab ?? "number";
 
   const tabs: TabDef[] = useMemo(
     () => [
       { key: "number", label: "Number", badge: status && !usable ? { tone: "warn" } : null },
-      { key: "messages", label: "Messages", badge: templates ? { text: `${ready}/3`, tone: ready === 3 ? "good" : sendable > 0 ? "info" : "warn" } : null },
+      { key: "messages", label: "Messages" },
       { key: "rules", label: "Rules" },
       { key: "check", label: "Check", badge: health ? { tone: health.ok ? "good" : "bad" } : null },
     ],
-    [status, usable, templates, ready, sendable, health],
+    [status, usable, health],
   );
 
   if (!status || !prefs || !mode) return <div style={{ fontSize: 13, color: V.muted }}>Loading…</div>;
@@ -197,7 +206,7 @@ export function WhatsappSetup({ firmId, webhook, onChanged }: { firmId: string; 
             </span>
           </Stat>
           <Stat label="Messages" onClick={() => setTab("messages")}>
-            {templates ? `${ready} of 3 ready` : "Checking…"}
+            3 reminders, managed by FynHelp
           </Stat>
           {status.shared.configured && mode === "fynhelp" && credits && !credits.unmetered && (
             <Stat label="Credits">
@@ -305,7 +314,7 @@ export function WhatsappSetup({ firmId, webhook, onChanged }: { firmId: string; 
             </>
           )}
 
-          {active === "messages" && (usable ? <WhatsappTemplates view={templates} /> : <div style={{ fontSize: 13, color: V.muted }}>Choose or link a number first, then your reminder messages appear here.</div>)}
+          {active === "messages" && (usable ? <MessagesTab /> : <div style={{ fontSize: 13, color: V.muted }}>Choose or link a number first, then your reminder messages appear here.</div>)}
 
           {active === "rules" && (
             <Block title="How reminders work">

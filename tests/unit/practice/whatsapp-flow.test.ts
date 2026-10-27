@@ -5,6 +5,7 @@ import {
   chaseTemplateParams,
   classifyInbound,
   explainWaError,
+  PLATFORM_FAILURE_MESSAGE,
   waParam,
 } from "@/lib/practice/whatsappFlow";
 
@@ -29,13 +30,21 @@ describe("template message", () => {
 describe("Meta errors in plain words", () => {
   it("treats bad numbers and unapproved templates as permanent", () => {
     expect(explainWaError(131026, undefined)).toMatchObject({ permanent: true });
-    expect(explainWaError(132001, undefined).message).toMatch(/template/i);
-    expect(explainWaError(190, undefined).message).toMatch(/token/i);
+    // Faults that only FynHelp can fix are never explained to the firm: it sees "Failed", the reason goes to the logs.
+    for (const code of [132001, 190, 132000, 131047, 100]) {
+      const e = explainWaError(code, undefined);
+      expect(e.message).toBe(PLATFORM_FAILURE_MESSAGE);
+      expect(e.message).not.toMatch(/template|token|meta|approved/i);
+      expect(e.internal).toBeTruthy();
+    }
+    expect(explainWaError(132001, undefined).internal).toMatch(/template/i);
+    expect(explainWaError(190, undefined).internal).toMatch(/token/i);
   });
   it("treats rate limits as retryable", () => {
     expect(explainWaError(130429, undefined).permanent).toBe(false);
     expect(explainWaError(131056, undefined).permanent).toBe(false);
-    expect(explainWaError(undefined, "boom").message).toContain("boom");
+    expect(explainWaError(undefined, "boom").internal).toContain("boom");
+    expect(explainWaError(undefined, "boom").message).not.toContain("boom");
   });
 });
 

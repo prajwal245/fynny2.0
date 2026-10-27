@@ -30,6 +30,9 @@ describe("launch page", () => {
     const { container } = render(<LaunchPage />);
     container.querySelectorAll("style").forEach((n) => n.remove());
     expect(container.textContent).not.toMatch(/\[[^\]]*\]/);
+    // The offer rides on the link: the code is never shown or typed.
+    expect(container.textContent).not.toContain(LAUNCH_CODE);
+    expect(container.querySelectorAll("input[readonly]").length).toBe(0);
   });
 
   it("takes the code from a shared link", () => {

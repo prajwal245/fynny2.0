@@ -44,7 +44,9 @@ describe("the WhatsApp settings panel", () => {
     expect(screen.getAllByRole("tab").map((t) => t.textContent?.replace(/\d\/\d/, "").trim())).toEqual(["Number", "Messages", "Rules", "Check"]);
     expect(screen.getByText("Active")).toBeTruthy();
     // The header carries the number, the messages and the credits.
-    await waitFor(() => expect(screen.getByText("2 of 3 ready")).toBeTruthy());
+    // Nothing about approval is shown to firms: the wording is managed by FynHelp.
+    expect(screen.queryByText(/of 3 ready|approved|Meta has/i)).toBeNull();
+    expect(screen.getByText("3 reminders, managed by FynHelp")).toBeTruthy();
     expect(screen.getAllByText(/\+91 96063 70717/).length).toBeGreaterThan(0);
     // Only the open tab's content is on the page.
     expect(screen.getByText("Which WhatsApp number should FynHelp use?")).toBeTruthy();
@@ -52,13 +54,13 @@ describe("the WhatsApp settings panel", () => {
     expect(screen.queryByText("Test the connection")).toBeNull();
   });
 
-  it("switches tabs: messages show the stages and the preview, rules show the settings", async () => {
+  it("switches tabs: messages show what clients receive, rules show the settings", async () => {
     ui();
     await waitFor(() => expect(screen.getByText("Chaser on WhatsApp")).toBeTruthy());
     fireEvent.click(screen.getByRole("tab", { name: /Messages/ }));
-    await waitFor(() => expect(screen.getByTestId("wa-templates")).toBeTruthy());
-    expect(screen.getByText("Final reminder")).toBeTruthy();
-    expect(screen.getByTestId("whatsapp-preview")).toBeTruthy();
+    await waitFor(() => expect(screen.getByTestId("whatsapp-preview")).toBeTruthy());
+    expect(screen.getByText("What your clients receive")).toBeTruthy();
+    expect(screen.queryByText(/Meta|approved|template/i)).toBeNull();
     fireEvent.click(screen.getByRole("tab", { name: "Rules" }));
     await waitFor(() => expect(screen.getByText("How reminders work")).toBeTruthy());
     expect(screen.getByLabelText(/Phone numbers saved without a country code/)).toBeTruthy();

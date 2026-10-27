@@ -14,6 +14,7 @@ import {
   chaseTextWithLink,
   chooseSender,
   explainWaError,
+  PLATFORM_FAILURE_MESSAGE,
   inServiceWindow,
   stageForStep,
   windowClosed,
@@ -260,13 +261,16 @@ export async function sendChaseWhatsapp(
         // A bad token will fail the template too; any other failure (window closed, odd text rejection) falls back to it.
         else if (t.body.error?.code === 190 && !windowClosed(t.body.error.code)) {
           const why = explainWaError(190, t.body.error.message);
+          if (why.internal) console.error(`[whatsapp] platform fault: ${why.internal}`);
           return { ok: false, unconfigured: false, permanent: why.permanent, error: why.message };
         }
       }
       if (!sent) {
         // No approved template: say so plainly, before a credit is taken, instead of letting WhatsApp refuse it.
-        if (template.none)
-          return { ok: false, unconfigured: false, permanent: false, error: "No WhatsApp message template is approved yet, so this reminder cannot be sent. It goes out by itself as soon as one is approved (Settings, WhatsApp, Messages). A client who wrote to you in the last 23 hours can still be messaged." };
+        if (template.none) {
+          console.error("[whatsapp] platform fault: no approved reminder template is available, so reminders cannot go out");
+          return { ok: false, unconfigured: false, permanent: false, error: PLATFORM_FAILURE_MESSAGE };
+        }
         // Only a template costs a credit.
         const spend = await credits.spendForReminder(db, firmId, { sharedNumber: sender.shared });
         if (!spend.ok)
@@ -276,6 +280,7 @@ export async function sendChaseWhatsapp(
         const r = await post(sender, buildTemplateMessage(to, template.name, template.language || chaseTemplateLang(), params, buttons));
         if (!r.ok) {
           const why = explainWaError(r.body.error?.code, r.body.error?.error_data?.details ?? r.body.error?.message);
+          if (why.internal) console.error(`[whatsapp] platform fault: ${why.internal}`);
           return { ok: false, unconfigured: false, permanent: why.permanent, error: why.message };
         }
         sent = { wamid: r.body.messages![0].id, mode: "template" };

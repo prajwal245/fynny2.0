@@ -574,6 +574,19 @@ export async function systemHealth(ctx: AdminCtx) {
     config("cron", "Scheduled jobs", has("CRON_SECRET") || has("CA_CRON_SECRET"), "Cron secret set", "No cron secret; scheduled chasers and reminders will not run", true),
   );
 
+  // The WhatsApp reminder messages are FynHelp's to run, so their approval status lives here and not in firms' Settings.
+  await timed("whatsapp_templates", "WhatsApp reminder messages", async () => {
+    const { touchSender } = await import("@/lib/practice/touchpoints/whatsapp.server");
+    const sender = touchSender();
+    if (!sender) return "WhatsApp is not set up (access token or number ID missing)";
+    if (!sender.wabaId) return "WHATSAPP_WABA_ID is not set, so message approval cannot be checked";
+    const { stagesView } = await import("@/lib/practice/whatsappTemplates.server");
+    const stages = await stagesView(sender);
+    const names = stages.map((s) => `${s.label}: ${s.using ? (s.status === "approved" ? "ready" : `using ${s.using}`) : s.status}`).join(" · ");
+    if (!stages.some((s) => s.using)) return `No reminder can be sent. ${names}`;
+    return null;
+  });
+
   const since = new Date(Date.now() - DAY).toISOString();
   const stuckBefore = new Date(Date.now() - 10 * 60_000).toISOString();
   const [runs, stuck, failedRuns, queue, lastWebhook, lastSchedule] = await Promise.all([

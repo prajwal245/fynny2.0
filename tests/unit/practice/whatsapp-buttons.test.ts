@@ -13,6 +13,7 @@ import {
   chasePayload,
   chaseTextWithLink,
   parseChasePayload,
+  PLATFORM_FAILURE_MESSAGE,
 } from "@/lib/practice/whatsappFlow";
 import { hashToken, looksLike, newToken, uploadUrl } from "@/lib/practice/uploadLinks.server";
 
@@ -268,7 +269,8 @@ describe("sending the chase", () => {
       const { sendChaseWhatsapp } = await import("@/lib/practice/whatsappSend.server");
       const r = await sendChaseWhatsapp(world(false), "f1", "9845012345", params, { chase });
       expect(r.ok).toBe(false);
-      expect(r.error).toContain("No WhatsApp message template is approved yet");
+      expect(r.error).toBe(PLATFORM_FAILURE_MESSAGE);
+      expect(r.error).not.toMatch(/template|meta|approved/i);
       expect(sent).toHaveLength(0);
       expect(credit).toMatchObject({ spent: 0, refunded: 0 });
     });

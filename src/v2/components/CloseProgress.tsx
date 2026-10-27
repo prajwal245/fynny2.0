@@ -16,7 +16,7 @@ export function CloseProgress({ state, compact = false }: { state: CloseState; c
         </span>
         <span className="num" style={{ fontSize: compact ? 11.5 : 12.5, fontWeight: 600 }}>{state.percent} percent</span>
       </div>
-      <div style={{ height: 6, borderRadius: 999, background: "rgba(20,20,20,.07)", overflow: "hidden" }}>
+      <div style={{ height: 6, borderRadius: 999, background: "rgba(255,255,255,.1)", overflow: "hidden" }}>
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${state.percent}%` }}
@@ -30,7 +30,7 @@ export function CloseProgress({ state, compact = false }: { state: CloseState; c
             <span
               style={{
                 width: 15, height: 15, borderRadius: 999, display: "grid", placeItems: "center",
-                background: s.done ? "rgba(31,90,70,.14)" : s.stage === state.stage ? V.beige : "rgba(20,20,20,.06)",
+                background: s.done ? "rgba(91,211,154,.16)" : s.stage === state.stage ? V.beige : "rgba(255,255,255,.08)",
                 color: s.done ? V.green : V.muted,
               }}
             >

@@ -145,12 +145,12 @@ function ShellBody() {
     <>
       <div className="v2" style={{ minHeight: "100vh", display: "flex" }}>
         {open && (
-          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(20,20,20,.3)", zIndex: 55 }} />
+          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", zIndex: 55 }} />
         )}
         <aside
           className={`v2-sidebar${open ? " open" : ""}`}
           style={{
-            width: 244, flex: "0 0 244px", background: V.card, borderRight: `1px solid ${V.line}`,
+            width: 244, flex: "0 0 244px", background: "rgba(9,11,17,.72)", backdropFilter: "blur(18px)", borderRight: `1px solid ${V.line}`,
             padding: "22px 14px", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh",
             transition: "transform .22s ease",
           }}
@@ -173,8 +173,8 @@ function ShellBody() {
                   onClick={() => setRole(r)}
                   style={{
                     flex: 1, border: 0, cursor: "pointer", borderRadius: 999, padding: "6px 0", fontSize: 12, fontWeight: 600,
-                    fontFamily: "inherit", background: role === r ? V.card : "transparent", color: role === r ? V.ink : V.muted,
-                    boxShadow: role === r ? "0 1px 3px rgba(20,20,20,.10)" : "none",
+                    fontFamily: "inherit", background: role === r ? "rgba(249,16,58,.22)" : "transparent", color: role === r ? V.ink : V.muted,
+                    boxShadow: role === r ? "0 6px 14px -8px rgba(249,16,58,.7)" : "none",
                   }}
                 >
                   {r}
@@ -218,7 +218,7 @@ function ShellBody() {
         <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
           <header
             style={{
-              position: "sticky", top: 0, zIndex: 40, background: "rgba(248,247,244,.86)", backdropFilter: "blur(10px)",
+              position: "sticky", top: 0, zIndex: 40, background: "rgba(9,11,17,.72)", backdropFilter: "blur(14px)",
               borderBottom: `1px solid ${V.line}`, padding: "14px 24px",
               display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", alignItems: "center", gap: 14,
             }}

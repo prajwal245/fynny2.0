@@ -21,8 +21,8 @@ const CHIP: Record<string, { tone: Tone; label: string; icon: React.ReactNode; d
   paused: { tone: "warn", label: "Paused by Meta", icon: <AlertTriangle size={13} />, dot: "#B45309" },
   marketing: { tone: "warn", label: "Classed as Marketing", icon: <AlertTriangle size={13} />, dot: "#B45309" },
   unsupported: { tone: "warn", label: "Buttons not supported", icon: <AlertTriangle size={13} />, dot: "#B45309" },
-  missing: { tone: "neutral", label: "Not created yet", icon: <CircleDashed size={13} />, dot: "rgba(42,15,12,.35)" },
-  unknown: { tone: "neutral", label: "Cannot check", icon: <CircleDashed size={13} />, dot: "rgba(42,15,12,.35)" },
+  missing: { tone: "neutral", label: "Not created yet", icon: <CircleDashed size={13} />, dot: "rgba(244,246,250,.35)" },
+  unknown: { tone: "neutral", label: "Cannot check", icon: <CircleDashed size={13} />, dot: "rgba(244,246,250,.35)" },
 };
 const DAY: Record<string, string> = { request: "Day 0", followup: "Day 3", final: "Day 7" };
 
@@ -67,7 +67,7 @@ export function WhatsappTemplates({ view }: { view?: TemplatesView | null }) {
             initial={reduce ? false : { scaleY: 0 }}
             animate={{ scaleY: 1 }}
             transition={{ duration: 0.6, ease: "easeOut" }}
-            style={{ position: "absolute", left: 11, top: 14, bottom: 14, width: 2, background: `linear-gradient(${AGENTS.chaser.dot}, rgba(42,15,12,.12))`, transformOrigin: "top", borderRadius: 2 }}
+            style={{ position: "absolute", left: 11, top: 14, bottom: 14, width: 2, background: `linear-gradient(${AGENTS.chaser.dot}, rgba(244,246,250,.14))`, transformOrigin: "top", borderRadius: 2 }}
           />
           {v.stages.map((s, i) => {
             const c = CHIP[s.status] ?? CHIP.unknown;

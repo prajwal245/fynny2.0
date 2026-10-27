@@ -11,7 +11,7 @@ export type IntegrationTone = "good" | "warn" | "bad" | "neutral";
 
 export const INTEGRATION_STYLES = `
 .ic-list { display:grid; gap:12px; }
-.ic-card { position:relative; background:#fff; border:1px solid ${V.line}; border-radius:18px; padding:16px 18px; transition: box-shadow .25s ease, border-color .25s ease, transform .25s cubic-bezier(.16,1,.3,1); animation: ic-in .45s cubic-bezier(.16,1,.3,1) both; animation-delay: calc(var(--i, 0) * 60ms); }
+.ic-card { position:relative; background:${V.card}; border:1px solid ${V.line}; border-radius:18px; padding:16px 18px; transition: box-shadow .25s ease, border-color .25s ease, transform .25s cubic-bezier(.16,1,.3,1); animation: ic-in .45s cubic-bezier(.16,1,.3,1) both; animation-delay: calc(var(--i, 0) * 60ms); }
 .ic-card:hover { border-color: rgba(23,18,8,.18); box-shadow: 0 10px 28px -18px rgba(23,18,8,.35); transform: translateY(-1px); }
 .ic-card[data-open="true"] { border-color: rgba(138,30,24,.28); box-shadow: 0 14px 34px -22px rgba(138,30,24,.45); }
 @keyframes ic-in { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform:none; } }
@@ -42,7 +42,7 @@ export const INTEGRATION_STYLES = `
 .ic-spin { width:14px; height:14px; border-radius:50%; border:2px solid currentColor; border-right-color:transparent; animation: v2spin .7s linear infinite; display:inline-block; }
 .ic-check { display:inline-grid; place-items:center; width:18px; height:18px; border-radius:50%; background:#1F6B45; color:#fff; animation: ic-pop .45s cubic-bezier(.34,1.56,.64,1) both; }
 @keyframes ic-pop { from { transform: scale(.3); opacity:0; } to { transform:none; opacity:1; } }
-.ic-skel { height:40px; border-radius:12px; background: linear-gradient(90deg, ${V.gray} 0%, #fff 50%, ${V.gray} 100%); background-size:200% 100%; animation: v2shimmer 1.4s linear infinite; }
+.ic-skel { height:40px; border-radius:12px; background: linear-gradient(90deg, ${V.gray} 0%, rgba(255,255,255,.12) 50%, ${V.gray} 100%); background-size:200% 100%; animation: v2shimmer 1.4s linear infinite; }
 @media (max-width: 640px) { .ic-head { grid-template-columns: auto minmax(0,1fr); } .ic-actions { grid-column: 1 / -1; justify-content:flex-start; } }
 @media (prefers-reduced-motion: reduce) { .ic-card, .ic-row, .ic-check, .ic-body, .ic-steps span::after, .ic-tile, .ic-pill .dot::after { animation:none !important; transition:none !important; } }
 `;

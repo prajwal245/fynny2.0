@@ -36,7 +36,7 @@ function Steps({ items }: { items: string[] }) {
 
 const pill = (on: boolean, disabled = false): React.CSSProperties => ({
   padding: "8px 16px", borderRadius: 999, fontSize: 13, fontWeight: 600, cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.5 : 1,
-  background: on ? V.ink : V.card, color: on ? "#fff" : V.body, border: `1px solid ${on ? V.ink : V.line}`,
+  background: on ? V.brand : V.card, color: on ? "#fff" : V.body, border: `1px solid ${on ? V.brand : V.line}`,
 });
 
 export function WhatsappIntake({ unassigned, onShowUnassigned, onChanged }: { unassigned: number; onShowUnassigned: () => void; onChanged?: () => void }) {

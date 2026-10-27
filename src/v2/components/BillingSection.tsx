@@ -201,7 +201,7 @@ export function BillingSection() {
               const ready = b.available.some((x) => x.plan === k && x.cycle === cycle);
               const timing = current ? changeTiming(current, { plan: k, cycle }) : null;
               return (
-                <div key={k} style={{ border: `1px solid ${timing === "same" ? V.maroon : "rgba(42,15,12,.1)"}`, borderRadius: 14, padding: 16, display: "grid", gap: 8, alignContent: "start" }}>
+                <div key={k} style={{ border: `1px solid ${timing === "same" ? V.maroon : "rgba(255,255,255,.12)"}`, borderRadius: 14, padding: 16, display: "grid", gap: 8, alignContent: "start" }}>
                   <div style={{ fontWeight: 600 }}>{p.name}</div>
                   <div style={{ fontSize: 12, color: V.muted, marginTop: -4 }}>{p.recommendedFor}</div>
                   <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}>

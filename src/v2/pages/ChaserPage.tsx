@@ -101,7 +101,7 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
             key={f}
             className="v2-btn"
             onClick={() => setFilter(f)}
-            style={{ background: filter === f ? V.ink : V.card, color: filter === f ? "#fff" : V.body, borderColor: filter === f ? V.ink : V.line, padding: "8px 15px", fontSize: 12.5 }}
+            style={{ background: filter === f ? V.brand : V.card, color: filter === f ? "#fff" : V.body, borderColor: filter === f ? V.brand : V.line, padding: "8px 15px", fontSize: 12.5 }}
           >
             {f}
             <span style={{ opacity: 0.6 }}>{f === "All" ? chases.length : chases.filter((c) => c.status === f).length}</span>

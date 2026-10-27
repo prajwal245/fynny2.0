@@ -14,10 +14,10 @@ export type AgentKey = "extract" | "recon" | "narrate" | "chaser";
 
 /** One shade of the logo's red per agent, from bright to deep. */
 export const AGENTS: Record<AgentKey, { name: string; tint: string; ink: string; dot: string; verb: string }> = {
-  extract: { name: "Extract", tint: "#FDE8E3", ink: "#9E241D", dot: "#E4302A", verb: "Extracting" },
-  recon: { name: "Recon", tint: "#F8E1DA", ink: "#6E1712", dot: "#B42424", verb: "Matching transactions" },
-  narrate: { name: "Narrate", tint: "#FCEEE4", ink: "#7A3420", dot: "#C8553D", verb: "Generating MIS" },
-  chaser: { name: "Chaser", tint: "#F4E4DF", ink: "#3A0E0A", dot: "#8A1E18", verb: "Sending follow up" },
+  extract: { name: "Extract", tint: "rgba(249,16,58,.18)", ink: "#FF8296", dot: "#F9103A", verb: "Extracting" },
+  recon: { name: "Recon", tint: "rgba(249,98,70,.18)", ink: "#FFA08A", dot: "#F96246", verb: "Matching transactions" },
+  narrate: { name: "Narrate", tint: "rgba(255,235,185,.14)", ink: "#FFEBB9", dot: "#FFD98A", verb: "Generating MIS" },
+  chaser: { name: "Chaser", tint: "rgba(244,246,250,.12)", ink: "#F4F6FA", dot: "#E8506A", verb: "Sending follow up" },
 };
 
 export const AGENT_STYLES = `
@@ -25,9 +25,9 @@ export const AGENT_STYLES = `
 .v2-dot { position:relative; width:7px; height:7px; border-radius:999px; display:inline-block; flex:0 0 7px; }
 .v2-dot::after { content:""; position:absolute; inset:0; border-radius:999px; background:inherit; animation:v2pulse 1.6s ease-out infinite; }
 .v2-lift { transition:transform .22s ease, box-shadow .22s ease; }
-.v2-lift:hover { transform:translateY(-3px); box-shadow:0 2px 4px rgba(20,20,20,.05), 0 22px 40px -30px rgba(20,20,20,.55); }
+.v2-lift:hover { transform:translateY(-3px); border-color:rgba(249,16,58,.35); box-shadow:0 22px 44px -28px rgba(249,16,58,.45); }
 .v2-btn:active { transform:translateY(1px) scale(.985); }
-.v2-bar { height:3px; border-radius:999px; overflow:hidden; background:rgba(20,20,20,.07); }
+.v2-bar { height:3px; border-radius:999px; overflow:hidden; background:rgba(255,255,255,.1); }
 .v2-bar > i { display:block; height:100%; border-radius:999px; animation:v2sweep 1.5s ease-in-out infinite; }
 .v2-link { background:none; border:0; padding:0; color:inherit; font:inherit; font-weight:600; text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
 @keyframes v2sweep { 0%{ margin-left:-40%; width:40% } 100%{ margin-left:100%; width:40% } }
@@ -119,7 +119,7 @@ export function AgentGlyph({ agent, state = "idle", size = 32 }: { agent: AgentK
   const Icon = GLYPH_ICON[agent];
   const box: CSSProperties = {
     width: size, height: size, flex: `0 0 ${size}px`, borderRadius: size * 0.32,
-    background: state === "failed" ? "rgba(169,56,56,.1)" : a.tint, color: state === "failed" ? V.maroon : a.ink,
+    background: state === "failed" ? "rgba(249,16,58,.16)" : a.tint, color: state === "failed" ? V.maroon : a.ink,
     display: "grid", placeItems: "center", position: "relative", overflow: "hidden",
   };
   const loop = { repeat: Infinity, ease: "easeInOut" as const };
@@ -261,7 +261,7 @@ export function ProcessingCard({ run, onDismiss }: { run: LiveRun; onDismiss?: (
       style={{
         padding: 18,
         borderColor: failed ? "rgba(122,31,43,.35)" : a.tint,
-        background: failed ? "rgba(122,31,43,.03)" : "#fff",
+        background: failed ? "rgba(249,16,58,.08)" : V.card,
       }}
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>

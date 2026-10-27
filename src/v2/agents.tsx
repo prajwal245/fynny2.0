@@ -25,7 +25,7 @@ export const AGENT_STYLES = `
 .v2-dot { position:relative; width:7px; height:7px; border-radius:999px; display:inline-block; flex:0 0 7px; }
 .v2-dot::after { content:""; position:absolute; inset:0; border-radius:999px; background:inherit; animation:v2pulse 1.6s ease-out infinite; }
 .v2-lift { transition:transform .22s ease, box-shadow .22s ease; }
-.v2-lift:hover { transform:translateY(-3px); border-color:rgba(249,16,58,.35); box-shadow:0 22px 44px -28px rgba(249,16,58,.4); }
+.v2-lift:hover { transform:translateY(-3px); border-color:rgba(217,43,43,.35); box-shadow:0 22px 44px -28px rgba(217,43,43,.4); }
 .v2-btn:active { transform:translateY(1px) scale(.985); }
 .v2-bar { height:3px; border-radius:999px; overflow:hidden; background:var(--v2-line); }
 .v2-bar > i { display:block; height:100%; border-radius:999px; animation:v2sweep 1.5s ease-in-out infinite; }
@@ -119,7 +119,7 @@ export function AgentGlyph({ agent, state = "idle", size = 32 }: { agent: AgentK
   const Icon = GLYPH_ICON[agent];
   const box: CSSProperties = {
     width: size, height: size, flex: `0 0 ${size}px`, borderRadius: size * 0.32,
-    background: state === "failed" ? "rgba(249,16,58,.16)" : a.tint, color: state === "failed" ? V.maroon : a.ink,
+    background: state === "failed" ? "rgba(217,43,43,.16)" : a.tint, color: state === "failed" ? V.maroon : a.ink,
     display: "grid", placeItems: "center", position: "relative", overflow: "hidden",
   };
   const loop = { repeat: Infinity, ease: "easeInOut" as const };
@@ -261,7 +261,7 @@ export function ProcessingCard({ run, onDismiss }: { run: LiveRun; onDismiss?: (
       style={{
         padding: 18,
         borderColor: failed ? "rgba(122,31,43,.35)" : a.tint,
-        background: failed ? "rgba(249,16,58,.08)" : V.card,
+        background: failed ? "rgba(217,43,43,.08)" : V.card,
       }}
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>

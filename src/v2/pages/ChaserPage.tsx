@@ -5,7 +5,7 @@ import { Send, Plus, MessageCircle, Mail, Lock } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { useBilling } from "../lib/billing";
 import { getPracticeWhatsappStatus } from "@/lib/practice/practice.functions";
-import { Badge, Card, Drawer, EmptyState, Modal, PageHeader, Tone, V, formatDate } from "../ui";
+import { Badge, Card, Drawer, EmptyState, Modal, PageHeader, Segmented, Tone, V, formatDate } from "../ui";
 import { AgentGlyph, AgentStatusBadge, AgentTimeline, ShimmerText } from "../agents";
 import { Chase, useV2 } from "../store";
 import { CreditsAlert, CreditsChip, TopUpModal } from "../components/CreditsPanel";
@@ -96,17 +96,12 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
 
       <CreditsAlert onAdd={() => setTopUp(true)} />
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16, alignItems: "center" }}>
-        {FILTERS.map((f) => (
-          <button
-            key={f}
-            className="v2-btn"
-            onClick={() => setFilter(f)}
-            style={{ background: filter === f ? V.brand : V.card, color: filter === f ? "#fff" : V.body, borderColor: filter === f ? V.brand : V.line, padding: "8px 15px", fontSize: 12.5 }}
-          >
-            {f}
-            <span style={{ opacity: 0.6 }}>{f === "All" ? chases.length : chases.filter((c) => c.status === f).length}</span>
-          </button>
-        ))}
+        <Segmented
+          label="Filter chases"
+          value={filter}
+          onChange={setFilter}
+          options={FILTERS.map((f) => ({ value: f, label: f, count: f === "All" ? chases.length : chases.filter((c) => c.status === f).length }))}
+        />
         <span style={{ marginLeft: "auto" }}><CreditsChip onAdd={() => setTopUp(true)} /></span>
       </div>
       <TopUpModal open={topUp} onClose={() => setTopUp(false)} />

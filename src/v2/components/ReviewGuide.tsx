@@ -67,7 +67,7 @@ export function ReviewGuide({ items }: { items: ReviewItem[] }) {
         return (
           <Card key={g.docId} style={{ borderLeft: `3px solid ${V.brand}`, background: V.cream }} data-testid="review-guide">
             <div style={{ display: "grid", gridTemplateColumns: "34px minmax(0,1fr)", gap: 12, alignItems: "start" }}>
-              <span style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(249,16,58,.16)", color: V.brand, display: "grid", placeItems: "center" }}>
+              <span style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(217,43,43,.16)", color: V.brand, display: "grid", placeItems: "center" }}>
                 {looksLikeRegister ? <FileWarning size={18} /> : <Lightbulb size={18} />}
               </span>
               <div style={{ minWidth: 0, display: "grid", gap: 10 }}>

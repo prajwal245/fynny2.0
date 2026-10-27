@@ -16,6 +16,8 @@ import {
   expensePayload,
   paymentPayload,
   pickChargeAccount,
+  alreadyInZoho,
+  duplicateWindow,
   postable,
   preview,
   zohoErrorMessage,
@@ -582,6 +584,19 @@ async function plan(db: Db, ctx: FirmContext, c: Conn, l: Awaited<ReturnType<typ
   const invoices = t.direction === "in" ? await openInvoices(db, ctx, l.id) : [];
   const p = postable(t, invoices);
   if (p.kind === "none") throw new PracticeError("not_postable", p.why);
+  // Ask Zoho itself whether this money is already recorded: a stale pull must never lead to a second entry.
+  const win = duplicateWindow(t.date);
+  const range = { organization_id: l.organization_id, date_start: win.start, date_end: win.end, per_page: "200" };
+  const existing: { date: string; amount: number }[] = [];
+  if (p.kind === "receipt") {
+    const r = await zohoGet<{ customerpayments?: { date: string; amount: number }[] }>(db, c, "/customerpayments", { ...range, customer_id: p.invoice.customerId });
+    for (const x of r.customerpayments ?? []) existing.push({ date: x.date, amount: num(x.amount) });
+  } else {
+    const r = await zohoGet<{ expenses?: { date: string; total?: number; amount?: number }[] }>(db, c, "/expenses", range);
+    for (const x of r.expenses ?? []) existing.push({ date: x.date, amount: num(x.total ?? x.amount) });
+  }
+  const dup = alreadyInZoho(t, existing);
+  if (dup) throw new PracticeError("already_in_zoho", `Zoho Books already has an entry of ₹${dup.amount.toLocaleString("en-IN")} on ${dup.date.slice(0, 10)}. Pull the month again so it matches, instead of posting.`);
   let chargeAccount: { id: string; name: string } | null = null;
   if (p.kind === "bank_charge") {
     const r = await zohoGet<{ chartofaccounts?: { account_id: string; account_name: string }[] }>(db, c, "/chartofaccounts", {

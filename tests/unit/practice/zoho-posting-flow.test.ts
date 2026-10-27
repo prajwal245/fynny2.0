@@ -71,6 +71,8 @@ function fakeZoho(handler?: (m: string, url: string) => Response | undefined) {
     const j = (o: unknown, status = 200) => new Response(JSON.stringify(o), { status });
     if (url.includes("/oauth/v2/token")) return j({ access_token: "fresh", expires_in: 3600 });
     if (url.includes("/chartofaccounts?")) return j({ code: 0, chartofaccounts: [{ account_id: "exp9", account_name: "Bank Fees and Charges" }] });
+    if (url.includes("/expenses?") && method === "GET") return j({ code: 0, expenses: [] });
+    if (url.includes("/customerpayments?") && method === "GET") return j({ code: 0, customerpayments: [] });
     if (url.includes("/expenses") && method === "POST") return j({ code: 0, expense: { expense_id: "E1" } });
     if (url.includes("/expenses/E1") && method === "DELETE") return j({ code: 0, message: "deleted" });
     return j({ code: 1, message: "unexpected " + url }, 400);
@@ -154,6 +156,33 @@ describe("posting to Zoho Books", () => {
     fakeZoho();
     await expect(zoho.post(db2, ctx, "l1", TXN)).rejects.toThrow(/already/i);
     expect(calls.filter((c) => c.method === "POST").length).toBe(0);
+  });
+
+  it("refuses a bank charge Zoho already has, even if FynHelp's last pull was before it", async () => {
+    fakeZoho((m, url) => (m === "GET" && url.includes("/expenses?") ? new Response(JSON.stringify({ code: 0, expenses: [{ date: "2026-09-29", total: 590 }] })) : undefined));
+    const db = await world();
+    await expect(zoho.post(db, ctx, "l1", TXN)).rejects.toThrow(/already has an entry of ₹590/);
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
+    expect(await zoho.listPostings(db, ctx)).toHaveLength(0);
+  });
+
+  it("refuses a receipt Zoho already holds, but posts one it does not", async () => {
+    const invs = { code: 0, invoices: [{ invoice_id: "9", invoice_number: "INV-2602", customer_id: "cm", customer_name: "Mehta", total: 70800, balance: 40800, status: "overdue" }], page_context: { has_more_page: false } };
+    const receipt = { direction: "in", amount: 30000, description: "NEFT CR-MEHTA FOODS LLP-INV-2602", txn_date: "2026-09-15" };
+    fakeZoho((m, url) => {
+      if (m === "GET" && url.includes("/invoices?")) return new Response(JSON.stringify(invs));
+      if (m === "GET" && url.includes("/customerpayments?")) return new Response(JSON.stringify({ code: 0, customerpayments: [{ date: "2026-09-15", amount: 30000 }] }));
+      return undefined;
+    });
+    await expect(zoho.post(await world({ txn: receipt }), ctx, "l1", TXN)).rejects.toThrow(/already has an entry of ₹30,000/);
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
+    fakeZoho((m, url) => {
+      if (m === "GET" && url.includes("/invoices?")) return new Response(JSON.stringify(invs));
+      if (m === "POST" && url.includes("/customerpayments")) return new Response(JSON.stringify({ code: 0, payment: { payment_id: "P1" } }));
+      return undefined;
+    });
+    await expect(zoho.post(await world({ txn: receipt }), ctx, "l1", TXN)).resolves.toMatchObject({ zohoId: "P1" });
+    expect(calls.find((c) => c.method === "POST")!.body).toMatchObject({ customer_id: "cm", amount: 30000, invoices: [{ invoice_id: "9", amount_applied: 30000 }] });
   });
 
   it("undo deletes the entry in Zoho and marks it undone, once", async () => {

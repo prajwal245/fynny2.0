@@ -96,7 +96,7 @@ const Pill = ({ children, light = false }: { children: ReactNode; light?: boolea
 
 const FAQS: [string, ReactNode][] = [
   ["Is my clients’ data safe?", <>Each firm’s data is kept separate and used only to serve that firm. It is never shared with anyone else. The details are on our <a href="/security">Security page</a>.</>],
-  ["Can I rely on what the AI flags?", "FynHelp speeds up review; it doesn’t replace it. It surfaces what needs attention, and your team checks and signs off on everything."],
+  ["Does AI do the matching?", "No. Matching is rule-based and every match can be traced. AI only helps sort documents into their type, and every amount it reads must appear in the document. Your team reviews the exceptions and a partner signs off the MIS."],
   ["Do we have to change our accounting software?", "No. FynHelp works on top of the tools your firm already uses: Tally, Zoho Books, Excel, CSV and PDF statements."],
   ["How does the launch offer work?", `The first 100 CA firms get ${LAUNCH_DAYS} days free on any plan. Sign up from this page and the offer is applied for you, with nothing to type. The ${LAUNCH_DAYS} days count from your first upload.`],
   ["What happens after 30 days?", "Choose a plan and continue, or simply stop. We remind you before the trial ends, and your data stays readable and exportable for 30 days after it."],
@@ -161,8 +161,8 @@ export default function LaunchPage() {
             <div style={css("display:inline-flex;align-items:center;gap:10px;border:1px solid rgba(250,247,242,.16);background:rgba(250,247,242,.06);border-radius:999px;padding:6px 14px 6px 6px;font-size:13px;color:#E9E3DA")}>
               <span style={css("background:#D92B2B;color:#FFFFFF;border-radius:999px;padding:3px 10px;font-weight:500;font-size:12px")}>Now live</span>First 100 firms get {LAUNCH_DAYS} days free
             </div>
-            <h1 style={css("margin:0;font-weight:500;font-size:clamp(38px, 5.4vw, 68px);line-height:1.06;letter-spacing:-0.035em;max-width:920px")}>Close every client’s month faster. Walk into every meeting with answers.</h1>
-            <p style={css("margin:0;font-size:clamp(16px, 1.6vw, 19px);line-height:1.6;color:#CFC7BC;max-width:680px")}>FynHelp reviews the client books your firm already handles, flags what needs attention, and gives your team clear insights to take to clients. Less chasing. More advisory.</p>
+            <h1 style={css("margin:0;font-weight:500;font-size:clamp(38px, 5.4vw, 68px);line-height:1.06;letter-spacing:-0.035em;max-width:920px")}>Close every client’s month faster, with every number traceable to its source.</h1>
+            <p style={css("margin:0;font-size:clamp(16px, 1.6vw, 19px);line-height:1.6;color:#CFC7BC;max-width:680px")}>FynHelp collects your clients’ documents, reconciles bank to your Tally or Zoho books and drafts a source-traceable MIS, so your team reviews the exceptions instead of matching every line.</p>
             <div style={css("display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:8px")}>
               <StartButton big where="launch-hero">Claim {LAUNCH_DAYS} days free</StartButton>
               <DemoLink where="launch-hero" className="ghost" style={css("display:inline-flex;align-items:center;background:rgba(250,247,242,.08);border:1px solid rgba(250,247,242,.2);color:#FAF7F2;text-decoration:none;font-weight:500;font-size:16px;padding:12px 24px;border-radius:999px;min-height:52px;box-sizing:border-box")}>See it on a real client · 20 min</DemoLink>
@@ -174,7 +174,7 @@ export default function LaunchPage() {
           <div style={css("border-radius:20px;padding:10px;background:rgba(250,247,242,.08);border:1px solid rgba(250,247,242,.14);max-width:1000px;margin:0 auto")}>
             <div style={css("background:#FAF7F2;color:#141210;border-radius:14px;overflow:hidden")}>
               <div style={css("display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid #E8E1D7;flex-wrap:wrap;gap:12px")}>
-                <FynLogo size="sm" />
+                <div style={css("font-size:13px;font-weight:500")}>FynHelp portfolio</div>
                 <div style={css("font-size:12px;color:#5E5953")}>The product, on sample files</div>
               </div>
               <img src="/guide/19-portfolio.jpg" alt="FynHelp portfolio: every client with its status for the month" width={1600} height={900} style={css("display:block;width:100%;height:auto")} />
@@ -185,7 +185,7 @@ export default function LaunchPage() {
           <div style={{ marginTop: 48 }}>
             <div style={css("font-size:14px;color:#CFC7BC;margin-bottom:14px")}>What firms get with FynHelp</div>
             <div style={css("display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:12px")}>
-              {[["Hours back", "on every client, every month"], ["Flags early", "before deadlines, not after"], ["Unlimited users", "your whole team, one price"], [`From ${inr(PLANS.starter.monthly)}`, "per month, priced per client"]].map(([a, b]) => (
+              {[["Exceptions only", "your team reviews what didn’t match"], ["Source-traceable", "every MIS number links to its lines"], ["Unlimited users", "your whole team, one price"], [`From ${inr(PLANS.starter.monthly)}`, "per month, priced per client"]].map(([a, b]) => (
                 <div key={a} className="lift" style={css("background:#FAF7F2;color:#141210;border-radius:14px;padding:18px 20px")}>
                   <div style={css("font-size:26px;font-weight:500;letter-spacing:-0.02em")}>{a}</div>
                   <div style={css("font-size:13px;color:#5E5953;margin-top:4px")}>{b}</div>
@@ -200,46 +200,46 @@ export default function LaunchPage() {
       <section id="outcomes" style={css("padding:112px 0 96px")}>
         <div className="wrap">
           <Pill>What changes for your firm</Pill>
-          <h2 style={css("margin:18px 0 48px;font-weight:500;font-size:clamp(30px, 3.6vw, 46px);line-height:1.1;letter-spacing:-0.03em;max-width:720px")}>Less time on numbers. More time with clients.</h2>
+          <h2 style={css("margin:18px 0 48px;font-weight:500;font-size:clamp(30px, 3.6vw, 46px);line-height:1.1;letter-spacing:-0.03em;max-width:720px")}>Less time matching lines. More time with clients.</h2>
 
           <div style={css("display:grid;grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));gap:16px")}>
             <div className="lift" style={css("background:#F3ECE2;border-radius:20px;padding:28px;display:flex;flex-direction:column;gap:20px;min-height:360px;box-sizing:border-box")}>
               <div style={css("flex:1;display:flex;align-items:center;justify-content:center;gap:12px")}>
                 <div style={css("background:#FFFFFF;border:1px solid #E3D8C9;border-radius:12px;padding:14px 16px;width:150px")}>
                   <div style={css("font-size:11px;color:#5E5953")}>Before</div>
-                  <div style={css("font-size:18px;font-weight:500;margin-top:4px")}>Line by line</div>
+                  <div style={css("font-size:18px;font-weight:500;margin-top:4px")}>Every line</div>
                   <div style={css("height:6px;border-radius:99px;background:#E3D8C9;margin-top:10px;overflow:hidden")}><div style={css("width:90%;height:100%;background:#C9BBA8;border-radius:99px")} /></div>
                 </div>
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#8E1B1F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
                 <div style={css("background:#FFFFFF;border:1px solid #E3D8C9;border-radius:12px;padding:14px 16px;width:150px")}>
                   <div style={css("font-size:11px;color:#5E5953")}>With FynHelp</div>
-                  <div style={css("font-size:18px;font-weight:500;margin-top:4px;color:#B3221F")}>Flagged first</div>
+                  <div style={css("font-size:18px;font-weight:500;margin-top:4px;color:#B3221F")}>Exceptions first</div>
                   <div style={css("height:6px;border-radius:99px;background:#E3D8C9;margin-top:10px;overflow:hidden")}><div style={css("width:40%;height:100%;background:#D92B2B;border-radius:99px")} /></div>
                 </div>
               </div>
               <div>
                 <h3 style={css("margin:0 0 8px;font-size:20px;font-weight:500;letter-spacing:-0.01em")}>Your team gets its hours back</h3>
-                <p style={css("margin:0;font-size:15px;line-height:1.6;color:#5E5953")}>Juniors stop going line by line through every client’s books. They start with what’s flagged and finish review sooner.</p>
+                <p style={css("margin:0;font-size:15px;line-height:1.6;color:#5E5953")}>Juniors stop matching every bank line by hand. Recon does the matching, and they start with the exceptions and finish the close sooner.</p>
               </div>
             </div>
 
             <div className="lift" style={css("background:#F3ECE2;border-radius:20px;padding:28px;display:flex;flex-direction:column;gap:20px;min-height:360px;box-sizing:border-box")}>
               <div style={css("flex:1;display:flex;flex-direction:column;justify-content:center;gap:8px")}>
-                {[["Sample flag: missing entries", "Fix now", "#8E1B1F", 1], ["Sample flag: deadline in 9 days", "On track", "#6B4A2B", 1], ["Sample flag: unusual expense", "Check", "#5E5953", 0.7]].map(([t, a, c, o]) => (
+                {[["Sample: bank statement not received", "Chasing", "#8E1B1F", 1], ["Sample: amount differs by ₹120", "Add a note", "#6B4A2B", 1], ["Sample: no matching book entry", "Review", "#5E5953", 0.7]].map(([t, a, c, o]) => (
                   <div key={String(t)} style={css(`background:#FFFFFF;border:1px solid #E3D8C9;border-radius:10px;padding:12px 14px;font-size:13px;display:flex;justify-content:space-between;gap:8px;opacity:${o}`)}><span>{t}</span><span style={css(`color:${c};font-weight:500`)}>{a}</span></div>
                 ))}
               </div>
               <div>
-                <h3 style={css("margin:0 0 8px;font-size:20px;font-weight:500;letter-spacing:-0.01em")}>No more deadline surprises</h3>
-                <p style={css("margin:0;font-size:15px;line-height:1.6;color:#5E5953")}>Gaps surface early, while there’s still time to fix them, not in the middle of filing season.</p>
+                <h3 style={css("margin:0 0 8px;font-size:20px;font-weight:500;letter-spacing:-0.01em")}>Nothing slips through</h3>
+                <p style={css("margin:0;font-size:15px;line-height:1.6;color:#5E5953")}>Missing documents are chased for you, and unmatched lines stay visible with a reason until someone decides.</p>
               </div>
             </div>
           </div>
 
           <div style={css("display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:16px;margin-top:16px")}>
             {[
-              ["Partners review less, trust more", "Work reaches the partner clearer and more consistent, so sign-off takes less time.", <><path d="M9 12l2 2 4-4" /><circle cx="12" cy="12" r="9" /></>],
-              ["Advisory becomes a service line", "Ready insights turn monthly numbers into client conversations worth paying for.", <path d="M4 19V9M10 19V5M16 19v-7M22 19H2" />],
+              ["Partners review less, trust more", "Every MIS number links back to the lines behind it, so a partner can check it quickly and sign off.", <><path d="M9 12l2 2 4-4" /><circle cx="12" cy="12" r="9" /></>],
+              ["Time for advisory", "With the close done sooner, your team has time for the conversations clients pay for.", <path d="M4 19V9M10 19V5M16 19v-7M22 19H2" />],
               ["More clients, same team", "Handle more clients without hiring. Unlimited users come with every plan.", <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5" /><path d="M16 4.5a3.5 3.5 0 010 7M18 14.8c1.9.7 3.1 2.6 3.5 5.2" /></>],
             ].map(([t, p, icon]) => (
               <div key={String(t)} className="lift" style={css("background:#F3ECE2;border-radius:20px;padding:28px;display:flex;flex-direction:column;gap:16px")}>
@@ -265,8 +265,8 @@ export default function LaunchPage() {
             {[
               ["Create your account", "One minute, work email only. Your launch code is applied for you.", "Your firm is set up today"],
               ["Add your first clients", "Start with 3 to 5 clients. Upload a bank statement and the books (Tally, Zoho, Excel, CSV or PDF), or let documents arrive by email and WhatsApp.", "No migration, no disruption"],
-              ["See what needs attention", "FynHelp reviews the books and shows flags and insights, client by client.", "Your team knows where to look"],
-              ["Review, sign off, advise", "Your team checks, approves and takes clear answers to clients.", "Faster closes, better conversations"],
+              ["See what needs attention", "FynHelp reads the documents, matches bank to books and shows what is left, client by client.", "Your team knows where to look"],
+              ["Review, sign off, advise", "Your team resolves the exceptions, reviews the MIS and a partner signs it off.", "Source-linked and signed off by a partner"],
             ].map(([t, p, f], i) => (
               <li key={t} className="lift" style={css("background:#FFFFFF;border-radius:18px;padding:24px;display:flex;flex-direction:column;gap:10px")}>
                 <div style={css(`font-family:${MONO};font-size:12px;color:#B3221F`)}>STEP 0{i + 1}</div>
@@ -331,7 +331,7 @@ export default function LaunchPage() {
             <div>
               <Pill>Built to earn your trust</Pill>
               <h2 style={css("margin:18px 0 16px;font-weight:500;font-size:clamp(30px, 3.6vw, 44px);line-height:1.1;letter-spacing:-0.03em")}>Your clients trust you with their numbers. We take that seriously.</h2>
-              <p style={css("margin:0;font-size:16px;line-height:1.6;color:#5E5953")}>FynHelp flags and suggests. Your team reviews, decides and signs off. Nothing reaches a client without your approval.</p>
+              <p style={css("margin:0;font-size:16px;line-height:1.6;color:#5E5953")}>FynHelp reads, matches and drafts. Your team reviews, decides and signs off. Nothing reaches a client without your approval.</p>
             </div>
             <div style={css("display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:12px")}>
               {[
@@ -385,7 +385,7 @@ export default function LaunchPage() {
           <div style={css("background:radial-gradient(100% 90% at 100% 100%, #8E1B1F 0%, #3A1214 40%, #141210 75%);color:#FAF7F2;border-radius:28px;padding:clamp(28px, 5vw, 64px);display:grid;grid-template-columns:repeat(auto-fit, minmax(300px, 1fr));gap:40px;align-items:center")}>
             <div style={css("display:flex;flex-direction:column;gap:18px")}>
               <div style={css("display:inline-flex;align-self:flex-start;background:#D92B2B;color:#FFFFFF;border-radius:999px;padding:6px 14px;font-size:13px;font-weight:500")}>Launch offer · 100 firms only</div>
-              <h2 style={css("margin:0;font-weight:500;font-size:clamp(30px, 3.8vw, 48px);line-height:1.08;letter-spacing:-0.03em")}>See what FynHelp finds in your own client books. Free for {LAUNCH_DAYS} days.</h2>
+              <h2 style={css("margin:0;font-weight:500;font-size:clamp(30px, 3.8vw, 48px);line-height:1.08;letter-spacing:-0.03em")}>See your own client’s month closed in FynHelp. Free for {LAUNCH_DAYS} days.</h2>
               <p style={css("margin:0;font-size:16px;line-height:1.6;color:#CFC7BC")}>Add your first clients today, or book 20 minutes with our founders first.</p>
               <DemoLink where="launch-final" style={css("align-self:flex-start;color:#FAF7F2;font-size:15px;font-weight:500;text-underline-offset:4px")}>Prefer a walkthrough? Book a demo</DemoLink>
             </div>
@@ -419,7 +419,7 @@ export default function LaunchPage() {
           <div style={css("display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:32px")}>
             <div style={css("display:flex;flex-direction:column;gap:12px")}>
               <FynLogo variant="light" size="md" />
-              <p style={css("margin:0;font-size:14px;line-height:1.6")}>AI financial intelligence for CA firms. Bengaluru, India.</p>
+              <p style={css("margin:0;font-size:14px;line-height:1.6")}>Month-end close software for CA firms. Bengaluru, India.</p>
             </div>
             {[
               ["Product", [["#outcomes", "Features"], ["#pricing", "Pricing"], ["#how", "How it works"], ["/security", "Security"]]],

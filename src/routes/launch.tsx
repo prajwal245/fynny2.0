@@ -7,7 +7,7 @@ export const Route = createFileRoute("/launch")({
     seo({
       title: "Launch offer: 30 days free for the first 100 CA firms",
       description:
-        "FynHelp reviews the client books your firm already handles, flags what needs attention and gives your team clear insights. The first 100 CA firms get 30 days free.",
+        "Month-end close for CA firms: FynHelp collects client documents, reconciles bank to Tally or Zoho and drafts a source-traceable MIS. The first 100 firms get 30 days free.",
       path: "/launch",
       jsonLd: [breadcrumbLd([{ name: "Launch offer", path: "/launch" }])],
     }),

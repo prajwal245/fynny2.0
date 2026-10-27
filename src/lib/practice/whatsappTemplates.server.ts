@@ -122,3 +122,12 @@ export async function stagesView(sender: Pick<Sender, "wabaId" | "token"> | null
 }
 
 export { buttonLayoutOf };
+
+/**
+ * One line of the connection check for a stage. Red only when the stage has nothing it can send. A template still
+ * in review with an older approved one in use, or a final reminder that borrows the follow-up, is working as designed.
+ */
+export function stageHealth(st: StageView): { ok: boolean | null; detail: string } {
+  const ok = st.status === "approved" ? true : st.using ? null : st.status === "unknown" ? null : false;
+  return { ok, detail: st.note };
+}

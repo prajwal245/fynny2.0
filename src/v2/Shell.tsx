@@ -175,7 +175,7 @@ function ShellBody() {
                   style={{
                     flex: 1, border: 0, cursor: "pointer", borderRadius: 999, padding: "6px 0", fontSize: 12, fontWeight: 600,
                     fontFamily: "inherit", background: role === r ? "var(--v2-seg)" : "transparent", color: role === r ? V.ink : V.muted,
-                    boxShadow: role === r ? "0 6px 14px -8px rgba(249,16,58,.7)" : "none",
+                    boxShadow: role === r ? "0 6px 14px -8px rgba(217,43,43,.7)" : "none",
                   }}
                 >
                   {r}

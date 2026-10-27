@@ -3,12 +3,12 @@ import { createPortal } from "react-dom";
  * FynHelp v2 dashboard — design system primitives.
  * Self-contained: does not touch any existing app styling.
  */
-import { ReactNode, CSSProperties, useEffect, useRef, useState } from "react";
+import { ReactNode, CSSProperties, useEffect, useId, useRef, useState } from "react";
 import { motion, AnimatePresence, useIsPresent } from "framer-motion";
 import { X } from "lucide-react";
 import { LIQUID_BUTTON_CSS } from "@/lib/liquidButton";
 
-/** Palette: red #F9103A and #F96246, cream #FFEBB9, ink #090B11, mist #F4F6FA. Green and amber are for status only. */
+/** Palette: red #D92B2B and #8E1B1F, cream #EADBC8, ink #141210, mist #FAF7F2. Green and amber are for status only. */
 /**
  * Every colour is a CSS variable, so the whole product switches between light (the default) and dark by
  * changing one attribute on <html>. The values live in THEME_VARS below.
@@ -38,8 +38,8 @@ export const V = {
 };
 
 const THEME_VARS = `
-:root { --v2-bg:#FFF8F3; --v2-card:#FFFFFF; --v2-ink:#2A0F0C; --v2-body:rgba(42,15,12,0.72); --v2-muted:rgba(42,15,12,0.50); --v2-line:rgba(138,30,24,0.12); --v2-blue:#FBE6DC; --v2-beige:#F8DCCB; --v2-gray:#FBF1EB; --v2-maroon:#B42424; --v2-coral:#D8302A; --v2-green:#2F6B4F; --v2-brand:#D8302A; --v2-brandBright:#E4302A; --v2-brandDeep:#8A1E18; --v2-cream:#FCEEE4; --v2-warnBg:#FCEBD9; --v2-warnFg:#7A3E0C; --v2-side:#FFFFFF; --v2-head:rgba(255,248,243,.86); --v2-overlay:rgba(20,20,20,.34); --v2-pop:#FFFFFF; --v2-sticky:#FFFFFF; --v2-sticky-hover:#FBF1EB; --v2-input:#FFFFFF; --v2-seg:#FFFFFF; --v2-tab:#FFFFFF; --v2-tab-shadow:0 1px 2px rgba(20,20,20,.08), 0 6px 14px -8px rgba(20,20,20,.25); --v2-good-bg:rgba(47,107,79,.11); --v2-dash:rgba(20,20,20,.2); --v2-switch:rgba(20,20,20,.14); --v2-shine:#FFFFFF; --v2-card-shadow:0 1px 2px rgba(138,30,24,.05), 0 14px 32px -26px rgba(138,30,24,.35); --v2-glow:none; --v2-scheme:light; --v2-ag-extract-tint:#FDE8E3; --v2-ag-extract-ink:#9E241D; --v2-ag-extract-dot:#E4302A; --v2-ag-recon-tint:#F8E1DA; --v2-ag-recon-ink:#6E1712; --v2-ag-recon-dot:#B42424; --v2-ag-narrate-tint:#FCEEE4; --v2-ag-narrate-ink:#7A3420; --v2-ag-narrate-dot:#C8553D; --v2-ag-chaser-tint:#F4E4DF; --v2-ag-chaser-ink:#3A0E0A; --v2-ag-chaser-dot:#8A1E18; --v2-btn-a:#E4302A; --v2-btn-b:#B42424; --v2-btn-ha:#D8302A; --v2-btn-hb:#8A1E18; --v2-lq:#FCEEE4; --v2-lq-ink:#8A1E18; }
-:root[data-v2-theme="dark"] { --v2-bg:#090B11; --v2-card:rgba(255,255,255,0.045); --v2-ink:#F4F6FA; --v2-body:rgba(244,246,250,0.74); --v2-muted:rgba(244,246,250,0.50); --v2-line:rgba(255,255,255,0.09); --v2-blue:rgba(249,16,58,0.16); --v2-beige:rgba(255,235,185,0.12); --v2-gray:rgba(255,255,255,0.06); --v2-maroon:#FF6B80; --v2-coral:#F96246; --v2-green:#5BD39A; --v2-brand:#F9103A; --v2-brandBright:#F9103A; --v2-brandDeep:#FFEBB9; --v2-cream:rgba(255,235,185,0.07); --v2-warnBg:rgba(255,235,185,0.12); --v2-warnFg:#FFEBB9; --v2-side:rgba(9,11,17,.72); --v2-head:rgba(9,11,17,.72); --v2-overlay:rgba(0,0,0,.62); --v2-pop:#12141B; --v2-sticky:#14161D; --v2-sticky-hover:#1C1E26; --v2-input:rgba(255,255,255,.05); --v2-seg:rgba(249,16,58,.22); --v2-tab:linear-gradient(180deg, rgba(249,16,58,.28), rgba(249,16,58,.14)); --v2-tab-shadow:0 1px 0 rgba(255,255,255,.14) inset, 0 8px 18px -10px rgba(249,16,58,.7); --v2-good-bg:rgba(91,211,154,.16); --v2-dash:rgba(255,255,255,.25); --v2-switch:rgba(255,255,255,.18); --v2-shine:rgba(255,255,255,.12); --v2-card-shadow:0 1px 0 rgba(255,255,255,.05) inset, 0 18px 40px -28px rgba(0,0,0,.8); --v2-glow:radial-gradient(120% 70% at 100% 105%, rgba(249,16,58,.30) 0%, rgba(120,12,30,.16) 38%, transparent 70%), radial-gradient(70% 40% at 0% 0%, rgba(249,98,70,.07) 0%, transparent 70%); --v2-scheme:dark; --v2-ag-extract-tint:rgba(249,16,58,.18); --v2-ag-extract-ink:#FF8296; --v2-ag-extract-dot:#F9103A; --v2-ag-recon-tint:rgba(249,98,70,.18); --v2-ag-recon-ink:#FFA08A; --v2-ag-recon-dot:#F96246; --v2-ag-narrate-tint:rgba(255,235,185,.14); --v2-ag-narrate-ink:#FFEBB9; --v2-ag-narrate-dot:#FFD98A; --v2-ag-chaser-tint:rgba(244,246,250,.12); --v2-ag-chaser-ink:#F4F6FA; --v2-ag-chaser-dot:#E8506A; --v2-btn-a:#FF2A50; --v2-btn-b:#D00A30; --v2-btn-ha:#FF4A5F; --v2-btn-hb:#F96246; --v2-lq:#FFEBB9; --v2-lq-ink:#090B11; }
+:root { --v2-bg:#FAF7F2; --v2-card:#FFFFFF; --v2-ink:#141210; --v2-body:rgba(20,18,16,0.72); --v2-muted:rgba(20,18,16,0.50); --v2-line:rgba(138,30,24,0.12); --v2-blue:#FBE6DC; --v2-beige:#EADBC8; --v2-gray:#FBF1EB; --v2-maroon:#8E1B1F; --v2-coral:#D92B2B; --v2-green:#2F6B4F; --v2-brand:#D92B2B; --v2-brandBright:#D92B2B; --v2-brandDeep:#8E1B1F; --v2-cream:#F3EADC; --v2-warnBg:#FCEBD9; --v2-warnFg:#7A3E0C; --v2-side:#FFFFFF; --v2-head:rgba(250,247,242,.86); --v2-overlay:rgba(20,20,20,.34); --v2-pop:#FFFFFF; --v2-sticky:#FFFFFF; --v2-sticky-hover:#FBF1EB; --v2-input:#FFFFFF; --v2-seg:#FFFFFF; --v2-tab:#FFFFFF; --v2-tab-shadow:0 1px 2px rgba(20,20,20,.08), 0 6px 14px -8px rgba(20,20,20,.25); --v2-good-bg:rgba(47,107,79,.11); --v2-dash:rgba(20,20,20,.2); --v2-switch:rgba(20,20,20,.14); --v2-shine:#FFFFFF; --v2-card-shadow:0 1px 2px rgba(138,30,24,.05), 0 14px 32px -26px rgba(138,30,24,.35); --v2-glow:none; --v2-scheme:light; --v2-ag-extract-tint:#FDE8E3; --v2-ag-extract-ink:#9E241D; --v2-ag-extract-dot:#E4302A; --v2-ag-recon-tint:#F8E1DA; --v2-ag-recon-ink:#6E1712; --v2-ag-recon-dot:#B42424; --v2-ag-narrate-tint:#FCEEE4; --v2-ag-narrate-ink:#7A3420; --v2-ag-narrate-dot:#C8553D; --v2-ag-chaser-tint:#F4E4DF; --v2-ag-chaser-ink:#3A0E0A; --v2-ag-chaser-dot:#8A1E18; --v2-btn-a:#D92B2B; --v2-btn-b:#8E1B1F; --v2-btn-ha:#C42626; --v2-btn-hb:#701519; --v2-lq:#EADBC8; --v2-lq-ink:#8E1B1F; }
+:root[data-v2-theme="dark"] { --v2-bg:#141210; --v2-card:rgba(255,255,255,0.045); --v2-ink:#FAF7F2; --v2-body:rgba(250,247,242,0.74); --v2-muted:rgba(250,247,242,0.50); --v2-line:rgba(255,255,255,0.09); --v2-blue:rgba(217,43,43,0.16); --v2-beige:rgba(234,219,200,0.12); --v2-gray:rgba(255,255,255,0.06); --v2-maroon:#FF8A80; --v2-coral:#8E1B1F; --v2-green:#5BD39A; --v2-brand:#D92B2B; --v2-brandBright:#D92B2B; --v2-brandDeep:#EADBC8; --v2-cream:rgba(234,219,200,0.07); --v2-warnBg:rgba(234,219,200,0.12); --v2-warnFg:#EADBC8; --v2-side:rgba(20,18,16,.72); --v2-head:rgba(20,18,16,.72); --v2-overlay:rgba(0,0,0,.62); --v2-pop:#1B1816; --v2-sticky:#1C1917; --v2-sticky-hover:#26221F; --v2-input:rgba(255,255,255,.05); --v2-seg:rgba(217,43,43,.22); --v2-tab:linear-gradient(180deg, rgba(217,43,43,.28), rgba(217,43,43,.14)); --v2-tab-shadow:0 1px 0 rgba(255,255,255,.14) inset, 0 8px 18px -10px rgba(217,43,43,.7); --v2-good-bg:rgba(91,211,154,.16); --v2-dash:rgba(255,255,255,.25); --v2-switch:rgba(255,255,255,.18); --v2-shine:rgba(255,255,255,.12); --v2-card-shadow:0 1px 0 rgba(255,255,255,.05) inset, 0 18px 40px -28px rgba(0,0,0,.8); --v2-glow:radial-gradient(120% 70% at 100% 105%, rgba(217,43,43,.30) 0%, rgba(120,12,30,.16) 38%, transparent 70%), radial-gradient(70% 40% at 0% 0%, rgba(142,27,31,.07) 0%, transparent 70%); --v2-scheme:dark; --v2-ag-extract-tint:rgba(217,43,43,.18); --v2-ag-extract-ink:#FF9A8F; --v2-ag-extract-dot:#D92B2B; --v2-ag-recon-tint:rgba(142,27,31,.18); --v2-ag-recon-ink:#F0A27A; --v2-ag-recon-dot:#8E1B1F; --v2-ag-narrate-tint:rgba(234,219,200,.14); --v2-ag-narrate-ink:#EADBC8; --v2-ag-narrate-dot:#EADBC8; --v2-ag-chaser-tint:rgba(250,247,242,.12); --v2-ag-chaser-ink:#FAF7F2; --v2-ag-chaser-dot:#E0605A; --v2-btn-a:#E23A3A; --v2-btn-b:#A81F24; --v2-btn-ha:#EC4A4A; --v2-btn-hb:#C23030; --v2-lq:#EADBC8; --v2-lq-ink:#141210; }
 `;
 
 export type ThemeMode = "light" | "dark";
@@ -80,8 +80,8 @@ ${LIQUID_BUTTON_CSS}
 .v2-btn { display:inline-flex; align-items:center; gap:8px; border-radius:999px; border:1px solid transparent; font-size:14px; font-weight:600; padding:10px 18px; cursor:pointer; text-decoration:none; transition:transform .18s ease, background .2s ease, box-shadow .2s ease; }
 .v2-btn:hover { transform:translateY(-1px); }
 .v2-btn:active { transform:translateY(1px) scale(.985); }
-.v2-btn-primary { background:linear-gradient(180deg, var(--v2-btn-a) 0%, var(--v2-btn-b) 100%); color:#FFFFFF; box-shadow:0 1px 0 rgba(255,255,255,.28) inset, 0 10px 24px -10px rgba(249,16,58,.75); }
-.v2-btn-primary:hover { background:linear-gradient(180deg, var(--v2-btn-ha) 0%, var(--v2-btn-hb) 100%); box-shadow:0 1px 0 rgba(255,255,255,.3) inset, 0 12px 28px -10px rgba(249,98,70,.8); }
+.v2-btn-primary { background:linear-gradient(180deg, var(--v2-btn-a) 0%, var(--v2-btn-b) 100%); color:#FFFFFF; box-shadow:0 1px 0 rgba(255,255,255,.28) inset, 0 10px 24px -10px rgba(217,43,43,.75); }
+.v2-btn-primary:hover { background:linear-gradient(180deg, var(--v2-btn-ha) 0%, var(--v2-btn-hb) 100%); box-shadow:0 1px 0 rgba(255,255,255,.3) inset, 0 12px 28px -10px rgba(142,27,31,.8); }
 .v2-btn-ghost { background:${V.card}; color:${V.ink}; border-color:${V.line}; }
 .v2-btn-ghost:hover { background:${V.gray}; }
 .v2-btn-quiet { background:transparent; color:${V.body}; padding:7px 12px; font-size:13px; border-color:${V.line}; }
@@ -96,7 +96,7 @@ ${LIQUID_BUTTON_CSS}
 .v2-btn-lg { padding:13px 22px; font-size:15px; }
 .v2-btn-block { width:100%; justify-content:center; }
 .v2-btn-danger { background:transparent; color:${V.maroon}; border-color:rgba(255,107,128,.4); }
-.v2-btn-danger:hover { background:rgba(249,16,58,.12); }
+.v2-btn-danger:hover { background:rgba(217,43,43,.12); }
 /* Busy: keeps its width, shows a spinner, ignores clicks. */
 .v2-btn[data-busy="true"] { pointer-events:none; position:relative; }
 .v2-btn[data-busy="true"]::before { content:""; width:12px; height:12px; border-radius:999px; border:2px solid currentColor; border-right-color:transparent; animation:v2spin .7s linear infinite; }
@@ -112,14 +112,14 @@ ${LIQUID_BUTTON_CSS}
 .v2-table tbody tr.clickable:hover { background:${V.gray}; cursor:pointer; }
 .v2-nav a { display:flex; align-items:center; gap:11px; padding:10px 13px; border-radius:12px; font-size:14.5px; color:${V.body}; text-decoration:none; margin-bottom:2px; transition:background .18s ease, color .18s ease; }
 .v2-nav a:hover { background:${V.gray}; color:${V.ink}; }
-.v2-nav a[data-status="active"] { background:linear-gradient(90deg, rgba(249,16,58,.26), rgba(249,16,58,.06)); color:${V.ink}; font-weight:600; box-shadow:inset 3px 0 0 ${V.brand}; }
+.v2-nav a[data-status="active"] { background:linear-gradient(90deg, rgba(217,43,43,.26), rgba(217,43,43,.06)); color:${V.ink}; font-weight:600; box-shadow:inset 3px 0 0 ${V.brand}; }
 .v2-nav a[data-status="active"] svg { color:${V.brand}; }
 .v2-scroll { overflow-x:auto; }
 .v2-skel { background:linear-gradient(90deg, ${V.gray} 25%, ${V.cream} 50%, ${V.gray} 75%); background-size:200% 100%; animation:v2shimmer 1.3s infinite linear; border-radius:10px; }
 @keyframes v2shimmer { from { background-position:200% 0; } to { background-position:-200% 0; } }
 .v2-grid-cards { display:grid; gap:16px; grid-template-columns:repeat(auto-fill, minmax(min(280px, 100%), 1fr)); }
 /* The action column stays in view when a wide table scrolls. */
-.v2-table .v2-sticky-end { position:sticky; right:0; background:var(--v2-sticky); box-shadow:-10px 0 12px -12px rgba(9,11,17,.4); }
+.v2-table .v2-sticky-end { position:sticky; right:0; background:var(--v2-sticky); box-shadow:-10px 0 12px -12px rgba(20,18,16,.4); }
 .v2-table tbody tr.clickable:hover .v2-sticky-end { background:var(--v2-sticky-hover); }
 @media (max-width:760px){
   /* Phones: each row becomes a compact card instead of a table that scrolls sideways. */
@@ -160,7 +160,7 @@ const TONES: Record<Tone, { bg: string; fg: string }> = {
   neutral: { bg: V.gray, fg: V.body },
   good: { bg: "var(--v2-good-bg)", fg: V.green },
   warn: { bg: V.warnBg, fg: V.warnFg },
-  bad: { bg: "rgba(249,16,58,0.16)", fg: V.maroon },
+  bad: { bg: "rgba(217,43,43,0.16)", fg: V.maroon },
   info: { bg: V.blue, fg: V.brandDeep },
 };
 
@@ -385,4 +385,42 @@ export function formatINR(n: number) {
 
 export function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+
+/**
+ * A row of choices with one sliding thumb: the thumb glides to the choice you tap, like a physical switch.
+ * Each option can carry a small count.
+ */
+export function Segmented<T extends string>({ options, value, onChange, label }: { options: { value: T; label: string; count?: number }[]; value: T; onChange: (v: T) => void; label: string }) {
+  const id = useId();
+  return (
+    <div role="tablist" aria-label={label} style={{ display: "inline-flex", flexWrap: "wrap", gap: 2, padding: 4, borderRadius: 999, background: V.gray, border: `1px solid ${V.line}` }}>
+      {options.map((o) => {
+        const on = o.value === value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            onClick={() => onChange(o.value)}
+            style={{ position: "relative", border: 0, background: "transparent", cursor: "pointer", font: "inherit", fontSize: 12.5, fontWeight: 600, padding: "7px 14px", borderRadius: 999, color: on ? "#fff" : V.body, transition: "color .25s ease" }}
+          >
+            {on && (
+              <motion.span
+                layoutId={`seg-${id}`}
+                transition={{ type: "spring", stiffness: 480, damping: 34 }}
+                style={{ position: "absolute", inset: 0, borderRadius: 999, background: `linear-gradient(180deg, var(--v2-btn-a), var(--v2-btn-b))`, boxShadow: "0 8px 18px -10px var(--v2-brand)" }}
+              />
+            )}
+            <span style={{ position: "relative", display: "inline-flex", gap: 6, alignItems: "center" }}>
+              {o.label}
+              {o.count !== undefined && <span style={{ opacity: 0.65 }}>{o.count}</span>}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
 }

@@ -100,7 +100,7 @@ export function ReconGuide({ clientId, onUpload, onTab }: { clientId: string; on
   return (
     <Card style={{ borderLeft: `3px solid ${V.brand}`, background: V.cream, marginBottom: 18 }} data-testid="recon-guide">
       <div style={{ display: "grid", gridTemplateColumns: "34px minmax(0,1fr)", gap: 12, alignItems: "start" }}>
-        <span style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(249,16,58,.16)", color: V.brand, display: "grid", placeItems: "center" }}>{icon}</span>
+        <span style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(217,43,43,.16)", color: V.brand, display: "grid", placeItems: "center" }}>{icon}</span>
         <div style={{ display: "grid", gap: 12, minWidth: 0 }}>
           <div>
             <div style={{ fontSize: 15, fontWeight: 600 }}>{title}</div>

@@ -151,7 +151,7 @@ export default function ReportsPage({ clientId: scopedClient }: { clientId?: str
                   style={{
                     textAlign: "left", padding: "11px 13px", borderRadius: 13, cursor: "pointer",
                     border: `1px solid ${template === t ? V.ink : V.line}`,
-                    background: template === t ? "rgba(249,16,58,.1)" : "transparent",
+                    background: template === t ? "rgba(217,43,43,.1)" : "transparent",
                   }}
                 >
                   <div style={{ fontSize: 13.5, fontWeight: 600 }}>{t}</div>

@@ -6,7 +6,7 @@
 import type { Db } from "../db.server";
 import { sharedPhoneNumberId, post, sendPlainText } from "../whatsappSend.server";
 import { listTemplates } from "../whatsappTemplates.server";
-import { buildTemplateMessage, buttonPayloadOf, explainWaError, waParam } from "../whatsappFlow";
+import { buildTemplateMessage, buttonPayloadOf, cleanMetaId, explainWaError, waParam } from "../whatsappFlow";
 import {
   TOUCH_ACTION_RULES,
   mayMessage,
@@ -31,7 +31,7 @@ const templateEnv = () => ({ setup: env("WHATSAPP_TOUCH_SETUP_TEMPLATE"), trial:
 export function touchSender() {
   const phoneNumberId = sharedPhoneNumberId();
   const token = env("WHATSAPP_ACCESS_TOKEN");
-  return phoneNumberId && token ? { phoneNumberId, token, wabaId: env("WHATSAPP_WABA_ID") ?? null } : null;
+  return phoneNumberId && token ? { phoneNumberId, token, wabaId: cleanMetaId(env("WHATSAPP_WABA_ID")) } : null;
 }
 
 interface Subject {

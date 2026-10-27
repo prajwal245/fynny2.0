@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { buttonLayoutOf, pickTemplate, templateCandidates, templateStatus, type MetaTemplate } from "@/lib/practice/whatsappFlow";
+import { cleanMetaId, buttonLayoutOf, pickTemplate, templateCandidates, templateStatus, type MetaTemplate } from "@/lib/practice/whatsappFlow";
 
 const OURS = (order: "url_first" | "qr_first") => {
   const url = { type: "URL", text: "Upload documents", url: "https://fynhelp.com/u/{{1}}" };
@@ -115,5 +115,29 @@ describe("choosing the template for a reminder", () => {
     expect(v[1].note).toContain("in review");
     expect(v[1].note).toContain("is used");
     expect(v[0].buttons).toBe(true);
+  });
+});
+
+describe("account IDs pasted with extra characters", () => {
+  it("keeps only the digits, and refuses anything that is not an ID", async () => {
+    const { cleanMetaId } = await import("@/lib/practice/whatsappFlow");
+    expect(cleanMetaId("$$\\mathbf{2457752908089073}$$")).toBe("2457752908089073");
+    expect(cleanMetaId(' "2457752908089073" \n')).toBe("2457752908089073");
+    expect(cleanMetaId("2457752908089073")).toBe("2457752908089073");
+    expect(cleanMetaId("")).toBeNull();
+    expect(cleanMetaId(undefined)).toBeNull();
+    expect(cleanMetaId("12345")).toBeNull();
+    expect(cleanMetaId("1".repeat(25))).toBeNull();
+  });
+
+  it("the sender uses the cleaned ID, so the template lookup goes to the right address", async () => {
+    process.env["WHATSAPP_WABA_ID"] = "$$\\mathbf{2457752908089073}$$";
+    process.env["WHATSAPP_ACCESS_TOKEN"] = "tok";
+    process.env["WHATSAPP_DEFAULT_PHONE_NUMBER_ID"] = "111222333444";
+    const { touchSender } = await import("@/lib/practice/touchpoints/whatsapp.server");
+    expect(touchSender()?.wabaId).toBe("2457752908089073");
+    delete process.env["WHATSAPP_WABA_ID"];
+    delete process.env["WHATSAPP_ACCESS_TOKEN"];
+    delete process.env["WHATSAPP_DEFAULT_PHONE_NUMBER_ID"];
   });
 });

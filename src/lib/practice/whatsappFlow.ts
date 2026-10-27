@@ -347,3 +347,13 @@ export function pickTemplate(templates: MetaTemplate[], candidates: string[], la
   }
   return null;
 }
+
+/**
+ * A WhatsApp Business Account ID (or phone number ID) is only digits. People paste them from chats and documents
+ * with extra characters around them ("$$\\mathbf{2457752908089073}$$", spaces, quotes), which Meta rejects. Keep
+ * the digits; anything that is not 6 to 20 digits is no ID at all.
+ */
+export function cleanMetaId(raw: string | null | undefined): string | null {
+  const d = String(raw ?? "").replace(/\D/g, "");
+  return d.length >= 6 && d.length <= 20 ? d : null;
+}

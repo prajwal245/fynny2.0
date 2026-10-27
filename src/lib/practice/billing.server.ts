@@ -13,6 +13,7 @@
  * Without keys the trial still runs and pauses work at the end; the Billing
  * screen says payments are being set up.
  */
+import { LAUNCH_CODE, LAUNCH_DAYS } from "@/lib/launchCode";
 import type { Db, FirmContext } from "./db.server";
 import { canSignOff, logActivity } from "./db.server";
 import { sendEmail } from "./email.server";
@@ -810,6 +811,12 @@ export async function previewCoupon(db: Db, ctx: FirmContext, code: string, plan
 export async function redeemTrialCoupon(db: Db, ctx: FirmContext, code: string) {
   await assertNotTest(db, ctx.firmId);
   if (!canSignOff(ctx)) throw new PracticeError("forbidden", "Only a partner can apply a code.");
+  // The launch offer is part of the product, so it exists without anyone running SQL: created on first use, never changed after.
+  if (code.trim().toUpperCase() === LAUNCH_CODE)
+    await db.from("ca_coupons").upsert(
+      { code: LAUNCH_CODE, kind: "trial_days", value: LAUNCH_DAYS - TRIAL_DAYS, max_redemptions: 100, per_firm_limit: 1, active: true, note: "Launch offer: 30 days free for the first 100 firms." },
+      { onConflict: "code", ignoreDuplicates: true },
+    );
   const c = await checkCoupon(db, ctx.firmId, code);
   if (c.kind !== "trial_days") throw new PracticeError("bad_coupon", "That code is a discount. Enter it when you choose a plan.");
   const row = await loadBilling(db, ctx.firmId);

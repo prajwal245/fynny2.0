@@ -168,3 +168,14 @@ describe("the connection check", () => {
     expect((await m.resolveTemplate(sender, 1)).none).toBe(true);
   });
 });
+
+describe("many firms at once", () => {
+  it("share one read of Meta's template list", async () => {
+    const m = await import("@/lib/practice/whatsappTemplates.server");
+    metaList = [t("document_request_v2", "APPROVED", { components: OURS("url_first") })];
+    calls = 0;
+    const all = await Promise.all(Array.from({ length: 25 }, () => m.listTemplates(sender)));
+    expect(calls).toBe(1);
+    expect(all.every((l) => l?.length === 1)).toBe(true);
+  });
+});

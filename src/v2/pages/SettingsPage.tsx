@@ -30,6 +30,7 @@ import { GmailIcon, TallyIcon, WhatsAppIcon } from "../components/BrandIcons";
 import { ZohoBooksSection } from "../components/ZohoBooks";
 import { INTEGRATION_STYLES, IntegrationCard } from "../components/IntegrationCard";
 import { CONTROLS_STYLES, Checkbox, Disclosure, Field, SettingRow } from "../components/Controls";
+import { StatefulButton } from "../components/MotionKit";
 import { Link } from "@tanstack/react-router";
 import { UploadCloud } from "lucide-react";
 
@@ -324,31 +325,23 @@ export default function SettingsPage() {
                 Setup tips and trial alerts on WhatsApp. Reply STOP anytime to opt out.
               </Checkbox>
             </div>
-            <button
-              className="v2-btn v2-btn-primary"
-              style={{ marginTop: 16 }}
-              disabled={!form.name.trim()}
-              onClick={async () => {
-                if (form.phone.trim() && !parseMobile(form.phone)) {
-                  toast.error("Enter a valid mobile number, for example 98200 11223.");
-                  return;
-                }
-                const ok = await saveFirm(
-                  {
-                    name: form.name.trim(),
-                    city: form.city.trim(),
-                    frn: form.frn.trim(),
-                    email: form.email.trim(),
-                    phone: form.phone.trim(),
-                    whatsappOk: form.whatsappOk,
-                  },
-                  { settings: true },
-                );
-                if (ok) toast.success("Firm details saved");
-              }}
-            >
-              Save changes
-            </button>
+            <div style={{ marginTop: 16 }}>
+              <StatefulButton
+                label="Save changes"
+                disabled={!form.name.trim()}
+                onAction={async () => {
+                  if (form.phone.trim() && !parseMobile(form.phone)) {
+                    toast.error("Enter a valid mobile number, for example 98200 11223.");
+                    throw new Error("invalid mobile");
+                  }
+                  const ok = await saveFirm(
+                    { name: form.name.trim(), city: form.city.trim(), frn: form.frn.trim(), email: form.email.trim(), phone: form.phone.trim(), whatsappOk: form.whatsappOk },
+                    { settings: true },
+                  );
+                  if (!ok) throw new Error("not saved");
+                }}
+              />
+            </div>
           </Section>
 
           <Section title="Your profile">
@@ -366,25 +359,19 @@ export default function SettingsPage() {
                 <input id="settings-email" className="v2-input" value={session?.email ?? ""} disabled />
               </Field>
             </div>
-            <button
-              className="v2-btn v2-btn-primary"
-              style={{ marginTop: 16 }}
-              disabled={!profileName.trim() || busy === "profile"}
-              onClick={() =>
-                run(
-                  "profile",
-                  async () => {
-                    const { error } = await supabase.auth.updateUser({
-                      data: { full_name: profileName.trim() },
-                    });
-                    if (error) throw error;
-                  },
-                  "Profile saved",
-                )
-              }
-            >
-              Save profile
-            </button>
+            <div style={{ marginTop: 16 }}>
+              <StatefulButton
+                label="Save profile"
+                disabled={!profileName.trim()}
+                onAction={async () => {
+                  const { error } = await supabase.auth.updateUser({ data: { full_name: profileName.trim() } });
+                  if (error) {
+                    toast.error(errMsg(error));
+                    throw error;
+                  }
+                }}
+              />
+            </div>
           </Section>
         </>
       )}

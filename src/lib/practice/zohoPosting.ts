@@ -103,6 +103,42 @@ export function postable(t: BankTxn, openInvoices: OpenInvoice[]): Postable {
   return { kind: "receipt", invoice: hit.invoice };
 }
 
+/* ── who may use posting ────────────────────────────────── */
+
+/**
+ * Posting is opt-in per firm. ZOHO_POSTING_FIRMS lists the firm ids that may use it
+ * (comma separated). Empty or unset means nobody; "*" is the only way to mean everybody.
+ */
+export function postingAllowedFor(list: string | undefined, firmId: string): boolean {
+  const ids = (list ?? "").split(/[\s,]+/).filter(Boolean);
+  return ids.includes("*") || ids.includes(firmId);
+}
+
+/* ── is it already in Zoho? ──────────────────────────────── */
+
+export interface ZohoEntry {
+  date: string;
+  amount: number;
+}
+
+const dayMs = 86_400_000;
+export const DUPLICATE_WINDOW_DAYS = 3;
+
+/** The window of dates to ask Zoho about, either side of the bank line. */
+export function duplicateWindow(date: string): { start: string; end: string } {
+  const t = Date.parse(`${date}T00:00:00Z`);
+  const iso = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+  return { start: iso(t - DUPLICATE_WINDOW_DAYS * dayMs), end: iso(t + DUPLICATE_WINDOW_DAYS * dayMs) };
+}
+
+/** An entry for the same amount within a few days: treat the bank line as already recorded in Zoho. */
+export function alreadyInZoho(t: BankTxn, entries: ZohoEntry[]): ZohoEntry | null {
+  const at = Date.parse(`${t.date}T00:00:00Z`);
+  return (
+    entries.find((e) => Math.abs(e.amount - t.amount) < 0.005 && Math.abs(Date.parse(`${e.date.slice(0, 10)}T00:00:00Z`) - at) <= DUPLICATE_WINDOW_DAYS * dayMs) ?? null
+  );
+}
+
 /* ── payloads and previews ───────────────────────────────── */
 
 export const TAG = "Created by FynHelp";

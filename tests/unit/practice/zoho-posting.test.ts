@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
   accountKind,
+  alreadyInZoho,
   BANK_CHARGE_LIMIT,
+  duplicateWindow,
   expensePayload,
   idempotencyRef,
   invoiceHint,
   paymentPayload,
   pickChargeAccount,
   postable,
+  postingAllowedFor,
   preview,
   zohoErrorMessage,
   type BankTxn,
@@ -92,5 +95,34 @@ describe("payloads", () => {
   it("picks Zoho's bank-charges expense account, and none when there is none", () => {
     expect(pickChargeAccount([{ account_id: "1", account_name: "Office Supplies" }, { account_id: "2", account_name: "Bank Fees and Charges" }])?.id).toBe("2");
     expect(pickChargeAccount([{ account_id: "1", account_name: "Office Supplies" }])).toBeNull();
+  });
+});
+
+describe("is it already in Zoho", () => {
+  it("looks three days either side", () => {
+    expect(duplicateWindow("2026-09-30")).toEqual({ start: "2026-09-27", end: "2026-10-03" });
+    expect(duplicateWindow("2026-03-01")).toEqual({ start: "2026-02-26", end: "2026-03-04" });
+  });
+  it("calls it recorded only for the same amount within the window", () => {
+    const t = txn({ amount: 590, date: "2026-09-30" });
+    expect(alreadyInZoho(t, [{ date: "2026-09-28", amount: 590 }])).not.toBeNull();
+    expect(alreadyInZoho(t, [{ date: "2026-09-28", amount: 591 }])).toBeNull();
+    expect(alreadyInZoho(t, [{ date: "2026-09-20", amount: 590 }])).toBeNull();
+    expect(alreadyInZoho(t, [])).toBeNull();
+  });
+});
+
+describe("posting is opt-in per firm", () => {
+  it("is off for everyone unless a firm is listed", () => {
+    expect(postingAllowedFor(undefined, "f1")).toBe(false);
+    expect(postingAllowedFor("", "f1")).toBe(false);
+    expect(postingAllowedFor("on", "f1")).toBe(false);
+    expect(postingAllowedFor("f2, f3", "f1")).toBe(false);
+  });
+  it("lets in only the listed firms, and only * means everybody", () => {
+    expect(postingAllowedFor("f1", "f1")).toBe(true);
+    expect(postingAllowedFor("f2,f1 f3", "f1")).toBe(true);
+    expect(postingAllowedFor("f1", "f10")).toBe(false);
+    expect(postingAllowedFor("*", "anyone")).toBe(true);
   });
 });

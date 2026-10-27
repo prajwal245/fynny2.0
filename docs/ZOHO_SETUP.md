@@ -24,7 +24,7 @@ FynHelp never edits or deletes anything it did not create. Every entry it create
 | `GMAIL_ENCRYPTION_KEY` | already set; also encrypts Zoho tokens |
 | `ZOHO_ACCOUNTS_URL` | optional, default `https://accounts.zoho.in` |
 | `ZOHO_REDIRECT_URI` | optional, default the URL above |
-| `ZOHO_POSTING` | leave **unset** to keep posting off for everyone. Set to `on` to allow firms to opt in. Setting it back to anything else switches posting off at once. |
+| `ZOHO_POSTING_FIRMS` | **Opt-in per firm.** Leave unset and nobody sees the approved-entries option. List firm ids (comma separated) to let in a pilot firm. Only `*` means every firm. Remove an id to switch that firm off at once. |
 
 ## 3. Database (Supabase SQL editor)
 
@@ -37,14 +37,14 @@ Write (only when a partner clicks "Allow approved entries"): `ZohoBooks.expenses
 
 ## 5. Safety rules built in
 
-- Posting needs all three: `ZOHO_POSTING=on`, the firm's write consent, and the client's switch.
+- Posting needs all three: the firm listed in `ZOHO_POSTING_FIRMS`, that firm's own write consent in Zoho, and the client's switch. Connecting Zoho Books for reading is also a choice: a partner has to click Connect.
 - Only a partner can approve; the bank line's amount, date and narration are read from FynHelp's database, never from the browser.
 - Bank charges only, up to ₹5,000, booked to the "Bank Fees and Charges" expense account (FynHelp will not create accounts).
 - Receipts only when the narration names exactly one open invoice and the amount does not exceed what is due.
 - One live entry per bank line (database-enforced), so a double click or retry cannot post twice.
 - A write is never retried automatically. If Zoho does not answer, the line is held as "check Zoho" until a person looks.
 
-## 6. Go-live check (do this once on a Zoho test organisation before turning `ZOHO_POSTING` on)
+## 6. Go-live check (do this once on a Zoho test organisation before listing a firm in `ZOHO_POSTING_FIRMS`)
 
 1. Connect Zoho in Settings; link a client to its bank account; pull a month.
 2. Open a bank charge in Exceptions → "Post to Zoho Books…" is hidden until all three switches are on. Switch them on.

@@ -49,9 +49,18 @@ export const STORY_STYLES = `
 .ls .card { background:#fff; border:1px solid #E8E1D7; border-radius:20px; padding:24px; transition:transform .5s cubic-bezier(.34,1.56,.64,1), box-shadow .3s ease; }
 .ls .card:hover { transform:translateY(-4px); box-shadow:0 22px 40px -28px rgba(20,18,16,.45); }
 .ls .pv { display:grid; grid-template-columns:repeat(auto-fit, minmax(250px, 1fr)); gap:16px; }
-.ls .tile { display:flex; align-items:center; gap:12px; background:#fff; border:1px solid #E8E1D7; border-radius:16px; padding:14px 16px; transition:transform .5s cubic-bezier(.34,1.56,.64,1); }
-.ls .tile:hover { transform:translateY(-3px); }
-.ls .tile .lg { width:40px; height:40px; border-radius:12px; display:grid; place-items:center; background:#FAF7F2; border:1px solid #EFE8DE; flex:0 0 auto; }
+.ls .mq { position:relative; overflow:hidden; -webkit-mask-image:linear-gradient(90deg, transparent, #000 9%, #000 91%, transparent); mask-image:linear-gradient(90deg, transparent, #000 9%, #000 91%, transparent); padding:10px 0; }
+.ls .mq-track { display:flex; gap:16px; width:max-content; animation:ls-marquee 38s linear infinite; padding-left:16px; }
+.ls .mq[data-reverse="true"] .mq-track { animation-direction:reverse; animation-duration:46s; }
+.ls .mq:hover .mq-track, .ls .mq:focus-within .mq-track { animation-play-state:paused; }
+@keyframes ls-marquee { to { transform:translateX(calc((100% + 16px) / -3)); } }
+.ls .mq-tool { display:flex; align-items:center; gap:16px; min-width:330px; background:#fff; border:1px solid #E8E1D7; border-radius:22px; padding:18px 22px; box-shadow:0 14px 30px -26px rgba(20,18,16,.5); transition:transform .5s cubic-bezier(.34,1.56,.64,1), border-color .3s ease, box-shadow .3s ease; }
+.ls .mq-tool:hover { transform:translateY(-5px); border-color:#D92B2B; box-shadow:0 24px 44px -26px rgba(217,43,43,.45); }
+.ls .mq-tool .lg { width:62px; height:62px; border-radius:18px; display:grid; place-items:center; background:#FAF7F2; border:1px solid #EFE8DE; flex:0 0 auto; }
+.ls .mq-tool .tg { font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; padding:2px 8px; border-radius:99px; background:#F3ECE2; color:#6B4A2B; font-weight:600; }
+.ls .mq-fmt { display:inline-flex; align-items:center; gap:10px; white-space:nowrap; background:#fff; border:1px solid #E8E1D7; border-radius:999px; padding:11px 20px; font-size:14px; font-weight:500; transition:transform .5s cubic-bezier(.34,1.56,.64,1); }
+.ls .mq-fmt:hover { transform:translateY(-3px); }
+@media (prefers-reduced-motion: reduce) { .ls .mq { -webkit-mask-image:none; mask-image:none; } .ls .mq-track { animation:none; flex-wrap:wrap; width:auto; padding:0 20px; justify-content:center; } }
 .ls .story { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
 @media (max-width:860px){ .ls .story { grid-template-columns:1fr; } }
 .ls .tl { position:relative; display:grid; gap:14px; padding-left:22px; }
@@ -176,27 +185,71 @@ export function PainValue() {
   );
 }
 
+/** Tools whose real marks we show, with what FynHelp does with each. */
+const TOOLS: { icon: ReactNode; name: string; line: string; tag: string }[] = [
+  { icon: <TallyIcon size={34} />, name: "TallyPrime", line: "Reads your exports, including Tally on Cloud", tag: "Books" },
+  { icon: <ZohoIcon size={34} />, name: "Zoho Books", line: "Connects to your organisation", tag: "Books" },
+  { icon: <WhatsAppIcon size={34} />, name: "WhatsApp", line: "Asks clients and receives their files", tag: "Clients" },
+  { icon: <GmailIcon size={34} />, name: "Gmail", line: "Statements emailed to the firm inbox come in", tag: "Inbox" },
+];
+const FORMATS: { icon: ReactNode; name: string }[] = [
+  { icon: <FileSpreadsheet size={18} color="#1F7A52" />, name: "Excel" },
+  { icon: <FileSpreadsheet size={18} color="#2B6CB0" />, name: "CSV" },
+  { icon: <FileText size={18} color="#B3221F" />, name: "PDF statements" },
+  { icon: <ImageIcon size={18} color="#8E1B1F" />, name: "Photos and scans" },
+  { icon: <FileText size={18} color="#1E4E8C" />, name: "Tally XML" },
+  { icon: <FileSpreadsheet size={18} color="#1F7A52" />, name: "GST registers" },
+  { icon: <FileSpreadsheet size={18} color="#6B4A2B" />, name: "TDS registers" },
+  { icon: <FileText size={18} color="#5E5953" />, name: "Payroll registers" },
+];
+
+/** Two slow, opposite rows: the tools (real marks) above, the file types below. Pauses on hover; still and wrapped for reduced motion. */
 export function Integrations() {
-  const tiles: [ReactNode, string, string][] = [
-    [<TallyIcon key="t" size={24} />, "TallyPrime", "Exports, including Tally on Cloud"],
-    [<ZohoIcon key="z" size={24} />, "Zoho Books", "Connected to your organisation"],
-    [<WhatsAppIcon key="w" size={24} />, "WhatsApp", "Asks clients and receives their files"],
-    [<GmailIcon key="g" size={24} />, "Gmail", "Statements emailed to the firm inbox come in"],
-    [<FileSpreadsheet key="x" size={22} color="#1F7A52" />, "Excel and CSV", "Bank statements and registers"],
-    [<FileText key="p" size={22} color="#B3221F" />, "PDF and photos", "Including scans of statements"],
-  ];
+  const reduce = useReducedMotion();
+  const row = (kids: ReactNode, reverse = false, label: string) => (
+    <div className="mq" data-reverse={reverse} aria-label={label} role="group">
+      <div className="mq-track">
+        {kids}
+        {!reduce && (
+          <>
+            <span aria-hidden="true" style={{ display: "contents" }}>{kids}</span>
+            <span aria-hidden="true" style={{ display: "contents" }}>{kids}</span>
+          </>
+        )}
+      </div>
+    </div>
+  );
   return (
-    <section className="ls" style={css("padding:40px 0 56px")}>
+    <section className="ls" style={css("padding:48px 0 72px;overflow:hidden")}>
       <div className="wrap">
         <Head kicker="Works with what you already use" title="No new ledger. No migration." sub="FynHelp sits on top of the books your clients already keep, and reads the files they already send." />
-        <div style={css("display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:12px")}>
-          {tiles.map(([icon, name, line]) => (
-            <div key={name} className="tile">
-              <span className="lg">{icon}</span>
-              <div><div style={css("font-weight:500;font-size:15px")}>{name}</div><div style={css("font-size:12.5px;color:#5E5953;line-height:1.4")}>{line}</div></div>
+      </div>
+      {row(
+        TOOLS.map((t) => (
+          <div key={t.name} className="mq-tool">
+            <span className="lg">{t.icon}</span>
+            <div style={{ minWidth: 0 }}>
+              <div style={css("display:flex;align-items:center;gap:8px")}>
+                <span style={css("font-weight:600;font-size:17px")}>{t.name}</span>
+                <span className="tg">{t.tag}</span>
+              </div>
+              <div style={css("font-size:13px;color:#5E5953;line-height:1.4;margin-top:3px")}>{t.line}</div>
             </div>
-          ))}
-        </div>
+          </div>
+        )),
+        false,
+        "Tools FynHelp works with",
+      )}
+      <div style={{ height: 14 }} />
+      {row(
+        FORMATS.map((f) => (
+          <div key={f.name} className="mq-fmt">{f.icon}{f.name}</div>
+        )),
+        true,
+        "Files FynHelp reads",
+      )}
+      <div className="wrap">
+        <p style={css("margin:22px 0 0;text-align:center;font-size:13.5px;color:#5E5953")}>Clients keep their software. Your team keeps one way of reviewing them all.</p>
       </div>
     </section>
   );

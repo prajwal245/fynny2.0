@@ -81,7 +81,7 @@ function fakeZoho(handler?: (m: string, url: string) => Response | undefined) {
 
 beforeEach(() => {
   process.env["GMAIL_ENCRYPTION_KEY"] = "test-key";
-  process.env["ZOHO_POSTING"] = "on";
+  process.env["ZOHO_POSTING_FIRMS"] = "f1";
   process.env["ZOHO_CLIENT_ID"] = "id";
   process.env["ZOHO_CLIENT_SECRET"] = "secret";
 });
@@ -119,9 +119,11 @@ describe("posting to Zoho Books", () => {
 
   it("does nothing when the platform switch, the consent or the client switch is off", async () => {
     fakeZoho();
-    process.env["ZOHO_POSTING"] = "off";
-    await expect(zoho.post(await world(), ctx, "l1", TXN)).rejects.toThrow(/not switched on/);
-    process.env["ZOHO_POSTING"] = "on";
+    process.env["ZOHO_POSTING_FIRMS"] = "some-other-firm";
+    await expect(zoho.post(await world(), ctx, "l1", TXN)).rejects.toThrow(/not switched on for your firm/);
+    delete process.env["ZOHO_POSTING_FIRMS"];
+    await expect(zoho.post(await world(), ctx, "l1", TXN)).rejects.toThrow(/not switched on for your firm/);
+    process.env["ZOHO_POSTING_FIRMS"] = "f1";
     await expect(zoho.post(await world({ write: false }), ctx, "l1", TXN)).rejects.toThrow(/Allow FynHelp/);
     await expect(zoho.post(await world({ posting: false }), ctx, "l1", TXN)).rejects.toThrow(/off for this client/);
     expect(calls.some((c) => c.method === "POST")).toBe(false);

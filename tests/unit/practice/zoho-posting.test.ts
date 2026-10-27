@@ -10,6 +10,7 @@ import {
   paymentPayload,
   pickChargeAccount,
   postable,
+  postingAllowedFor,
   preview,
   zohoErrorMessage,
   type BankTxn,
@@ -108,5 +109,20 @@ describe("is it already in Zoho", () => {
     expect(alreadyInZoho(t, [{ date: "2026-09-28", amount: 591 }])).toBeNull();
     expect(alreadyInZoho(t, [{ date: "2026-09-20", amount: 590 }])).toBeNull();
     expect(alreadyInZoho(t, [])).toBeNull();
+  });
+});
+
+describe("posting is opt-in per firm", () => {
+  it("is off for everyone unless a firm is listed", () => {
+    expect(postingAllowedFor(undefined, "f1")).toBe(false);
+    expect(postingAllowedFor("", "f1")).toBe(false);
+    expect(postingAllowedFor("on", "f1")).toBe(false);
+    expect(postingAllowedFor("f2, f3", "f1")).toBe(false);
+  });
+  it("lets in only the listed firms, and only * means everybody", () => {
+    expect(postingAllowedFor("f1", "f1")).toBe(true);
+    expect(postingAllowedFor("f2,f1 f3", "f1")).toBe(true);
+    expect(postingAllowedFor("f1", "f10")).toBe(false);
+    expect(postingAllowedFor("*", "anyone")).toBe(true);
   });
 });

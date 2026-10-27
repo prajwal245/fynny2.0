@@ -1021,7 +1021,7 @@ export const zohoBooksConnect = createServerFn({ method: "POST" })
       await asPartner(ctx, "connect Zoho Books");
       const zoho = await import("./zoho.server");
       if (!zoho.zohoConfigured()) throw new Error("Zoho Books isn't switched on for FynHelp yet.");
-      if (data?.write && !zoho.postingAvailable()) throw new Error("Posting to Zoho Books isn't switched on for FynHelp yet.");
+      if (data?.write && !zoho.postingAvailable(ctx.firmId)) throw new Error("Posting to Zoho Books isn't switched on for your firm.");
       const nonce = zoho.newNonce();
       const { setCookie } = await import("@tanstack/react-start/server");
       setCookie(zoho.NONCE_COOKIE, nonce, { httpOnly: true, secure: process.env["NODE_ENV"] === "production", sameSite: "lax", path: "/api/integrations/zoho", maxAge: 900 });

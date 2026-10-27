@@ -103,6 +103,17 @@ export function postable(t: BankTxn, openInvoices: OpenInvoice[]): Postable {
   return { kind: "receipt", invoice: hit.invoice };
 }
 
+/* ── who may use posting ────────────────────────────────── */
+
+/**
+ * Posting is opt-in per firm. ZOHO_POSTING_FIRMS lists the firm ids that may use it
+ * (comma separated). Empty or unset means nobody; "*" is the only way to mean everybody.
+ */
+export function postingAllowedFor(list: string | undefined, firmId: string): boolean {
+  const ids = (list ?? "").split(/[\s,]+/).filter(Boolean);
+  return ids.includes("*") || ids.includes(firmId);
+}
+
 /* ── is it already in Zoho? ──────────────────────────────── */
 
 export interface ZohoEntry {

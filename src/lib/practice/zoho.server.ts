@@ -19,6 +19,7 @@ import {
   alreadyInZoho,
   duplicateWindow,
   postable,
+  postingAllowedFor,
   preview,
   zohoErrorMessage,
   type BankTxn,
@@ -31,8 +32,8 @@ const WRITE_SCOPES = ["ZohoBooks.expenses.CREATE", "ZohoBooks.expenses.DELETE", 
 export const ZOHO_SCOPES = READ_SCOPES.join(",");
 export const ZOHO_WRITE_SCOPES = [...READ_SCOPES, ...WRITE_SCOPES].join(",");
 
-/** Platform switch: posting can be turned off for every firm at once without a deploy of code. */
-export const postingAvailable = () => process.env["ZOHO_POSTING"] === "on";
+/** Opt-in per firm: only firms listed in ZOHO_POSTING_FIRMS (or "*") may even see the option. Unset means nobody. */
+export const postingAvailable = (firmId: string) => postingAllowedFor(process.env["ZOHO_POSTING_FIRMS"], firmId);
 export const ZOHO_CALLBACK_PATH = "/api/integrations/zoho/callback";
 export const NONCE_COOKIE = "fh_zoho_nonce";
 
@@ -143,7 +144,7 @@ export async function completeConnect(db: Db, firmId: string, userId: string, co
     access_expires_at: new Date(Date.now() + ((t.expires_in ?? 3600) - 120) * 1000).toISOString(),
     status: "connected",
     last_error: null,
-    write_enabled: write && postingAvailable(),
+    write_enabled: write && postingAvailable(firmId),
     updated_at: new Date().toISOString(),
   };
   const { error } = await db.from("ca_zoho_connections").upsert(row, { onConflict: "ca_firm_id" });
@@ -268,8 +269,8 @@ export async function status(db: Db, ctx: FirmContext) {
     connected: !!c && c.status === "connected",
     error: c?.status === "error" ? c.last_error : null,
     connectedAt: c?.created_at ?? null,
-    /** Platform switch (ZOHO_POSTING=on) and whether this firm has given Zoho's separate write consent. */
-    postingAvailable: postingAvailable(),
+    /** Whether this firm has been let in to the posting option (ZOHO_POSTING_FIRMS), and whether it has given Zoho's separate write consent. */
+    postingAvailable: postingAvailable(ctx.firmId),
     writeEnabled: !!c?.write_enabled,
     links: links ?? [],
   };
@@ -546,7 +547,7 @@ export async function openInvoices(db: Db, ctx: FirmContext, linkId: string): Pr
 const FALLBACK_CHARGE_HELP = "Zoho Books has no \"Bank Fees and Charges\" account. Add one under Chart of Accounts, then try again.";
 
 async function requirePosting(db: Db, ctx: FirmContext, linkId: string) {
-  if (!postingAvailable()) throw new PracticeError("posting_off", "Posting to Zoho Books is not switched on for FynHelp.");
+  if (!postingAvailable(ctx.firmId)) throw new PracticeError("posting_off", "Posting to Zoho Books is not switched on for your firm.");
   const c = await requireConnection(db, ctx.firmId);
   if (!c.write_enabled) throw new PracticeError("write_not_granted", "Allow FynHelp to create entries in Zoho Books first (Settings → Zoho Books).");
   const l = await linkOf(db, ctx, linkId);
@@ -557,7 +558,7 @@ async function requirePosting(db: Db, ctx: FirmContext, linkId: string) {
 export async function setPosting(db: Db, ctx: FirmContext, linkId: string, enabled: boolean) {
   const l = await linkOf(db, ctx, linkId);
   if (enabled) {
-    if (!postingAvailable()) throw new PracticeError("posting_off", "Posting to Zoho Books is not switched on for FynHelp.");
+    if (!postingAvailable(ctx.firmId)) throw new PracticeError("posting_off", "Posting to Zoho Books is not switched on for your firm.");
     const c = await requireConnection(db, ctx.firmId);
     if (!c.write_enabled) throw new PracticeError("write_not_granted", "Allow FynHelp to create entries in Zoho Books first.");
   }

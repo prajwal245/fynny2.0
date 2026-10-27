@@ -25,4 +25,20 @@ describe("WhatsApp preview", () => {
     render(<WhatsappPreview clientName="Acme" contact="  " item="Invoice" firmName="Rao & Co" />);
     expect(screen.getByTestId("whatsapp-preview").textContent).toContain("Hello Asha");
   });
+
+  it("previews only the reminders whose template Meta approved", () => {
+    render(<WhatsappPreview clientName="Acme" contact="Asha" item="Invoice" firmName="Rao & Co" steps={[2]} />);
+    expect(screen.queryByRole("tab", { name: "Day 0" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "Day 7" })).toBeNull();
+    expect(screen.getByRole("tab", { name: "Day 3" })).toBeTruthy();
+    expect(screen.getByTestId("whatsapp-preview").textContent).toContain("gentle reminder");
+  });
+
+  it("shows no message at all while nothing is approved or while Meta is still being asked", () => {
+    const { rerender } = render(<WhatsappPreview clientName="Acme" contact="Asha" item="Invoice" firmName="Rao & Co" steps={[]} />);
+    expect(screen.getByTestId("whatsapp-preview").textContent).toContain("nothing to preview");
+    expect(screen.queryByText("Upload documents")).toBeNull();
+    rerender(<WhatsappPreview clientName="Acme" contact="Asha" item="Invoice" firmName="Rao & Co" steps={null} />);
+    expect(screen.getByTestId("whatsapp-preview").textContent).toContain("Checking which messages");
+  });
 });

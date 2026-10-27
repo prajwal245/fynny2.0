@@ -330,7 +330,7 @@ export function templateCandidates(stage: ChaseStage, env: { request?: string; f
   const legacy = "document_request";
   const list =
     stage === "request"
-      ? [env.request ?? "document_request_v2", legacy]
+      ? [env.request ?? "document_request_v2", legacy, env.followup ?? "document_followup_v2", env.final ?? "document_final_v2"]
       : stage === "followup"
         ? [env.followup ?? "document_followup_v2", env.request ?? "document_request_v2", legacy]
         : [env.final ?? "document_final_v2", env.followup ?? "document_followup_v2", env.request ?? "document_request_v2", legacy];
@@ -338,12 +338,12 @@ export function templateCandidates(stage: ChaseStage, env: { request?: string; f
 }
 
 /** The first usable candidate, with the button layout to send it with. Null when none is approved. */
-export function pickTemplate(templates: MetaTemplate[], candidates: string[], language: string): { name: string; layout: ButtonLayout | null } | null {
+export function pickTemplate(templates: MetaTemplate[], candidates: string[], language: string): { name: string; layout: ButtonLayout | null; /** The language code Meta approved it in, which is the one a send must use ("en" and "en_US" are different to Meta). */ language: string } | null {
   for (const name of candidates) {
     const t = templates.find((x) => x.name === name && x.language === language) ?? templates.find((x) => x.name === name && x.language.startsWith(language));
     if (templateStatus(t) !== "approved") continue;
     const layout = buttonLayoutOf(t!);
-    return { name, layout: layout === "none" || layout === "other" ? null : layout };
+    return { name, layout: layout === "none" || layout === "other" ? null : layout, language: t!.language };
   }
   return null;
 }

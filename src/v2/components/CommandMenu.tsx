@@ -121,7 +121,7 @@ export function CommandMenu({ open, onClose }: { open: boolean; onClose: () => v
     <AnimatePresence>
       {open && (
         <Layer className="v2" style={{ position: "fixed", inset: 0, zIndex: 90, display: "grid", placeItems: "start center", paddingTop: "12vh", paddingInline: 16 }}>
-          <motion.div onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} style={{ position: "absolute", inset: 0, background: "rgba(20,20,20,.28)" }} />
+          <motion.div onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} style={{ position: "absolute", inset: 0, background: "var(--v2-overlay)" }} />
           <motion.div
             role="dialog"
             aria-label="Command menu"
@@ -129,7 +129,7 @@ export function CommandMenu({ open, onClose }: { open: boolean; onClose: () => v
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.98 }}
             transition={{ duration: 0.16 }}
-            style={{ position: "relative", width: "min(620px,100%)", background: V.card, borderRadius: 18, border: `1px solid ${V.line}`, boxShadow: "0 30px 80px -30px rgba(20,20,20,.5)", overflow: "hidden" }}
+            style={{ position: "relative", width: "min(620px,100%)", background: "var(--v2-pop)", borderRadius: 18, border: `1px solid ${V.line}`, boxShadow: "0 30px 80px -30px rgba(9,11,17,.5)", overflow: "hidden" }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 16px", borderBottom: `1px solid ${V.line}` }}>
               <Search size={16} color={V.muted} />

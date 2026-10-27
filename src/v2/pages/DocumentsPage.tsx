@@ -255,7 +255,7 @@ export default function DocumentsPage({
                 padding: scopedClient ? "22px 18px" : "32px 18px",
                 textAlign: "center",
                 cursor: "pointer",
-                border: `1.5px dashed ${drag ? V.ink : "rgba(20,20,20,.2)"}`,
+                border: `1.5px dashed ${drag ? V.ink : "var(--v2-dash)"}`,
                 borderRadius: 14,
                 background: drag ? V.gray : "transparent",
                 transition: "background .15s ease, border-color .15s ease",

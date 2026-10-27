@@ -20,14 +20,30 @@ export function WhatsappPreview({
   item,
   firmName,
   compact = false,
+  steps,
 }: {
   clientName: string;
   contact: string;
   item: string;
   firmName: string;
   compact?: boolean;
+  /**
+   * Which reminders to preview: only the ones whose template Meta has approved, so nobody previews a message that
+   * cannot be sent. Undefined: all three. Null: not known yet. An empty list: none is approved.
+   */
+  steps?: number[] | null;
 }) {
-  const [step, setStep] = useState(1);
+  const shown = steps === undefined ? STAGES : STAGES.filter((s) => steps?.includes(s.step));
+  const [chosen, setStep] = useState(1);
+  const step = shown.some((s) => s.step === chosen) ? chosen : (shown[0]?.step ?? 1);
+  if (steps === null)
+    return <div style={{ fontSize: 12.5, color: V.muted }} data-testid="whatsapp-preview">Checking which messages Meta has approved…</div>;
+  if (!shown.length)
+    return (
+      <div data-testid="whatsapp-preview" style={{ fontSize: 12.5, color: V.body, lineHeight: 1.6, padding: "12px 14px", borderRadius: 12, background: V.gray }}>
+        No reminder template is approved by Meta yet, so there is nothing to preview. When one is approved, its message appears here.
+      </div>
+    );
   const text = chaseText(chaseTemplateParams({ contactName: contact.trim() || "Asha", clientName, items: [item], firmName }), step);
   const btn = (label: string, icon: React.ReactNode) => (
     <div key={label} style={{ background: "#fff", borderRadius: 10, padding: "9px 12px", textAlign: "center", color: "#00A5F4", fontSize: 13.5, fontWeight: 600, display: "flex", gap: 6, alignItems: "center", justifyContent: "center", boxShadow: "0 1px 0.5px rgba(11,20,26,.13)" }}>
@@ -41,7 +57,7 @@ export function WhatsappPreview({
           <WhatsAppIcon size={14} /> What your client sees
         </span>
         <span style={{ marginLeft: "auto", display: "inline-flex", gap: 4 }} role="tablist" aria-label="Reminder stage">
-          {STAGES.map((s) => (
+          {shown.map((s) => (
             <button
               key={s.step}
               type="button"

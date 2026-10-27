@@ -7,6 +7,7 @@ import { Link, useLocation } from "@/lib/router-compat";
 import { Menu, X } from "lucide-react";
 import FynLogo from "@/components/FynLogo";
 import { C } from "@/components/site/siteTheme";
+import { LIQUID_BUTTON_CSS } from "@/lib/liquidButton";
 import {
   CTA_DEMO,
   CTA_START,
@@ -39,6 +40,7 @@ const STYLES = `
 .sh-btn:hover { transform:translateY(-1px); }
 .sh-primary { background:${C.ink}; color:${C.onDark}; }
 .sh-primary:hover { background:${C.inkDeep}; }
+${LIQUID_BUTTON_CSS}
 .sh-ghost { color:${C.ink}; border:1px solid rgba(23,18,8,.16); background:transparent; }
 .sh-ghost:hover { border-color:rgba(23,18,8,.4); }
 .sh a:focus-visible, .sh button:focus-visible { outline:2px solid ${C.coral}; outline-offset:2px; }

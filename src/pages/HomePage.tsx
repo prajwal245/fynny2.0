@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "@/lib/router-compat";
+import { LIQUID_BUTTON_CSS } from "@/lib/liquidButton";
 import { HOME_FAQS } from "@/content/faqs";
 import { CTA_DEMO, CTA_NOTE, CTA_START, SIGNUP_URL, signupUrl, trackCta } from "@/components/site/cta";
 import { DemoLink, openDemo } from "@/components/site/BookDemo";
@@ -86,6 +87,7 @@ const STYLES = `
 .fh-dark .fh-btn-ghost, .fh-maroon .fh-btn-ghost { border-color:rgba(247,241,230,.26); color:${C.onDark}; }
 .fh-btn-ghost:hover { transform:translateY(-2px); background:rgba(23,18,8,.05); }
 .fh-dark .fh-btn-ghost:hover, .fh-maroon .fh-btn-ghost:hover { background:rgba(255,255,255,.08); }
+${LIQUID_BUTTON_CSS}
 
 /* ── HERO ── */
 .fh-hero { padding:118px 0 46px; text-align:center; position:relative; }

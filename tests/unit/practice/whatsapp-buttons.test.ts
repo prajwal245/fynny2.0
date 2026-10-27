@@ -240,6 +240,40 @@ describe("sending the chase", () => {
     delete process.env["WHATSAPP_FINAL_TEMPLATE"];
   });
 
+  describe("with the template list from Meta", () => {
+    const body = { type: "BODY", text: "Hello {{1}}" };
+    const meta = (data: unknown[]) => {
+      process.env["WHATSAPP_WABA_ID"] = "2457752908089073";
+      vi.stubGlobal("fetch", async (u: string, init?: { body?: string }) => {
+        if (String(u).includes("message_templates")) return { ok: true, json: async () => ({ data }) };
+        sent.push({ body: JSON.parse(init?.body ?? "{}") });
+        return { ok: true, json: async () => ({ messages: [{ id: "wamid.1" }] }) };
+      });
+    };
+    afterEach(async () => {
+      delete process.env["WHATSAPP_WABA_ID"];
+      (await import("@/lib/practice/whatsappTemplates.server")).forgetTemplates();
+    });
+
+    it("sends in the language Meta approved, not the one configured", async () => {
+      meta([{ name: "document_request_v2", status: "APPROVED", language: "en_US", category: "UTILITY", components: [body] }]);
+      const { sendChaseWhatsapp } = await import("@/lib/practice/whatsappSend.server");
+      const r = await sendChaseWhatsapp(world(false), "f1", "9845012345", params, { chase });
+      expect(r).toMatchObject({ ok: true, mode: "template" });
+      expect((sent[0].body as { template: { name: string; language: { code: string } } }).template).toMatchObject({ name: "document_request_v2", language: { code: "en_US" } });
+    });
+
+    it("with no template approved it says so plainly, sends nothing and spends no credit", async () => {
+      meta([{ name: "document_request_v2", status: "PENDING", language: "en", category: "UTILITY", components: [body] }]);
+      const { sendChaseWhatsapp } = await import("@/lib/practice/whatsappSend.server");
+      const r = await sendChaseWhatsapp(world(false), "f1", "9845012345", params, { chase });
+      expect(r.ok).toBe(false);
+      expect(r.error).toContain("No WhatsApp message template is approved yet");
+      expect(sent).toHaveLength(0);
+      expect(credit).toMatchObject({ spent: 0, refunded: 0 });
+    });
+  });
+
   it("inside the window the wording follows the step", async () => {
     const { sendChaseWhatsapp } = await import("@/lib/practice/whatsappSend.server");
     await sendChaseWhatsapp(world(true), "f1", "9845012345", params, { chase, step: 3 });

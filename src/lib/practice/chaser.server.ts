@@ -247,10 +247,21 @@ export interface CreateChaseInput {
   period?: string | null;
 }
 
+/** What happened to the first reminder when a chase was created. */
+export interface FirstSend {
+  /** Sent now, by email and/or WhatsApp (a test account's simulated sends count: they are recorded). */
+  sent: boolean;
+  /** Not yet: outside the sending window, or waiting for the firm's WhatsApp. It goes out by itself. */
+  waiting: boolean;
+  /** Tried and could not (the chase timeline says why). */
+  failed: boolean;
+}
+
 export async function createChase(
   db: Db,
   ctx: FirmContext,
   input: CreateChaseInput,
+  opts: { sendNow?: boolean } = {},
 ) {
   const client = await assertClient(db, ctx, input.business_id);
   const contactIsEmail = isEmail(input.contact);
@@ -319,7 +330,21 @@ export async function createChase(
     "chaser",
     `Chase created for ${input.type}.`,
   );
-  return data as ChaseRow;
+  // The Chaser starts working the moment the chase exists: the first reminder goes out now (inside the sending
+  // window) instead of waiting for the next scheduled run or for someone to press Send.
+  let firstSend: FirstSend | null = null;
+  if (opts.sendNow) {
+    try {
+      const r = await Promise.race([
+        runDueFollowups(now, ctx.firmId, { requestId: data.id as string }),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 20_000)),
+      ]);
+      if (r) firstSend = { sent: r.sent + r.whatsapp + r.simulated > 0, waiting: r.deferred > 0 || (r.sent + r.whatsapp + r.simulated + r.failed === 0), failed: r.failed > 0 };
+    } catch (e) {
+      console.error(`[chaser] first send for ${data.id}: ${(e as Error).message}`);
+    }
+  }
+  return Object.assign(data as ChaseRow, { firstSend });
 }
 
 async function loadChase(
@@ -574,7 +599,7 @@ export async function setChaseStatus(
  * Cron: send the follow-ups that are due and escalate the ones that have had
  * their two nudges. Safe to run more than once a day.
  */
-export async function runDueFollowups(now = new Date(), firmId?: string) {
+export async function runDueFollowups(now = new Date(), firmId?: string, opts: { requestId?: string } = {}) {
   const db = await adminDb();
   let q = db
     .from("ca_document_requests")
@@ -586,6 +611,7 @@ export async function runDueFollowups(now = new Date(), firmId?: string) {
     .order("next_follow_up_at")
     .limit(200);
   if (firmId) q = q.eq("ca_firm_id", firmId);
+  if (opts.requestId) q = q.eq("id", opts.requestId);
   const { data, error } = await q;
   if (error) throw new PracticeError("db_error", error.message);
 

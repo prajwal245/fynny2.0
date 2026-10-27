@@ -3,10 +3,10 @@ import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-route
 import {
   LayoutGrid, Users, FileText, ListChecks, AlertTriangle, Send, BarChart3, Settings, Menu, X, LogOut,
   BookOpen,
-  Search,
+  Search, Sun, Moon,
 } from "lucide-react";
 import { toast } from "sonner";
-import { V, V2_STYLES } from "./ui";
+import { V, V2_STYLES, useV2Theme } from "./ui";
 import { AGENT_STYLES, ProcessingCard, ShimmerText } from "./agents";
 import { AnimatePresence, motion } from "framer-motion";
 import brandMark from "@/assets/brand/fynhelp-icon-red-new.png";
@@ -53,6 +53,7 @@ export default function V2Shell() {
 
 function ShellBody() {
   const [open, setOpen] = useState(false);
+  const [theme, toggleTheme] = useV2Theme();
   const { hydrated, session, onboarded, firm, signOut, period, setPeriod, periods, role, setRole, review, exceptions, chases, firmRole, canSignOff, runs, dismissRun, reports } = useV2();
   const navigate = useNavigate();
   // The page actually on screen (not one still loading), without a trailing slash.
@@ -145,12 +146,12 @@ function ShellBody() {
     <>
       <div className="v2" style={{ minHeight: "100vh", display: "flex" }}>
         {open && (
-          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(20,20,20,.3)", zIndex: 55 }} />
+          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, background: "var(--v2-overlay)", zIndex: 55 }} />
         )}
         <aside
           className={`v2-sidebar${open ? " open" : ""}`}
           style={{
-            width: 244, flex: "0 0 244px", background: V.card, borderRight: `1px solid ${V.line}`,
+            width: 244, flex: "0 0 244px", background: "var(--v2-side)", backdropFilter: "blur(18px)", borderRight: `1px solid ${V.line}`,
             padding: "22px 14px", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh",
             transition: "transform .22s ease",
           }}
@@ -173,8 +174,8 @@ function ShellBody() {
                   onClick={() => setRole(r)}
                   style={{
                     flex: 1, border: 0, cursor: "pointer", borderRadius: 999, padding: "6px 0", fontSize: 12, fontWeight: 600,
-                    fontFamily: "inherit", background: role === r ? V.card : "transparent", color: role === r ? V.ink : V.muted,
-                    boxShadow: role === r ? "0 1px 3px rgba(20,20,20,.10)" : "none",
+                    fontFamily: "inherit", background: role === r ? "var(--v2-seg)" : "transparent", color: role === r ? V.ink : V.muted,
+                    boxShadow: role === r ? "0 6px 14px -8px rgba(249,16,58,.7)" : "none",
                   }}
                 >
                   {r}
@@ -218,7 +219,7 @@ function ShellBody() {
         <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
           <header
             style={{
-              position: "sticky", top: 0, zIndex: 40, background: "rgba(248,247,244,.86)", backdropFilter: "blur(10px)",
+              position: "sticky", top: 0, zIndex: 40, background: "var(--v2-head)", backdropFilter: "blur(14px)",
               borderBottom: `1px solid ${V.line}`, padding: "14px 24px",
               display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", alignItems: "center", gap: 14,
             }}
@@ -238,6 +239,15 @@ function ShellBody() {
                 style={{ color: V.muted, gap: 10 }}
               >
                 <Search size={14} /> <span className="v2-hide-md">Search or run an agent…</span> <span className="v2-kbd">⌘K</span>
+              </button>
+              <button
+                className="v2-icon-btn"
+                onClick={toggleTheme}
+                aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                title={theme === "dark" ? "Light mode" : "Dark mode"}
+                data-testid="theme-toggle"
+              >
+                {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
               </button>
               <label className="v2-hide-sm" style={{ fontSize: 11.5, color: V.muted }}>Period</label>
               <select

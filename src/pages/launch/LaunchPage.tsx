@@ -7,6 +7,7 @@ import { PLAN_ORDER, PLANS } from "@/lib/practice/billing/plans";
 import { LAUNCH_CODE, LAUNCH_DAYS, captureLaunchCode } from "@/lib/launchCode";
 import { CALENDLY_URL } from "@/components/site/cta";
 import { track } from "@/lib/analytics";
+import FynLogo from "@/components/FynLogo";
 
 /** Writes a style the way the design does ("a: b; c: d") and returns the React object. */
 const css = (text: string): CSSProperties => {
@@ -97,7 +98,7 @@ const FAQS: [string, ReactNode][] = [
   ["Is my clients’ data safe?", <>Each firm’s data is kept separate and used only to serve that firm. It is never shared with anyone else. The details are on our <a href="/security">Security page</a>.</>],
   ["Can I rely on what the AI flags?", "FynHelp speeds up review; it doesn’t replace it. It surfaces what needs attention, and your team checks and signs off on everything."],
   ["Do we have to change our accounting software?", "No. FynHelp works on top of the tools your firm already uses: Tally, Zoho Books, Excel, CSV and PDF statements."],
-  ["How does the launch offer work?", `The first 100 CA firms get ${LAUNCH_DAYS} days free on any plan. If you sign up from this page, the code ${LAUNCH_CODE} is applied for you, nothing to type. The ${LAUNCH_DAYS} days count from your first upload.`],
+  ["How does the launch offer work?", `The first 100 CA firms get ${LAUNCH_DAYS} days free on any plan. Sign up from this page and the offer is applied for you, with nothing to type. The ${LAUNCH_DAYS} days count from your first upload.`],
   ["What happens after 30 days?", "Choose a plan and continue, or simply stop. We remind you before the trial ends, and your data stays readable and exportable for 30 days after it."],
   ["You’re new. What if something goes wrong?", "Fair question. Early firms get direct access to our founders and a named person to call. Your data stays yours: you can export it any time."],
 ];
@@ -134,7 +135,7 @@ export default function LaunchPage() {
 
       {/* ANNOUNCEMENT BAR */}
       <div style={css("background:#D92B2B;color:#FFFFFF;font-size:14px;padding:10px 16px;text-align:center;line-height:1.4")}>
-        <span style={{ fontWeight: 500 }}>Launch offer:</span> The first 100 CA firms get <strong style={{ fontWeight: 600 }}>{LAUNCH_DAYS} days free</strong>. Code <span style={css(`font-family:${MONO};background:rgba(255,255,255,.18);padding:2px 8px;border-radius:6px`)}>{LAUNCH_CODE}</span> is applied for you at sign-up.{" "}
+        <span style={{ fontWeight: 500 }}>Launch offer:</span> The first 100 CA firms get <strong style={{ fontWeight: 600 }}>{LAUNCH_DAYS} days free</strong>. Applied for you at sign-up.{" "}
         <a href="#signup" style={css("color:#FFFFFF;font-weight:500;text-decoration:underline;text-underline-offset:3px")}>Claim your spot</a>
       </div>
 
@@ -142,8 +143,8 @@ export default function LaunchPage() {
       <section id="top" style={css("background:radial-gradient(120% 80% at 50% 115%, #8E1B1F 0%, #3A1214 38%, #141210 70%);color:#FAF7F2;padding-bottom:72px")}>
         <div className="wrap">
           <nav style={css("display:flex;align-items:center;justify-content:space-between;gap:24px;padding:24px 0")}>
-            <a href="#top" style={css("display:flex;align-items:center;gap:10px;color:#FAF7F2;text-decoration:none;font-weight:600;font-size:20px;letter-spacing:-0.02em")}>
-              <span style={css("width:34px;height:34px;border-radius:10px;background:#D92B2B;display:flex;align-items:center;justify-content:center;color:#FFFFFF;font-size:18px;font-weight:600")}>F</span>FynHelp
+            <a href="#top" aria-label="FynHelp" style={css("display:flex;align-items:center;text-decoration:none")}>
+              <FynLogo variant="light" size="md" />
             </a>
             <div className="navlinks" style={css("display:flex;gap:4px;padding:6px;border:1px solid rgba(250,247,242,.14);border-radius:999px;background:rgba(250,247,242,.04)")}>
               {[["#outcomes", "Product"], ["#how", "How it works"], ["#pricing", "Pricing"], ["#trust", "Security"], ["#faq", "FAQ"]].map(([h, l]) => (
@@ -166,33 +167,17 @@ export default function LaunchPage() {
               <StartButton big where="launch-hero">Claim {LAUNCH_DAYS} days free</StartButton>
               <DemoLink where="launch-hero" className="ghost" style={css("display:inline-flex;align-items:center;background:rgba(250,247,242,.08);border:1px solid rgba(250,247,242,.2);color:#FAF7F2;text-decoration:none;font-weight:500;font-size:16px;padding:12px 24px;border-radius:999px;min-height:52px;box-sizing:border-box")}>See it on a real client · 20 min</DemoLink>
             </div>
-            <p style={css("margin:0;font-size:13px;color:#B5ADA4")}>Code <span style={css(`font-family:${MONO};color:#FAF7F2`)}>{LAUNCH_CODE}</span> applied for you · No card needed · Your team signs off on everything</p>
+            <p style={css("margin:0;font-size:13px;color:#B5ADA4")}>Offer applied for you · No card needed · Your team signs off on everything</p>
           </div>
 
           {/* PRODUCT PREVIEW */}
           <div style={css("border-radius:20px;padding:10px;background:rgba(250,247,242,.08);border:1px solid rgba(250,247,242,.14);max-width:1000px;margin:0 auto")}>
             <div style={css("background:#FAF7F2;color:#141210;border-radius:14px;overflow:hidden")}>
-              <div style={css("display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #E8E1D7;flex-wrap:wrap;gap:12px")}>
-                <div style={css("display:flex;align-items:center;gap:10px;font-size:14px;font-weight:500")}><span style={css("width:22px;height:22px;border-radius:6px;background:#D92B2B;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:12px")}>F</span>Client overview · October</div>
-                <div style={css("font-size:12px;color:#5E5953")}>Sample data</div>
+              <div style={css("display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid #E8E1D7;flex-wrap:wrap;gap:12px")}>
+                <FynLogo size="sm" />
+                <div style={css("font-size:12px;color:#5E5953")}>The product, on sample files</div>
               </div>
-              <div style={css("display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:16px;padding:20px")}>
-                {[["Needs attention", "3 clients", "Flags to review this week", true], ["Upcoming deadlines", "7 filings", "Next 14 days", false], ["Insights ready", "5 reports", "Ready to share with clients", false]].map(([a, b, c, red]) => (
-                  <div key={String(a)} className="lift" style={css("background:#FFFFFF;border:1px solid #E8E1D7;border-radius:12px;padding:16px")}>
-                    <div style={css("font-size:12px;color:#5E5953")}>{a}</div>
-                    <div style={css(`font-size:28px;font-weight:500;letter-spacing:-0.02em;margin-top:6px;${red ? "color:#B3221F" : ""}`)}>{b}</div>
-                    <div style={css("font-size:12px;color:#5E5953;margin-top:4px")}>{c}</div>
-                  </div>
-                ))}
-              </div>
-              <div style={css("padding:0 20px 20px;display:flex;flex-direction:column;gap:8px")}>
-                {[["#D92B2B", "Sample client A · unreconciled entries to review", "Review", "#F6E2DF", "#8E1B1F"], ["#C9A27A", "Sample client B · GST filing due in 6 days", "Due soon", "#F1E7DA", "#6B4A2B"]].map(([dot, text, tag, bg, fg]) => (
-                  <div key={text} style={css("display:flex;align-items:center;justify-content:space-between;gap:12px;background:#FFFFFF;border:1px solid #E8E1D7;border-radius:10px;padding:12px 16px;font-size:14px;flex-wrap:wrap")}>
-                    <span style={css("display:flex;align-items:center;gap:10px")}><span style={css(`width:8px;height:8px;border-radius:99px;background:${dot}`)} />{text}</span>
-                    <span style={css(`font-size:12px;background:${bg};color:${fg};padding:4px 10px;border-radius:99px;font-weight:500`)}>{tag}</span>
-                  </div>
-                ))}
-              </div>
+              <img src="/guide/19-portfolio.jpg" alt="FynHelp portfolio: every client with its status for the month" width={1600} height={900} style={css("display:block;width:100%;height:auto")} />
             </div>
           </div>
 
@@ -306,7 +291,6 @@ export default function LaunchPage() {
 
           <div style={css("margin:40px auto 0;max-width:820px;background:rgba(217,43,43,.14);border:1px solid rgba(217,43,43,.45);border-radius:16px;padding:18px 22px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px")}>
             <div style={css("font-size:15px;line-height:1.5")}><strong style={{ fontWeight: 600 }}>Launch offer: {LAUNCH_DAYS} days free on any plan.</strong> First 100 firms only.</div>
-            <div style={css(`font-family:${MONO};font-size:14px;background:#FAF7F2;color:#141210;padding:8px 14px;border-radius:10px`)}>{LAUNCH_CODE}</div>
           </div>
 
           <div style={css("display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:16px;margin-top:32px;align-items:stretch")}>
@@ -410,7 +394,7 @@ export default function LaunchPage() {
               {done ? (
                 <div role="status" style={css("display:flex;flex-direction:column;gap:10px;padding:12px 0")}>
                   <div style={css("font-size:22px;font-weight:500")}>Taking you to sign-up…</div>
-                  <p style={css("margin:0;font-size:15px;line-height:1.6;color:#5E5953")}>Your code {LAUNCH_CODE} is already applied.</p>
+                  <p style={css("margin:0;font-size:15px;line-height:1.6;color:#5E5953")}>Your {LAUNCH_DAYS} free days are already applied.</p>
                 </div>
               ) : (
                 <>
@@ -420,9 +404,6 @@ export default function LaunchPage() {
                       <input type={type} name={name} autoComplete={ac} placeholder={ph} required={name === "email"} style={css("font:inherit;font-weight:400;font-size:15px;padding:12px 14px;border:1px solid #D9CFC2;border-radius:10px;background:#FFFFFF;min-height:46px;box-sizing:border-box")} />
                     </label>
                   ))}
-                  <label style={css("display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500")}>Launch code
-                    <input type="text" value={LAUNCH_CODE} readOnly aria-readonly="true" style={css(`font-family:${MONO};font-size:15px;padding:12px 14px;border:1px dashed #D92B2B;border-radius:10px;background:#FBEDEB;color:#8E1B1F;min-height:46px;box-sizing:border-box`)} />
-                  </label>
                   <button type="submit" className="cta" style={css("font:inherit;font-weight:500;font-size:16px;background:#D92B2B;color:#FFFFFF;border:0;border-radius:999px;min-height:52px;cursor:pointer;margin-top:4px")}>Start my free trial</button>
                   <p style={css("margin:0;font-size:12px;color:#5E5953;text-align:center")}>No card needed. Your data is only used to serve your firm.</p>
                 </>
@@ -437,7 +418,7 @@ export default function LaunchPage() {
         <div className="wrap">
           <div style={css("display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:32px")}>
             <div style={css("display:flex;flex-direction:column;gap:12px")}>
-              <div style={css("display:flex;align-items:center;gap:10px;color:#FAF7F2;font-weight:600;font-size:20px")}><span style={css("width:34px;height:34px;border-radius:10px;background:#D92B2B;display:flex;align-items:center;justify-content:center;color:#FFFFFF;font-size:18px")}>F</span>FynHelp</div>
+              <FynLogo variant="light" size="md" />
               <p style={css("margin:0;font-size:14px;line-height:1.6")}>AI financial intelligence for CA firms. Bengaluru, India.</p>
             </div>
             {[

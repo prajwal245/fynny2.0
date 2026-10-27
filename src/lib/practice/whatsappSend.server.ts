@@ -169,7 +169,7 @@ interface GraphReply {
   error?: { code?: number; message?: string; error_data?: { details?: string } };
 }
 
-async function post(sender: Pick<Sender, "phoneNumberId" | "token">, payload: unknown): Promise<{ ok: boolean; body: GraphReply }> {
+export async function post(sender: Pick<Sender, "phoneNumberId" | "token">, payload: unknown): Promise<{ ok: boolean; body: GraphReply }> {
   const res = await fetch(`${GRAPH}/${sender.phoneNumberId}/messages`, {
     method: "POST",
     headers: { Authorization: `Bearer ${sender.token}`, "Content-Type": "application/json" },

@@ -62,7 +62,28 @@ export default function FollowUpsPage() {
             <Kpi label="Moved on alone" value={d.stats.movedOn} hint="before we reached out" />
             <Kpi label="Reached by a person" value={d.stats.reached} hint="marked reached" />
             <Kpi label="Emails sent" value={d.stats.emailed} hint="automatic nudges" />
+            <Kpi label="WhatsApp sent" value={d.stats.whatsapped} hint="to people who agreed" />
+            <Kpi label="Asked for a call" value={d.stats.asked} hint="tapped Call me or wrote back" />
           </div>
+        </Panel>
+      )}
+
+      {d && (
+        <Panel title="WhatsApp follow-ups" testId="wa-ready">
+          {d.whatsapp.problem ? (
+            <p className="text-sm" style={{ color: muted }}>{d.whatsapp.problem} Until then follow-ups go by email and by a person.</p>
+          ) : (
+            <div className="grid gap-2">
+              {d.whatsapp.templates.map((t) => (
+                <div key={t.key} className="flex flex-wrap items-center gap-2 text-sm">
+                  <Pill tone={t.ok ? "good" : "warn"}>{t.ok ? "Ready" : "Not ready"}</Pill>
+                  <code>{t.name}</code>
+                  {!t.ok && <span style={{ color: muted }}>{t.why}. Messages that need it wait and are left to a person.</span>}
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-xs mt-3" style={{ color: muted }}>Sent only to people who agreed to WhatsApp, about their own set-up, trial or plan, 9 am to 8 pm IST, at most once in 3 days. Each message has Call me, Not now and Stop messages buttons.</p>
         </Panel>
       )}
 
@@ -81,7 +102,10 @@ export default function FollowUpsPage() {
             <div className="flex flex-wrap items-center gap-2 mb-1">
               {r.hot && <Pill tone="bad">Hot</Pill>}
               <Pill>{KIND_LABEL[r.kind as TouchKind] ?? r.kind}</Pill>
+              {r.callbackRequested && <Pill tone="bad">{r.replied ? "Replied: call back today" : "Asked for a call"}</Pill>}
               {r.emailSentAt && <Pill tone="good">Emailed {day(r.emailSentAt)}</Pill>}
+              {r.whatsappSentAt && <Pill tone="good">WhatsApp {day(r.whatsappSentAt)}</Pill>}
+              {r.whatsappError && <Pill tone="warn">WhatsApp stopped: {r.whatsappError}</Pill>}
               {r.status === "auto_resolved" && <Pill tone={r.recovered ? "good" : "info"}>{r.recovered ? "Came back after we reached out" : "Moved on by themselves"}</Pill>}
               {r.status === "done" && <Pill tone="good">{OUTCOME_LABEL[r.outcome ?? "other"]}</Pill>}
               <span className="text-xs ml-auto" style={{ color: muted }}>since {r.since}</span>

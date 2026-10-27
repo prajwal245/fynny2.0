@@ -11,7 +11,7 @@ import { adminDb, chaserEvent, logActivity, type Db, type FirmContext } from "./
 import { BUCKET, registerDocument } from "./documents.server";
 import { PracticeError } from "./core";
 import { advances, buttonPayloadOf, CHASE_ACTION_RULES, CHASE_BUTTON_LABEL, chasePayload, DATE_ACTIONS, classifyInbound, explainWaError, isWaDelivery, parseChasePayload, parseJoinCode, phoneTail, pickAutoRoute, type WaDelivery } from "./whatsappFlow";
-import { bindRoute, chaseTemplate, finalTemplate, followupTemplate, sendButtons, chaseTemplateLang, ensureJoinCode, firmCountryCode, resolveSender, sendPlainText, sharedDisplayNumber, sharedPhoneNumberId } from "./whatsappSend.server";
+import { bindRoute, sendButtons, chaseTemplateLang, ensureJoinCode, firmCountryCode, resolveSender, sendPlainText, sharedDisplayNumber, sharedPhoneNumberId } from "./whatsappSend.server";
 import { samePhone } from "./chaser/rules";
 
 // WHATSAPP_GRAPH_BASE exists only so tests and demos can use a stand-in Meta Graph API.
@@ -709,32 +709,12 @@ export async function whatsappHealth(db: Db, ctx: FirmContext): Promise<{ ok: bo
     }
   }
   const waba = sender?.wabaId;
-  const names = [...new Set([chaseTemplate(), followupTemplate(), finalTemplate()])];
-  for (const name of names) {
-    if (!waba) {
-      steps.push({ label: `Template "${name}"`, ok: null, detail: "Add the WhatsApp Business Account ID to check that the template is approved." });
-    } else if (token) {
-      try {
-        const res = await fetch(`${GRAPH}/${waba}/message_templates?name=${encodeURIComponent(name)}&fields=name,status,language,category`, { headers: { Authorization: `Bearer ${token}` } });
-        const b = (await res.json().catch(() => ({}))) as { data?: { status: string; language: string; category?: string }[]; error?: { message?: string } };
-        const t = b.data?.find((x) => x.language === chaseTemplateLang()) ?? b.data?.[0];
-        // Marketing costs about six times as much as Utility: say so if Meta has moved a template.
-        const marketing = t?.category === "MARKETING";
-        steps.push({
-          label: `Template "${name}"`,
-          ok: res.ok && t?.status === "APPROVED" && !marketing,
-          detail: !res.ok
-            ? (b.error?.message ?? "Could not read templates.")
-            : !t
-              ? "No template with this name. Create it in WhatsApp Manager (4 body fields)."
-              : marketing
-                ? `${t.status} (${t.language}) but Meta has classed it as Marketing, which costs far more per message. Reword it to stay factual and resubmit as Utility.`
-                : `${t.status} (${t.language})${t.category ? `, ${t.category.toLowerCase()}` : ""}.`,
-        });
-      } catch (e) {
-        steps.push({ label: `Template "${name}"`, ok: false, detail: `Could not reach Meta (${(e as Error).message}).` });
-      }
-    }
+  if (!waba) {
+    steps.push({ label: "Reminder templates", ok: null, detail: "Add the WhatsApp Business Account ID (WHATSAPP_WABA_ID) so FynHelp can check that each template is approved." });
+  } else if (token && sender) {
+    // The same view as Settings: what each stage will really send, with the fallback in plain words.
+    const { stagesView, stageHealth } = await import("./whatsappTemplates.server");
+    for (const st of await stagesView(sender)) steps.push({ label: `${st.label} template`, ...stageHealth(st) });
   }
   return { ok: steps.every((s) => s.ok !== false), steps };
 }

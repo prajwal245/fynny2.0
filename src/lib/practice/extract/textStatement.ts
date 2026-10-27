@@ -12,6 +12,8 @@ import { parseDate, round2, toPaise, type ExtractedRow } from "../core";
 const DATE_AT_START =
   /^\s*(\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}|\d{1,2}[-\s][A-Za-z]{3}[-\s]\d{2,4}|\d{4}-\d{2}-\d{2})\b/;
 const MONEY = /(?:\(?-?[\d,]+\.\d{2}\)?(?:\s?(?:Cr|Dr|CR|DR))?)/g;
+/** Marks of a pen note beside a printed line ("paid? check w/ Ramesh !!", "personal ->") rather than a wrapped narration. */
+const ANNOTATION = /[?!]|->|=>|<-|~|\bw\/|\bpls\b|\bcheck\b/i;
 const SKIP =
   /\b(opening balance|closing balance|balance b\/?f|brought forward|carried forward|total)\b/i;
 
@@ -46,6 +48,12 @@ export function rowsFromStatementText(text: string): TextStatementResult {
       // Narration spilling onto the next line.
       const prev = rows[rows.length - 1];
       if (prev && !SKIP.test(line) && !line.match(MONEY)?.length) {
+        if (ANNOTATION.test(line)) {
+          // Keep the note for the reviewer, but out of the bank's narration so it never skews matching.
+          prev.parse_issues = [...prev.parse_issues, `Note beside this line: "${line.slice(0, 120)}"`];
+          prev.raw_text = `${prev.raw_text} ${line}`;
+          return;
+        }
         prev.description = `${prev.description} ${line}`.trim().slice(0, 500);
         prev.raw_text = `${prev.raw_text} ${line}`;
       }

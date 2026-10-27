@@ -159,7 +159,7 @@ export const TERMS: LegalDoc = {
   {
    "t": "c",
    "n": "4.2",
-   "text": "The Service operates alongside the Customer’s existing accounting software and accesses ledger exports and connected sources on a read-only basis. It does not post or alter entries in Tally, Zoho Books or any other accounting system."
+   "text": "The Service operates alongside the Customer’s existing accounting software and accesses ledger exports and connected sources on a read-only basis. It does not post or alter entries in Tally or any other accounting system. Where the Customer has connected Zoho Books and a partner of the Customer has expressly enabled approved entries for a client, the Service may create, and may remove, individual entries in that client’s Zoho Books organisation only after a partner of the Customer has reviewed and approved each entry. The Service does not otherwise alter or delete entries in Zoho Books."
   },
   {
    "t": "c",

@@ -42,7 +42,7 @@ const FACTS: [string, string][] = [
   ["Sign-in", "Email and password through Supabase Auth. Passwords are stored as salted hashes, never in plain text."],
   ["AI processing", "To read documents and draft MIS insights, the text of a document is sent to our AI providers (Google Gemini, Groq, and OCR.space for scans and photos) through their APIs. We never use your clients' data to train models."],
   ["Learning", "When your team corrects a line or decides an exception, that lesson is kept for your firm and that client only. Partners can make the agents forget it."],
-  ["Your ledger", "FynHelp never writes to Tally or Zoho. You upload exports; your books stay where they are."],
+  ["Your ledger", "Read-only by default. FynHelp never writes to Tally. Zoho Books is read-only unless a partner switches on approved entries for a client; then FynHelp creates only an entry a partner has previewed and approved (a bank charge or a receipt for one named invoice), tagged \u201cCreated by FynHelp\u201d, logged and undoable."],
   ["Deleting data", "Write to support@fynhelp.com from the firm owner's email and we delete the firm's documents and data."],
   ["Certifications", "None yet. We will publish certifications only once they are independently verified."],
 ];

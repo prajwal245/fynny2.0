@@ -27,14 +27,14 @@ export const Route = createFileRoute("/api/integrations/zoho/callback")({
         const nonce = /(?:^|;\s*)fh_zoho_nonce=([^;]+)/.exec(request.headers.get("cookie") ?? "")?.[1];
         try {
           const zoho = await import("@/lib/practice/zoho.server");
-          const { firmId, userId } = await zoho.verifyState(state, nonce);
+          const { firmId, userId, write } = await zoho.verifyState(state, nonce);
           const { adminDb, firmContext, canSignOff } = await import("@/lib/practice/db.server");
           const db = await adminDb();
           // The person who started must still be a partner of that firm.
           const ctx = await firmContext(db, userId);
           if (ctx.firmId !== firmId || !canSignOff(ctx)) return back(request, "error", "Only a partner of the firm can connect Zoho Books.");
-          await zoho.completeConnect(db, firmId, userId, code, q.get("accounts-server"));
-          return back(request, "connected");
+          await zoho.completeConnect(db, firmId, userId, code, q.get("accounts-server"), write);
+          return back(request, write ? "write_granted" : "connected");
         } catch (e) {
           console.error("[zoho] callback failed:", (e as Error).message);
           return back(request, "error", (e as Error).message || "Zoho Books could not be connected.");

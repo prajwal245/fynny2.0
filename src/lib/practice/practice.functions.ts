@@ -1015,15 +1015,17 @@ export const zohoBooksStatus = createServerFn({ method: "POST" })
 /** Starts Zoho consent. A cookie ties the callback to this browser. */
 export const zohoBooksConnect = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) =>
+  .inputValidator((d) => z.object({ write: z.boolean().optional() }).parse(d ?? {}))
+  .handler(async ({ data, context }) =>
     withFirm(context.userId, async (_db, ctx) => {
       await asPartner(ctx, "connect Zoho Books");
       const zoho = await import("./zoho.server");
       if (!zoho.zohoConfigured()) throw new Error("Zoho Books isn't switched on for FynHelp yet.");
+      if (data?.write && !zoho.postingAvailable()) throw new Error("Posting to Zoho Books isn't switched on for FynHelp yet.");
       const nonce = zoho.newNonce();
       const { setCookie } = await import("@tanstack/react-start/server");
       setCookie(zoho.NONCE_COOKIE, nonce, { httpOnly: true, secure: process.env["NODE_ENV"] === "production", sameSite: "lax", path: "/api/integrations/zoho", maxAge: 900 });
-      return { url: await zoho.consentUrl(ctx.firmId, ctx.userId, nonce) };
+      return { url: await zoho.consentUrl(ctx.firmId, ctx.userId, nonce, !!data?.write) };
     }),
   );
 
@@ -1078,6 +1080,57 @@ export const zohoBooksDisconnect = createServerFn({ method: "POST" })
       return (await import("./zoho.server")).disconnect(db, ctx);
     }),
   );
+
+export const zohoBooksOpenInvoices = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ linkId: uuid }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./zoho.server")).openInvoices(db, ctx, data.linkId)),
+  );
+
+export const zohoBooksSetPosting = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ linkId: uuid, enabled: z.boolean() }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      await asPartner(ctx, "switch posting to Zoho Books on or off");
+      return (await import("./zoho.server")).setPosting(db, ctx, data.linkId, data.enabled);
+    }),
+  );
+
+export const zohoBooksPreviewPost = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ linkId: uuid, txnId: uuid }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      await asPartner(ctx, "post to Zoho Books");
+      return (await import("./zoho.server")).previewPost(db, ctx, data.linkId, data.txnId);
+    }),
+  );
+
+export const zohoBooksPost = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ linkId: uuid, txnId: uuid }).parse(d))
+  .handler(async ({ data, context }) =>
+    withWork(context.userId, async (db, ctx) => {
+      await asPartner(ctx, "post to Zoho Books");
+      return (await import("./zoho.server")).post(db, ctx, data.linkId, data.txnId);
+    }),
+  );
+
+export const zohoBooksUndoPost = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ postingId: uuid }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      await asPartner(ctx, "undo a Zoho Books entry");
+      return (await import("./zoho.server")).undoPost(db, ctx, data.postingId);
+    }),
+  );
+
+export const zohoBooksPostings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => withFirm(context.userId, async (db, ctx) => (await import("./zoho.server")).listPostings(db, ctx)));
 
 export const zohoBooksSync = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

@@ -4,9 +4,11 @@
  * deliberately left out.
  */
 import { SITE_URL, absoluteUrl } from "./seo";
+import { publishedStatic } from "@/content/blog";
 
 export const INDEXABLE_PAGES: { path: string; changefreq: "weekly" | "monthly" | "yearly"; priority: string }[] = [
   { path: "/", changefreq: "weekly", priority: "1.0" },
+  { path: "/launch", changefreq: "monthly", priority: "0.9" },
   { path: "/pipeline", changefreq: "monthly", priority: "0.9" },
   { path: "/agents/extract", changefreq: "monthly", priority: "0.8" },
   { path: "/agents/recon", changefreq: "monthly", priority: "0.8" },
@@ -38,17 +40,24 @@ function supabaseRest(): { url: string; key: string } | null {
 /** Published posts, newest first. A database hiccup returns [] rather than breaking the sitemap. */
 export async function publishedPosts(): Promise<PublishedPost[]> {
   const sb = supabaseRest();
-  if (!sb) return [];
+  if (!sb) return withOwn([]);
   try {
     const res = await fetch(
       `${sb.url}/rest/v1/blog_posts?select=slug,updated_at,published_at&status=eq.published&order=published_at.desc&limit=1000`,
       { headers: { apikey: sb.key, Authorization: `Bearer ${sb.key}` } },
     );
-    if (!res.ok) return [];
-    return ((await res.json()) as PublishedPost[]).filter((p) => p.slug && /^[a-z0-9-]+$/i.test(p.slug));
+    if (!res.ok) return withOwn([]);
+    return withOwn(((await res.json()) as PublishedPost[]).filter((p) => p.slug && /^[a-z0-9-]+$/i.test(p.slug)));
   } catch {
-    return [];
+    return withOwn([]);
   }
+}
+
+/** Articles kept in the codebase are in the sitemap too, even if the database cannot be reached. */
+function withOwn(db: PublishedPost[]): PublishedPost[] {
+  const have = new Set(db.map((p) => p.slug));
+  const own = publishedStatic().filter((p) => !have.has(p.slug)).map((p) => ({ slug: p.slug, updated_at: p.published_at, published_at: p.published_at }));
+  return [...db, ...own].sort((a, b) => new Date(b.updated_at ?? b.published_at ?? 0).getTime() - new Date(a.updated_at ?? a.published_at ?? 0).getTime());
 }
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");

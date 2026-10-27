@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { sanitizeForStorage } from "@/lib/sanitizeHtml";
 import { articleExcerpt, cleanArticleHtml } from "@/lib/cleanArticleHtml";
 import { toDescription } from "@/lib/seo";
+import { publishedStatic, type StaticPost } from "@/content/blog";
 
 export interface ListPost {
   id: string;
@@ -51,13 +52,50 @@ export const cleanExcerpt = (excerpt: string | null | undefined) =>
 export const listExcerpt = (p: ListPost) =>
   cleanExcerpt(p.excerpt) || articleExcerpt(p.content ?? "", 200, { title: p.title, coverImageUrl: p.cover_image_url });
 
+const asListPost = (p: StaticPost): ListPost => ({
+  id: `static:${p.slug}`,
+  slug: p.slug,
+  title: p.title,
+  excerpt: p.excerpt,
+  content: p.content,
+  category: p.category,
+  reading_time_minutes: p.reading_time_minutes,
+  published_at: p.published_at,
+  cover_image_url: null,
+  is_featured: false,
+});
+
+const asBlogPost = (p: StaticPost): BlogPost => ({
+  id: `static:${p.slug}`,
+  slug: p.slug,
+  title: p.title,
+  excerpt: p.excerpt,
+  content: p.content,
+  category: p.category,
+  author_name: "FynHelp team",
+  author_role: "Month-end close for CA firms",
+  tags: p.tags,
+  views: 0,
+  reading_time_minutes: p.reading_time_minutes,
+  published_at: p.published_at,
+  cover_image_url: null,
+  seo_title: p.seo_title,
+  seo_description: p.seo_description,
+  og_image: null,
+  updated_at: p.published_at,
+});
+
 export async function fetchPublishedPosts(): Promise<ListPost[]> {
   const { data } = await supabase
     .from("blog_posts")
     .select("id, slug, title, excerpt, content, category, reading_time_minutes, published_at, cover_image_url, is_featured")
     .eq("status", "published")
     .order("published_at", { ascending: false });
-  return (data ?? []) as ListPost[];
+  const db = (data ?? []) as ListPost[];
+  // Articles kept in the codebase join the list; a database post with the same slug wins.
+  const own = new Set(db.map((p) => p.slug));
+  const all = [...db, ...publishedStatic().filter((p) => !own.has(p.slug)).map(asListPost)];
+  return all.sort((a, b) => new Date(b.published_at ?? 0).getTime() - new Date(a.published_at ?? 0).getTime());
 }
 
 export async function fetchPost(slug: string): Promise<BlogPost | null> {
@@ -70,7 +108,9 @@ export async function fetchPost(slug: string): Promise<BlogPost | null> {
     .eq("slug", slug)
     .eq("status", "published")
     .maybeSingle();
-  return (data as BlogPost | null) ?? null;
+  if (data) return data as BlogPost;
+  const own = publishedStatic().find((p) => p.slug === slug);
+  return own ? asBlogPost(own) : null;
 }
 
 /** Three more posts to read: same category first, then the newest. */
@@ -99,6 +139,16 @@ export async function fetchRelated(post: BlogPost): Promise<RelatedPost[]> {
     for (const r of (data ?? []) as RelatedPost[]) {
       if (out.length >= 3) break;
       if (!out.some((o) => o.slug === r.slug)) out.push(r);
+    }
+  }
+  if (out.length < 3) {
+    // Articles kept in the codebase fill the rest: same category first.
+    const more = publishedStatic()
+      .filter((p) => p.slug !== post.slug && !out.some((o) => o.slug === p.slug))
+      .sort((a, b) => Number(b.category === post.category) - Number(a.category === post.category));
+    for (const p of more) {
+      if (out.length >= 3) break;
+      out.push({ slug: p.slug, title: p.title, category: p.category, published_at: p.published_at, reading_time_minutes: p.reading_time_minutes });
     }
   }
   return out;

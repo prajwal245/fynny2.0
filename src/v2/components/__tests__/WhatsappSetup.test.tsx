@@ -16,9 +16,13 @@ vi.mock("@/lib/practice/practice.functions", () => ({
   }),
 }));
 vi.mock("../../store", () => ({ useV2: () => ({ firm: { name: "Rao & Co" } }) }));
+vi.mock("../../lib/credits", () => ({ useCredits: () => null }));
 vi.mock("@/lib/caGmail.functions", () => ({ getChaserPrefs: () => prefs(), setChaserPrefs: vi.fn() }));
 vi.mock("../../lib/billing", () => ({ useBilling: () => ({ access: { whatsappChaser: false } }) }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+
+// jsdom has no IntersectionObserver; the shimmering text uses one to start when it scrolls into view.
+vi.stubGlobal("IntersectionObserver", class { observe() {} unobserve() {} disconnect() {} takeRecords() { return []; } });
 
 import { WhatsappSetup } from "../WhatsappSetup";
 

@@ -42,7 +42,7 @@ export const INTEGRATION_STYLES = `
 .ic-spin { width:14px; height:14px; border-radius:50%; border:2px solid currentColor; border-right-color:transparent; animation: v2spin .7s linear infinite; display:inline-block; }
 .ic-check { display:inline-grid; place-items:center; width:18px; height:18px; border-radius:50%; background:#1F6B45; color:#fff; animation: ic-pop .45s cubic-bezier(.34,1.56,.64,1) both; }
 @keyframes ic-pop { from { transform: scale(.3); opacity:0; } to { transform:none; opacity:1; } }
-.ic-skel { height:40px; border-radius:12px; background: linear-gradient(90deg, ${V.gray} 0%, rgba(255,255,255,.12) 50%, ${V.gray} 100%); background-size:200% 100%; animation: v2shimmer 1.4s linear infinite; }
+.ic-skel { height:40px; border-radius:12px; background: linear-gradient(90deg, ${V.gray} 0%, var(--v2-shine) 50%, ${V.gray} 100%); background-size:200% 100%; animation: v2shimmer 1.4s linear infinite; }
 @media (max-width: 640px) { .ic-head { grid-template-columns: auto minmax(0,1fr); } .ic-actions { grid-column: 1 / -1; justify-content:flex-start; } }
 @media (prefers-reduced-motion: reduce) { .ic-card, .ic-row, .ic-check, .ic-body, .ic-steps span::after, .ic-tile, .ic-pill .dot::after { animation:none !important; transition:none !important; } }
 `;

@@ -56,7 +56,7 @@ export function AgentTabs({ tabs, value, onChange, label }: { tabs: TabDef[]; va
               <motion.span
                 layoutId={`${id}-pill`}
                 transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 38 }}
-                style={{ position: "absolute", inset: 0, borderRadius: 11, background: "linear-gradient(180deg, rgba(249,16,58,.28), rgba(249,16,58,.14))", boxShadow: "0 1px 0 rgba(255,255,255,.14) inset, 0 8px 18px -10px rgba(249,16,58,.7)" }}
+                style={{ position: "absolute", inset: 0, borderRadius: 11, background: "var(--v2-tab)", boxShadow: "var(--v2-tab-shadow)" }}
               />
             )}
             <span style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 7 }}>

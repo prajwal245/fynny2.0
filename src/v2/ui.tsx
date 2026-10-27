@@ -3,53 +3,78 @@ import { createPortal } from "react-dom";
  * FynHelp v2 dashboard — design system primitives.
  * Self-contained: does not touch any existing app styling.
  */
-import { ReactNode, CSSProperties, useEffect, useRef } from "react";
+import { ReactNode, CSSProperties, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, useIsPresent } from "framer-motion";
 import { X } from "lucide-react";
 
+/** Palette: red #F9103A and #F96246, cream #FFEBB9, ink #090B11, mist #F4F6FA. Green and amber are for status only. */
 /**
- * Colours come from the FynHelp logo only: its red gradient (#E4302A → #8A1E18),
- * its cream (#FCEEE4) and the near-black red of the app icon. Green and amber
- * are kept, muted, for status meaning alone (matched / needs attention).
+ * Every colour is a CSS variable, so the whole product switches between light (the default) and dark by
+ * changing one attribute on <html>. The values live in THEME_VARS below.
  */
 export const V = {
-  bg: "#090B11",
-  /** Glass: a faint white wash over the dark page, so the red glow shows through. */
-  card: "rgba(255,255,255,0.045)",
-  ink: "#F4F6FA",
-  body: "rgba(244,246,250,0.74)",
-  muted: "rgba(244,246,250,0.50)",
-  line: "rgba(255,255,255,0.09)",
-  /** Red-tinted wash: active navigation, info chips, icon wells. */
-  blue: "rgba(249,16,58,0.16)",
-  /** Warm cream wash: counts and highlights. */
-  beige: "rgba(255,235,185,0.12)",
-  gray: "rgba(255,255,255,0.06)",
-  /** Error text and borders, readable on dark. */
-  maroon: "#FF6B80",
-  coral: "#F96246",
-  green: "#5BD39A",
-  brand: "#F9103A",
-  brandBright: "#F9103A",
-  /** Text on the red wash: the warm cream from the palette. */
-  brandDeep: "#FFEBB9",
-  cream: "rgba(255,235,185,0.07)",
-  warnBg: "rgba(255,235,185,0.12)",
-  warnFg: "#FFEBB9",
+  bg: "var(--v2-bg)",
+  card: "var(--v2-card)",
+  ink: "var(--v2-ink)",
+  body: "var(--v2-body)",
+  muted: "var(--v2-muted)",
+  line: "var(--v2-line)",
+  blue: "var(--v2-blue)",
+  beige: "var(--v2-beige)",
+  gray: "var(--v2-gray)",
+  maroon: "var(--v2-maroon)",
+  coral: "var(--v2-coral)",
+  green: "var(--v2-green)",
+  brand: "var(--v2-brand)",
+  brandBright: "var(--v2-brandBright)",
+  brandDeep: "var(--v2-brandDeep)",
+  cream: "var(--v2-cream)",
+  warnBg: "var(--v2-warnBg)",
+  warnFg: "var(--v2-warnFg)",
   radius: 20,
   font: "var(--font-geist-sans)",
   mono: "var(--font-geist-mono)",
 };
 
+const THEME_VARS = `
+:root { --v2-bg:#F4F6FA; --v2-card:#FFFFFF; --v2-ink:#090B11; --v2-body:rgba(9,11,17,0.74); --v2-muted:rgba(9,11,17,0.52); --v2-line:rgba(9,11,17,0.10); --v2-blue:rgba(249,16,58,0.08); --v2-beige:#FFEBB9; --v2-gray:rgba(9,11,17,0.045); --v2-maroon:#C70A2E; --v2-coral:#F96246; --v2-green:#1F8A5B; --v2-brand:#F9103A; --v2-brandBright:#F9103A; --v2-brandDeep:#B3082A; --v2-cream:#FFF6E0; --v2-warnBg:#FFF1CF; --v2-warnFg:#7A4A00; --v2-side:rgba(255,255,255,.82); --v2-head:rgba(244,246,250,.82); --v2-overlay:rgba(9,11,17,.38); --v2-pop:#FFFFFF; --v2-sticky:#FFFFFF; --v2-sticky-hover:#F4F6FA; --v2-input:#FFFFFF; --v2-seg:#FFFFFF; --v2-tab:#FFFFFF; --v2-tab-shadow:0 1px 2px rgba(9,11,17,.10), 0 6px 14px -8px rgba(9,11,17,.25); --v2-good-bg:rgba(31,138,91,.12); --v2-dash:rgba(9,11,17,.22); --v2-switch:rgba(9,11,17,.16); --v2-shine:#FFFFFF; --v2-card-shadow:0 1px 2px rgba(9,11,17,.05), 0 16px 34px -26px rgba(9,11,17,.28); --v2-glow:radial-gradient(90% 50% at 100% 110%, rgba(249,16,58,.09) 0%, transparent 70%); --v2-scheme:light; --v2-ag-extract-tint:#FDE6EA; --v2-ag-extract-ink:#B3082A; --v2-ag-extract-dot:#F9103A; --v2-ag-recon-tint:#FEE9E3; --v2-ag-recon-ink:#B33A22; --v2-ag-recon-dot:#F96246; --v2-ag-narrate-tint:#FFF1CF; --v2-ag-narrate-ink:#7A4A00; --v2-ag-narrate-dot:#E0A030; --v2-ag-chaser-tint:#E9ECF2; --v2-ag-chaser-ink:#090B11; --v2-ag-chaser-dot:#6B1B2C; }
+:root[data-v2-theme="dark"] { --v2-bg:#090B11; --v2-card:rgba(255,255,255,0.045); --v2-ink:#F4F6FA; --v2-body:rgba(244,246,250,0.74); --v2-muted:rgba(244,246,250,0.50); --v2-line:rgba(255,255,255,0.09); --v2-blue:rgba(249,16,58,0.16); --v2-beige:rgba(255,235,185,0.12); --v2-gray:rgba(255,255,255,0.06); --v2-maroon:#FF6B80; --v2-coral:#F96246; --v2-green:#5BD39A; --v2-brand:#F9103A; --v2-brandBright:#F9103A; --v2-brandDeep:#FFEBB9; --v2-cream:rgba(255,235,185,0.07); --v2-warnBg:rgba(255,235,185,0.12); --v2-warnFg:#FFEBB9; --v2-side:rgba(9,11,17,.72); --v2-head:rgba(9,11,17,.72); --v2-overlay:rgba(0,0,0,.62); --v2-pop:#12141B; --v2-sticky:#14161D; --v2-sticky-hover:#1C1E26; --v2-input:rgba(255,255,255,.05); --v2-seg:rgba(249,16,58,.22); --v2-tab:linear-gradient(180deg, rgba(249,16,58,.28), rgba(249,16,58,.14)); --v2-tab-shadow:0 1px 0 rgba(255,255,255,.14) inset, 0 8px 18px -10px rgba(249,16,58,.7); --v2-good-bg:rgba(91,211,154,.16); --v2-dash:rgba(255,255,255,.25); --v2-switch:rgba(255,255,255,.18); --v2-shine:rgba(255,255,255,.12); --v2-card-shadow:0 1px 0 rgba(255,255,255,.05) inset, 0 18px 40px -28px rgba(0,0,0,.8); --v2-glow:radial-gradient(120% 70% at 100% 105%, rgba(249,16,58,.30) 0%, rgba(120,12,30,.16) 38%, transparent 70%), radial-gradient(70% 40% at 0% 0%, rgba(249,98,70,.07) 0%, transparent 70%); --v2-scheme:dark; --v2-ag-extract-tint:rgba(249,16,58,.18); --v2-ag-extract-ink:#FF8296; --v2-ag-extract-dot:#F9103A; --v2-ag-recon-tint:rgba(249,98,70,.18); --v2-ag-recon-ink:#FFA08A; --v2-ag-recon-dot:#F96246; --v2-ag-narrate-tint:rgba(255,235,185,.14); --v2-ag-narrate-ink:#FFEBB9; --v2-ag-narrate-dot:#FFD98A; --v2-ag-chaser-tint:rgba(244,246,250,.12); --v2-ag-chaser-ink:#F4F6FA; --v2-ag-chaser-dot:#E8506A; }
+`;
+
+export type ThemeMode = "light" | "dark";
+const THEME_KEY = "fynhelp-theme";
+
+/** Light unless the person chose dark. Applies the choice to <html> and remembers it on this device. */
+export function useV2Theme(): [ThemeMode, () => void] {
+  const [mode, setMode] = useState<ThemeMode>("light");
+  useEffect(() => {
+    let saved: string | null = null;
+    try { saved = window.localStorage.getItem(THEME_KEY); } catch { /* private mode */ }
+    if (saved === "dark") setMode("dark");
+  }, []);
+  useEffect(() => {
+    document.documentElement.setAttribute("data-v2-theme", mode);
+    return () => document.documentElement.removeAttribute("data-v2-theme");
+  }, [mode]);
+  const toggle = () =>
+    setMode((m) => {
+      const next: ThemeMode = m === "dark" ? "light" : "dark";
+      try { window.localStorage.setItem(THEME_KEY, next); } catch { /* private mode */ }
+      return next;
+    });
+  return [mode, toggle];
+}
+
 export const V2_STYLES = `
-.v2 { background:${V.bg}; background-image:radial-gradient(120% 70% at 100% 105%, rgba(249,16,58,.30) 0%, rgba(120,12,30,.16) 38%, transparent 70%), radial-gradient(70% 40% at 0% 0%, rgba(249,98,70,.07) 0%, transparent 70%); background-attachment:fixed; color:${V.ink}; color-scheme:dark; font-family:${V.font}; -webkit-font-smoothing:antialiased; font-size:15px; }
+${THEME_VARS}
+.v2 { background:${V.bg}; background-image:var(--v2-glow); background-attachment:fixed; color:${V.ink}; color-scheme:var(--v2-scheme); font-family:${V.font}; -webkit-font-smoothing:antialiased; font-size:15px; }
 .v2 *, .v2 *::before, .v2 *::after { box-sizing:border-box; }
 .v2 h1,.v2 h2,.v2 h3,.v2 h4 { font-family:${V.font}; margin:0; letter-spacing:-0.02em; font-weight:600; color:${V.ink}; }
 .v2 p,.v2 span,.v2 a,.v2 li,.v2 td,.v2 th,.v2 button,.v2 input,.v2 select,.v2 textarea,.v2 label { font-family:${V.font}; }
 .v2 .num, .v2 .tabular-nums, .v2-table td, .v2-table th { font-variant-numeric:tabular-nums; }
 /* Identifiers and raw data (references, GSTIN/PAN, section codes, transaction ids). */
 .v2 .v2-mono, .v2 .font-mono { font-family:${V.mono}; font-variant-numeric:tabular-nums; letter-spacing:0; }
-.v2-card { background:${V.card}; border:1px solid ${V.line}; border-radius:${V.radius}px; backdrop-filter:blur(14px) saturate(120%); -webkit-backdrop-filter:blur(14px) saturate(120%); box-shadow:0 1px 0 rgba(255,255,255,.05) inset, 0 18px 40px -28px rgba(0,0,0,.8); }
+.v2-card { background:${V.card}; border:1px solid ${V.line}; border-radius:${V.radius}px; backdrop-filter:blur(14px) saturate(120%); -webkit-backdrop-filter:blur(14px) saturate(120%); box-shadow:var(--v2-card-shadow); }
 .v2-btn { display:inline-flex; align-items:center; gap:8px; border-radius:999px; border:1px solid transparent; font-size:14px; font-weight:600; padding:10px 18px; cursor:pointer; text-decoration:none; transition:transform .18s ease, background .2s ease, box-shadow .2s ease; }
 .v2-btn:hover { transform:translateY(-1px); }
 .v2-btn:active { transform:translateY(1px) scale(.985); }
@@ -76,7 +101,7 @@ export const V2_STYLES = `
 @keyframes v2spin { to { transform:rotate(360deg); } }
 .v2-kbd { display:inline-flex; align-items:center; gap:2px; font-size:11px; font-weight:600; color:${V.muted}; border:1px solid ${V.line}; border-bottom-width:2px; border-radius:6px; padding:1px 6px; background:${V.card}; font-family:inherit; }
 .v2-input:focus { outline:none; border-color:${V.brand}; box-shadow:0 0 0 3px rgba(249,16,58,.22); }
-.v2-input, .v2 select.v2-input, .v2 textarea.v2-input { width:100%; background:rgba(255,255,255,.05); border:1px solid ${V.line}; border-radius:12px; padding:10px 13px; font-size:14.5px; color:${V.ink}; outline:none; transition:border-color .18s ease; }
+.v2-input, .v2 select.v2-input, .v2 textarea.v2-input { width:100%; background:var(--v2-input); border:1px solid ${V.line}; border-radius:12px; padding:10px 13px; font-size:14.5px; color:${V.ink}; outline:none; transition:border-color .18s ease; }
 .v2-label { display:block; font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; color:${V.muted}; margin-bottom:6px; font-weight:600; }
 .v2-table { width:100%; border-collapse:collapse; }
 .v2-table th { text-align:left; font-size:11.5px; letter-spacing:.09em; text-transform:uppercase; color:${V.muted}; font-weight:600; padding:12px 16px; border-bottom:1px solid ${V.line}; }
@@ -92,8 +117,8 @@ export const V2_STYLES = `
 @keyframes v2shimmer { from { background-position:200% 0; } to { background-position:-200% 0; } }
 .v2-grid-cards { display:grid; gap:16px; grid-template-columns:repeat(auto-fill, minmax(min(280px, 100%), 1fr)); }
 /* The action column stays in view when a wide table scrolls. */
-.v2-table .v2-sticky-end { position:sticky; right:0; background:#14161D; box-shadow:-10px 0 12px -12px rgba(0,0,0,.7); }
-.v2-table tbody tr.clickable:hover .v2-sticky-end { background:#1C1E26; }
+.v2-table .v2-sticky-end { position:sticky; right:0; background:var(--v2-sticky); box-shadow:-10px 0 12px -12px rgba(9,11,17,.4); }
+.v2-table tbody tr.clickable:hover .v2-sticky-end { background:var(--v2-sticky-hover); }
 @media (max-width:760px){
   /* Phones: each row becomes a compact card instead of a table that scrolls sideways. */
   .v2-table-stack thead { display:none; }
@@ -131,7 +156,7 @@ export type Tone = "neutral" | "good" | "warn" | "bad" | "info";
 
 const TONES: Record<Tone, { bg: string; fg: string }> = {
   neutral: { bg: V.gray, fg: V.body },
-  good: { bg: "rgba(91,211,154,0.13)", fg: V.green },
+  good: { bg: "var(--v2-good-bg)", fg: V.green },
   warn: { bg: V.warnBg, fg: V.warnFg },
   bad: { bg: "rgba(249,16,58,0.16)", fg: V.maroon },
   info: { bg: V.blue, fg: V.brandDeep },
@@ -266,7 +291,7 @@ export function Drawer({ open, onClose, title, children }: { open: boolean; onCl
             onClick={onClose}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.22 }}
-            style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.62)" }}
+            style={{ position: "absolute", inset: 0, background: "var(--v2-overlay)" }}
           />
           <motion.aside
             className="v2"
@@ -306,7 +331,7 @@ export function Modal({ open, onClose, title, children }: { open: boolean; onClo
             onClick={onClose}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.62)" }}
+            style={{ position: "absolute", inset: 0, background: "var(--v2-overlay)" }}
           />
           <motion.div
             className="v2 v2-card"

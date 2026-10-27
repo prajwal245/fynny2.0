@@ -16,7 +16,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, Building2, Check, Mail, UploadCloud, UserPlus, Users } from "lucide-react";
-import { V } from "../ui";
+import { V, V2_STYLES, useV2Theme } from "../ui";
 import { ProcessingCard } from "../agents";
 import { supabase } from "@/integrations/supabase/client";
 import { referralApply, updatePracticePipelineSettings } from "@/lib/practice/practice.functions";
@@ -40,6 +40,7 @@ const STEP_HINT = [
 const DEFAULT_AUTONOMY = { auto_recon: true, auto_chase_day: 5 };
 
 export default function OnboardingPage() {
+  useV2Theme();
   const { session, saveFirm, addClient, addDoc, completeOnboarding, firm, firmIdReady, docs, runs } = useV2();
   const savePipeline = useServerFn(updatePracticePipelineSettings);
   const applyReferralFn = useServerFn(referralApply);
@@ -271,7 +272,7 @@ export default function OnboardingPage() {
 
   return (
     <div className="onb" data-step={step}>
-      <style>{ONB_STYLES}</style>
+      <style>{V2_STYLES + ONB_STYLES}</style>
       <div className="onb-main">
         <a className="onb-brand" href="/" aria-label="FynHelp home" style={{ color: "inherit", textDecoration: "none" }}>
           <span className="onb-logo">F</span>
@@ -591,12 +592,12 @@ const ONB_STYLES = `
 .onb-logo { width:28px; height:28px; border-radius:9px; background:${V.ink}; color:#fff; display:grid; place-items:center; font-weight:700; font-size:14px; }
 .onb-rail { list-style:none; margin:6px 0 0; padding:0; display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:6px; }
 .onb-rail li { display:flex; flex-direction:column; gap:6px; font-size:12px; color:${V.muted}; }
-.onb-rail li::before { content:""; height:3px; border-radius:999px; background:rgba(255,255,255,.12); transition:background .3s ease; }
+.onb-rail li::before { content:""; height:3px; border-radius:999px; background:var(--v2-line); transition:background .3s ease; }
 .onb-rail li[data-state="done"]::before, .onb-rail li[data-state="current"]::before { background:${V.ink}; }
 .onb-rail li[data-state="current"] { color:${V.ink}; font-weight:600; }
 .onb-rail .onb-dot { display:none; }
 .onb-rail-hint { display:none; }
-.onb-card { background:${V.card}; backdrop-filter:blur(14px); border:1px solid ${V.line}; border-radius:22px; padding:clamp(20px,3vw,32px); box-shadow:0 1px 2px rgba(255,255,255,.05) inset, 0 24px 48px -36px rgba(0,0,0,.8); }
+.onb-card { background:${V.card}; backdrop-filter:blur(14px); border:1px solid ${V.line}; border-radius:22px; padding:clamp(20px,3vw,32px); box-shadow:0 1px 2px rgba(9,11,17,.04), 0 24px 48px -36px rgba(9,11,17,.35); }
 .onb-eyebrow { font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:${V.muted}; font-weight:700; margin-bottom:16px; }
 .onb-title { font-size:clamp(24px,3vw,30px); letter-spacing:-0.03em; line-height:1.15; margin:0; }
 .onb-sub { margin:8px 0 4px; font-size:14px; color:${V.body}; line-height:1.6; }
@@ -604,7 +605,7 @@ const ONB_STYLES = `
 .onb-more summary { cursor:pointer; font-size:13px; font-weight:600; color:${V.ink}; }
 .onb-more summary span { font-weight:400; color:${V.muted}; }
 .onb-2col { display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr)); }
-.onb-drop { display:grid; justify-items:center; gap:6px; text-align:center; border:1.5px dashed rgba(255,255,255,.22); border-radius:18px; padding:36px 20px; cursor:pointer; transition:border-color .2s ease, background .2s ease; }
+.onb-drop { display:grid; justify-items:center; gap:6px; text-align:center; border:1.5px dashed var(--v2-dash); border-radius:18px; padding:36px 20px; cursor:pointer; transition:border-color .2s ease, background .2s ease; }
 .onb-drop:hover { border-color:${V.ink}; background:rgba(249,16,58,.08); }
 .onb-drop-icon { width:46px; height:46px; border-radius:14px; background:${V.blue}; color:${V.brandDeep}; display:grid; place-items:center; margin-bottom:6px; }
 .onb-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
@@ -619,7 +620,7 @@ const ONB_STYLES = `
 .onb-toggle-label { font-size:14px; font-weight:600; }
 .onb-toggle-text { font-size:12.5px; color:${V.body}; margin-top:3px; line-height:1.5; }
 .onb-pill { font-size:11.5px; color:${V.muted}; border:1px solid ${V.line}; border-radius:999px; padding:4px 10px; white-space:nowrap; }
-.onb-switch { width:42px; height:24px; border-radius:999px; border:0; background:rgba(255,255,255,.18); position:relative; cursor:pointer; transition:background .2s ease; flex:0 0 auto; }
+.onb-switch { width:42px; height:24px; border-radius:999px; border:0; background:var(--v2-switch); position:relative; cursor:pointer; transition:background .2s ease; flex:0 0 auto; }
 .onb-switch span { position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:999px; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.2); transition:transform .2s ease; }
 .onb-switch[data-on="true"] { background:${V.green}; }
 .onb-switch[data-on="true"] span { transform:translateX(18px); }

@@ -29,6 +29,9 @@ export default function ClientWorkspacePage() {
   const [editing, setEditing] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [archiveReason, setArchiveReason] = useState("");
+  // Declared before the early return below: hooks must run in the same order on every render.
+  const [matchTxn, setMatchTxn] = useState<string | null>(null);
+  const [onlyOpen, setOnlyOpen] = useState(true);
   const navigate = useNavigate();
   const { canSignOff, role, archiveClient, clients, docs, exceptions, reports, chases, review, runs, recon, runRecon, generateReport, period, closeStateFor, activityFor, agentRunsFor, isReadyForMis } = useV2();
   const client = clients.find((c) => c.id === clientId);
@@ -88,8 +91,6 @@ export default function ClientWorkspacePage() {
     }
     runRecon(client.id, (r) => toast.success(`Recon complete. Matched ${r.matched}, exceptions ${r.exceptions}.`));
   };
-  const [matchTxn, setMatchTxn] = useState<string | null>(null);
-  const [onlyOpen, setOnlyOpen] = useState(true);
   // One click from any unmatched line to the matching drawer.
   const matchLine = (txnId: string) => {
     setMatchTxn(txnId);

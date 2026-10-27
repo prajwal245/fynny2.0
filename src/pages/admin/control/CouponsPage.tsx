@@ -65,7 +65,7 @@ export default function CouponsPage() {
     return { line: `Firms who enter this code get ${form.kind === "percent" ? `${v}%` : inr(v)} off ${when}, before GST (${GST_PERCENT}% is added on top).`, rows, cycle };
   }, [form.kind, form.value, form.duration, form.plans, form.cycles, money]);
 
-  const usePreset = (p: (typeof PRESETS)[number]) =>
+  const applyPreset = (p: (typeof PRESETS)[number]) =>
     setForm((f) => ({ ...f, kind: p.kind, value: p.value, duration: p.duration, code: f.code || `${p.prefix}`, plans: [], cycles: [] }));
 
   const create = async () => {
@@ -114,7 +114,7 @@ export default function CouponsPage() {
         <div className="flex flex-wrap gap-2 mb-4" aria-label="Quick start">
           <span className="text-xs self-center" style={{ color: muted }}>Quick start:</span>
           {PRESETS.map((p) => (
-            <button key={p.label} type="button" className="rounded-full px-3 py-1 text-xs font-semibold" style={{ border: `1px solid ${line}`, background: "#fff", color: ink }} onClick={() => usePreset(p)}>
+            <button key={p.label} type="button" className="rounded-full px-3 py-1 text-xs font-semibold" style={{ border: `1px solid ${line}`, background: "#fff", color: ink }} onClick={() => applyPreset(p)}>
               {p.label}
             </button>
           ))}

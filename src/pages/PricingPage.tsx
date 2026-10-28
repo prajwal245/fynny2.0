@@ -156,7 +156,7 @@ const gstNote = (cur: Currency) => (cur === "INR" ? `+ ${GST_PERCENT}% GST` : "+
 /** Features that differ between plans, shown on the cards. Only what works today. */
 const CARD_FEATURES: Record<PlanKey, string[]> = {
   starter: ["Extraction, reconciliation and source-linked MIS", "Gmail intake and Chaser by email, no limit", `${PLAN_CREDITS.starter} WhatsApp reminder credits a month`, "MIS exports with a “Prepared with FynHelp” footer"],
-  professional: ["Everything in Essential", `${PLAN_CREDITS.professional} WhatsApp reminder credits a month`, "MIS exports in your firm's name", "Help importing your clients"],
+  professional: ["Everything in Essential", `${PLAN_CREDITS.professional} WhatsApp reminder credits a month`, "MIS exports in your firm’s name", "Help importing your clients"],
   scale: ["Everything in Firm", `${PLAN_CREDITS.scale.toLocaleString("en-IN")} WhatsApp reminder credits a month`, "Priority WhatsApp support and a named contact", "Assisted import of up to 100 clients"],
 };
 
@@ -355,7 +355,7 @@ export default function PricingPage() {
       </Section>
 
       {/* 6. ROI CALCULATOR */}
-      <Section kicker="Is it worth it" title="What your team's time" italic="is worth." center>
+      <Section kicker="Is it worth it" title="What your team’s time" italic="is worth." center>
         <Reveal>
           <div className="fh-tool" data-testid="roi">
             <div className="grid">
@@ -459,14 +459,14 @@ export default function PricingPage() {
       </section>
 
       {/* 10. TRUST */}
-      <Section kicker="Trust" title="Your clients' books," italic="kept that way." center alt>
+      <Section kicker="Trust" title="Your clients’ books," italic="kept that way." center alt>
         <div className="fh-trustgrid">
           {[
             ["Audit trail", "Every match, correction and sign-off is recorded with who did it and when."],
-            ["No AI training", "Your clients' documents are never used to train AI models."],
+            ["No AI training", "Your clients’ documents are never used to train AI models."],
             ["Encryption", "Data is encrypted in transit and at rest; files sit in private storage."],
             ["Role-based access", "Partners, managers and juniors see and do only what their role allows."],
-            ["DPDP Act readiness", "Consent, purpose limits and deletion are built in, following India's DPDP Act."],
+            ["DPDP Act readiness", "Consent, purpose limits and deletion are built in, following India’s DPDP Act."],
           ].map(([t, d], i) => (
             <Reveal key={t} delay={i * 50}>
               <div className="fh-trust"><h4>{t}</h4><p>{d}</p></div>

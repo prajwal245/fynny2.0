@@ -165,13 +165,13 @@ function Problem() {
     },
     {
       icon: TrendingDown,
-      title: "You can't scale what you can't automate",
-      body: "Every new client is a net cost to your team's capacity. Hiring junior staff to handle volume eats the margin that made growth worthwhile.",
+      title: "You can’t scale what you can’t automate",
+      body: "Every new client is a net cost to your team’s capacity. Hiring junior staff to handle volume eats the margin that made growth worthwhile.",
     },
     {
       icon: Users,
       title: "Your senior people are doing junior work",
-      body: "Your partners have the expertise to advise clients and build relationships. Instead, they're reviewing Excel sheets that should have been ready days ago.",
+      body: "Your partners have the expertise to advise clients and build relationships. Instead, they’re reviewing Excel sheets that should have been ready days ago.",
     },
   ];
   return (
@@ -281,7 +281,7 @@ function Features() {
     { icon: FileText, t: "Monthly client MIS", d: "Built from matched lines only, with every figure linked to its source. PDF and Excel." },
     { icon: LineChart, t: "Exception queue", d: "Every unmatched line with a reason code. Match, ignore or book it, with a note on the audit trail." },
     { icon: Bell, t: "Document chaser", d: "Follow up clients for missing statements by email or a WhatsApp link." },
-    { icon: LayoutGrid, t: "Portfolio view", d: "Every client's close status for the month in one place, with partner sign-off." },
+    { icon: LayoutGrid, t: "Portfolio view", d: "Every client’s close status for the month in one place, with partner sign-off." },
   ];
   return (
     <section style={{ background: SOFT }}>

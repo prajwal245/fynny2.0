@@ -360,10 +360,10 @@ const FEATURES = [
 // (tests/unit/practice/sample-benchmark.test.ts). Price: the Scale plan.
 const PER_CLIENT_FROM = Math.min(...Object.values(BILLING_PLANS).map((p) => p.monthly / p.clientsIncluded));
 const TILES = [
-  { cls: "m", badge: "Time saved", fig: "< 1 sec", cap: "To reconcile a client-month and draft its MIS figures, from file to numbers. Measured on our sample files: under 0.4 s each." },
-  { cls: "d", badge: "Automation", fig: "4 agents", cap: "Collect, read, reconcile and draft the MIS on their own, in 5 matching passes. Your team only sees the exceptions, each with a reason." },
-  { cls: "c", badge: "AI-native", fig: "100%", cap: "of MIS figures computed in code and linked to the bank and book lines behind them. AI reads the documents and writes the commentary." },
-  { cls: "g", badge: "More revenue", fig: "PRICE", cap: "a client a month on Scale, plus GST. Offer a monthly MIS to every client and grow fees without adding staff." },
+  { cls: "m", badge: "Processing speed", fig: "< 1 sec", cap: "From file to reconciled numbers and drafted MIS figures for a client-month. Measured on our sample files: under 0.4 s each. Your team’s time goes into reviewing, not matching." },
+  { cls: "d", badge: "Automation", fig: "4 agents", cap: "Collect, read, reconcile and draft the MIS on their own, with bank matched to books in 5 passes: exact, same-day, close, your firm’s rules and split payments. Your team only sees the exceptions, each with a reason." },
+  { cls: "c", badge: "Traceable", fig: "100%", cap: "of MIS figures are computed in code and linked to the bank and book lines behind them. AI reads the documents and writes the commentary; it never computes a figure." },
+  { cls: "g", badge: "Cost per client", fig: "PRICE", cap: "a client a month on Scale, plus GST. Offer a monthly MIS to every client and grow fees without adding staff." },
 ];
 
 /** A realistic miniature of each problem, drawn in the page's own colours. Illustrative sample content, not data. */
@@ -440,7 +440,7 @@ const PROBLEMS = [
 
 const PIPELINE = [
   { icon: FileSearch, t: "Extract", d: "Multi-format documents classified and read into structured lines.", plan: "All plans" },
-  { icon: GitCompareArrows, t: "Recon", d: "Exact, fuzzy and firm-rule matching. Every exception gets a reason code.", plan: "All plans" },
+  { icon: GitCompareArrows, t: "Recon", d: "5 matching passes: exact, same-day, close, your firm’s rules and split payments. Every exception gets a reason code.", plan: "All plans" },
   { icon: MessageSquareText, t: "Narrate", d: "A monthly MIS built from matched lines, every figure linked to source.", plan: "All plans" },
   { icon: BellRing, t: "Chaser", d: "Scheduled email follow-ups for missing documents, plus a WhatsApp quick-send link.", plan: "Email on all plans, WhatsApp on Firm+" },
   { icon: ScrollText, t: "Audit trail", d: "Who decided what, when, with the note they left and the source line it touched.", plan: "All plans" },
@@ -449,7 +449,7 @@ const PIPELINE = [
 
 const STEPS = [
   ["Bring in the documents", "Upload bank statements and Tally or Zoho exports, or let clients email them in. No migration, nothing switched off."],
-  ["We extract & match", "Documents classified and reconciled — exact, then fuzzy, then your firm's rules."],
+  ["We extract & match", "Documents are read, then bank is matched to books in 5 passes: exact, same-day, close, your firm’s rules and split payments."],
   ["Review exceptions only", "Genuine mismatches surface with a reason code and a link to source."],
   ["Client gets a clean MIS", "A source-linked pack with a narrative your client can actually read."],
 ];
@@ -465,8 +465,8 @@ const TRUST = [
 
 const PLANS = [
   { key: "starter" as const, adds: ["Extract, Recon and MIS reports", "Email Chaser follow-ups", "Full audit trail", "Unlimited users"], cta: "Start free, no card" },
-  { key: "professional" as const, adds: ["Everything in Essential", "500 WhatsApp reminder credits a month", "Your firm's branding on MIS exports", "Gmail intake for client documents"], cta: "Start free, no card", popular: true },
-  { key: "scale" as const, adds: ["Everything in Firm", "Guided onboarding with a founder", "Priority support"], cta: "Talk to us" },
+  { key: "professional" as const, adds: ["Everything in Essential", "500 WhatsApp reminder credits a month", "Your firm’s branding on MIS exports", "Gmail intake for client documents"], cta: "Start free, no card", popular: true },
+  { key: "scale" as const, adds: ["Everything in Firm", "Guided onboarding with a founder", "Priority support"], cta: "Start free, no card", secondary: "Talk to us" },
 ].map((p) => {
   const b = BILLING_PLANS[p.key];
   return {
@@ -525,8 +525,8 @@ export default function HomePage() {
               Month-end close for CA firms, <span className="ital">without the scramble</span>
             </h1>
             <p className="sub">
-              FynHelp collects your clients&rsquo; documents, reconciles bank to Tally or Zoho books and drafts
-              a source-traceable MIS, so your team reviews exceptions instead of matching every line.
+              Four agents collect your clients&rsquo; documents, reconcile bank to Tally or Zoho, and draft a
+              source-traceable MIS. Your team reviews the exceptions, and a partner signs.
             </p>
 
             <form
@@ -648,51 +648,15 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── MAROON BLOCK ── */}
+      {/* ── PRICING LINE (the full table is further down) ── */}
       <section style={{ padding: "0 22px 40px" }}>
-        <div className="fh-wrap" style={{ padding: 0 }}>
+        <div className="fh-wrap" style={{ padding: 0, textAlign: "center" }}>
           <Reveal>
-            <div className="fh-maroon">
-              <div className="fh-maroon-grid">
-                <div>
-                  <span className="fh-kicker">Invest in the close you want</span>
-                  <h2 className="fh-h2">
-                    Give your firm back
-                    <br />
-                    <span className="ital">the week it loses</span>
-                  </h2>
-                  <p className="fh-lead">
-                    Priced per active client, never per seat. Onboard the whole practice, keep your ledger
-                    exactly where it is, and start with the entities that hurt most.
-                  </p>
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 26 }}>
-                    <Link to={SIGNUP_URL} className="fh-btn fh-btn-coral" onClick={() => trackCta("start", "home-pricing-teaser")}>
-                      {CTA_START} <ArrowUpRight size={15} />
-                    </Link>
-                    <Link to="/ca-firms" className="fh-btn fh-btn-ghost">
-                      For CA firms
-                    </Link>
-                  </div>
-                </div>
-                <div className="fh-maroon-card">
-                  <div className="lbl">{BILLING_PLANS.starter.name} plan</div>
-                  <div className="v num">{money(BILLING_PLANS.starter.monthly, cur)}<small style={{ fontSize: 16 }}>/mo</small></div>
-                  <div className="fh-uptick">Free trial from your first upload, no card needed</div>
-                  <div className="fh-line">
-                    <span>Active clients included</span>
-                    <b>{BILLING_PLANS.starter.clientsIncluded}</b>
-                  </div>
-                  <div className="fh-line">
-                    <span>Users</span>
-                    <b>Unlimited</b>
-                  </div>
-                  <div className="fh-line">
-                    <span>Prices</span>
-                    <b>+ 18% GST</b>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <p style={{ margin: 0, fontSize: 18, letterSpacing: "-0.02em" }}>
+              <a href="#pricing" onClick={() => trackCta("start", "home-pricing-line")} style={{ color: C.ink, fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 4, textDecorationColor: C.coral }}>
+                Priced per active client, never per seat
+              </a>
+            </p>
           </Reveal>
         </div>
       </section>
@@ -905,18 +869,21 @@ export default function HomePage() {
                       </li>
                     ))}
                   </ul>
-                  <Link
-                    to={SIGNUP_URL}
-                    className={`fh-btn ${p.popular ? "fh-btn-coral" : "fh-btn-primary"}`}
-                    onClick={(e) => {
-                      if (p.name === "Scale") {
-                        e.preventDefault();
-                        openDemo("home-plan-scale");
-                      } else trackCta("start", `home-plan-${p.name.toLowerCase()}`);
-                    }}
-                  >
-                    {p.cta} <ArrowUpRight size={15} />
-                  </Link>
+                  <div style={{ marginTop: "auto", display: "grid", gap: 10 }}>
+                    <Link
+                      to={SIGNUP_URL}
+                      className={`fh-btn ${p.popular ? "fh-btn-coral" : "fh-btn-primary"}`}
+                      style={{ marginTop: 0 }}
+                      onClick={() => trackCta("start", `home-plan-${p.name.toLowerCase()}`)}
+                    >
+                      {p.cta} <ArrowUpRight size={15} />
+                    </Link>
+                    {"secondary" in p && p.secondary && (
+                      <button type="button" className="fh-btn fh-btn-ghost" style={{ marginTop: 0 }} onClick={() => openDemo(`home-plan-${p.name.toLowerCase()}`)}>
+                        {p.secondary}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </Reveal>
               );

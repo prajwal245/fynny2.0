@@ -47,7 +47,7 @@ export const AGENTS: Agent[] = [
     kicker: "Module 02",
     headline: "Bank lines matched",
     italic: "to the books",
-    sub: "Bank lines are matched to book lines in passes: exact, same-day, fuzzy, your firm's rules, then split payments. What does not match stays visible with a reason code.",
+    sub: "Bank lines are matched to book lines in passes: exact, same-day, close, your firm’s rules, then split payments. What does not match stays visible with a reason code.",
     stats: [
       ["5", "matching passes"],
       ["Reason", "code on every exception"],
@@ -60,7 +60,7 @@ export const AGENTS: Agent[] = [
       { t: "Learns from your decisions", d: "Lines your team ignores or marks reconciled are remembered for that client, with who decided and why." },
     ],
     outputs: ["Match report with reasons", "Exception queue", "Decisions remembered per client"],
-    inputs: ["Extracted bank lines", "Book lines from Tally exports or a connected Zoho Books", "Your firm's past decisions"],
+    inputs: ["Extracted bank lines", "Book lines from Tally exports or a connected Zoho Books", "Your firm’s past decisions"],
   },
   {
     slug: "narrate",
@@ -69,7 +69,7 @@ export const AGENTS: Agent[] = [
     kicker: "Module 03",
     headline: "A monthly MIS",
     italic: "with its sources attached",
-    sub: "Builds the client's monthly MIS from matched lines only: revenue, expenses, statutory dates and a few plain-language insights, each citing the transactions behind it. A partner signs it off.",
+    sub: "Builds the client’s monthly MIS from matched lines only: revenue, expenses, statutory dates and a few plain-language insights, each citing the transactions behind it. A partner signs it off.",
     stats: [
       ["Matched", "lines only, never guesses"],
       ["Every", "figure opens its source lines"],
@@ -145,7 +145,7 @@ export const AGENT_SEO: Record<string, { title: string; description: string; key
     h1Italic: "without the chasing",
     title: "Client document collection for CA practices",
     description:
-      "Stop chasing clients for bank statements and bills. Polite email and WhatsApp follow-ups in your firm's name that stop the moment the document arrives.",
+      "Stop chasing clients for bank statements and bills. Polite email and WhatsApp follow-ups in your firm’s name that stop the moment the document arrives.",
     keyword: "Document collection",
   },
 };

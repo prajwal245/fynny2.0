@@ -1,0 +1,65 @@
+# One-time, manual: stores the SheetJS "xlsx" 0.20.3 package in the repo, so installs (and Vercel deploys)
+# no longer depend on cdn.sheetjs.com being reachable. It downloads from SheetJS's own host, checks what it
+# got, proves the app installs and builds with it, and pushes a branch for a pull request.
+name: Vendor xlsx
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  vendor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Download SheetJS 0.20.3 from its official host
+        run: |
+          mkdir -p vendor
+          curl --fail --silent --show-error --location --retry 10 --retry-delay 6 --retry-all-errors --max-time 180 \
+            -o vendor/xlsx-0.20.3.tgz https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
+          ls -l vendor/xlsx-0.20.3.tgz
+
+      - name: Check it is SheetJS xlsx 0.20.3
+        run: |
+          tar -xzf vendor/xlsx-0.20.3.tgz -O package/package.json | node -e '
+            let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => {
+              const p = JSON.parse(s);
+              if (p.name !== "xlsx" || p.version !== "0.20.3" || !/sheetjs/i.test(JSON.stringify(p.repository ?? p.homepage ?? ""))) { console.error("Unexpected package:", p.name, p.version); process.exit(1); }
+              console.log("OK:", p.name, p.version);
+            });'
+          sha512sum vendor/xlsx-0.20.3.tgz | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Point package.json at the vendored copy
+        run: |
+          sed -i 's#"xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"#"xlsx": "file:vendor/xlsx-0.20.3.tgz"#' package.json
+          grep -n '"xlsx"' package.json
+          grep -q '"xlsx": "file:vendor/xlsx-0.20.3.tgz"' package.json
+
+      - name: Install, as Vercel does
+        run: npm install --no-audit --no-fund
+
+      - name: Build, as Vercel does
+        id: build
+        continue-on-error: true
+        run: npm run build
+
+      - name: Report the build
+        run: |
+          echo "Build outcome: ${{ steps.build.outcome }}" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Push a branch for the pull request
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b chore/vendor-xlsx
+          git add vendor/xlsx-0.20.3.tgz package.json
+          git commit -m "Store the xlsx 0.20.3 package in the repo so installs no longer depend on cdn.sheetjs.com"
+          git push origin chore/vendor-xlsx

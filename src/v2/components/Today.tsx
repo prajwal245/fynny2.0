@@ -230,7 +230,7 @@ export function NeedsYou({ items }: { items: NeedsItem[] }) {
 
 const TRIGGER: Record<string, string> = { user: "by your team", pipeline: "automatically", schedule: "on schedule", retry: "retry", channel: "on arrival" };
 
-export function AgentActivity({ runs }: { runs: AgentRunRecord[] }) {
+export function AgentActivity({ runs, onClose }: { runs: AgentRunRecord[]; onClose?: () => void }) {
   const { clientName } = useV2();
   useNow();
   const recent = runs.slice(0, 7);
@@ -238,14 +238,21 @@ export function AgentActivity({ runs }: { runs: AgentRunRecord[] }) {
     <Card data-testid="agent-activity">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
         <h3 style={{ fontSize: 15.5 }}>Agent activity</h3>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: V.muted }} title="Updates by itself">
-          <span className="v2-dot" style={{ background: V.green }} /> Live
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 11.5, color: V.muted }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }} title="Updates by itself">
+            <span className="v2-dot" style={{ background: V.green }} /> Live
+          </span>
+          {onClose && (
+            <button type="button" className="v2-icon-btn" onClick={onClose} aria-label="Hide agent activity" title="Hide agent activity" data-testid="activity-close" style={{ width: 28, height: 28 }}>
+              <X size={14} />
+            </button>
+          )}
         </span>
       </div>
       {recent.length === 0 ? (
         <p style={{ fontSize: 13, color: V.muted, margin: 0 }}>Upload a document and each agent's work shows up here as it happens.</p>
       ) : (
-        <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 12 }}>
+        <ul className="today-feed" style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 12 }}>
           <AnimatePresence initial={false}>
             {recent.map((r) => {
               const a = AGENTS[(r.agent in AGENTS ? r.agent : "extract") as AgentKey];
@@ -393,7 +400,12 @@ export function agentSummary(runs: AgentRunRecord[], needs: number) {
 
 export const TODAY_STYLES = `
 .today-grid { display:grid; gap:18px; grid-template-columns:minmax(0,1fr) minmax(0,340px); align-items:start; }
-@media (max-width:1100px){ .today-grid { grid-template-columns:minmax(0,1fr); } }
+.today-grid[data-panel="closed"] { grid-template-columns:minmax(0,1fr); }
+.today-main { display:grid; gap:18px; min-width:0; }
+/* The side panel stays in view while the page scrolls, and scrolls inside itself when it is taller than the screen. */
+.today-aside { position:sticky; top:82px; max-height:calc(100vh - 106px); overflow-y:auto; overscroll-behavior:contain; display:grid; gap:18px; align-content:start; min-width:0; scrollbar-width:thin; }
+.today-feed { max-height:min(46vh, 420px); overflow-y:auto; padding-right:4px !important; scrollbar-width:thin; }
+@media (max-width:1100px){ .today-grid { grid-template-columns:minmax(0,1fr); } .today-aside { position:static; max-height:none; overflow:visible; order:-1; } }
 .today-item { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:12px; align-items:center; padding:12px; border-radius:14px; }
 .today-item:hover { background:${V.gray}; }
 .today-icon { width:34px; height:34px; border-radius:11px; display:grid; place-items:center; }

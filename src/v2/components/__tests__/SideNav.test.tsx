@@ -50,4 +50,18 @@ describe("side navigation", () => {
     expect(localStorage.getItem("fynhelp.v2.sidefold")).toBe("1");
     expect(document.querySelector(".v2-side")?.className).toContain("folded");
   });
+
+  it("hides and shows with the [ key, but not while typing", async () => {
+    mount("/app");
+    await screen.findByText("Rao and Co");
+    fireEvent.keyDown(window, { key: "[" });
+    expect(localStorage.getItem("fynhelp.v2.sidefold")).toBe("1");
+    fireEvent.keyDown(window, { key: "[" });
+    expect(localStorage.getItem("fynhelp.v2.sidefold")).toBe("0");
+    const box = document.createElement("input");
+    document.body.appendChild(box);
+    fireEvent.keyDown(box, { key: "[" });
+    expect(localStorage.getItem("fynhelp.v2.sidefold")).toBe("0");
+    box.remove();
+  });
 });

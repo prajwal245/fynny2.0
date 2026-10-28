@@ -69,6 +69,18 @@ export function SideNav({
       try { window.localStorage.setItem(FOLD_KEY, f ? "0" : "1"); } catch { /* private mode */ }
       return !f;
     });
+  // "[" hides or shows the menu, the way many editors do. Ignored while typing.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "[" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      fold();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const isOpen = (g: Group) => opened[g.id] ?? g.id === active;
   const total = (g: Group) => g.items.reduce((n, i) => n + (counts[i.to] ?? 0), 0);
 
@@ -181,7 +193,7 @@ export function SideNav({
         </nav>
       </aside>
 
-      <button className="v2-fold" onClick={fold} aria-label={folded ? "Show the menu" : "Hide the menu"} title={folded ? "Show the menu" : "Hide the menu"}>
+      <button className="v2-fold" onClick={fold} aria-label={folded ? "Show the menu" : "Hide the menu"} aria-keyshortcuts="[" title={folded ? "Show the menu ([)" : "Hide the menu ([)"}>
         {folded ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
       </button>
     </div>
@@ -205,7 +217,7 @@ export const SIDENAV_STYLES = `
 .v2-rail-dot { position:absolute; top:9px; right:9px; width:7px; height:7px; border-radius:999px; background:${V.brand}; box-shadow:0 0 0 2px var(--v2-side); }
 .v2-panel { width:232px; flex:0 0 232px; display:flex; flex-direction:column; padding:18px 12px 14px; background:var(--v2-side); backdrop-filter:blur(18px); border-right:1px solid ${V.line}; overflow:hidden; transition:margin-left .35s cubic-bezier(.16,1,.3,1), opacity .25s ease; }
 .v2-side.folded .v2-panel { margin-left:-232px; opacity:0; pointer-events:none; }
-.v2-fold { position:absolute; top:22px; right:-12px; width:24px; height:24px; display:grid; place-items:center; border-radius:999px; border:1px solid ${V.line}; background:${V.bg}; color:${V.muted}; cursor:pointer; z-index:2; transition:transform .3s cubic-bezier(.34,1.56,.64,1), color .2s; }
+.v2-fold { position:absolute; top:22px; right:-14px; width:28px; height:28px; display:grid; place-items:center; border-radius:999px; border:1px solid ${V.line}; background:${V.bg}; color:${V.muted}; cursor:pointer; z-index:2; transition:transform .3s cubic-bezier(.34,1.56,.64,1), color .2s; }
 .v2-fold:hover { color:${V.ink}; transform:scale(1.12); }
 .v2-group { display:flex; align-items:center; gap:11px; width:100%; padding:10px 13px; margin-bottom:2px; border-radius:12px; border:0; background:transparent; font:inherit; font-size:14.5px; color:${V.body}; cursor:pointer; text-align:left; transition:background .18s ease, color .18s ease; }
 .v2-group:hover { background:${V.gray}; color:${V.ink}; }

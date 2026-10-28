@@ -31,30 +31,13 @@ import { SiteFooter } from "@/components/site/SiteShell";
 import ProductShot from "@/components/site/ProductShot";
 import { CurrencySwitch, localize, money, useCurrency } from "@/lib/currency";
 import { PLANS as BILLING_PLANS } from "@/lib/practice/billing/plans";
+import { C } from "@/lib/sitePalette";
 
 /* ─────────────────────────────────────────────────────────
    FynHelp homepage — editorial fintech layout
    Display: Instrument Sans (tight grotesk) + Fraunces italic
    Palette: cream page · deep maroon blocks · coral accent
    ───────────────────────────────────────────────────────── */
-
-const C = {
-  page: "#F2EEE7",
-  pageAlt: "#EBE6DD",
-  card: "#FFFDF9",
-  ink: "#171208",
-  inkDeep: "#0E0B06",
-  body: "rgba(23,18,8,0.62)",
-  muted: "rgba(23,18,8,0.42)",
-  line: "rgba(23,18,8,0.09)",
-  lineSoft: "rgba(23,18,8,0.055)",
-  maroon: "#A93838",
-  maroonDeep: "#5C1216",
-  coral: "#E2673F",
-  gold: "#8B6914",
-  green: "#1F5A46",
-  onDark: "#F7F1E6",
-};
 
 const STYLES = `
 .fyn-home { background:${C.page}; color:${C.ink}; font-family:'Instrument Sans','Inter',system-ui,sans-serif; -webkit-font-smoothing:antialiased; overflow-x:hidden; }

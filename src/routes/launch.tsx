@@ -5,9 +5,10 @@ import LaunchPage from "@/pages/launch/LaunchPage";
 export const Route = createFileRoute("/launch")({
   head: () =>
     seo({
-      title: "Launch offer: 30 days free for the first 100 CA firms",
+      title: "FynHelp — Month-end close for CA firms, run by agents",
+      rawTitle: true,
       description:
-        "Month-end close for CA firms: FynHelp collects client documents, reconciles bank to Tally or Zoho and drafts a source-traceable MIS. The first 100 firms get 30 days free.",
+        "FynHelp chases clients on WhatsApp, reads documents, reconciles bank to Tally or Zoho and drafts the MIS. Your team reviews. The partner signs.",
       path: "/launch",
       jsonLd: [breadcrumbLd([{ name: "Launch offer", path: "/launch" }])],
     }),

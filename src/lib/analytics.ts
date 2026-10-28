@@ -115,6 +115,9 @@ export function trackPageView(path: string, properties?: Record<string, unknown>
 export type FynHelpEvent =
   | "waitlist_signup"
   | "cta_click"
+  | "launch_cta_trial_click"
+  | "launch_cta_demo_click"
+  | "launch_announcement_dismissed"
   | "demo_requested"
   | "sign_up"
   | "demo_started"
@@ -145,6 +148,8 @@ export const ATTRIBUTED_EVENTS: readonly FynHelpEvent[] = [
   "demo_requested",
   "waitlist_signup",
   "cta_click",
+  "launch_cta_trial_click",
+  "launch_cta_demo_click",
   "onboarding_completed",
   "subscription_upgraded",
 ];

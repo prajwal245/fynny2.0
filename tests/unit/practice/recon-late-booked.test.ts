@@ -65,3 +65,15 @@ describe("account-booked tax payments and uncleared cheques", () => {
     expect(e?.candidates).toHaveLength(0);
   });
 });
+
+describe("no suggestion across different parties", () => {
+  it("does not offer another party's different amount as a candidate (drawings vs a supplier cheque)", () => {
+    const r = reconcile(
+      [t({ id: "b", side: "bank", direction: "out", amount: 60000, txn_date: "2025-08-28", description: "SELF - DRAWINGS RAJIV MEHTA" })],
+      [t({ id: "k", side: "books", direction: "out", amount: 90000, txn_date: "2025-08-29", counterparty: "Shivalik Ispat Pvt Ltd", description: "Shivalik Ispat Pvt Ltd - cheque" })],
+    );
+    const e = r.exceptions.find((x) => x.side === "bank");
+    expect(e?.reason_code).toBe("no_candidate");
+    expect(e?.candidates).toHaveLength(0);
+  });
+});

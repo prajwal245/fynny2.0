@@ -71,14 +71,13 @@ describe("lessonFrom", () => {
 });
 
 describe("applyMemory", () => {
-  it("settles next month's copy of a corrected line without a person", () => {
+  it("pre-fills next month's copy of a corrected line but leaves it for a person to confirm", () => {
     const { rows, applied } = applyMemory([row()], [stripe]);
-    expect(rows[0].route).toBe("transaction");
+    expect(rows[0].route).toBe("review");
     expect(rows[0].direction).toBe("in");
     expect(rows[0].counterparty).toBe("Stripe Payments India");
-    expect(rows[0].confidence).toBe(REMEMBERED_CONFIDENCE);
-    expect(rows[0].reason).toBeNull();
-    expect(applied).toEqual([{ memoryId: "m1", rowIndex: 0, released: true }]);
+    expect(rows[0].reason).toMatch(/Confirm it is right/);
+    expect(applied).toEqual([{ memoryId: "m1", rowIndex: 0, released: false }]);
   });
 
   it("never invents a missing amount or date: such rows still go to review", () => {
@@ -174,10 +173,17 @@ describe("applyMemory safety", () => {
   it("keeps doubtful amounts with a person", () => {
     expect(applyMemory([row({ reason: "Amount does not appear in the document text" })], [lesson]).rows[0].route).toBe("review");
   });
-  it("settles the direction doubt a person already answered", () => {
+  it("suggests the direction a person already answered, but does not settle the line", () => {
     const r = row({ reason: "Statement has one unsigned amount column; money in/out was assumed", direction: "out" });
     const out = applyMemory([r], [lesson]).rows[0];
-    expect(out.route).toBe("transaction");
+    expect(out.route).toBe("review");
     expect(out.direction).toBe("in");
+  });
+  it("never moves any line out of review by itself", () => {
+    for (const reason of [null, "Low confidence", "Statement has one unsigned amount column; money in/out was assumed"]) {
+      const { rows, applied } = applyMemory([row({ reason })], [lesson]);
+      expect(rows[0].route).toBe("review");
+      expect(applied.every((a) => a.released === false)).toBe(true);
+    }
   });
 });

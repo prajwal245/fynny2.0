@@ -61,6 +61,8 @@ export function misBucket(t: Line): MisBucket {
   // Interest comes before transfer and loan words: "FD interest" is income and "loan interest" is a cost.
   if (t.direction === "in" && INTEREST.test(text) && !/\b(loan|emi)\b/i.test(text) && (!REFUND.test(text) || INTEREST_ON_REFUND.test(text))) return "other_income";
   if (t.direction === "out" && INTEREST.test(text) && !TAX.test(text)) return "expense";
+  // Charges and fees are costs even when they sit on a loan or a cheque ("EMI CHQ RET CHGS", "LOAN PROCESSING FEE").
+  if (t.direction === "out" && CHARGES.test(text) && !/\b(challan|cpin|itns|tds|advance tax)\b/i.test(text)) return "expense";
   // A proprietor's or partner's drawings are capital, never a transfer between the firm's own accounts.
   if (DRAWINGS.test(text)) return "loan_capital";
   if (t.category === "transfer" || TRANSFER.test(text)) return "transfer";

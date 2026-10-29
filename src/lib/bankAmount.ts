@@ -18,14 +18,14 @@ export type AmountPattern = 1 | 2 | 3 | 4 | 5;
 // ── Header dictionaries ──────────────────────────────────────────────────────
 
 export const DEBIT_HEADERS = [
-  "debit", "debit amount", "debit amt", "debit amt.",
-  "withdrawal", "withdrawal amt", "withdrawal amt.", "withdrawal amount",
+  "debit", "debits", "debit amount", "debit amt", "debit amt.",
+  "withdrawals", "withdrawal", "withdrawal amt", "withdrawal amt.", "withdrawal amount",
   "dr", "dr amount", "dr amt", "paid out", "money out", "outflow", "out",
 ];
 
 export const CREDIT_HEADERS = [
-  "credit", "credit amount", "credit amt", "credit amt.",
-  "deposit", "deposit amt", "deposit amt.", "deposit amount",
+  "credit", "credits", "credit amount", "credit amt", "credit amt.",
+  "deposits", "deposit", "deposit amt", "deposit amt.", "deposit amount",
   "cr", "cr amount", "cr amt", "paid in", "money in", "inflow", "in",
 ];
 
@@ -39,8 +39,8 @@ export const AMOUNT_HEADERS = [
   "amount (inr)", "value", "voucher amount",
 ];
 
-const WITHDRAWAL_HEADERS = ["withdrawal", "withdrawal amt", "withdrawal amt.", "withdrawal amount", "paid out", "money out"];
-const DEPOSIT_HEADERS = ["deposit", "deposit amt", "deposit amt.", "deposit amount", "paid in", "money in"];
+const WITHDRAWAL_HEADERS = ["withdrawals", "withdrawal", "withdrawal amt", "withdrawal amt.", "withdrawal amount", "paid out", "money out"];
+const DEPOSIT_HEADERS = ["deposits", "deposit", "deposit amt", "deposit amt.", "deposit amount", "paid in", "money in"];
 
 const normHeader = (h: string) => (h || "").toLowerCase().trim().replace(/[^a-z0-9/]+/g, " ").trim();
 

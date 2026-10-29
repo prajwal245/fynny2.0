@@ -90,10 +90,10 @@ const NEEDS_A_PERSON =
   /Identical to row|does not appear in the document|could not be tied|could not be read|Amount is in [A-Z]{3}|multi-currency/i;
 
 /**
- * Applies remembered lessons to freshly extracted rows. A row sent to review
- * only for doubt the person already resolved goes straight through; a row with
- * a missing date or amount, a doubtful amount, a foreign currency or a
- * suspected duplicate still goes to review.
+ * Applies remembered lessons to freshly extracted rows as a SUGGESTION. Who and which way
+ * are pre-filled from what a person taught before, and the row says so, but a row that went
+ * to review stays in review for a person to confirm: nothing a person has not seen in this
+ * document is ever settled by memory. `released` is always false and kept for callers.
  */
 export function applyMemory<R extends MemoryRow>(
   rows: R[],
@@ -111,18 +111,14 @@ export function applyMemory<R extends MemoryRow>(
     if (m.lesson.direction) next.direction = m.lesson.direction;
     if (m.lesson.counterparty) next.counterparty = m.lesson.counterparty;
     if (m.lesson.description) next.description = m.lesson.description;
-    const blocked =
-      NEEDS_A_PERSON.test(row.reason ?? "") ||
-      Boolean(row.currency && row.currency.toUpperCase() !== "INR");
-    const complete = Boolean(next.date && next.amount && next.amount > 0 && next.direction);
-    let released = false;
-    if (row.route === "review" && complete && !blocked) {
-      next.route = "transaction";
-      next.confidence = Math.max(row.confidence, REMEMBERED_CONFIDENCE);
-      next.reason = null;
-      released = true;
+    if (row.route === "review") {
+      const blocked =
+        NEEDS_A_PERSON.test(row.reason ?? "") ||
+        Boolean(row.currency && row.currency.toUpperCase() !== "INR");
+      // Keep the original doubt when it is one only a person can settle; otherwise say what was suggested.
+      if (!blocked) next.reason = "Same as a line you corrected before; the earlier answer is filled in. Confirm it is right.";
     }
-    applied.push({ memoryId: m.id, rowIndex: i, released });
+    applied.push({ memoryId: m.id, rowIndex: i, released: false });
     return next;
   });
   return { rows: out, applied };

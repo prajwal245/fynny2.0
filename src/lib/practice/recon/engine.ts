@@ -472,6 +472,36 @@ export function reconcile(
     });
   }
 
+  // Stage 1c — booked a few days late. Books are often written up days after the bank
+  // moved, so the same exact amount is accepted up to LATE_BOOKING_DAYS apart, but only
+  // when the party or a reference agrees and the pair is unique either way.
+  const LATE_BOOKING_DAYS = 5;
+  const lateIdentity = (a: ReconTxn, b: ReconTxn) =>
+    referenceScore(a, b) >= 0.8 || counterpartyScore(a, b, aliases) >= 0.9;
+  const latePair = (a: ReconTxn, b: ReconTxn) =>
+    a.direction === b.direction &&
+    toPaise(a.amount) === toPaise(b.amount) &&
+    daysBetween(a.txn_date, b.txn_date) <= LATE_BOOKING_DAYS &&
+    lateIdentity(a, b);
+  for (const t of bank) {
+    if (usedBank.has(t.id)) continue;
+    const cands = books.filter((b) => !usedBook.has(b.id) && latePair(t, b));
+    if (cands.length !== 1) continue;
+    const b = cands[0]!;
+    if (bank.some((o) => o.id !== t.id && !usedBank.has(o.id) && latePair(o, b))) continue;
+    usedBank.add(t.id);
+    usedBook.add(b.id);
+    const gap = daysBetween(t.txn_date, b.txn_date);
+    const s = fuzzyScore(t, b, cfg, aliases);
+    matches.push({
+      bank_txn_id: t.id,
+      book_txn_ids: [b.id],
+      stage: "fuzzy",
+      score: Math.max(0.88, s.score),
+      explanation: { ...s.explanation, note: `Booked ${gap} day${gap === 1 ? "" : "s"} ${new Date(b.txn_date) > new Date(t.txn_date) ? "after" : "before"} the bank date; same amount and the ${referenceScore(t, b) >= 0.8 ? "reference" : "party"} agree` },
+    });
+  }
+
   // Stage 2 — fuzzy, globally greedy on score with an ambiguity guard.
   type Pair = {
     bank: ReconTxn;

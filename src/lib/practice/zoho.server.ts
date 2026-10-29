@@ -364,6 +364,24 @@ export interface LedgerLine {
   moneyOut: number;
 }
 
+type LedgerPage = Record<string, unknown> & { page_context?: { has_more_page?: boolean } };
+
+/**
+ * The entries in a /chartofaccounts/transactions response. Zoho names the array `transactions`;
+ * older notes call it `chartofaccount_transactions`. Take either, else the first array of
+ * objects, so a rename can never turn a full ledger into "no entries".
+ */
+export function ledgerRows(r: LedgerPage): AccountTxn[] {
+  for (const k of ["transactions", "chartofaccount_transactions"]) {
+    const v = r[k];
+    if (Array.isArray(v)) return v as AccountTxn[];
+  }
+  for (const [k, v] of Object.entries(r)) {
+    if (k !== "page_context" && Array.isArray(v) && v.length && typeof v[0] === "object") return v as AccountTxn[];
+  }
+  return [];
+}
+
 interface AccountTxn {
   transaction_date?: string;
   date?: string;
@@ -448,15 +466,15 @@ async function monthsWithEntries(db: Db, c: Conn, organizationId: string, accoun
   const start = new Date(Date.UTC(end.getUTCFullYear() - 3, end.getUTCMonth(), 1));
   const counts = new Map<string, number>();
   for (let page = 1; page <= 10; page++) {
-    const r = await zohoGet<{ chartofaccount_transactions?: AccountTxn[]; page_context?: { has_more_page?: boolean } }>(db, c, "/chartofaccounts/transactions", {
+    const r = await zohoGet<LedgerPage>(db, c, "/chartofaccounts/transactions", {
       organization_id: organizationId,
       account_id: accountId,
-      "date.start": start.toISOString().slice(0, 10),
-      "date.end": end.toISOString().slice(0, 10),
+      date_start: start.toISOString().slice(0, 10),
+      date_end: end.toISOString().slice(0, 10),
       page: String(page),
       per_page: "200",
     });
-    for (const t of r.chartofaccount_transactions ?? []) {
+    for (const t of ledgerRows(r)) {
       const line = ledgerLine(t);
       if (line) counts.set(line.date.slice(0, 7), (counts.get(line.date.slice(0, 7)) ?? 0) + 1);
     }
@@ -474,16 +492,18 @@ export async function sync(db: Db, ctx: FirmContext, linkId: string, month: stri
   const { start, end, label } = monthRange(month);
 
   const lines: LedgerLine[] = [];
+  let lastPage: LedgerPage = {};
   for (let page = 1; page <= 50; page++) {
-    const r = await zohoGet<{ chartofaccount_transactions?: AccountTxn[]; page_context?: { has_more_page?: boolean } }>(db, c, "/chartofaccounts/transactions", {
+    const r = await zohoGet<LedgerPage>(db, c, "/chartofaccounts/transactions", {
       organization_id: l.organization_id,
       account_id: l.account_id,
-      "date.start": start,
-      "date.end": end,
+      date_start: start,
+      date_end: end,
       page: String(page),
       per_page: "200",
     });
-    for (const t of r.chartofaccount_transactions ?? []) {
+    lastPage = r;
+    for (const t of ledgerRows(r)) {
       const line = ledgerLine(t);
       // Zoho's date filter is applied again here, so a month never takes in a neighbour's entries.
       if (line && line.date >= start && line.date <= end) lines.push(line);
@@ -500,6 +520,7 @@ export async function sync(db: Db, ctx: FirmContext, linkId: string, month: stri
 
   if (!lines.length) {
     await touch(`${label}: no entries in Zoho for this account`);
+    console.warn(`[zoho] sync ${label}: no entries for account ${l.account_id}; response keys: ${Object.keys(lastPage).join(",") || "none"}`);
     // Say where the entries are, so a wrong month is a one-click fix and a wrong organisation is obvious.
     const found = await monthsWithEntries(db, c, l.organization_id, l.account_id).catch(() => [] as { month: string; label: string; count: number }[]);
     const where = found.length

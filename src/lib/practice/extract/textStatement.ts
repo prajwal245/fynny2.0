@@ -77,6 +77,8 @@ export function rowsFromStatementText(text: string): TextStatementResult {
     let description = line.slice(dm[0].length);
     for (const m of monies) description = description.replace(m, " ");
     description = description.replace(/\s+/g, " ").trim();
+    // A balance column cut off by the page edge leaves a fragment such as "24,35," at the end.
+    description = description.replace(/\s+\d[\d,]*,$/, "");
     // A second date right after the first is the value date.
     description = description.replace(DATE_AT_START, "").trim();
 
@@ -94,6 +96,19 @@ export function rowsFromStatementText(text: string): TextStatementResult {
       }
     } else {
       issues.push("No running balance to confirm money in/out");
+    }
+    if (!direction) {
+      // A Dr or Cr printed against the amount itself (from the Debit/Credit column it sat in) beats guessing from words.
+      const amountToken = monies.length >= 2 ? monies[monies.length - 2] : monies[0];
+      const mark = /\b(Cr|Dr)\s*$/i.exec(amountToken ?? "")?.[1]?.toLowerCase();
+      if (mark) {
+        direction = mark === "cr" ? "in" : "out";
+        const mismatch = issues.some((m) => m.startsWith("Running balance does not move"));
+        confidence = mismatch ? 0.7 : 0.85;
+        const rest = issues.filter((m) => !m.startsWith("No running balance"));
+        issues.length = 0;
+        issues.push(...rest, "Direction from the Debit or Credit column, not confirmed by a running balance");
+      }
     }
     if (!direction) {
       const hint = /\b(cr|credit|deposit|by)\b/i.test(line)
@@ -122,6 +137,28 @@ export function rowsFromStatementText(text: string): TextStatementResult {
       parse_issues: issues,
     });
   });
+
+  // The statement's own opening and closing balances can prove every direction at once: if the lines add up to the
+  // movement between them (to the paisa), no line can be the wrong way round, even with no running balance per line.
+  const closing = lines.find((l) => /closing balance/i.test(l));
+  const closingMoney = closing?.match(MONEY);
+  if (opening && closingMoney?.length && rows.length && rows.every((r) => r.direction)) {
+    const num = (raw: string | undefined) => {
+      const p = parseMoneyCell(raw);
+      return p.sign === -1 ? -p.value : p.value;
+    };
+    const open = num(opening.match(MONEY)?.slice(-1)[0]);
+    const close = num(closingMoney[closingMoney.length - 1]);
+    const net = rows.reduce((n, r) => n + toPaise(r.amount ?? 0) * (r.direction === "in" ? 1 : -1), 0);
+    if (Math.abs(toPaise(open) + net - toPaise(close)) <= 100) {
+      for (const r of rows) {
+        if (r.parse_confidence >= 0.9) continue;
+        r.parse_confidence = 0.95;
+        r.parse_issues = [...r.parse_issues.filter((m) => !m.startsWith("Direction from the Debit")), "Direction from the Debit or Credit column; the statement adds up to its closing balance"];
+        verified++;
+      }
+    }
+  }
 
   return { rows, verifiedShare: rows.length ? verified / rows.length : 0 };
 }

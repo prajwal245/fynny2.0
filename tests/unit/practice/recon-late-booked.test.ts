@@ -44,3 +44,24 @@ describe("entries booked a few days late", () => {
     expect(two.stats.matched).toBe(0);
   });
 });
+
+describe("account-booked tax payments and uncleared cheques", () => {
+  it("matches a GST challan to an entry booked to Tax Payable three days later", () => {
+    const r = reconcile(
+      [t({ id: "b", side: "bank", direction: "out", amount: 29309.41, txn_date: "2025-08-24", description: "GST CPIN 85139468156956" })],
+      [t({ id: "k", side: "books", direction: "out", amount: 29309.41, txn_date: "2025-08-27", counterparty: "Tax Payable", description: "Tax Payable - GST challan" })],
+    );
+    expect(r.stats.matched).toBe(1);
+  });
+
+  it("calls an uncleared cheque in the books an outstanding cheque, not an amount mismatch", () => {
+    const r = reconcile(
+      [t({ id: "b", side: "bank", direction: "out", amount: 144755.72, txn_date: "2025-08-03", description: "RTGS-SHIVALIK ISPAT PVT LTD-SIP/511" })],
+      [t({ id: "k", side: "books", direction: "out", amount: 90000, txn_date: "2025-08-29", counterparty: "Shivalik Ispat Pvt Ltd", description: "Shivalik Ispat Pvt Ltd - cheque issued, not yet cleared", reference: "CHQ 700123" })],
+    );
+    const e = r.exceptions.find((x) => x.side === "books");
+    expect(e?.reason_code).toBe("no_candidate");
+    expect(e?.detail).toContain("Cheque issued in the books");
+    expect(e?.candidates).toHaveLength(0);
+  });
+});

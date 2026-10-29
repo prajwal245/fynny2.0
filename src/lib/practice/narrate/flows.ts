@@ -45,7 +45,11 @@ const CHARGES = /\b(bank charges?|charges|chrgs?|chgs?|chg|sms (charges?|chg)|se
 const ADVANCE = /\b(advance|adv)\b(?!\s*tax)/i;
 const LOAN = /\b(loan|emi|od a\/?c|cc a\/?c|overdraft|capital|director'?s? (contribution|loan)|drawings?|unsecured)\b/i;
 const TRANSFER = /\b(self|own a\/?c|own account|sweep|fd (booking|closure|maturity)|fixed deposit|inter ?account|contra|transfer to (my|own)|a\/c transfer)\b/i;
-const REFUND = /\b(refund|reversal|reversed|rev\b|chargeback|returned)\b/i;
+const REFUND = /\b(refund|reversal|reversed|rev\b|chargeback|returned|(rtgs|neft|imps|upi|ach|ecs)[\s-]*(return|rtn))\b/i;
+// Interest earned: savings (INT.PD), FD, credit interest, and the interest the department pays on a refund (s.244A).
+const INTEREST = /\b(interest|int\.? ?(pd|paid|cr|credit)|int on)\b/i;
+const INTEREST_ON_REFUND = /interest on (income tax |it |tax )?refund/i;
+const DRAWINGS = /\bdrawings?\b/i;
 
 /** Ledgers a CA parks money in until they know what it is. */
 export const SUSPENSE = /\b(suspense|unidentified|unknown receipts?|unknown party|unreconciled receipts?)\b/i;
@@ -54,6 +58,11 @@ export function misBucket(t: Line): MisBucket {
   const text = `${t.description ?? ""} ${t.counterparty ?? ""}`;
   // Booked to Suspense in the books: cash that is not yet anyone's income.
   if (t.direction === "in" && SUSPENSE.test(text)) return "unidentified";
+  // Interest comes before transfer and loan words: "FD interest" is income and "loan interest" is a cost.
+  if (t.direction === "in" && INTEREST.test(text) && !/\b(loan|emi)\b/i.test(text) && (!REFUND.test(text) || INTEREST_ON_REFUND.test(text))) return "other_income";
+  if (t.direction === "out" && INTEREST.test(text) && !TAX.test(text)) return "expense";
+  // A proprietor's or partner's drawings are capital, never a transfer between the firm's own accounts.
+  if (DRAWINGS.test(text)) return "loan_capital";
   if (t.category === "transfer" || TRANSFER.test(text)) return "transfer";
   if (LOAN.test(text)) return "loan_capital";
   if (t.direction === "in") {

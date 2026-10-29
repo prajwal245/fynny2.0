@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { Card, Drawer, V, formatINR } from "../ui";
 import { tallyConnectors, zohoBooksStatus } from "@/lib/practice/practice.functions";
 import { useV2, monthOf } from "../store";
-import { EXPORT_KINDS, buildTallyExport, buildZohoExport, countFor, detectBooks, similarLines, type BooksSystem, type ExportKind } from "@/lib/practice/zohoExport";
+import { EXPORT_KINDS, buildTallyExport, buildZohoExport, countFor, detectBooks, similarLines, type BooksSystem, type ExportException, type ExportKind } from "@/lib/practice/zohoExport";
 
 function save(filename: string, body: string, type: string) {
   const url = URL.createObjectURL(new Blob(["﻿", body], { type: `${type};charset=utf-8` }));
@@ -133,20 +133,20 @@ export function BooksExportButton({ clientId, allPeriods }: { clientId: string; 
   );
 }
 
-export function BooksExportDrawer({ open, onClose, clientId, allPeriods, initialSystem, similarTo }: { open: boolean; onClose: () => void; clientId: string | null; allPeriods: boolean; initialSystem?: BooksSystem; similarTo?: { amount: number; narration: string } }) {
+export function BooksExportDrawer({ open, onClose, clientId, allPeriods, initialSystem, similarTo, onlyIds, lines }: { open: boolean; onClose: () => void; clientId: string | null; allPeriods: boolean; initialSystem?: BooksSystem; similarTo?: { amount: number; narration: string }; onlyIds?: string[]; lines?: ExportException[] }) {
   const { exceptions, clients, clientName, docs, period } = useV2();
   const month = allPeriods ? null : period;
   const [onlySimilar, setOnlySimilar] = useState(true);
   const everything = useMemo(
     () =>
       exceptions
-        .filter((e) => !month || monthOf(e.date) === month)
+        .filter((e) => onlyIds || !month || monthOf(e.date) === month)
         .map((e) => ({ id: e.id, clientId: e.clientId, date: e.date, amount: e.amount, narration: e.narration, side: e.side, status: e.status })),
-    [exceptions, month],
+    [exceptions, month, onlyIds],
   );
   const mine = clientId ? everything.filter((e) => e.clientId === clientId && e.status === "open") : [];
   const similar = similarTo ? similarLines(mine, similarTo) : null;
-  const list = similar && onlySimilar ? everything.filter((e) => similar.some((x) => x.id === e.id)) : everything;
+  const list = lines ? lines : onlyIds ? everything.filter((e) => onlyIds.includes(e.id)) : similar && onlySimilar ? everything.filter((e) => similar.some((x) => x.id === e.id)) : everything;
   // With no client chosen, offer the ones that have something to export.
   const withWork = clients.filter((c) => countFor(list, c.id, null).all > 0);
   const [picked, setPicked] = useState<string | null>(null);

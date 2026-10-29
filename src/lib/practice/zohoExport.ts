@@ -156,7 +156,7 @@ export type BooksSystem = "zoho" | "tally";
 export function detectBooks(docs: { clientId: string; side?: string; source?: string; kind?: string; name?: string }[], clientId: string): BooksSystem | null {
   const mine = docs.filter((d) => d.clientId === clientId);
   if (mine.some((d) => d.source === "Zoho Books")) return "zoho";
-  if (mine.some((d) => d.side === "books" && (d.kind === "tally_xml" || /\.xml$/i.test(d.name ?? "")))) return "tally";
+  if (mine.some((d) => d.source === "Tally" || (d.side === "books" && (d.kind === "tally_xml" || /\.xml$/i.test(d.name ?? ""))))) return "tally";
   return null;
 }
 
@@ -215,4 +215,21 @@ export function buildTallyExport(
   );
   const body = [`<?xml version="1.0" encoding="UTF-8"?>`, `<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>All Masters</REPORTNAME></REQUESTDESC><REQUESTDATA>`, ...ledgers, ...vouchers, `</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>`].join("\n");
   return { filename: `tally-vouchers_${slug}_${stamp}.xml`, count: lines.length, total: lines.reduce((s, e) => s + Math.abs(e.amount), 0), xml: body };
+}
+
+/**
+ * Lines like `ref`: same direction and the same party, or, with no party, the same expense account
+ * (payments) or the same opening words (receipts). Used by "export this and similar lines".
+ */
+export function similarLines(list: ExportException[], ref: { amount: number; narration: string }): ExportException[] {
+  const out = ref.amount < 0;
+  const party = partyOf(ref.narration).toLowerCase();
+  const head = (s: string) => clean(s).toLowerCase().split(" ").slice(0, 2).join(" ");
+  return list.filter((e) => {
+    if (e.amount < 0 !== out || e.side === "books") return false;
+    // A payment that points at a known account (charges, rent, salary) is grouped by account.
+    if (out && expenseAccount(ref.narration) !== "Other Expenses") return expenseAccount(e.narration) === expenseAccount(ref.narration);
+    if (party) return partyOf(e.narration).toLowerCase() === party;
+    return head(e.narration) === head(ref.narration);
+  });
 }

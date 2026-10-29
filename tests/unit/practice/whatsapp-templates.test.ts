@@ -30,9 +30,9 @@ describe("reading Meta's templates", () => {
   });
 
   it("each stage tries its own template first and falls back to older approved ones", () => {
-    expect(templateCandidates("request", {})).toEqual(["document_request_v2", "document_request", "document_followup_v1", "document_followup_v2", "document_final_v2"]);
-    expect(templateCandidates("followup", {})).toEqual(["document_followup_v1", "document_followup_v2", "document_request_v2", "document_request"]);
-    expect(templateCandidates("final", { final: "my_final" })).toEqual(["my_final", "document_followup_v1", "document_followup_v2", "document_request_v2", "document_request"]);
+    expect(templateCandidates("request", {})).toEqual(["document_request_v2", "document_request", "document_followup_v1", "document_final_v2"]);
+    expect(templateCandidates("followup", {})).toEqual(["document_followup_v1", "document_request_v2", "document_request"]);
+    expect(templateCandidates("final", { final: "my_final" })).toEqual(["my_final", "document_followup_v1", "document_request_v2", "document_request"]);
     // A name set in WHATSAPP_FOLLOWUP_TEMPLATE replaces the defaults.
     expect(templateCandidates("followup", { followup: "my_followup" })).toEqual(["my_followup", "document_request_v2", "document_request"]);
   });
@@ -47,14 +47,14 @@ describe("reading Meta's templates", () => {
     expect(pickTemplate(list, templateCandidates("request", {}), "en")).toEqual({ name: "document_request_v2", layout: "qr_first", language: "en" });
   });
 
-  it("the gentle reminder uses document_followup_v1 first, then v2 if v1 is not approved", () => {
+  it("the gentle reminder uses document_followup_v1 only, and never document_followup_v2", () => {
     const four = [{ type: "BODY", text: "Hello {{1}}, a gentle reminder from {{4}}. For {{2}} we still need {{3}}." }, ...OURS("url_first").slice(1)];
     const both = [t("document_followup_v1", "APPROVED", { components: four }), t("document_followup_v2", "APPROVED", { components: four }), t("document_request_v2", "APPROVED", { components: four })];
     expect(pickTemplate(both, templateCandidates("followup", {}), "en")?.name).toBe("document_followup_v1");
+    // With v1 not approved, v2 is still not used: the reminder falls back to the request template.
     const v1Review = [t("document_followup_v1", "PENDING", { components: four }), ...both.slice(1)];
-    expect(pickTemplate(v1Review, templateCandidates("followup", {}), "en")?.name).toBe("document_followup_v2");
-    const v1Missing = both.slice(1);
-    expect(pickTemplate(v1Missing, templateCandidates("followup", {}), "en")?.name).toBe("document_followup_v2");
+    expect(pickTemplate(v1Review, templateCandidates("followup", {}), "en")?.name).toBe("document_request_v2");
+    for (const stage of ["request", "followup", "final"] as const) expect(templateCandidates(stage, {})).not.toContain("document_followup_v2");
     // The request and the final reminder are untouched: still v2.
     expect(pickTemplate(both, templateCandidates("request", {}), "en")?.name).toBe("document_request_v2");
   });
@@ -67,13 +67,13 @@ describe("reading Meta's templates", () => {
     expect(bodyVariables({ components: [{ type: "BODY" }] })).toBeNull();
     expect(chaseTemplateStatus(t("document_followup_v1", "APPROVED", { components: three }))).toBe("unsupported");
     expect(chaseTemplateStatus(t("document_followup_v1", "APPROVED", { components: four }))).toBe("approved");
-    const list = [t("document_followup_v1", "APPROVED", { components: three }), t("document_followup_v2", "APPROVED", { components: four })];
-    expect(pickTemplate(list, templateCandidates("followup", {}), "en")?.name).toBe("document_followup_v2");
+    const list = [t("document_followup_v1", "APPROVED", { components: three }), t("document_request_v2", "APPROVED", { components: four })];
+    expect(pickTemplate(list, templateCandidates("followup", {}), "en")?.name).toBe("document_request_v2");
   });
 
   it("the final reminder uses the follow-up template when it has none of its own", () => {
-    const list = [t("document_followup_v2", "APPROVED", { components: OURS("url_first") }), t("document_request", "APPROVED")];
-    expect(pickTemplate(list, templateCandidates("final", {}), "en")).toEqual({ name: "document_followup_v2", layout: "url_first", language: "en" });
+    const list = [t("document_followup_v1", "APPROVED", { components: OURS("url_first") }), t("document_request", "APPROVED")];
+    expect(pickTemplate(list, templateCandidates("final", {}), "en")).toEqual({ name: "document_followup_v1", layout: "url_first", language: "en" });
   });
 
   it("never picks a Marketing template, and returns null when nothing is approved", () => {

@@ -32,7 +32,7 @@ const ui = () => render(<WhatsappSetup firmId="f1" webhook="https://x.test/api/p
 
 beforeEach(() => {
   status.mockResolvedValue(ready);
-  templates.mockResolvedValue({ test: false, shared: true, stages: [stage("request", "First request", "document_request_v2", "approved"), stage("followup", "Gentle reminder", "document_followup_v2", "approved"), stage("final", "Final reminder", "document_followup_v2", "missing")] });
+  templates.mockResolvedValue({ test: false, shared: true, stages: [stage("request", "First request", "document_request_v2", "approved"), stage("followup", "Gentle reminder", "document_followup_v1", "approved"), stage("final", "Final reminder", "document_followup_v1", "missing")] });
   check.mockResolvedValue({ ok: false, steps: [{ label: "Number in use", ok: true, detail: "FynHelp's shared number." }, { label: "Final reminder template", ok: false, detail: "Nothing to send." }] });
 });
 afterEach(cleanup);

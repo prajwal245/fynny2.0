@@ -110,3 +110,22 @@ describe("Export for Tally", () => {
     expect(detectBooks([{ clientId: "c2", source: "Zoho Books" }], "c1")).toBeNull();
   });
 });
+
+import { similarLines } from "@/lib/practice/zohoExport";
+
+describe("similar lines", () => {
+  const more: ExportException[] = [
+    ex({ id: "s1", amount: -17.7, narration: "SMS CHGS 01-07-25 TO 30-09-25" }),
+    ex({ id: "s2", amount: -590, narration: "BANK CHARGES GST ON CHG" }),
+    ex({ id: "s3", amount: -45000, narration: "SHOP RENT - GURU NANAK MARKET" }),
+    ex({ id: "s4", amount: 5000, narration: "NEFT CR-KAVERI TEXTILES-INV-2601" }),
+    ex({ id: "s5", amount: 7000, narration: "NEFT CR-KAVERI TEXTILES-INV-2609" }),
+    ex({ id: "s6", amount: 9000, narration: "NEFT CR-MEHTA FOODS-INV-2602" }),
+  ];
+  it("groups bank charges together and keeps rent apart", () => {
+    expect(similarLines(more, { amount: -17.7, narration: "SMS CHGS" }).map((e) => e.id)).toEqual(["s1", "s2"]);
+  });
+  it("groups receipts from the same customer, not every receipt", () => {
+    expect(similarLines(more, { amount: 5000, narration: "NEFT CR-KAVERI TEXTILES-INV-2601" }).map((e) => e.id)).toEqual(["s4", "s5"]);
+  });
+});

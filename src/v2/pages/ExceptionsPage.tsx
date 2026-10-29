@@ -16,8 +16,8 @@ import { AgentStatusBadge } from "../agents";
 import { EXCEPTION_REASONS, Exception, monthOf, useV2 } from "../store";
 import { openExceptions } from "../lib/exceptions";
 import { ZohoPostPanel } from "../components/ZohoPost";
-import { BooksExportButton, BooksExportDrawer, SYSTEM_LABEL } from "../components/BooksExport";
-import { detectBooks } from "@/lib/practice/zohoExport";
+import { BooksExportButton, BooksExportDrawer, BX_STYLES, SYSTEM_LABEL, SystemLogo, useBooksFor } from "../components/BooksExport";
+import type { BooksSystem } from "@/lib/practice/zohoExport";
 
 /**
  * Exception Queue. Cross-client as a page; the client's Exceptions tab when
@@ -38,7 +38,7 @@ export default function ExceptionsPage({
   const [reason, setReason] = useState("all");
   const [openId, setOpenId] = useState<string | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
-  const [exportOpen, setExportOpen] = useState(false);
+  const [exportFor, setExportFor] = useState<BooksSystem | null>(null);
   const [note, setNote] = useState("");
   const [actError, setActError] = useState<string | null>(null);
 
@@ -176,6 +176,7 @@ export default function ExceptionsPage({
 
   return (
     <>
+      <style>{BX_STYLES}</style>
       {!scopedClient && (
         <PageHeader
           title="Exception Queue"
@@ -322,7 +323,7 @@ export default function ExceptionsPage({
                       >
                         {safeMatch(e) && (
                           <button
-                            className="v2-btn v2-btn-quiet"
+                            className="bx-btn bx-sm bx-primary"
                             title="Match with the suggested entry (same amount)"
                             onClick={() => void act(e, "match", [liveCandidates(e)[0].id as string])}
                           >
@@ -330,7 +331,7 @@ export default function ExceptionsPage({
                           </button>
                         )}
                         <button
-                          className="v2-btn v2-btn-quiet"
+                          className="bx-btn bx-sm"
                           onClick={() => openItem(e)}
                         >
                           Decide
@@ -374,15 +375,7 @@ export default function ExceptionsPage({
               )}
             </div>
 
-            {active.status === "open" && active.side !== "books" && (
-              <div style={{ fontSize: 12.5, color: V.muted, lineHeight: 1.6, marginTop: 12 }}>
-                Not in the books yet? Add it in {SYSTEM_LABEL[detectBooks(docs, active.clientId) ?? "zoho"]}, or{" "}
-                <button className="v2-btn v2-btn-ghost" style={{ padding: "2px 8px", fontSize: 12.5 }} onClick={() => setExportOpen(true)}>
-                  export this and similar lines
-                </button>{" "}
-                as a ready-to-import file.
-              </div>
-            )}
+            {active.status === "open" && active.side !== "books" && <ExportHint clientId={active.clientId} onOpen={(sys) => setExportFor(sys)} />}
             {active.status === "open" && <ZohoPostPanel clientId={active.clientId} txnId={active.txnId} side={active.side} open={!!active} />}
 
             <div>
@@ -563,7 +556,28 @@ export default function ExceptionsPage({
           </div>
         )}
       </Drawer>
-      {active && <BooksExportDrawer open={exportOpen} onClose={() => setExportOpen(false)} clientId={active.clientId} allPeriods={scope === "all"} />}
+      {active && <BooksExportDrawer open={exportFor !== null} onClose={() => setExportFor(null)} clientId={active.clientId} allPeriods={scope === "all"} initialSystem={exportFor ?? undefined} similarTo={{ amount: active.amount, narration: active.narration }} />}
     </>
+  );
+}
+
+/** Inside an exception: one button per connected books system, with its logo. */
+function ExportHint({ clientId, onOpen }: { clientId: string; onOpen: (s: BooksSystem) => void }) {
+  const connected = useBooksFor(clientId);
+  const shown: BooksSystem[] = connected.length ? connected : ["zoho", "tally"];
+  if (!connected.ready) return null;
+  return (
+    <div className="bx-hint" role="note">
+      <style>{BX_STYLES}</style>
+      <strong>Not in the books yet?</strong>
+      <p>Add it in {shown.map((s) => SYSTEM_LABEL[s]).join(" or ")}, or download this line and the ones like it as a file ready to import.</p>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        {shown.map((s) => (
+          <button key={s} className="bx-btn bx-primary" onClick={() => onOpen(s)}>
+            <SystemLogo system={s} size={18} />Export this and similar lines to {SYSTEM_LABEL[s]}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }

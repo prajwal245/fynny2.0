@@ -34,3 +34,14 @@ describe("Zoho Books ledger", () => {
     expect(trustedAccountsServer("http://169.254.169.254")).toBeNull();
   });
 });
+
+describe("reading Zoho's account ledger response", () => {
+  it("finds the entries whatever the array is called, so a full ledger is never read as empty", async () => {
+    const { ledgerRows } = await import("@/lib/practice/zoho.server");
+    const row = { transaction_date: "2025-08-01", debit_amount: 5 };
+    expect(ledgerRows({ code: 0, transactions: [row], page_context: {} })).toHaveLength(1);
+    expect(ledgerRows({ code: 0, chartofaccount_transactions: [row] })).toHaveLength(1);
+    expect(ledgerRows({ code: 0, something_else: [row], page_context: { has_more_page: false } })).toHaveLength(1);
+    expect(ledgerRows({ code: 0, message: "success" })).toHaveLength(0);
+  });
+});

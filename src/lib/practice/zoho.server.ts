@@ -442,6 +442,31 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
   return [...d].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/** Months (newest first) in the last three years where this Zoho account has entries. */
+async function monthsWithEntries(db: Db, c: Conn, organizationId: string, accountId: string) {
+  const end = new Date();
+  const start = new Date(Date.UTC(end.getUTCFullYear() - 3, end.getUTCMonth(), 1));
+  const counts = new Map<string, number>();
+  for (let page = 1; page <= 10; page++) {
+    const r = await zohoGet<{ chartofaccount_transactions?: AccountTxn[]; page_context?: { has_more_page?: boolean } }>(db, c, "/chartofaccounts/transactions", {
+      organization_id: organizationId,
+      account_id: accountId,
+      "date.start": start.toISOString().slice(0, 10),
+      "date.end": end.toISOString().slice(0, 10),
+      page: String(page),
+      per_page: "200",
+    });
+    for (const t of r.chartofaccount_transactions ?? []) {
+      const line = ledgerLine(t);
+      if (line) counts.set(line.date.slice(0, 7), (counts.get(line.date.slice(0, 7)) ?? 0) + 1);
+    }
+    if (!r.page_context?.has_more_page) break;
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([month, count]) => ({ month, count, label: new Date(`${month}-01T00:00:00Z`).toLocaleString("en-IN", { month: "short", year: "numeric", timeZone: "UTC" }) }));
+}
+
 export async function sync(db: Db, ctx: FirmContext, linkId: string, month: string) {
   const { data: l } = await db.from("ca_zoho_links").select("*").eq("id", linkId).eq("ca_firm_id", ctx.firmId).maybeSingle();
   if (!l) throw new PracticeError("not_found", "That Zoho link no longer exists.");
@@ -475,7 +500,12 @@ export async function sync(db: Db, ctx: FirmContext, linkId: string, month: stri
 
   if (!lines.length) {
     await touch(`${label}: no entries in Zoho for this account`);
-    return { status: "empty" as const, entries: 0, note: `No entries in ${l.account_name} for ${label}.` };
+    // Say where the entries are, so a wrong month is a one-click fix and a wrong organisation is obvious.
+    const found = await monthsWithEntries(db, c, l.organization_id, l.account_id).catch(() => [] as { month: string; label: string; count: number }[]);
+    const where = found.length
+      ? ` ${l.account_name} in ${l.organization_name} has entries in ${found.slice(0, 4).map((m) => `${m.label} (${m.count})`).join(", ")}. Choose one of those months.`
+      : ` ${l.account_name} in ${l.organization_name} has no entries in the last three years. Check that this is the right Zoho organisation and account.`;
+    return { status: "empty" as const, entries: 0, note: `No entries for ${label}.${where}`, suggestMonth: found[0]?.month ?? null };
   }
 
   const bytes = new TextEncoder().encode(ledgerCsv(lines));

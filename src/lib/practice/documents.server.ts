@@ -557,10 +557,10 @@ export async function processExtraction(
   const parts = [
     `${filename} read: ${inserted} transaction${inserted === 1 ? "" : "s"} extracted`,
   ];
-  const releasedByMemory = remembered.applied.filter((a) => a.released).length;
-  if (releasedByMemory)
+  const prefilledByMemory = remembered.applied.length;
+  if (prefilledByMemory)
     parts.push(
-      `${releasedByMemory} settled from your earlier corrections`,
+      `${prefilledByMemory} pre-filled from your earlier corrections, for you to confirm`,
     );
   if (openReview) parts.push(`${openReview} sent to review`);
   if (outcome.duplicateRows + crossDocDuplicates)

@@ -947,7 +947,8 @@ function explain(
   const sameParty = best.explanation.counterparty_score >= 0.6;
   // A bank charge, interest or tax line is not an "amount mismatch" against an
   // unrelated party's bill: it simply has no entry in the books yet.
-  if (!sameParty && (tag || ratio < 0.5)) {
+  // Another party at a different amount is never a suggestion, however close the date.
+  if (!sameParty && (tag || ratio < 0.5 || !sameAmount)) {
     return {
       ...base,
       // An entry for another party at a very different amount is not a suggestion.

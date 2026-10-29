@@ -9,7 +9,7 @@ FynHelp sends **six** WhatsApp templates. All six must be:
 | # | Template name | Used for | Body variables | Buttons |
 |---|---|---|---|---|
 | 1 | `document_request_v2` | First request to a firm's client (day 0) | 4 | Upload, then 3 quick replies |
-| 2 | `document_followup_v1` (used first), `document_followup_v2` (used if v1 is not approved) | Gentle reminder (day 3) | 4 | Upload, then 3 quick replies |
+| 2 | `document_followup_v1` (v1 only; v2 is not used) | Gentle reminder (day 3) | 4 | Upload, then 3 quick replies |
 | 3 | `document_final_v2` | Final reminder (day 7) | 4 | Upload, then 3 quick replies |
 | 4 | `fh_setup_help` | FynHelp to a firm that has not finished setting up | 3 | Open FynHelp, then 3 quick replies |
 | 5 | `fh_trial_update` | FynHelp to a firm about its trial | 3 | Open FynHelp, then 3 quick replies |

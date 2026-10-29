@@ -331,8 +331,8 @@ export function templateStatus(t: MetaTemplate | undefined): TemplateStatus {
   return "approved";
 }
 
-/** The gentle reminder: v1 first, v2 if v1 is not approved. WHATSAPP_FOLLOWUP_TEMPLATE, when set, is the only name tried first. */
-export const FOLLOWUP_DEFAULTS = ["document_followup_v1", "document_followup_v2"];
+/** The gentle reminder uses document_followup_v1 only (never v2). WHATSAPP_FOLLOWUP_TEMPLATE, when set, replaces it. */
+export const FOLLOWUP_DEFAULTS = ["document_followup_v1"];
 
 /** The names to try for a stage, best first, ending with the older template that is already approved. */
 export function templateCandidates(stage: ChaseStage, env: { request?: string; followup?: string; final?: string }): string[] {

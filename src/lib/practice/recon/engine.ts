@@ -237,14 +237,35 @@ const STOP = new Set([
   "services",
 ]);
 
+interface PreparedName {
+  n: string;
+  tokens: string[];
+  grams: string[];
+}
+const PREPARED = new Map<string, PreparedName>();
+
+/** A name's normal form, tokens and bigrams, computed once per distinct string. */
+function prepared(raw: string): PreparedName {
+  let p = PREPARED.get(raw);
+  if (p) return p;
+  const n = normaliseText(raw);
+  const tokens = n.split(" ").filter((t) => t.length > 1 && !STOP.has(t));
+  p = { n, tokens, grams: bigrams(tokens.join(" ") || n) };
+  if (PREPARED.size > 100_000) PREPARED.clear();
+  PREPARED.set(raw, p);
+  return p;
+}
+
 /** Similarity of two names in [0, 1]: best of token overlap and bigram Dice. */
 export function nameScore(a: string, b: string): number {
-  const na = normaliseText(a);
-  const nb = normaliseText(b);
+  const pa = prepared(a);
+  const pb = prepared(b);
+  const na = pa.n;
+  const nb = pb.n;
   if (!na || !nb) return 0;
   if (na === nb) return 1;
-  const ta = na.split(" ").filter((t) => t.length > 1 && !STOP.has(t));
-  const tb = nb.split(" ").filter((t) => t.length > 1 && !STOP.has(t));
+  const ta = pa.tokens;
+  const tb = pb.tokens;
   let overlap = 0;
   if (ta.length && tb.length) {
     const hits = ta.filter((t) =>
@@ -257,17 +278,18 @@ export function nameScore(a: string, b: string): number {
     ).length;
     overlap = hits / Math.min(ta.length, tb.length);
   }
-  const ga = bigrams(ta.join(" ") || na);
-  const gb = bigrams(tb.join(" ") || nb);
+  const ga = pa.grams;
+  const gb = pb.grams;
   let dice = 0;
   if (ga.length && gb.length) {
-    const pool = [...gb];
+    const pool = new Map<string, number>();
+    for (const g of gb) pool.set(g, (pool.get(g) ?? 0) + 1);
     let inter = 0;
     for (const g of ga) {
-      const i = pool.indexOf(g);
-      if (i !== -1) {
+      const c = pool.get(g);
+      if (c) {
         inter++;
-        pool.splice(i, 1);
+        pool.set(g, c - 1);
       }
     }
     dice = (2 * inter) / (ga.length + gb.length);
@@ -283,10 +305,19 @@ export class AliasBook {
       if (k) this.map.set(k, normaliseText(a.canonical));
     }
   }
+  private memo = new Map<string, string | null>();
   /** Canonical name for a counterparty or narration, if the alias table knows it. */
   resolve(text: string | null | undefined): string | null {
     const n = normaliseText(text);
     if (!n) return null;
+    if (!this.map.size) return null;
+    const hit = this.memo.get(n);
+    if (hit !== undefined) return hit;
+    const found = this.lookup(n);
+    this.memo.set(n, found);
+    return found;
+  }
+  private lookup(n: string): string | null {
     if (this.map.has(n)) return this.map.get(n)!;
     for (const [alias, canonical] of this.map) {
       if (alias.length >= 4 && ` ${n} `.includes(` ${alias} `))
@@ -398,6 +429,38 @@ export function reconcile(
   const bank = [...bankIn].sort(byDateThenId);
   const books = [...booksIn].sort(byDateThenId);
 
+  // Lookups by direction and exact amount, in the sorted order of each side, so a stage never
+  // scans every line to find the few that could possibly pair.
+  const keyOf = (t: ReconTxn) => `${t.direction}|${toPaise(t.amount)}`;
+  const indexBy = (list: ReconTxn[]) => {
+    const m = new Map<string, ReconTxn[]>();
+    for (const t of list) (m.get(keyOf(t)) ?? m.set(keyOf(t), []).get(keyOf(t))!).push(t);
+    return m;
+  };
+  const bankByAmount = indexBy(bank);
+  const booksByAmount = indexBy(books);
+  const orderOf = new Map<string, number>(books.map((b, i) => [b.id, i]));
+  // Books of one direction sorted by amount, for "within tolerance" lookups.
+  const sortedBooks = { in: [] as ReconTxn[], out: [] as ReconTxn[] };
+  for (const b of books) sortedBooks[b.direction].push(b);
+  sortedBooks.in.sort((a, b) => a.amount - b.amount);
+  sortedBooks.out.sort((a, b) => a.amount - b.amount);
+  /** Books of the same direction whose amount is within `tol` of `amount`, in the sorted order of `books`. */
+  const booksNear = (direction: Direction, amount: number, tol: number) => {
+    const arr = sortedBooks[direction];
+    const lo = amount - tol - 0.005;
+    let a = 0;
+    let z = arr.length;
+    while (a < z) {
+      const mid = (a + z) >> 1;
+      if (arr[mid]!.amount < lo) a = mid + 1;
+      else z = mid;
+    }
+    const out: ReconTxn[] = [];
+    for (let i = a; i < arr.length && arr[i]!.amount <= amount + tol + 0.005; i++) out.push(arr[i]!);
+    return out.sort((x, y) => orderOf.get(x.id)! - orderOf.get(y.id)!);
+  };
+
   const usedBank = new Set<string>();
   const usedBook = new Set<string>();
   const matches: MatchDecision[] = [];
@@ -455,10 +518,10 @@ export function reconcile(
     daysBetween(a.txn_date, b.txn_date) <= PAIR_WINDOW;
   for (const t of bank) {
     if (usedBank.has(t.id)) continue;
-    const cands = books.filter((b) => !usedBook.has(b.id) && samePair(t, b));
+    const cands = (booksByAmount.get(keyOf(t)) ?? []).filter((b) => !usedBook.has(b.id) && samePair(t, b));
     if (cands.length !== 1) continue;
     const b = cands[0];
-    if (bank.some((o) => o.id !== t.id && !usedBank.has(o.id) && samePair(o, b))) continue;
+    if ((bankByAmount.get(keyOf(b)) ?? []).some((o) => o.id !== t.id && !usedBank.has(o.id) && samePair(o, b))) continue;
     usedBank.add(t.id);
     usedBook.add(b.id);
     const gap = daysBetween(t.txn_date, b.txn_date);
@@ -490,10 +553,10 @@ export function reconcile(
     lateIdentity(a, b);
   for (const t of bank) {
     if (usedBank.has(t.id)) continue;
-    const cands = books.filter((b) => !usedBook.has(b.id) && latePair(t, b));
+    const cands = (booksByAmount.get(keyOf(t)) ?? []).filter((b) => !usedBook.has(b.id) && latePair(t, b));
     if (cands.length !== 1) continue;
     const b = cands[0]!;
-    if (bank.some((o) => o.id !== t.id && !usedBank.has(o.id) && latePair(o, b))) continue;
+    if ((bankByAmount.get(keyOf(b)) ?? []).some((o) => o.id !== t.id && !usedBank.has(o.id) && latePair(o, b))) continue;
     usedBank.add(t.id);
     usedBook.add(b.id);
     const gap = daysBetween(t.txn_date, b.txn_date);
@@ -515,12 +578,11 @@ export function reconcile(
     explanation: MatchExplanation;
   };
   const pairs: Pair[] = [];
-  const openBooks = books.filter((b) => !usedBook.has(b.id));
   for (const t of bank) {
     if (usedBank.has(t.id)) continue;
     const tol = tolerance(t.amount, cfg);
-    for (const b of openBooks) {
-      if (b.direction !== t.direction) continue;
+    for (const b of booksNear(t.direction, t.amount, tol)) {
+      if (usedBook.has(b.id)) continue;
       if (Math.abs(b.amount - t.amount) > tol) continue;
       if (daysBetween(t.txn_date, b.txn_date) > cfg.dateWindowDays) continue;
       const s = fuzzyScore(t, b, cfg, aliases);
@@ -582,7 +644,7 @@ export function reconcile(
       aliases.resolve(t.counterparty) ?? aliases.resolve(t.description);
     if (canonical) {
       const tol = tolerance(t.amount, cfg);
-      const cands = books.filter(
+      const cands = booksNear(t.direction, t.amount, tol).filter(
         (b) =>
           !usedBook.has(b.id) &&
           b.direction === t.direction &&
@@ -617,7 +679,7 @@ export function reconcile(
     tags[t.id] = rule.tag;
     const window = rule.date_window_days ?? 31;
     const tol = tolerance(t.amount, cfg);
-    const cands = books
+    const cands = booksNear(t.direction, t.amount, tol)
       .filter(
         (b) =>
           !usedBook.has(b.id) &&
@@ -665,16 +727,19 @@ export function reconcile(
   };
   const findSplit = (target: ReconTxn, pool: ReconTxn[]): ReconTxn[] | null => {
     const goal = toPaise(target.amount);
-    const c = pool
-      .filter(
-        (o) =>
-          o.direction === target.direction &&
-          toPaise(o.amount) < goal &&
-          daysBetween(o.txn_date, target.txn_date) <= SPLIT_WINDOW &&
-          partyOk(target, o),
-      )
-      .sort(byDateThenId)
-      .slice(0, 12);
+    // The pool is already in date order, so the first twelve that pass are the twelve earliest.
+    const c: ReconTxn[] = [];
+    for (const o of pool) {
+      if (
+        o.direction === target.direction &&
+        toPaise(o.amount) < goal &&
+        daysBetween(o.txn_date, target.txn_date) <= SPLIT_WINDOW &&
+        partyOk(target, o)
+      ) {
+        c.push(o);
+        if (c.length === 12) break;
+      }
+    }
     const found: ReconTxn[][] = [];
     for (let i = 0; i < c.length; i++)
       for (let j = i + 1; j < c.length; j++) {
@@ -790,6 +855,21 @@ export function reconcile(
 const fmt = formatRupees;
 
 /** Works out why a transaction could not be matched and who the nearest candidates were. */
+const DAY_AMOUNT = new WeakMap<ReconTxn[], Map<string, ReconTxn[]>>();
+/** Lines on one side with the same direction, amount and date as `t`, in list order (built once per list). */
+function sameDayAmount(list: ReconTxn[], t: ReconTxn): ReconTxn[] {
+  let m = DAY_AMOUNT.get(list);
+  if (!m) {
+    m = new Map();
+    for (const o of list) {
+      const k = `${o.direction}|${toPaise(o.amount)}|${o.txn_date}`;
+      (m.get(k) ?? m.set(k, []).get(k)!).push(o);
+    }
+    DAY_AMOUNT.set(list, m);
+  }
+  return m.get(`${t.direction}|${toPaise(t.amount)}|${t.txn_date}`) ?? [];
+}
+
 function explain(
   t: ReconTxn,
   sameSide: ReconTxn[],
@@ -800,7 +880,7 @@ function explain(
   ambiguous: boolean,
 ): ExceptionDecision {
   const tol = tolerance(t.amount, cfg);
-  const dup = sameSide.find(
+  const dup = sameDayAmount(sameSide, t).find(
     (o) =>
       o.id !== t.id &&
       o.direction === t.direction &&

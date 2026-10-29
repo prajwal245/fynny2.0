@@ -267,6 +267,7 @@ export function ZohoBooksSection({ index = 0 }: { index?: number }) {
     setDone((d) => ({ ...d, [l.id]: "" }));
     try {
       const r = await zohoBooksSync({ data: { linkId: l.id, month: months[l.id] ?? fallbackMonth } });
+      if (r.status === "empty" && r.suggestMonth) setMonths((m) => ({ ...m, [l.id]: r.suggestMonth as string }));
       setDone((d) => ({ ...d, [l.id]: r.status === "synced" ? `Pulled ${r.entries} entries. Extract is reading them now.` : r.note }));
       await load();
     } catch (e) {

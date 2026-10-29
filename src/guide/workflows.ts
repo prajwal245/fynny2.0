@@ -290,6 +290,58 @@ export const WORKFLOWS: Workflow[] = [
     },
   },
   {
+    id: "zoho-export",
+    title: "Export for Zoho Books",
+    category: "erp",
+    summary:
+      "Turn the lines the books are missing into CSVs a CA imports into Zoho Books by hand. FynHelp never writes to Zoho for this, so it carries no risk and needs no connection.",
+    pipeline: ["Open bank-side exceptions", "Pick client and period", "Download CSV", "Import in Zoho, re-run Recon"],
+    logic: "Human-in-the-loop",
+    confidence: "Nothing is sent anywhere: a person imports the file and checks every guess",
+    timing: "Instant; built in the browser",
+    keywords: ["zoho", "export", "csv", "import", "expenses", "payments received", "bank statement", "missing entries", "books"],
+    inputs: [{ label: "Data", detail: "Open exceptions on the bank side for one client, for the month in the top bar or all periods" }],
+    rules: [
+      "Where: Exception Queue, pick one client, then Export for Zoho. It also appears on the client's Exceptions tab.",
+      "Missing expenses: money-out lines, with an expense account guessed from the narration (bank charges, rent, salaries, utilities, travel, tax, else Other Expenses).",
+      "Missing receipts: money-in lines, with the customer and invoice number read from the narration and the UTR as reference.",
+      "Bank lines: every open line in Zoho's bank-statement layout (Withdrawals and Deposits columns) to categorise inside Zoho.",
+      "Dates are dd/MM/yyyy and amounts are plain numbers. Paid Through and Deposit To stay blank: pick your bank account while importing.",
+      "A narration that starts with = + @ is quoted so a spreadsheet never runs it as a formula.",
+    ],
+    exceptions: [
+      { trigger: "No open bank-side lines for the client and period", outcome: "The button is disabled and each file shows 0 lines" },
+      { trigger: "The narration names no clear party or invoice", outcome: "That cell is left blank for the CA to fill in Zoho" },
+    ],
+    nodes: [
+      { id: "e", label: "Open exceptions", kind: "source", x: 20, y: 120, note: "Bank-side lines still not in the books, for one client." },
+      { id: "r", label: "Shape for Zoho", kind: "rule", x: 240, y: 120, note: "Zoho's column names, dd/MM/yyyy dates, unsigned amounts, formula-safe cells." },
+      { id: "d", label: "Download CSV", kind: "output", x: 470, y: 120, note: "Three files: expenses, receipts, bank lines." },
+      { id: "z", label: "CA imports in Zoho", kind: "human", x: 700, y: 120, note: "The CA maps columns, confirms accounts and imports. FynHelp has no write access." },
+      { id: "rr", label: "Re-run Recon", kind: "rule", x: 910, y: 120, note: "Once the entries are in the books, the lines match." },
+    ],
+    edges: [
+      { from: "e", to: "r" },
+      { from: "r", to: "d" },
+      { from: "d", to: "z" },
+      { from: "z", to: "rr", label: "after import" },
+    ],
+    before: {
+      columns: ["Open bank line", "Amount"],
+      rows: [
+        ["BANK CHARGES GST ON CHG", "−₹590.00"],
+        ["UPI/CR/4455667788/Sundar Auto/INV-2603", "₹12,500.00"],
+      ],
+    },
+    after: {
+      columns: ["Zoho file", "Row"],
+      rows: [
+        ["Expenses", "05/09/2026 · Bank Fees and Charges · 590.00"],
+        ["Payments received", "08/09/2026 · Sundar Auto · 12500.00 · INV-2603"],
+      ],
+    },
+  },
+  {
     id: "gst",
     title: "GST registers: sales, purchase and GSTR-2B",
     category: "tax",

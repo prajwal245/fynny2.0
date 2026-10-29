@@ -54,3 +54,14 @@ Write (only when a partner clicks "Allow approved entries"): `ZohoBooks.expenses
 4. Click Undo; confirm the expense is gone in Zoho.
 5. Click approve twice quickly; confirm only one expense exists.
 6. Post a receipt whose narration names one open invoice; confirm the payment is applied to it, then undo.
+
+## Export for Zoho (no connection needed)
+
+For a client whose books are in Zoho Books, FynHelp can write CSVs of what the books are missing, so a CA imports them by hand. FynHelp never writes to Zoho for this.
+
+1. Exception Queue → pick one client → **Export for Zoho** (also on the client's Exceptions tab). It follows the month in the top bar or "All periods".
+2. Download **Missing expenses**, **Missing receipts** or **Bank lines to categorise**.
+3. In Zoho Books import the file (the path is shown under each file), map the columns, set Paid Through / Deposit To to the bank account, and check the account, customer and invoice guesses.
+4. Run Recon again; the lines now match.
+
+If a Zoho pull finds nothing, the message names the organisation and account and lists the months that do have entries.

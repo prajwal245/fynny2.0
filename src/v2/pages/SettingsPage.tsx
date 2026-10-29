@@ -27,6 +27,7 @@ import { WhatsappSetup } from "../components/WhatsappSetup";
 import { parseMobile } from "@/lib/practice/mobile";
 import { TallyConnector } from "../components/TallyConnector";
 import { GmailIcon, TallyIcon, WhatsAppIcon } from "../components/BrandIcons";
+import { AccountSettings } from "../components/AccountSettings";
 import { ZohoBooksSection } from "../components/ZohoBooks";
 import { INTEGRATION_STYLES, IntegrationCard } from "../components/IntegrationCard";
 import { CONTROLS_STYLES, Checkbox, Disclosure, Field, SettingRow } from "../components/Controls";
@@ -37,9 +38,9 @@ import { UploadCloud } from "lucide-react";
 type Team = Awaited<ReturnType<typeof listPracticeTeam>>;
 type Integrations = Awaited<ReturnType<typeof getPracticeIntegrations>>;
 
-const TABS = ["general", "billing", "integrations", "team", "automations"] as const;
+const TABS = ["general", "billing", "integrations", "team", "automations", "account"] as const;
 type Tab = (typeof TABS)[number];
-const TAB_LABEL: Record<Tab, string> = { general: "General", billing: "Billing", integrations: "Integrations", team: "Team", automations: "Automations" };
+const TAB_LABEL: Record<Tab, string> = { general: "General", billing: "Billing", integrations: "Integrations", team: "Team", automations: "Automations", account: "Account" };
 
 /** Which tab to open: the address (?tab=), a link to #billing, or coming back from Google. */
 function firstTab(): Tab {
@@ -109,7 +110,6 @@ export default function SettingsPage() {
     role: "junior" as Team["roles"][number],
   });
   const [tallyOnline, setTallyOnline] = useState(false);
-  const [profileName, setProfileName] = useState(session?.name ?? "");
   const [busy, setBusy] = useState<string | null>(null);
   const [gmailResult, setGmailResult] = useState<string | null>(null);
   // Back from Google: check the inbox straight away and show the health check.
@@ -146,9 +146,6 @@ export default function SettingsPage() {
         whatsappOk: Boolean(firm.whatsappOk),
       });
   }, [firm]);
-  useEffect(() => {
-    setProfileName(session?.name ?? "");
-  }, [session]);
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -235,7 +232,8 @@ export default function SettingsPage() {
   if (!partnerView)
     return (
       <>
-        <PageHeader title="Settings" subtitle="Firm details, team, integrations and automations." />
+        <PageHeader title="Settings" subtitle="Your account. Firm settings are for partners." />
+        <AccountSettings />
         <EmptyState
           icon={<Lock size={22} />}
           title="Settings are for partners"
@@ -344,37 +342,10 @@ export default function SettingsPage() {
             </div>
           </Section>
 
-          <Section title="Your profile">
-            <div
-              style={{
-                display: "grid",
-                gap: 16,
-                gridTemplateColumns: "repeat(auto-fit,minmax(min(220px, 100%), 1fr))",
-              }}
-            >
-              <Field label="Name" htmlFor="settings-name">
-                <input id="settings-name" className="v2-input" value={profileName} onChange={(e) => setProfileName(e.target.value)} />
-              </Field>
-              <Field label="Email" htmlFor="settings-email" hint="This is how you sign in.">
-                <input id="settings-email" className="v2-input" value={session?.email ?? ""} disabled />
-              </Field>
-            </div>
-            <div style={{ marginTop: 16 }}>
-              <StatefulButton
-                label="Save profile"
-                disabled={!profileName.trim()}
-                onAction={async () => {
-                  const { error } = await supabase.auth.updateUser({ data: { full_name: profileName.trim() } });
-                  if (error) {
-                    toast.error(errMsg(error));
-                    throw error;
-                  }
-                }}
-              />
-            </div>
-          </Section>
         </>
       )}
+
+      {tab === "account" && <AccountSettings />}
 
       {tab === "billing" && (
         <>

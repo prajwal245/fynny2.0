@@ -26,6 +26,8 @@ FynHelp never edits or deletes anything it did not create. Every entry it create
 | `ZOHO_REDIRECT_URI` | optional, default the URL above |
 | `ZOHO_POSTING_FIRMS` | **Opt-in per firm.** Leave unset and nobody sees the approved-entries option. List firm ids (comma separated) to let in a pilot firm. Only `*` means every firm. Remove an id to switch that firm off at once. |
 
+Paste each value without a trailing line break, space or quotes. FynHelp cleans them on read, but a stray line break in `ZOHO_CLIENT_ID` once sent partners to Zoho's "Invalid Client: Client ID passed does not exist" page (the sign-in address ended in `%0A`). Admin, System Health, "Zoho Books sign-in" tells you when a stored value needed cleaning or looks wrong.
+
 ## 3. Database (Supabase SQL editor)
 
 Run `supabase/migrations/20261103090000_zoho_posting.sql` once. It only adds columns and one table, and everything defaults to off.

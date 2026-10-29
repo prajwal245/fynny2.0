@@ -8,6 +8,7 @@
  * and then only for an entry a partner has previewed and approved. See docs/ZOHO_SETUP.md.
  */
 import { PracticeError } from "./core";
+import { clientIdLooksValid, cleanEnv } from "./zohoConfig";
 import type { Db, FirmContext } from "./db.server";
 import { BUCKET, processExtraction, registerDocument } from "./documents.server";
 import {
@@ -32,6 +33,8 @@ const WRITE_SCOPES = ["ZohoBooks.expenses.CREATE", "ZohoBooks.expenses.DELETE", 
 export const ZOHO_SCOPES = READ_SCOPES.join(",");
 export const ZOHO_WRITE_SCOPES = [...READ_SCOPES, ...WRITE_SCOPES].join(",");
 
+const zenv = (name: string) => cleanEnv(process.env[name]);
+
 /** Opt-in per firm: only firms listed in ZOHO_POSTING_FIRMS (or "*") may even see the option. Unset means nobody. */
 export const postingAvailable = (firmId: string) => postingAllowedFor(process.env["ZOHO_POSTING_FIRMS"], firmId);
 export const ZOHO_CALLBACK_PATH = "/api/integrations/zoho/callback";
@@ -41,19 +44,26 @@ const ACCOUNTS_RE = /^https:\/\/accounts\.zoho\.(com|in|eu|com\.au|jp|ca|com\.cn
 const API_RE = /^https:\/\/(www\.)?zohoapis\.(com|in|eu|com\.au|jp|ca|com\.cn|sa|uk)$/;
 
 export function zohoConfigured(): boolean {
-  return !!process.env["ZOHO_CLIENT_ID"] && !!process.env["ZOHO_CLIENT_SECRET"] && !!process.env["GMAIL_ENCRYPTION_KEY"];
+  return !!zenv("ZOHO_CLIENT_ID") && !!zenv("ZOHO_CLIENT_SECRET") && !!process.env["GMAIL_ENCRYPTION_KEY"];
+}
+
+/** A reason not to send a partner to Zoho at all: with a client id of the wrong shape, Zoho would only show its own error page. */
+export function connectProblem(): string | null {
+  if (clientIdLooksValid(zenv("ZOHO_CLIENT_ID"))) return null;
+  console.error("[zoho] ZOHO_CLIENT_ID does not look like a Zoho client id; sign-in is blocked until it is fixed");
+  return "Zoho Books sign-in is not set up correctly on our side yet. Please tell support@fynhelp.com, and use an uploaded Tally or Zoho export meanwhile.";
 }
 
 function creds() {
-  const clientId = process.env["ZOHO_CLIENT_ID"] ?? "";
-  const clientSecret = process.env["ZOHO_CLIENT_SECRET"] ?? "";
+  const clientId = zenv("ZOHO_CLIENT_ID");
+  const clientSecret = zenv("ZOHO_CLIENT_SECRET");
   if (!clientId || !clientSecret) throw new PracticeError("not_configured", "Zoho Books isn't switched on for FynHelp yet.");
   return { clientId, clientSecret };
 }
 
 /** Where people sign in to Zoho first. Indian accounts by default; Zoho sends other regions back with their own server. */
-export const defaultAccountsServer = () => process.env["ZOHO_ACCOUNTS_URL"] ?? "https://accounts.zoho.in";
-export const redirectUri = () => process.env["ZOHO_REDIRECT_URI"] ?? `https://www.fynhelp.com${ZOHO_CALLBACK_PATH}`;
+export const defaultAccountsServer = () => (zenv("ZOHO_ACCOUNTS_URL") || "https://accounts.zoho.in").replace(/\/+$/, "");
+export const redirectUri = () => zenv("ZOHO_REDIRECT_URI") || `https://www.fynhelp.com${ZOHO_CALLBACK_PATH}`;
 
 /** Only Zoho's own servers (or the configured test server) ever receive the client secret or tokens. */
 export function trustedAccountsServer(url: string | null | undefined): string | null {
@@ -62,7 +72,7 @@ export function trustedAccountsServer(url: string | null | undefined): string | 
 }
 function trustedApiDomain(url: string | null | undefined): string | null {
   const u = (url ?? "").replace(/\/+$/, "");
-  return API_RE.test(u) || (!!process.env["ZOHO_API_DOMAIN"] && u === process.env["ZOHO_API_DOMAIN"]) ? u : null;
+  return API_RE.test(u) || (!!zenv("ZOHO_API_DOMAIN") && u === zenv("ZOHO_API_DOMAIN").replace(/\/+$/, "")) ? u : null;
 }
 
 /* ── signed state: binds the Zoho consent to this firm, user and browser ── */

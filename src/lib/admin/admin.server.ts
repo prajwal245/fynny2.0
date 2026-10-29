@@ -4,6 +4,7 @@
  * already checked; changes write an audit row.
  */
 import { PracticeError } from "../practice/core";
+import { zohoConfigProblems } from "../practice/zohoConfig";
 import { PLANS, planAmountPaise, type Cycle, type PlanKey } from "../practice/billing/plans";
 import { audit, type AdminCtx } from "./security.server";
 import { ASSIGNABLE_ROLES, can, SUPPORT_REFUND_LIMIT, type AdminRole } from "./rbac";
@@ -570,6 +571,12 @@ export async function systemHealth(ctx: AdminCtx) {
     config("razorpay_webhook", "Razorpay webhook", has("RAZORPAY_WEBHOOK_SECRET"), "Signing secret set", "RAZORPAY_WEBHOOK_SECRET is not set; payments will not update plans"),
     config("email", "Outgoing email", has("RESEND_API_KEY"), "Resend key set", "RESEND_API_KEY is not set; reminders and chasers will not send"),
     config("gmail", "Gmail intake", has("GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_ENCRYPTION_KEY"), "Google sign-in and encryption key set", "Gmail settings are incomplete; firms cannot connect Gmail", true),
+    (() => {
+      const problems = zohoConfigProblems(process.env);
+      // Not set at all is a choice (Zoho Books stays off); a wrong value is a fault firms will hit.
+      const unset = !process.env["ZOHO_CLIENT_ID"] && !process.env["ZOHO_CLIENT_SECRET"];
+      return config("zoho", "Zoho Books sign-in", problems.length === 0, "Client id and secret set and clean", unset ? "Zoho Books is not set up (ZOHO_CLIENT_ID and ZOHO_CLIENT_SECRET)" : problems.join(". "), true);
+    })(),
     config("ocr", "Scanned document reading", has("OCR_SPACE_API_KEY"), "OCR key set", "OCR_SPACE_API_KEY is not set; scans and photos cannot be read", true),
     config("cron", "Scheduled jobs", has("CRON_SECRET") || has("CA_CRON_SECRET"), "Cron secret set", "No cron secret; scheduled chasers and reminders will not run", true),
   );

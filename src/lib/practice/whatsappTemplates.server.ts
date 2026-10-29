@@ -8,8 +8,8 @@ import {
   buttonLayoutOf,
   pickTemplate,
   stageForStep,
+  chaseTemplateStatus,
   templateCandidates,
-  templateStatus,
   type ButtonLayout,
   type ChaseStage,
   type MetaTemplate,
@@ -117,7 +117,7 @@ export async function stagesView(sender: Pick<Sender, "wabaId" | "token"> | null
     }
     const wanted = templateCandidates(stage, templateEnv())[0];
     const wantedT = list.find((t) => t.name === wanted && (t.language === language() || t.language.startsWith(language())));
-    const st = templateStatus(wantedT);
+    const st = chaseTemplateStatus(wantedT);
     const picked = pickTemplate(list, templateCandidates(stage, templateEnv()), language());
     const usingWanted = picked?.name === wanted;
     const note =
@@ -132,7 +132,7 @@ export async function stagesView(sender: Pick<Sender, "wabaId" | "token"> | null
             : st === "marketing"
               ? `Meta classed "${wanted}" as Marketing, which costs far more per message. Reword it plainly and resubmit as Utility.${picked ? ` "${picked.name}" is used meanwhile.` : ""}`
               : st === "unsupported"
-                ? `"${wanted}" has buttons FynHelp cannot fill in. It needs one Upload documents link and three quick replies.`
+                ? `"${wanted}" has a layout FynHelp cannot fill in. It needs four variables, one Upload documents link and three quick replies.`
                 : st === "paused"
                   ? `Meta has paused "${wanted}" because of low quality. ${picked ? `"${picked.name}" is used meanwhile.` : ""}`
                   : `"${wanted}" does not exist in WhatsApp Manager yet.${picked ? ` "${picked.name}" is used meanwhile.` : ""}`;

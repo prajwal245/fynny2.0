@@ -242,7 +242,7 @@ describe("sending the chase", () => {
   });
 
   describe("with the template list from Meta", () => {
-    const body = { type: "BODY", text: "Hello {{1}}" };
+    const body = { type: "BODY", text: "Hello {{1}}, this is {{4}}. For {{2}} we need {{3}}." };
     const meta = (data: unknown[]) => {
       process.env["WHATSAPP_WABA_ID"] = "2457752908089073";
       vi.stubGlobal("fetch", async (u: string, init?: { body?: string }) => {

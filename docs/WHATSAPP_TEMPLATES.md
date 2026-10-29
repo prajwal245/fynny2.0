@@ -25,7 +25,7 @@ A chase has three stages, so there are **three templates**. They have the same f
 | Stage | When | Template name | Env variable |
 |---|---|---|---|
 | Request | reminder 1 (day 0) | `document_request_v2` | `WHATSAPP_CHASE_TEMPLATE` |
-| Gentle follow-up | reminder 2 (day 3) | `document_followup_v2` | `WHATSAPP_FOLLOWUP_TEMPLATE` |
+| Gentle follow-up | reminder 2 (day 3) | `document_followup_v1` first, then `document_followup_v2` | `WHATSAPP_FOLLOWUP_TEMPLATE` |
 | Final reminder | reminder 3 (day 7), then the partner is told on day 10 | `document_final_v2` | `WHATSAPP_FINAL_TEMPLATE` |
 
 If a stage has no template of its own, it uses the one before it, so you can start with the first and add the others later. The existing approved `document_request` keeps working until you switch.
@@ -68,7 +68,7 @@ FynHelp reads your templates from Meta (every few minutes) and, for each reminde
 | Reminder | Tries, in order |
 |---|---|
 | 1 | `document_request_v2`, then `document_request` |
-| 2 | `document_followup_v2`, then the reminder 1 list |
+| 2 | `document_followup_v1`, `document_followup_v2`, then the reminder 1 list |
 | 3 | `document_final_v2`, then the reminder 2 list |
 
 So while a new template is **in review** the older approved one keeps sending, and the moment Meta approves the new one it takes over, with the button order read from the template itself. Nothing to flip. **This needs `WHATSAPP_WABA_ID`** (your WhatsApp Business Account ID, in Vercel) so FynHelp can read the list. Settings → WhatsApp → **Your reminder messages** shows each stage, its status and what it will send, plus a preview of what the client sees.
@@ -80,7 +80,7 @@ Without `WHATSAPP_WABA_ID` it falls back to the settings below.
 | Variable | Value |
 |---|---|
 | `WHATSAPP_CHASE_TEMPLATE` | `document_request_v2` |
-| `WHATSAPP_FOLLOWUP_TEMPLATE` | `document_followup_v2` (optional) |
+| `WHATSAPP_FOLLOWUP_TEMPLATE` | optional; when set it replaces the default `document_followup_v1`, then `_v2` order |
 | `WHATSAPP_FINAL_TEMPLATE` | `document_final_v2` (optional) |
 | `WHATSAPP_CHASE_BUTTONS` | `url_first` if the Upload button is listed first in WhatsApp Manager, `qr_first` if the three quick replies come first. (`on` = `url_first`.) |
 | `PUBLIC_APP_URL` | `https://fynhelp.com` (the address in the upload link) |

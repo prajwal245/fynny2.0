@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanMetaId, buttonLayoutOf, pickTemplate, templateCandidates, templateStatus, type MetaTemplate } from "@/lib/practice/whatsappFlow";
+import { cleanMetaId, bodyVariables, buttonLayoutOf, chaseTemplateStatus, pickTemplate, templateCandidates, templateStatus, type MetaTemplate } from "@/lib/practice/whatsappFlow";
 
 const OURS = (order: "url_first" | "qr_first") => {
   const url = { type: "URL", text: "Upload documents", url: "https://fynhelp.com/u/{{1}}" };
@@ -30,9 +30,11 @@ describe("reading Meta's templates", () => {
   });
 
   it("each stage tries its own template first and falls back to older approved ones", () => {
-    expect(templateCandidates("request", {})).toEqual(["document_request_v2", "document_request", "document_followup_v2", "document_final_v2"]);
-    expect(templateCandidates("followup", {})).toEqual(["document_followup_v2", "document_request_v2", "document_request"]);
-    expect(templateCandidates("final", { final: "my_final" })).toEqual(["my_final", "document_followup_v2", "document_request_v2", "document_request"]);
+    expect(templateCandidates("request", {})).toEqual(["document_request_v2", "document_request", "document_followup_v1", "document_followup_v2", "document_final_v2"]);
+    expect(templateCandidates("followup", {})).toEqual(["document_followup_v1", "document_followup_v2", "document_request_v2", "document_request"]);
+    expect(templateCandidates("final", { final: "my_final" })).toEqual(["my_final", "document_followup_v1", "document_followup_v2", "document_request_v2", "document_request"]);
+    // A name set in WHATSAPP_FOLLOWUP_TEMPLATE replaces the defaults.
+    expect(templateCandidates("followup", { followup: "my_followup" })).toEqual(["my_followup", "document_request_v2", "document_request"]);
   });
 
   it("while the new template is in review, the old approved one keeps working", () => {
@@ -43,6 +45,30 @@ describe("reading Meta's templates", () => {
   it("once approved, the new template is used with the button order it was created in", () => {
     const list = [t("document_request_v2", "APPROVED", { components: OURS("qr_first") }), t("document_request", "APPROVED")];
     expect(pickTemplate(list, templateCandidates("request", {}), "en")).toEqual({ name: "document_request_v2", layout: "qr_first", language: "en" });
+  });
+
+  it("the gentle reminder uses document_followup_v1 first, then v2 if v1 is not approved", () => {
+    const four = [{ type: "BODY", text: "Hello {{1}}, a gentle reminder from {{4}}. For {{2}} we still need {{3}}." }, ...OURS("url_first").slice(1)];
+    const both = [t("document_followup_v1", "APPROVED", { components: four }), t("document_followup_v2", "APPROVED", { components: four }), t("document_request_v2", "APPROVED", { components: four })];
+    expect(pickTemplate(both, templateCandidates("followup", {}), "en")?.name).toBe("document_followup_v1");
+    const v1Review = [t("document_followup_v1", "PENDING", { components: four }), ...both.slice(1)];
+    expect(pickTemplate(v1Review, templateCandidates("followup", {}), "en")?.name).toBe("document_followup_v2");
+    const v1Missing = both.slice(1);
+    expect(pickTemplate(v1Missing, templateCandidates("followup", {}), "en")?.name).toBe("document_followup_v2");
+    // The request and the final reminder are untouched: still v2.
+    expect(pickTemplate(both, templateCandidates("request", {}), "en")?.name).toBe("document_request_v2");
+  });
+
+  it("skips a chase template whose body takes a different number of variables than the four we fill in", () => {
+    const three = [{ type: "BODY", text: "Hello {{1}}, reminder for {{2}}: {{3}}." }, ...OURS("url_first").slice(1)];
+    const four = [{ type: "BODY", text: "Hello {{1}}, {{4}} needs {{3}} for {{2}}." }, ...OURS("url_first").slice(1)];
+    expect(bodyVariables({ components: three })).toBe(3);
+    expect(bodyVariables({ components: four })).toBe(4);
+    expect(bodyVariables({ components: [{ type: "BODY" }] })).toBeNull();
+    expect(chaseTemplateStatus(t("document_followup_v1", "APPROVED", { components: three }))).toBe("unsupported");
+    expect(chaseTemplateStatus(t("document_followup_v1", "APPROVED", { components: four }))).toBe("approved");
+    const list = [t("document_followup_v1", "APPROVED", { components: three }), t("document_followup_v2", "APPROVED", { components: four })];
+    expect(pickTemplate(list, templateCandidates("followup", {}), "en")?.name).toBe("document_followup_v2");
   });
 
   it("the final reminder uses the follow-up template when it has none of its own", () => {
@@ -105,7 +131,7 @@ describe("choosing the template for a reminder", () => {
 
   it("the Settings panel explains each stage in one sentence", async () => {
     const m = await import("@/lib/practice/whatsappTemplates.server");
-    metaList = [t("document_request_v2", "APPROVED", { components: OURS("url_first") }), t("document_followup_v2", "PENDING"), t("document_request", "APPROVED")];
+    metaList = [t("document_request_v2", "APPROVED", { components: OURS("url_first") }), t("document_followup_v1", "PENDING"), t("document_request", "APPROVED")];
     const v = await m.stagesView(sender);
     expect(v.map((s) => [s.stage, s.status, s.using])).toEqual([
       ["request", "approved", "document_request_v2"],
@@ -146,7 +172,7 @@ describe("the connection check", () => {
   it("is red only for a stage that has nothing to send, and plain about the rest", async () => {
     const m = await import("@/lib/practice/whatsappTemplates.server");
     // What the customer saw: request still in review, follow-up approved, final not created.
-    metaList = [t("document_request_v2", "PENDING", { components: OURS("url_first") }), t("document_followup_v2", "APPROVED", { components: OURS("url_first") })];
+    metaList = [t("document_request_v2", "PENDING", { components: OURS("url_first") }), t("document_followup_v1", "APPROVED", { components: OURS("url_first") })];
     const lines = (await m.stagesView(sender)).map((s) => ({ stage: s.stage, ...m.stageHealth(s) }));
     // The first request borrows the approved follow-up while its own is in review: not a failure.
     expect(lines[0]).toMatchObject({ stage: "request", ok: null });
@@ -154,7 +180,7 @@ describe("the connection check", () => {
     // The follow-up is ready, and the final reminder borrows it: not a failure.
     expect(lines[1]).toMatchObject({ stage: "followup", ok: true });
     expect(lines[2]).toMatchObject({ stage: "final", ok: null });
-    expect(lines[2].detail).toContain("document_followup_v2");
+    expect(lines[2].detail).toContain("document_followup_v1");
     // With the older template approved, reminder 1 is also fine while the new one is in review.
     metaList.push(t("document_request", "APPROVED"));
     m.forgetTemplates();

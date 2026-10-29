@@ -300,7 +300,7 @@ export interface MetaTemplate {
   status: string;
   language: string;
   category?: string;
-  components?: { type: string; buttons?: { type: string; url?: string; text?: string }[] }[];
+  components?: { type: string; text?: string; buttons?: { type: string; url?: string; text?: string }[] }[];
 }
 
 /** "none": no buttons. A layout: exactly our four buttons. "other": buttons we cannot fill in. */
@@ -331,23 +331,44 @@ export function templateStatus(t: MetaTemplate | undefined): TemplateStatus {
   return "approved";
 }
 
+/** The gentle reminder: v1 first, v2 if v1 is not approved. WHATSAPP_FOLLOWUP_TEMPLATE, when set, is the only name tried first. */
+export const FOLLOWUP_DEFAULTS = ["document_followup_v1", "document_followup_v2"];
+
 /** The names to try for a stage, best first, ending with the older template that is already approved. */
 export function templateCandidates(stage: ChaseStage, env: { request?: string; followup?: string; final?: string }): string[] {
   const legacy = "document_request";
+  const followup = env.followup ? [env.followup] : FOLLOWUP_DEFAULTS;
   const list =
     stage === "request"
-      ? [env.request ?? "document_request_v2", legacy, env.followup ?? "document_followup_v2", env.final ?? "document_final_v2"]
+      ? [env.request ?? "document_request_v2", legacy, ...followup, env.final ?? "document_final_v2"]
       : stage === "followup"
-        ? [env.followup ?? "document_followup_v2", env.request ?? "document_request_v2", legacy]
-        : [env.final ?? "document_final_v2", env.followup ?? "document_followup_v2", env.request ?? "document_request_v2", legacy];
+        ? [...followup, env.request ?? "document_request_v2", legacy]
+        : [env.final ?? "document_final_v2", ...followup, env.request ?? "document_request_v2", legacy];
   return [...new Set(list)];
+}
+
+/** The chase templates take four body variables ({{1}} to {{4}}); a template with another count would be rejected by Meta at send time. */
+export function bodyVariables(t: Pick<MetaTemplate, "components">): number | null {
+  const body = (t.components ?? []).find((c) => c.type === "BODY");
+  if (typeof body?.text !== "string") return null;
+  return new Set(body.text.match(/\{\{\s*\d+\s*\}\}/g) ?? []).size;
+}
+
+/** templateStatus, plus the check that a chase template really takes the four variables we fill in. */
+export function chaseTemplateStatus(t: MetaTemplate | undefined): TemplateStatus {
+  const s = templateStatus(t);
+  if (s === "approved" && t) {
+    const n = bodyVariables(t);
+    if (n !== null && n !== 4) return "unsupported";
+  }
+  return s;
 }
 
 /** The first usable candidate, with the button layout to send it with. Null when none is approved. */
 export function pickTemplate(templates: MetaTemplate[], candidates: string[], language: string): { name: string; layout: ButtonLayout | null; /** The language code Meta approved it in, which is the one a send must use ("en" and "en_US" are different to Meta). */ language: string } | null {
   for (const name of candidates) {
     const t = templates.find((x) => x.name === name && x.language === language) ?? templates.find((x) => x.name === name && x.language.startsWith(language));
-    if (templateStatus(t) !== "approved") continue;
+    if (chaseTemplateStatus(t) !== "approved") continue;
     const layout = buttonLayoutOf(t!);
     return { name, layout: layout === "none" || layout === "other" ? null : layout, language: t!.language };
   }

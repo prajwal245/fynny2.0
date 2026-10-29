@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import { ShieldCheck } from "lucide-react";
+import { BulkBar, ConfirmButton, SEL_STYLES, SelectAllHeader, SelectCell, useSelection } from "../components/Selection";
 import {
   Badge,
   Card,
   Drawer,
   EmptyState,
+  Modal,
   PageHeader,
   V,
   formatDate,
@@ -174,9 +176,37 @@ export default function ExceptionsPage({
     return Boolean(c?.id) && c.amount !== undefined && Math.abs(Math.abs(c.amount) - Math.abs(e.amount)) < 0.01;
   };
 
+  const sel = useSelection(list.map((e) => e.id));
+  const selected = list.filter((e) => sel.has(e.id));
+  const selectedClients = new Set(selected.map((e) => e.clientId));
+  const [bulk, setBulk] = useState<null | "ignore" | "reconciled_external">(null);
+  const [bulkNote, setBulkNote] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkExport, setBulkExport] = useState<BooksSystem | null>(null);
+  const matchable = selected.filter((e) => safeMatch(e));
+  /** Runs one decision per selected line, one after the other, then offers a single Undo for all of them. */
+  const runBulk = async (rows: Exception[], make: (e: Exception) => Parameters<typeof setExceptionStatus>, done: string) => {
+    setBulkBusy(true);
+    const closed: string[] = [];
+    let failed = 0;
+    for (const e of rows) {
+      const err = await setExceptionStatus(...make(e));
+      if (err) failed++;
+      else closed.push(e.id);
+    }
+    setBulkBusy(false);
+    sel.clear();
+    if (closed.length)
+      toast.success(`${closed.length} ${done}${failed ? `. ${failed} could not be changed and stay open.` : "."}`, {
+        action: { label: "Undo", onClick: () => void closed.reduce((p, id) => p.then(() => reopenException(id)), Promise.resolve()) },
+        duration: 10000,
+      });
+    else if (failed) toast.error(`None of the ${failed} lines could be changed.`);
+  };
+
   return (
     <>
-      <style>{BX_STYLES}</style>
+      <style>{BX_STYLES + SEL_STYLES}</style>
       {!scopedClient && (
         <PageHeader
           title="Exception Queue"
@@ -256,6 +286,7 @@ export default function ExceptionsPage({
           <table className="v2-table v2-table-stack">
             <thead>
               <tr>
+                <SelectAllHeader sel={sel} total={list.length} />
                 {!scopedClient && <th>Client</th>}
                 <th>Reason</th>
                 <th className="v2-hide-md">Side</th>
@@ -276,9 +307,10 @@ export default function ExceptionsPage({
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0, x: 24 }}
                     transition={{ duration: 0.28 }}
-                    className="clickable"
+                    className={`clickable${sel.has(e.id) ? " is-selected" : ""}`}
                     onClick={() => openItem(e)}
                   >
+                    <SelectCell sel={sel} id={e.id} label={`${e.narration.slice(0, 40)}, ${formatINR(e.amount)}`} />
                     {!scopedClient && (
                       <td style={{ fontWeight: 600 }}>
                         {clientName(e.clientId)}
@@ -556,6 +588,67 @@ export default function ExceptionsPage({
           </div>
         )}
       </Drawer>
+      <BulkBar sel={sel} total={list.length} noun={selected.length === 1 ? "line" : "lines"}>
+        <button
+          className="bx-btn bx-sm bx-primary"
+          disabled={bulkBusy || matchable.length === 0}
+          title={matchable.length ? "Match each line with its same-amount suggestion" : "None of the selected lines has a same-amount suggestion"}
+          onClick={() =>
+            void runBulk(matchable, (e) => [e.id, "resolved", { action: "match", counterpartIds: [liveCandidates(e)[0]!.id as string] }], "matched. They now count in the MIS")
+          }
+        >
+          Match suggested ({matchable.length})
+        </button>
+        <button className="bx-btn bx-sm" disabled={bulkBusy} onClick={() => setBulk("reconciled_external")}>
+          Reconciled elsewhere
+        </button>
+        <button className="bx-btn bx-sm" disabled={bulkBusy} onClick={() => setBulk("ignore")}>
+          Ignore
+        </button>
+        {(["zoho", "tally"] as const).map((s) => (
+          <button
+            key={s}
+            className="bx-btn bx-sm bx-logo"
+            style={{ minHeight: 40, padding: "4px 12px" }}
+            disabled={selectedClients.size !== 1 || selected.every((e) => e.side === "books")}
+            aria-label={`Export selected to ${SYSTEM_LABEL[s]}`}
+            title={selectedClients.size !== 1 ? "Select lines from one client to export" : `Export selected to ${SYSTEM_LABEL[s]}`}
+            onClick={() => setBulkExport(s)}
+          >
+            <SystemLogo system={s} />
+          </button>
+        ))}
+      </BulkBar>
+      <Modal open={bulk !== null} onClose={() => (bulkBusy ? undefined : setBulk(null))} title={bulk === "ignore" ? `Ignore ${selected.length} lines` : `Mark ${selected.length} lines reconciled elsewhere`}>
+        <p style={{ fontSize: 13, color: V.muted, lineHeight: 1.6, marginTop: 0 }}>
+          {bulk === "ignore" ? "Ignored lines stay out of the MIS." : "These were settled outside FynHelp, so they leave the queue."} The note below goes in the audit trail for every line, and you can undo the whole batch afterwards.
+        </p>
+        <label className="v2-label" htmlFor="bulk-note">Note (required)</label>
+        <textarea id="bulk-note" className="v2-input" rows={3} value={bulkNote} onChange={(e) => setBulkNote(e.target.value)} placeholder="e.g. Cleared in Zoho on 5 Oct" autoFocus />
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 14 }}>
+          <button className="bx-btn" onClick={() => setBulk(null)} disabled={bulkBusy}>Cancel</button>
+          <button
+            className="bx-btn bx-primary"
+            disabled={bulkBusy || !bulkNote.trim()}
+            onClick={async () => {
+              const kind = bulk!;
+              const note = bulkNote.trim();
+              await runBulk(
+                selected,
+                (e) => (kind === "ignore" ? [e.id, "ignored", { note }] : [e.id, "resolved", { action: "reconciled_external", note }]),
+                kind === "ignore" ? "ignored. They stay out of the MIS" : "marked reconciled outside FynHelp",
+              );
+              setBulk(null);
+              setBulkNote("");
+            }}
+          >
+            {bulkBusy ? "Working…" : `Apply to ${selected.length}`}
+          </button>
+        </div>
+      </Modal>
+      {selectedClients.size === 1 && (
+        <BooksExportDrawer open={bulkExport !== null} onClose={() => setBulkExport(null)} clientId={[...selectedClients][0]!} allPeriods initialSystem={bulkExport ?? undefined} onlyIds={selected.map((e) => e.id)} />
+      )}
       {active && <BooksExportDrawer open={exportFor !== null} onClose={() => setExportFor(null)} clientId={active.clientId} allPeriods={scope === "all"} initialSystem={exportFor ?? undefined} similarTo={{ amount: active.amount, narration: active.narration }} />}
     </>
   );

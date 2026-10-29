@@ -298,6 +298,9 @@ export function Drawer({ open, onClose, title, children }: { open: boolean; onCl
           />
           <motion.aside
             className="v2"
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
             initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
             // No overshoot: a spring pushed the panel past the edge and clipped it for a moment.
             transition={{ type: "tween", duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
@@ -338,6 +341,9 @@ export function Modal({ open, onClose, title, children }: { open: boolean; onClo
           />
           <motion.div
             className="v2 v2-card"
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
             initial={{ opacity: 0, y: 14, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.98 }}

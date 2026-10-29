@@ -27,6 +27,9 @@ import { AgentStatusBadge, RowSkeleton } from "../agents";
 import { IntakePanel } from "../components/IntakePanel";
 import { SourceIcon } from "../components/BrandIcons";
 import { Doc, useV2 } from "../store";
+import { BulkBar, SEL_STYLES, SelectAllHeader, SelectCell, useSelection } from "../components/Selection";
+import { BX_STYLES, BooksExportDrawer, SYSTEM_LABEL, SystemLogo } from "../components/BooksExport";
+import type { BooksSystem } from "@/lib/practice/zohoExport";
 
 const TONE: Record<Doc["status"], Tone> = {
   Uploading: "info",
@@ -123,6 +126,10 @@ export default function DocumentsPage({
     : docs;
   const unassigned = scopedClient ? [] : docs.filter((d) => !d.clientId);
   const active = docs.find((d) => d.id === open) ?? null;
+  const rowKey = (r: { id?: string }, i: number) => r.id ?? `row-${i}`;
+  const sel = useSelection(active?.rows.map(rowKey) ?? []);
+  const [exportRows, setExportRows] = useState<BooksSystem | null>(null);
+  const pickedRows = (active?.rows ?? []).filter((r, i) => sel.has(rowKey(r, i)));
   // Inside a client workspace the workspace itself shows the live cards.
   const extractRuns = scopedClient ? [] : runs.filter((r) => r.agent === "extract");
   const targetClient = scopedClient ?? uploadClient;
@@ -697,6 +704,7 @@ export default function DocumentsPage({
               >
                 <thead>
                   <tr>
+                    <SelectAllHeader sel={sel} total={active.rows.length} />
                     <th>Date</th>
                     <th>Particulars</th>
                     <th style={{ textAlign: "right" }}>Amount</th>
@@ -705,7 +713,8 @@ export default function DocumentsPage({
                 </thead>
                 <tbody>
                   {active.rows.map((r, i) => (
-                    <tr key={r.id ?? i}>
+                    <tr key={r.id ?? i} className={sel.has(rowKey(r, i)) ? "is-selected" : undefined}>
+                      <SelectCell sel={sel} id={rowKey(r, i)} label={`${r.particulars.slice(0, 40)}, ${formatINR(r.amount)}`} />
                       <td className="num">{formatDate(r.date)}</td>
                       <td>{r.particulars}</td>
                       <td
@@ -736,6 +745,26 @@ export default function DocumentsPage({
                   ))}
                 </tbody>
               </motion.table>
+            )}
+            <style>{BX_STYLES + SEL_STYLES}</style>
+            <BulkBar sel={sel} total={active.rows.length} noun={pickedRows.length === 1 ? "transaction" : "transactions"} inDrawer>
+              {active.side === "bank" && active.clientId
+                ? (["zoho", "tally"] as const).map((s) => (
+                    <button key={s} className="bx-btn bx-sm bx-logo" style={{ minHeight: 40, padding: "4px 12px" }} aria-label={`Export selected to ${SYSTEM_LABEL[s]}`} title={`Export the selected transactions to ${SYSTEM_LABEL[s]}`} onClick={() => setExportRows(s)}>
+                      <SystemLogo system={s} />
+                    </button>
+                  ))
+                : null}
+            </BulkBar>
+            {active.clientId && (
+              <BooksExportDrawer
+                open={exportRows !== null}
+                onClose={() => setExportRows(null)}
+                clientId={active.clientId}
+                allPeriods
+                initialSystem={exportRows ?? undefined}
+                lines={pickedRows.map((r, i) => ({ id: r.id ?? `row-${i}`, clientId: active.clientId, date: r.date, amount: r.amount, narration: r.particulars, side: "bank" as const, status: "open" as const }))}
+              />
             )}
           </div>
         )}

@@ -15,7 +15,10 @@ import {
   formatINR,
 } from "../ui";
 import { AgentStatusBadge } from "../agents";
+import { BulkBar, ConfirmButton, SEL_STYLES, SelectAllHeader, SelectCell, useSelection } from "../components/Selection";
 import { ReviewItem, useV2 } from "../store";
+import { BX_STYLES } from "../components/BooksExport";
+const BX_STYLES_REVIEW = BX_STYLES + SEL_STYLES;
 
 type Draft = {
   date: string;
@@ -105,10 +108,27 @@ export default function ReviewPage({
     );
   };
 
+  const sel = useSelection(list.map((r) => r.id));
+  const picked = list.filter((r) => sel.has(r.id));
+  // Register rows are read again as registers, never confirmed into bank lines in bulk.
+  const pickedOk = picked.filter((r) => !(r.docId && registerDocs.has(r.docId)));
+  const confirmPicked = () => {
+    pickedOk.forEach((r) => resolveReview(r.id, "confirmed"));
+    const skipped = picked.length - pickedOk.length;
+    toast.success(`${pickedOk.length} row${pickedOk.length === 1 ? "" : "s"} confirmed${skipped ? `. ${skipped} from register files left for you.` : "."}`);
+    sel.clear();
+  };
+  const discardPicked = () => {
+    picked.forEach((r) => resolveReview(r.id, "discarded"));
+    toast.success(`${picked.length} row${picked.length === 1 ? "" : "s"} discarded.`);
+    sel.clear();
+  };
+
   const tone = (c: number): Tone => (c >= 0.7 ? "warn" : "bad");
 
   return (
     <>
+      <style>{BX_STYLES_REVIEW}</style>
       {!scopedClient && (
         <PageHeader
           title="Review Queue"
@@ -167,6 +187,7 @@ export default function ReviewPage({
           <table className="v2-table v2-table-stack">
             <thead>
               <tr>
+                <SelectAllHeader sel={sel} total={list.length} />
                 {!scopedClient && <th>Client</th>}
                 <th>Document</th>
                 <th>Raw text</th>
@@ -189,9 +210,10 @@ export default function ReviewPage({
                       backgroundColor: "rgba(31,90,70,0.08)",
                     }}
                     transition={{ duration: 0.32, ease: "easeOut" }}
-                    className="clickable"
+                    className={`clickable${sel.has(r.id) ? " is-selected" : ""}`}
                     onClick={() => openItem(r)}
                   >
+                    <SelectCell sel={sel} id={r.id} label={`${r.suggestion.particulars.slice(0, 40)}, ${formatINR(r.suggestion.amount)}`} />
                     {!scopedClient && (
                       <td style={{ fontWeight: 600 }}>
                         {clientName(r.clientId)}
@@ -407,6 +429,12 @@ export default function ReviewPage({
           </div>
         )}
       </Drawer>
+      <BulkBar sel={sel} total={list.length} noun={picked.length === 1 ? "row" : "rows"}>
+        <button className="bx-btn bx-sm bx-primary" disabled={pickedOk.length === 0} onClick={confirmPicked} title={pickedOk.length ? "Confirm each row as it was read" : "Register rows are read again as registers"}>
+          Confirm {pickedOk.length}
+        </button>
+        <ConfirmButton label={`Discard ${picked.length}`} confirmLabel={`Really discard ${picked.length}?`} onConfirm={discardPicked} />
+      </BulkBar>
     </>
   );
 }

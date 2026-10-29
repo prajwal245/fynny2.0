@@ -69,3 +69,44 @@ describe("Export for Zoho", () => {
     expect(invoiceRef("no invoice here")).toBe("");
   });
 });
+
+import { buildTallyExport, detectBooks } from "@/lib/practice/zohoExport";
+
+describe("Export for Tally", () => {
+  const o = { clientId: "c1", clientName: "Sun International", period: "2026-09", bankLedger: "Axis Bank A/c" };
+
+  it("writes a Payment voucher (expense debited, bank credited) and a Receipt voucher (bank debited, party credited)", () => {
+    const x = buildTallyExport(list, o);
+    expect(x.count).toBe(3);
+    expect(x.filename).toBe("tally-vouchers_sun-international_2026-09.xml");
+    expect(x.xml).toContain('<VOUCHER VCHTYPE="Payment" ACTION="Create"><DATE>20260905</DATE>');
+    expect(x.xml).toContain("<LEDGERNAME>Bank Charges</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-590.00</AMOUNT>");
+    expect(x.xml).toContain("<LEDGERNAME>Axis Bank A/c</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>590.00</AMOUNT>");
+    expect(x.xml).toContain('<VOUCHER VCHTYPE="Receipt" ACTION="Create"><DATE>20260908</DATE>');
+    expect(x.xml).toContain("<LEDGERNAME>Sundar Auto</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>12500.00</AMOUNT>");
+  });
+
+  it("every voucher balances: debits equal credits", () => {
+    const x = buildTallyExport(list, o).xml;
+    for (const v of x.split("<VOUCHER ").slice(1)) {
+      const amounts = [...v.matchAll(/<AMOUNT>(-?[\d.]+)<\/AMOUNT>/g)].map((m) => Number(m[1]));
+      expect(Math.round(amounts.reduce((a, b) => a + b, 0) * 100)).toBe(0);
+    }
+  });
+
+  it("creates the ledgers it names under a group, escapes XML and never writes a bad character", () => {
+    const x = buildTallyExport([ex({ id: "z", date: "2026-09-02", amount: -100, narration: 'R&D <test> "x"\u0001' })], { ...o, bankLedger: "A & B Bank" }).xml;
+    expect(x).toContain('<LEDGER NAME="Miscellaneous Expenses" ACTION="Create">');
+    expect(x).toContain("<PARENT>Indirect Expenses</PARENT>");
+    expect(x).toContain("R&amp;D &lt;test&gt; &quot;x&quot;");
+    expect(x).toContain("A &amp; B Bank");
+    expect(x).not.toMatch(/\u0001/);
+  });
+
+  it("knows which books a client keeps from the documents already there", () => {
+    expect(detectBooks([{ clientId: "c1", source: "Zoho Books" }], "c1")).toBe("zoho");
+    expect(detectBooks([{ clientId: "c1", side: "books", kind: "tally_xml" }], "c1")).toBe("tally");
+    expect(detectBooks([{ clientId: "c1", side: "bank", kind: "csv" }], "c1")).toBeNull();
+    expect(detectBooks([{ clientId: "c2", source: "Zoho Books" }], "c1")).toBeNull();
+  });
+});

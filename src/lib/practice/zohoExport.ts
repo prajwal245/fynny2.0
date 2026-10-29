@@ -147,3 +147,72 @@ export const countFor = (list: ExportException[], clientId: string, period: stri
   const l = openBank(list, clientId, period);
   return { out: l.filter((e) => e.amount < 0).length, in: l.filter((e) => e.amount > 0).length, all: l.length };
 };
+
+/* ── Tally ───────────────────────────────────────────────── */
+
+export type BooksSystem = "zoho" | "tally";
+
+/** Which books a client keeps, from the documents already in FynHelp. Null when nothing says. */
+export function detectBooks(docs: { clientId: string; side?: string; source?: string; kind?: string; name?: string }[], clientId: string): BooksSystem | null {
+  const mine = docs.filter((d) => d.clientId === clientId);
+  if (mine.some((d) => d.source === "Zoho Books")) return "zoho";
+  if (mine.some((d) => d.side === "books" && (d.kind === "tally_xml" || /\.xml$/i.test(d.name ?? "")))) return "tally";
+  return null;
+}
+
+const xml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "");
+const tallyDate = (iso: string) => iso.slice(0, 10).replace(/-/g, "");
+const TALLY_NAMES: Record<string, string> = {
+  "Bank Fees and Charges": "Bank Charges",
+  "Rent Expense": "Rent",
+  "Salaries and Employee Wages": "Salaries",
+  "Travel Expense": "Travelling Expenses",
+  "Other Expenses": "Miscellaneous Expenses",
+  Utilities: "Electricity Charges",
+  "Tax Payable": "Tax Paid (to be classified)",
+};
+
+export interface TallyExport {
+  filename: string;
+  count: number;
+  total: number;
+  xml: string;
+}
+
+/**
+ * Tally import XML for the open bank-side lines: a Payment voucher for each payment (expense or
+ * party debited, bank credited) and a Receipt voucher for each receipt (bank debited, party
+ * credited). Ledgers it names are created under a sensible group if they do not exist; the bank
+ * ledger must already exist, so its name is asked for.
+ */
+export function buildTallyExport(
+  list: ExportException[],
+  opts: { clientId: string; clientName: string; period: string | null; stamp?: string; bankLedger: string },
+): TallyExport {
+  const lines = openBank(list, opts.clientId, opts.period);
+  const slug = opts.clientName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "client";
+  const stamp = (opts.stamp ?? opts.period ?? "all-periods").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  const bank = clean(opts.bankLedger) || "Bank Account";
+  const masters = new Map<string, string>(); // ledger → parent group
+  const vouchers: string[] = [];
+  for (const e of lines) {
+    const out = e.amount < 0;
+    const other = out
+      ? (TALLY_NAMES[expenseAccount(e.narration)] ?? expenseAccount(e.narration))
+      : partyOf(e.narration) || "Unidentified Receipts (Suspense)";
+    if (!masters.has(other)) masters.set(other, out ? "Indirect Expenses" : /suspense/i.test(other) ? "Suspense A/c" : "Sundry Debtors");
+    const amt = money(e.amount);
+    const narr = xml(clean(e.narration).slice(0, 200));
+    const type = out ? "Payment" : "Receipt";
+    const entry = (name: string, debit: boolean) =>
+      `<ALLLEDGERENTRIES.LIST><LEDGERNAME>${xml(name)}</LEDGERNAME><ISDEEMEDPOSITIVE>${debit ? "Yes" : "No"}</ISDEEMEDPOSITIVE><AMOUNT>${debit ? "-" : ""}${amt}</AMOUNT></ALLLEDGERENTRIES.LIST>`;
+    vouchers.push(
+      `<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER VCHTYPE="${type}" ACTION="Create"><DATE>${tallyDate(e.date)}</DATE><VOUCHERTYPENAME>${type}</VOUCHERTYPENAME><NARRATION>${narr}</NARRATION>${out ? entry(other, true) + entry(bank, false) : entry(bank, true) + entry(other, false)}</VOUCHER></TALLYMESSAGE>`,
+    );
+  }
+  const ledgers = [...masters].map(
+    ([name, parent]) => `<TALLYMESSAGE xmlns:UDF="TallyUDF"><LEDGER NAME="${xml(name)}" ACTION="Create"><NAME.LIST><NAME>${xml(name)}</NAME></NAME.LIST><PARENT>${xml(parent)}</PARENT></LEDGER></TALLYMESSAGE>`,
+  );
+  const body = [`<?xml version="1.0" encoding="UTF-8"?>`, `<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>All Masters</REPORTNAME></REQUESTDESC><REQUESTDATA>`, ...ledgers, ...vouchers, `</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>`].join("\n");
+  return { filename: `tally-vouchers_${slug}_${stamp}.xml`, count: lines.length, total: lines.reduce((s, e) => s + Math.abs(e.amount), 0), xml: body };
+}

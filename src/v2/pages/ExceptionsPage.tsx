@@ -16,7 +16,8 @@ import { AgentStatusBadge } from "../agents";
 import { EXCEPTION_REASONS, Exception, monthOf, useV2 } from "../store";
 import { openExceptions } from "../lib/exceptions";
 import { ZohoPostPanel } from "../components/ZohoPost";
-import { ZohoExportButton } from "../components/ZohoExport";
+import { BooksExportButton, BooksExportDrawer, SYSTEM_LABEL } from "../components/BooksExport";
+import { detectBooks } from "@/lib/practice/zohoExport";
 
 /**
  * Exception Queue. Cross-client as a page; the client's Exceptions tab when
@@ -37,6 +38,7 @@ export default function ExceptionsPage({
   const [reason, setReason] = useState("all");
   const [openId, setOpenId] = useState<string | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
+  const [exportOpen, setExportOpen] = useState(false);
   const [note, setNote] = useState("");
   const [actError, setActError] = useState<string | null>(null);
 
@@ -231,12 +233,8 @@ export default function ExceptionsPage({
             </option>
           ))}
         </select>
-        <span style={{ marginLeft: "auto" }} title={client === "all" ? "Pick a client to export for Zoho Books" : undefined}>
-          {client === "all" ? (
-            <span style={{ fontSize: 12, color: V.muted }}>Pick a client to export for Zoho Books</span>
-          ) : (
-            <ZohoExportButton clientId={client} allPeriods={scope === "all"} />
-          )}
+        <span style={{ marginLeft: "auto" }}>
+          <BooksExportButton clientId={client} allPeriods={scope === "all"} />
         </span>
       </div>
 
@@ -378,7 +376,11 @@ export default function ExceptionsPage({
 
             {active.status === "open" && active.side !== "books" && (
               <div style={{ fontSize: 12.5, color: V.muted, lineHeight: 1.6, marginTop: 12 }}>
-                Not in the books yet? Add it in Zoho Books, or use <strong>Export for Zoho</strong> above the queue to download this and similar lines as a ready-to-import file.
+                Not in the books yet? Add it in {SYSTEM_LABEL[detectBooks(docs, active.clientId) ?? "zoho"]}, or{" "}
+                <button className="v2-btn v2-btn-ghost" style={{ padding: "2px 8px", fontSize: 12.5 }} onClick={() => setExportOpen(true)}>
+                  export this and similar lines
+                </button>{" "}
+                as a ready-to-import file.
               </div>
             )}
             {active.status === "open" && <ZohoPostPanel clientId={active.clientId} txnId={active.txnId} side={active.side} open={!!active} />}
@@ -561,6 +563,7 @@ export default function ExceptionsPage({
           </div>
         )}
       </Drawer>
+      {active && <BooksExportDrawer open={exportOpen} onClose={() => setExportOpen(false)} clientId={active.clientId} allPeriods={scope === "all"} />}
     </>
   );
 }

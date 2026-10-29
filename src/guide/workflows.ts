@@ -291,10 +291,10 @@ export const WORKFLOWS: Workflow[] = [
   },
   {
     id: "zoho-export",
-    title: "Export for Zoho Books",
+    title: "Export for Zoho Books or Tally",
     category: "erp",
     summary:
-      "Turn the lines the books are missing into CSVs a CA imports into Zoho Books by hand. FynHelp never writes to Zoho for this, so it carries no risk and needs no connection.",
+      "Turn the lines the books are missing into files a CA imports by hand: CSVs for Zoho Books, or an XML of Payment and Receipt vouchers for Tally. The format follows the books the client keeps. FynHelp never writes to either for this, so it carries no risk and needs no connection.",
     pipeline: ["Open bank-side exceptions", "Pick client and period", "Download CSV", "Import in Zoho, re-run Recon"],
     logic: "Human-in-the-loop",
     confidence: "Nothing is sent anywhere: a person imports the file and checks every guess",
@@ -302,7 +302,8 @@ export const WORKFLOWS: Workflow[] = [
     keywords: ["zoho", "export", "csv", "import", "expenses", "payments received", "bank statement", "missing entries", "books"],
     inputs: [{ label: "Data", detail: "Open exceptions on the bank side for one client, for the month in the top bar or all periods" }],
     rules: [
-      "Where: Exception Queue, pick one client, then Export for Zoho. It also appears on the client's Exceptions tab.",
+      "Where: the Export button above the Exception Queue (it names the client's books: Zoho Books or Tally), on the client's Exceptions tab, and inside every bank-side exception. With no client chosen, pick one inside the drawer.",
+      "Tally: type the bank ledger name; the file holds a Payment voucher (expense debited, bank credited) or Receipt voucher (bank debited, party credited) per line, and creates missing ledgers.",
       "Missing expenses: money-out lines, with an expense account guessed from the narration (bank charges, rent, salaries, utilities, travel, tax, else Other Expenses).",
       "Missing receipts: money-in lines, with the customer and invoice number read from the narration and the UTR as reference.",
       "Bank lines: every open line in Zoho's bank-statement layout (Withdrawals and Deposits columns) to categorise inside Zoho.",

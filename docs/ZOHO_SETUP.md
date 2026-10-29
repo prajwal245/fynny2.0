@@ -59,7 +59,7 @@ Write (only when a partner clicks "Allow approved entries"): `ZohoBooks.expenses
 
 For a client whose books are in Zoho Books, FynHelp can write CSVs of what the books are missing, so a CA imports them by hand. FynHelp never writes to Zoho for this.
 
-1. Exception Queue → pick one client → **Export for Zoho** (also on the client's Exceptions tab). It follows the month in the top bar or "All periods".
+1. Exception Queue → **Export** button (it says Zoho Books or Tally, from the books FynHelp has seen for that client; with no client chosen you pick one in the drawer). Also on the client's Exceptions tab and inside each bank-side exception. It follows the month in the top bar or "All periods". For Tally it downloads one XML of Payment/Receipt vouchers (type the bank ledger name first; missing ledgers are created) and you import it via Gateway of Tally → Import → Data.
 2. Download **Missing expenses**, **Missing receipts** or **Bank lines to categorise**.
 3. In Zoho Books import the file (the path is shown under each file), map the columns, set Paid Through / Deposit To to the bank account, and check the account, customer and invoice guesses.
 4. Run Recon again; the lines now match.

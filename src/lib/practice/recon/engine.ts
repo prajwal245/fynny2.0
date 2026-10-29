@@ -476,8 +476,13 @@ export function reconcile(
   // moved, so the same exact amount is accepted up to LATE_BOOKING_DAYS apart, but only
   // when the party or a reference agrees and the pair is unique either way.
   const LATE_BOOKING_DAYS = 5;
+  // A tax payment is booked to an account ("Tax Payable"), not a party, so two tax lines agree on kind.
+  const TAX_WORDS = /\b(gst|cpin|challan|tds|tax|cbdt|epf|esi)\b/i;
+  const taxText = (x: ReconTxn) => `${x.counterparty ?? ""} ${x.description ?? ""} ${x.reference ?? ""}`;
   const lateIdentity = (a: ReconTxn, b: ReconTxn) =>
-    referenceScore(a, b) >= 0.8 || counterpartyScore(a, b, aliases) >= 0.9;
+    referenceScore(a, b) >= 0.8 ||
+    counterpartyScore(a, b, aliases) >= 0.9 ||
+    (TAX_WORDS.test(taxText(a)) && TAX_WORDS.test(taxText(b)));
   const latePair = (a: ReconTxn, b: ReconTxn) =>
     a.direction === b.direction &&
     toPaise(a.amount) === toPaise(b.amount) &&
@@ -498,7 +503,7 @@ export function reconcile(
       book_txn_ids: [b.id],
       stage: "fuzzy",
       score: Math.max(0.88, s.score),
-      explanation: { ...s.explanation, note: `Booked ${gap} day${gap === 1 ? "" : "s"} ${new Date(b.txn_date) > new Date(t.txn_date) ? "after" : "before"} the bank date; same amount and the ${referenceScore(t, b) >= 0.8 ? "reference" : "party"} agree` },
+      explanation: { ...s.explanation, note: `Booked ${gap} day${gap === 1 ? "" : "s"} ${new Date(b.txn_date) > new Date(t.txn_date) ? "after" : "before"} the bank date; same amount and the ${referenceScore(t, b) >= 0.8 ? "reference" : counterpartyScore(t, b, aliases) >= 0.9 ? "party" : "tax payment"} agree` },
     });
   }
 
@@ -902,6 +907,18 @@ function explain(
     !(t.counterparty || t.description) ||
     !(best.o.counterparty || best.o.description);
 
+  // A cheque issued in the books that the bank has not paid yet is a normal month-end item,
+  // not a mismatch against some other payment to the same party.
+  const chequeWords = /\b(chq|cheque|check)\b/i;
+  const text = (x: ReconTxn) => `${x.description ?? ""} ${x.reference ?? ""}`;
+  if (t.side === "books" && !sameAmount && chequeWords.test(text(t)) && !chequeWords.test(text(best.o))) {
+    return {
+      ...base,
+      candidates: [],
+      reason_code: "no_candidate",
+      detail: "Cheque issued in the books and not yet paid by the bank. Normal at month end: it matches when the bank debits it. Leave it open, or mark it reconciled if it is outstanding.",
+    };
+  }
   if (sameAmount && gap <= cfg.dateWindowDays && refsDiffer) {
     return {
       ...base,

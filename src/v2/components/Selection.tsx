@@ -14,12 +14,12 @@ export const SEL_STYLES = `
 .sel-box:active input{transform:scale(.88)}
 .sel-box input:focus-visible{outline:2px solid var(--v2-brand);outline-offset:3px;border-radius:4px}
 tr.is-selected,tr.is-selected:hover{background:rgba(217,43,43,.06)!important;box-shadow:inset 3px 0 0 var(--v2-brand)}
-.sel-bar{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:70;display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;max-width:min(96vw,920px);padding:10px 14px;border-radius:16px;background:var(--v2-pop,#fff);color:var(--v2-ink);border:1.5px solid var(--v2-brand);box-shadow:0 18px 40px -18px rgba(142,27,31,.55),0 0 0 4px rgba(217,43,43,.10)}
+.sel-bar{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);width:max-content;z-index:70;display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;max-width:min(96vw,920px);padding:10px 14px;border-radius:14px;background:var(--v2-pop,#fff);color:var(--v2-ink);border:1px solid rgba(20,18,16,.12);box-shadow:0 18px 44px -16px rgba(20,18,16,.38),0 0 0 1px rgba(217,43,43,.35)}
 .sel-count{font-weight:700;font-size:14px;white-space:nowrap}
 .sel-link{background:none;border:0;padding:8px 6px;font:inherit;font-size:13px;font-weight:600;color:var(--v2-maroon);cursor:pointer;text-decoration:underline;text-underline-offset:3px;min-height:40px}
 .sel-link:focus-visible{outline:2px solid var(--v2-brand);outline-offset:2px;border-radius:6px}
 .sel-bar.in-drawer{z-index:95;left:auto;right:20px;transform:none;max-width:min(520px,calc(100vw - 40px))}
-@media (max-width:640px){.sel-bar{bottom:12px;left:8px;right:8px;transform:none;max-width:none}}
+@media (max-width:640px){.sel-bar{bottom:12px;left:8px;right:8px;transform:none;width:auto;max-width:none}}
 `;
 
 export interface Selection {
@@ -112,11 +112,25 @@ export function SelectAllHeader({ sel, total }: { sel: Selection; total: number 
 }
 
 /** Slides up while something is selected. A polite live region tells screen readers the count. */
+/** True while a drawer or modal is open, so a page-level bar does not sit half under it. */
+function useDialogOpen(): boolean {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const check = () => setOpen(!!document.querySelector("[aria-modal='true']"));
+    check();
+    const mo = new MutationObserver(check);
+    mo.observe(document.body, { childList: true, subtree: true });
+    return () => mo.disconnect();
+  }, []);
+  return open;
+}
+
 export function BulkBar({ sel, total, noun, children, inDrawer }: { sel: Selection; total: number; noun: string; children: ReactNode; inDrawer?: boolean }) {
   const reduce = useReducedMotion();
+  const dialogOpen = useDialogOpen();
   return (
     <AnimatePresence>
-      {sel.count > 0 && (
+      {sel.count > 0 && (inDrawer || !dialogOpen) && (
         <motion.div
           className={`sel-bar${inDrawer ? " in-drawer" : ""}`}
           role="region"

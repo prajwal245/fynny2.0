@@ -31,7 +31,7 @@ const readLedger = (clientId: string) => {
 
 /** Larger, easy-to-press export buttons with a red edge highlight and gentle motion (off for reduced motion). */
 export const BX_STYLES = `
-.bx-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 16px;border-radius:12px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;color:#141210;background:#fff;border:1.5px solid var(--v2-line);transition:transform .16s cubic-bezier(.2,.8,.2,1),box-shadow .2s ease,border-color .2s ease,background .2s ease}
+.bx-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 16px;border-radius:10px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;color:#141210;background:#fff;border:1.5px solid var(--v2-line);transition:transform .16s cubic-bezier(.2,.8,.2,1),box-shadow .2s ease,border-color .2s ease,background .2s ease}
 .bx-btn:hover:not(:disabled){border-color:var(--v2-brand);box-shadow:0 0 0 3px rgba(217,43,43,.14),0 8px 18px -12px rgba(142,27,31,.55);transform:translateY(-1px)}
 .bx-btn:active:not(:disabled){transform:translateY(0) scale(.97);box-shadow:0 0 0 2px rgba(217,43,43,.22)}
 .bx-sm{min-height:38px;padding:7px 14px;font-size:13px}
@@ -41,7 +41,7 @@ export const BX_STYLES = `
 .bx-logo{min-height:52px;padding:8px 20px}
 .bx-logo img{display:block;height:28px;width:auto;max-width:150px}
 .bx-label{font-size:12.5px;color:var(--v2-muted);font-weight:600}
-.bx-hint{margin-top:14px;padding:14px 14px 14px 16px;border-radius:14px;background:var(--v2-gray);border:1.5px solid rgba(217,43,43,.35);border-left:4px solid var(--v2-brand);animation:bx-in .32s cubic-bezier(.2,.8,.2,1) both,bx-ring 1.6s ease-out .35s 1}
+.bx-hint{margin-top:14px;padding:14px 14px 14px 16px;border-radius:12px;background:var(--v2-gray);border:1.5px solid rgba(217,43,43,.35);border-left:4px solid var(--v2-brand);animation:bx-in .32s cubic-bezier(.2,.8,.2,1) both,bx-ring 1.6s ease-out .35s 1}
 .bx-hint strong{display:block;font-size:14px;margin-bottom:4px}
 .bx-hint p{margin:0 0 12px;font-size:13px;line-height:1.55;color:var(--v2-muted)}
 @keyframes bx-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}

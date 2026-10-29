@@ -301,7 +301,7 @@ export async function generateReport(
   const warnings: string[] = [];
   if (unmatched.length)
     warnings.push(
-      `${unmatched.length} bank line${unmatched.length === 1 ? " is" : "s are"} not reconciled and ${unmatched.length === 1 ? "is" : "are"} excluded from these figures. Insights are based only on matched data.`,
+      `${unmatched.length} bank line${unmatched.length === 1 ? " is" : "s are"} not reconciled and ${unmatched.length === 1 ? "is" : "are"} excluded from these figures: ${formatRupees(sumRupees(unmatched.filter((t) => t.direction === "in").map((t) => t.amount)))} received and ${formatRupees(sumRupees(unmatched.filter((t) => t.direction === "out").map((t) => t.amount)))} paid. The totals below are not the whole month until these are resolved. Insights are based only on matched data.`,
     );
   if (reviewOpen.count)
     warnings.push(

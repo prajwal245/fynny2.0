@@ -570,11 +570,11 @@ function ExportHint({ clientId, onOpen }: { clientId: string; onOpen: (s: BooksS
     <div className="bx-hint" role="note">
       <style>{BX_STYLES}</style>
       <strong>Not in the books yet?</strong>
-      <p>Add it in {shown.map((s) => SYSTEM_LABEL[s]).join(" or ")}, or download this line and the ones like it as a file ready to import.</p>
+      <p>Add it in {shown.map((s) => SYSTEM_LABEL[s]).join(" or ")}, or export this line and the ones like it as a file ready to import. Tap the logo:</p>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         {shown.map((s) => (
-          <button key={s} className="bx-btn bx-primary" onClick={() => onOpen(s)}>
-            <SystemLogo system={s} size={18} />Export this and similar lines to {SYSTEM_LABEL[s]}
+          <button key={s} className="bx-btn bx-logo" onClick={() => onOpen(s)} aria-label={`Export this and similar lines to ${SYSTEM_LABEL[s]}`} title={`Export this and similar lines to ${SYSTEM_LABEL[s]}`}>
+            <SystemLogo system={s} />
           </button>
         ))}
       </div>

@@ -40,22 +40,22 @@ describe("Export buttons follow what is connected", () => {
   it("offers only Zoho Books when the client is linked to Zoho", async () => {
     fn.zoho.mockResolvedValue({ links: [{ business_id: "c1" }] });
     render(<BooksExportButton clientId="c1" allPeriods />);
-    expect(await screen.findByText("Export to Zoho Books")).toBeTruthy();
-    expect(screen.queryByText("Export to Tally")).toBeNull();
+    expect(await screen.findByLabelText("Export to Zoho Books")).toBeTruthy();
+    expect(screen.queryByLabelText("Export to Tally")).toBeNull();
   });
 
   it("offers only Tally when a Tally company is mapped to the client", async () => {
     fn.tally.mockResolvedValue([{ companies: [{ business_id: "c1" }] }]);
     render(<BooksExportButton clientId="c1" allPeriods />);
-    expect(await screen.findByText("Export to Tally")).toBeTruthy();
-    expect(screen.queryByText("Export to Zoho Books")).toBeNull();
+    expect(await screen.findByLabelText("Export to Tally")).toBeTruthy();
+    expect(screen.queryByLabelText("Export to Zoho Books")).toBeNull();
   });
 
   it("offers both, and says how to connect, when nothing is connected", async () => {
     render(<BooksExportButton clientId="c1" allPeriods />);
-    expect(await screen.findByText("Export to Zoho Books")).toBeTruthy();
-    expect(screen.getByText("Export to Tally")).toBeTruthy();
-    fireEvent.click(screen.getByText("Export to Tally"));
+    expect(await screen.findByLabelText("Export to Zoho Books")).toBeTruthy();
+    expect(screen.getByLabelText("Export to Tally")).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Export to Tally"));
     await waitFor(() => expect(screen.getByRole("dialog")).toBeTruthy());
     expect(screen.getByText(/no Zoho Books or Tally connection yet/)).toBeTruthy();
     expect(screen.getByLabelText("Bank ledger name in Tally")).toBeTruthy();
@@ -63,7 +63,7 @@ describe("Export buttons follow what is connected", () => {
 
   it("opens the Zoho files with counts when the Zoho button is used", async () => {
     render(<BooksExportButton clientId="c1" allPeriods />);
-    fireEvent.click(await screen.findByText("Export to Zoho Books"));
+    fireEvent.click(await screen.findByLabelText("Export to Zoho Books"));
     expect(await screen.findByText(/Missing expenses · 1/)).toBeTruthy();
     expect(screen.getByText(/Missing receipts · 1/)).toBeTruthy();
   });

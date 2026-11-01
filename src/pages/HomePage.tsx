@@ -573,7 +573,7 @@ export default function HomePage() {
                     controls
                     preload="metadata"
                     aria-label="FynHelp launch video"
-                    style={{ display: "block", width: "100%", height: "auto", maxHeight: "80vh", objectFit: "contain" }}
+                    style={{ display: "block", width: "100%", aspectRatio: "16 / 9", height: "auto", objectFit: "cover" }}
                   />
                 </div>
               </figure>

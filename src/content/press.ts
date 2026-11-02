@@ -22,7 +22,7 @@ const SLUG = "every-month-indias-ca-firms-lose-a-week-to-reconciliation-fynhelp-
 
 export const PRESS: PressItem[] = [
   {
-    id: "dailyhunt",
+    id: "dailyhunt", logo: "https://res.cloudinary.com/ghxledou/image/upload/v1793602195/logo_desktop_dark.svg",
     outlet: "Dailyhunt",
     url: "https://m.dailyhunt.in/news/india/english/r+news+india-epaper-dhfacc36dfce9c4bb68db0e89d033c921b/every+month+indias+ca+firms+lose+a+week+to+reconciliation+fynhelp+launches+to+win+it+back-newsid-dhfacc36dfce9c4bb68db0e89d033c921b_2299f150d68311f181fe103af9ee8acf?sm=Y",
   },

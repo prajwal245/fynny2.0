@@ -8,6 +8,7 @@ import { zohoConfigProblems } from "../practice/zohoConfig";
 import { PLANS, planAmountPaise, type Cycle, type PlanKey } from "../practice/billing/plans";
 import { audit, type AdminCtx } from "./security.server";
 import { ASSIGNABLE_ROLES, can, SUPPORT_REFUND_LIMIT, type AdminRole } from "./rbac";
+import { looksLikeTest } from "./testLook";
 import { ledgerRows, type BillingEvent, type LedgerRow } from "./ledger";
 
 const DAY = 86_400_000;
@@ -109,6 +110,14 @@ async function firmNames(ctx: AdminCtx, ids: string[]) {
 
 /* ── firms (the customers) ───────────────────────────────── */
 
+const ATTR_COLS = "signup_channel, signup_source, signup_medium, signup_campaign, signup_content, signup_landing, signup_referrer_host";
+type FirmRow = {
+  id: string; firm_name: string; email: string | null; city: string | null; created_at: string; admin_status: string | null; user_id: string;
+  is_demo: boolean | null; is_test: boolean | null;
+  signup_channel?: string | null; signup_source?: string | null; signup_medium?: string | null; signup_campaign?: string | null;
+  signup_content?: string | null; signup_landing?: string | null; signup_referrer_host?: string | null;
+};
+
 export type FirmFilter = { q?: string; status?: "active" | "suspended" | "flagged" | ""; plan?: "trial" | "paid" | "paused" | "cancelled" | ""; page?: number; /** Show the test (tester) firms instead of the real ones. */ tests?: boolean };
 
 function planState(b: BillingRow | undefined, now = Date.now()): "trial" | "paid" | "paused" | "cancelled" {
@@ -120,20 +129,23 @@ function planState(b: BillingRow | undefined, now = Date.now()): "trial" | "paid
 }
 
 export async function listFirms(ctx: AdminCtx, f: FirmFilter) {
-  let q = ctx.db
-    .from("ca_firms")
-    .select("id, firm_name, email, city, created_at, admin_status, user_id, is_demo, is_test")
-    .order("created_at", { ascending: false })
-    .limit(2000);
-  if (f.q?.trim()) {
-    const t = f.q.trim().replace(/[%,()]/g, " ");
-    q = q.or(`firm_name.ilike.%${t}%,email.ilike.%${t}%,city.ilike.%${t}%`);
-  }
-  if (f.status) q = q.eq("admin_status", f.status);
-  const { data, error } = await q;
-  if (error) throw new PracticeError("db_error", error.message);
+  const base = "id, firm_name, email, city, created_at, admin_status, user_id, is_demo, is_test";
+  const run = async (cols: string) => {
+    let q = ctx.db.from("ca_firms").select(cols).order("created_at", { ascending: false }).limit(2000);
+    if (f.q?.trim()) {
+      const t = f.q.trim().replace(/[%,()]/g, " ");
+      q = q.or(`firm_name.ilike.%${t}%,email.ilike.%${t}%,city.ilike.%${t}%`);
+    }
+    if (f.status) q = q.eq("admin_status", f.status);
+    return q;
+  };
+  // The source columns come with a database change; until it is applied the list still works, without them.
+  let res = await run(`${base}, ${ATTR_COLS}`);
+  if (res.error && /signup_/.test(res.error.message)) res = await run(base);
+  if (res.error) throw new PracticeError("db_error", res.error.message);
+  const data = (res.data ?? []) as unknown as FirmRow[];
   // Test firms are listed only when asked for (f.tests); they are never mixed in with real ones.
-  const firms = (data ?? []).filter((x) => !x.is_demo && Boolean(x.is_test) === Boolean(f.tests));
+  const firms = data.filter((x) => !x.is_demo && Boolean(x.is_test) === Boolean(f.tests));
   const ids = firms.map((x) => x.id);
   const billing = new Map<string, BillingRow>();
   const clients = new Map<string, number>();
@@ -163,7 +175,12 @@ export async function listFirms(ctx: AdminCtx, f: FirmFilter) {
       planState: planState(b),
       trialEnds: b?.status === "trialing" ? b.trial_ends_at : null,
       clients: clients.get(x.id) ?? 0,
+      /** How they sign in (email or Google). Where they came from is `channel` and `campaign`. */
       source: l?.provider ?? "email",
+      channel: x.signup_channel ?? null,
+      from: [x.signup_source, x.signup_campaign].filter(Boolean).join(" / ") || x.signup_referrer_host || null,
+      isTest: Boolean(x.is_test),
+      looksLikeTest: !x.is_test && looksLikeTest(x.firm_name, x.email),
       lastSignIn: l?.last_sign_in_at ?? null,
     };
   });
@@ -174,8 +191,9 @@ export async function listFirms(ctx: AdminCtx, f: FirmFilter) {
 
 export async function firmDetail(ctx: AdminCtx, firmId: string) {
   const { db } = ctx;
-  const [{ data: firm }, { data: billing }, { data: members }, { count: clients }, { count: docs }, { data: reports }, { data: log }] = await Promise.all([
-    db.from("ca_firms").select("id, firm_name, email, phone, city, state, created_at, admin_status, admin_note, icai_membership_number, verification_status, user_id").eq("id", firmId).maybeSingle(),
+  const [{ data: firm }, { data: attr }, { data: billing }, { data: members }, { count: clients }, { count: docs }, { data: reports }, { data: log }] = await Promise.all([
+    db.from("ca_firms").select("id, firm_name, email, phone, city, state, created_at, admin_status, admin_note, icai_membership_number, verification_status, user_id, is_test").eq("id", firmId).maybeSingle(),
+    db.from("ca_firms").select(ATTR_COLS).eq("id", firmId).maybeSingle(),
     db.from("ca_billing").select("*").eq("ca_firm_id", firmId).maybeSingle(),
     db.from("ca_firm_members").select("invited_email, role, status, created_at").eq("ca_firm_id", firmId).limit(100),
     db.from("ca_clients").select("id", { count: "exact", head: true }).eq("ca_firm_id", firmId),
@@ -187,6 +205,8 @@ export async function firmDetail(ctx: AdminCtx, firmId: string) {
   const showBilling = can(ctx.roles, "billing.view");
   return {
     firm,
+    /** Null until the source database change is applied, or for firms from before it. */
+    attribution: attr ?? null,
     billing: billing ? (showBilling ? billing : { plan: billing.plan, cycle: billing.cycle, status: billing.status, trial_ends_at: billing.trial_ends_at }) : null,
     members: members ?? [],
     clients: clients ?? 0,
@@ -213,6 +233,106 @@ export async function extendTrial(ctx: AdminCtx, firmId: string, days: number) {
   await ctx.db.from("ca_billing").update({ trial_ends_at: ends, updated_at: new Date().toISOString() }).eq("ca_firm_id", firmId);
   await audit(ctx, "trial_extended", "ca_firm", firmId, { days, ends });
   return { trialEnds: ends };
+}
+
+/** Mark firms as test (kept out of every report and the revenue figures) or as real again. Reversible. */
+export async function setFirmsTest(ctx: AdminCtx, firmIds: string[], isTest: boolean, note: string) {
+  const ids = [...new Set(firmIds)].slice(0, 100);
+  if (!ids.length) throw new PracticeError("none", "Pick at least one firm.");
+  const { data: rows } = await ctx.db.from("ca_firms").select("id, firm_name, is_demo").in("id", ids);
+  const ok = (rows ?? []).filter((r) => !r.is_demo);
+  const failed: string[] = [];
+  for (const r of ok) {
+    // The database refuses a test firm and a real firm sharing one person; say so plainly.
+    const { error } = await ctx.db.from("ca_firms").update({ is_test: isTest } as never).eq("id", r.id);
+    if (error) failed.push(`${r.firm_name}: ${/cannot be part|tester/i.test(error.message) ? "its owner also belongs to another firm of the other kind" : error.message}`);
+    else await audit(ctx, isTest ? "firm_marked_test" : "firm_marked_real", "ca_firm", r.id, { firm: r.firm_name, note: note.trim() });
+  }
+  return { changed: ok.length - failed.length, failed };
+}
+
+/**
+ * Permanently deletes a firm and everything it owns (clients, documents, reports, chases, billing record).
+ * Guarded: a typed-name confirmation, no paid history, no demo firm. Optionally removes the owner's login.
+ */
+export async function deleteFirm(ctx: AdminCtx, firmId: string, confirmName: string, alsoDeleteLogin: boolean) {
+  const { db } = ctx;
+  const { data: firm } = await db.from("ca_firms").select("id, firm_name, email, user_id, is_test, is_demo, created_at").eq("id", firmId).maybeSingle();
+  if (!firm) throw new PracticeError("not_found", "Firm not found.");
+  if (firm.is_demo) throw new PracticeError("demo_firm", "The demo firm cannot be deleted.");
+  if (confirmName.trim() !== String(firm.firm_name).trim()) throw new PracticeError("confirm_mismatch", "Type the firm's name exactly to confirm.");
+  const { data: b } = await db.from("ca_billing").select("razorpay_subscription_id, first_payment_id, status").eq("ca_firm_id", firmId).maybeSingle();
+  if (b && (b.razorpay_subscription_id || b.first_payment_id || ["active", "past_due", "pending"].includes(String(b.status))))
+    throw new PracticeError("has_payments", "This firm has paid or has a live subscription. Cancel and refund it first; paying firms are not deleted from here.");
+  const [{ count: clients }, { count: docs }, { count: reports }] = await Promise.all([
+    db.from("ca_clients").select("id", { count: "exact", head: true }).eq("ca_firm_id", firmId),
+    db.from("ca_document_extractions").select("id", { count: "exact", head: true }).eq("ca_firm_id", firmId),
+    db.from("ca_reports_log").select("id", { count: "exact", head: true }).eq("ca_firm_id", firmId),
+  ]);
+  // Logged first, so the record exists even if something fails half way.
+  await audit(ctx, "firm_deleted", "ca_firm", firmId, { firm: firm.firm_name, email: firm.email, wasTest: Boolean(firm.is_test), createdAt: firm.created_at, clients: clients ?? 0, documents: docs ?? 0, reports: reports ?? 0, alsoDeleteLogin });
+  const { error } = await db.from("ca_firms").delete().eq("id", firmId);
+  if (error) throw new PracticeError("db_error", `Could not delete: ${error.message}`);
+  let loginDeleted = false;
+  if (alsoDeleteLogin && firm.user_id) {
+    const uid = firm.user_id as string;
+    const [{ count: otherFirms }, { count: otherSeats }, { count: roles }] = await Promise.all([
+      db.from("ca_firms").select("id", { count: "exact", head: true }).eq("user_id", uid),
+      db.from("ca_firm_members").select("id", { count: "exact", head: true }).eq("user_id", uid).neq("status", "revoked"),
+      db.from("user_roles").select("id", { count: "exact", head: true }).eq("user_id", uid),
+    ]);
+    // Never remove a login that still belongs to another firm, or that has an admin role.
+    if (!otherFirms && !otherSeats && !roles) {
+      const { error: authErr } = await db.auth.admin.deleteUser(uid);
+      loginDeleted = !authErr;
+      await audit(ctx, "firm_owner_login_deleted", "ca_firm", firmId, { ok: loginDeleted, error: authErr?.message ?? null });
+    }
+  }
+  return { deleted: true, loginDeleted };
+}
+
+/** Sign-ups by where they came from, for real firms only (test and demo firms are left out). */
+export async function signupSources(ctx: AdminCtx, days: number) {
+  const since = new Date(Date.now() - Math.min(Math.max(days, 1), 365) * DAY).toISOString();
+  const res = await ctx.db
+    .from("ca_firms")
+    .select("id, is_demo, is_test, signup_channel, signup_source, signup_campaign, signup_content")
+    .gte("created_at", since)
+    .limit(20000);
+  if (res.error) return { ready: false as const, total: 0, tracked: 0, channels: [], campaigns: [] };
+  const firms = (res.data ?? []).filter((x) => !x.is_demo && !x.is_test);
+  const ids = firms.map((x) => x.id);
+  const clientsBy = new Set<string>();
+  const paidBy = new Set<string>();
+  for (let i = 0; i < ids.length; i += 300) {
+    const part = ids.slice(i, i + 300);
+    const [{ data: c }, { data: b }] = await Promise.all([
+      ctx.db.from("ca_clients").select("ca_firm_id").in("ca_firm_id", part).limit(50000),
+      ctx.db.from("ca_billing").select("ca_firm_id, status").in("ca_firm_id", part),
+    ]);
+    for (const r of c ?? []) clientsBy.add(r.ca_firm_id);
+    for (const r of b ?? []) if (["active", "past_due", "pending"].includes(String(r.status))) paidBy.add(r.ca_firm_id);
+  }
+  const group = (key: (f: (typeof firms)[number]) => string | null) => {
+    const m = new Map<string, { label: string; signups: number; activated: number; paid: number }>();
+    for (const f of firms) {
+      const label = key(f);
+      if (!label) continue;
+      const row = m.get(label) ?? { label, signups: 0, activated: 0, paid: 0 };
+      row.signups++;
+      if (clientsBy.has(f.id)) row.activated++;
+      if (paidBy.has(f.id)) row.paid++;
+      m.set(label, row);
+    }
+    return [...m.values()].sort((a, b) => b.signups - a.signups).slice(0, 25);
+  };
+  return {
+    ready: true as const,
+    total: firms.length,
+    tracked: firms.filter((f) => f.signup_channel).length,
+    channels: group((f) => f.signup_channel ?? "not tracked"),
+    campaigns: group((f) => (f.signup_campaign ? `${f.signup_campaign}${f.signup_content ? ` · ${f.signup_content}` : ""}` : null)),
+  };
 }
 
 /* ── operations: the agents' work across firms ───────────── */

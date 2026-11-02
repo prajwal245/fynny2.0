@@ -26,6 +26,7 @@ export type Permission =
   | "team.manage"
   | "firms.view"
   | "firms.update"
+  | "firms.delete"
   | "kyc.review"
   | "ops.view"
   | "ops.retry"
@@ -38,7 +39,7 @@ export type Permission =
   | "audit.view";
 
 const ALL: Permission[] = [
-  "dashboard.view", "team.manage", "firms.view", "firms.update", "kyc.review", "ops.view", "ops.retry",
+  "dashboard.view", "team.manage", "firms.view", "firms.update", "firms.delete", "kyc.review", "ops.view", "ops.retry",
   "billing.view", "billing.refund", "billing.refund.unlimited", "billing.export", "coupons.manage", "support.manage", "audit.view",
 ];
 

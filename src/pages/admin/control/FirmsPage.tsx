@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { adminExtendTrial, adminFirm, adminFirms, adminSetFirmStatus } from "@/lib/admin/admin.functions";
+import { adminDeleteFirm, adminExtendTrial, adminFirm, adminFirms, adminSetFirmStatus, adminSetFirmsTest, adminSignupSources } from "@/lib/admin/admin.functions";
 import { adminCall, adminError } from "@/components/admin/adminClient";
 import { useAdminSession } from "@/components/admin/AdminSessionGate";
 import { Btn, Empty, ErrorNote, PageHead, Panel, Pill, Table, Td, day, line, muted, when } from "./ui";
@@ -19,16 +19,52 @@ export default function FirmsPage() {
   const [plan, setPlan] = useState<PlanFilter>("");
   const [page, setPage] = useState(0);
   const [open, setOpen] = useState<string | null>(null);
+  const [tests, setTests] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const qc = useQueryClient();
   const list = useQuery({
-    queryKey: ["admin", "firms", q, status, plan, page],
-    queryFn: () => adminCall(() => adminFirms({ data: { q, status, plan, page } })),
+    queryKey: ["admin", "firms", q, status, plan, page, tests],
+    queryFn: () => adminCall(() => adminFirms({ data: { q, status, plan, page, tests } })),
     placeholderData: (p) => p,
   });
+  const toggle = (id: string) => setPicked((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const bulkMark = async (isTest: boolean) => {
+    setBulkBusy(true);
+    try {
+      const r = await adminCall(() => adminSetFirmsTest({ data: { firmIds: [...picked], isTest } }));
+      if (r.failed.length) toast.error(r.failed.join("; "));
+      if (r.changed) toast.success(isTest ? `${r.changed} firm${r.changed === 1 ? "" : "s"} marked as test and removed from reports.` : `${r.changed} firm${r.changed === 1 ? "" : "s"} marked as real.`);
+      setPicked(new Set());
+      await qc.invalidateQueries({ queryKey: ["admin"] });
+    } catch (e) {
+      toast.error(adminError(e));
+    } finally {
+      setBulkBusy(false);
+    }
+  };
 
   return (
     <div>
       <PageHead title="Firms" sub="Every CA firm on FynHelp: plan, clients, how they signed up, and their account status." />
+      <SourcesPanel />
       <Panel>
+        <div className="flex gap-2 mb-3" role="tablist" aria-label="Real or test firms">
+          <Btn kind={tests ? undefined : "primary"} onClick={() => { setTests(false); setPicked(new Set()); setPage(0); }}>Real firms</Btn>
+          <Btn kind={tests ? "primary" : undefined} onClick={() => { setTests(true); setPicked(new Set()); setPage(0); }} testId="firms-tests-tab">Test firms</Btn>
+        </div>
+        {can("firms.update") && picked.size > 0 && (
+          <div className="flex flex-wrap items-center gap-2 mb-3 rounded-xl px-3 py-2" style={{ background: "rgba(138,30,24,.06)" }} data-testid="firm-bulk-bar">
+            <span className="text-sm font-medium">{picked.size} selected</span>
+            {!tests ? (
+              <Btn disabled={bulkBusy} onClick={() => void bulkMark(true)} testId="firm-bulk-test">Mark as test</Btn>
+            ) : (
+              <Btn disabled={bulkBusy} onClick={() => void bulkMark(false)}>Mark as real</Btn>
+            )}
+            <Btn onClick={() => setPicked(new Set())}>Clear</Btn>
+            <span className="text-xs" style={{ color: muted }}>{tests ? "Real firms count in reports and revenue." : "Test firms are left out of every report and the revenue figures. You can undo this."}</span>
+          </div>
+        )}
         <div className="flex flex-wrap gap-2 mb-4">
           <input className="rounded-lg border px-3 py-2 text-sm flex-1 min-w-[200px]" placeholder="Search firm, email or city" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} data-testid="firm-search" />
           <select className="rounded-lg border px-3 py-2 text-sm" value={status} onChange={(e) => { setStatus(e.target.value as Status); setPage(0); }} aria-label="Account status" data-testid="firm-status-filter">
@@ -48,11 +84,16 @@ export default function FirmsPage() {
         <ErrorNote error={list.error} />
         {list.data && list.data.rows.length === 0 && <Empty>No firms match.</Empty>}
         {list.data && list.data.rows.length > 0 && (
-          <Table head={["Firm", "Plan", "Clients", "Signed up", "Via", "Last sign-in", "Account"]} testId="firms-table">
+          <Table head={["", "Firm", "Plan", "Clients", "Signed up", "Came from", "Last sign-in", "Account"]} testId="firms-table">
             {list.data.rows.map((f) => (
               <tr key={f.id} className="cursor-pointer hover:bg-black/[.02]" onClick={() => setOpen(f.id)}>
                 <Td>
-                  <div className="font-semibold">{f.name}</div>
+                  {can("firms.update") && (
+                    <input type="checkbox" aria-label={`Select ${f.name}`} checked={picked.has(f.id)} onClick={(e) => e.stopPropagation()} onChange={() => toggle(f.id)} />
+                  )}
+                </Td>
+                <Td>
+                  <div className="font-semibold">{f.name} {f.looksLikeTest && <Pill tone="warn">looks like a test</Pill>}</div>
                   <div className="text-xs" style={{ color: muted }}>{f.email}{f.city ? ` · ${f.city}` : ""}</div>
                 </Td>
                 <Td>
@@ -61,7 +102,10 @@ export default function FirmsPage() {
                 </Td>
                 <Td className="tabular-nums">{f.clients}</Td>
                 <Td>{day(f.createdAt)}</Td>
-                <Td className="capitalize">{f.source}</Td>
+                <Td>
+                  <div className="capitalize">{f.channel ? f.channel.replace("-", " ") : <span style={{ color: muted }}>not tracked</span>}</div>
+                  {f.from && <div className="text-xs" style={{ color: muted }}>{f.from}</div>}
+                </Td>
                 <Td>{when(f.lastSignIn)}</Td>
                 <Td><Pill tone={STATUS_TONE[f.status]}>{f.status}</Pill></Td>
               </tr>
@@ -78,17 +122,19 @@ export default function FirmsPage() {
           </div>
         )}
       </Panel>
-      {open && <FirmDrawer firmId={open} onClose={() => setOpen(null)} canUpdate={can("firms.update")} />}
+      {open && <FirmDrawer firmId={open} onClose={() => setOpen(null)} canUpdate={can("firms.update")} canDelete={can("firms.delete")} />}
     </div>
   );
 }
 
-function FirmDrawer({ firmId, onClose, canUpdate }: { firmId: string; onClose: () => void; canUpdate: boolean }) {
+function FirmDrawer({ firmId, onClose, canUpdate, canDelete }: { firmId: string; onClose: () => void; canUpdate: boolean; canDelete: boolean }) {
   const qc = useQueryClient();
   const d = useQuery({ queryKey: ["admin", "firm", firmId], queryFn: () => adminCall(() => adminFirm({ data: { firmId } })) });
   const [note, setNote] = useState("");
   const [days, setDays] = useState(7);
   const [busy, setBusy] = useState(false);
+  const [confirmName, setConfirmName] = useState("");
+  const [alsoLogin, setAlsoLogin] = useState(false);
 
   const act = async (fn: () => Promise<unknown>, ok: string) => {
     setBusy(true);
@@ -170,6 +216,37 @@ function FirmDrawer({ firmId, onClose, canUpdate }: { firmId: string; onClose: (
                 </div>
               )}
             </div>
+            <div className="rounded-xl p-3" style={{ border: `1px solid ${line}` }} data-testid="firm-source">
+              <div className="font-semibold mb-1">Where they came from</div>
+              {d.data.attribution?.signup_channel ? (
+                <div>
+                  <span className="capitalize">{d.data.attribution.signup_channel.replace("-", " ")}</span>
+                  {[d.data.attribution.signup_source, d.data.attribution.signup_medium].filter(Boolean).length > 0 && <> · {[d.data.attribution.signup_source, d.data.attribution.signup_medium].filter(Boolean).join(" / ")}</>}
+                  {d.data.attribution.signup_campaign && <div className="text-xs" style={{ color: muted }}>Campaign {d.data.attribution.signup_campaign}{d.data.attribution.signup_content ? ` · ${d.data.attribution.signup_content}` : ""}</div>}
+                  {(d.data.attribution.signup_landing || d.data.attribution.signup_referrer_host) && <div className="text-xs" style={{ color: muted }}>{d.data.attribution.signup_referrer_host ? `via ${d.data.attribution.signup_referrer_host} · ` : ""}landed on {d.data.attribution.signup_landing ?? "—"}</div>}
+                </div>
+              ) : (
+                <span style={{ color: muted }}>Not tracked (signed up before source tracking, or the visitor was a tester).</span>
+              )}
+            </div>
+            {canUpdate && (
+              <div className="rounded-xl p-3" style={{ border: `1px solid ${line}` }}>
+                <div className="font-semibold mb-1">Test or real</div>
+                <p className="text-xs mb-2" style={{ color: muted }}>{f.is_test ? "This is a test firm: it is left out of every report and the revenue figures." : "Fake or test sign-ups should be marked as test, so they stop counting as customers. You can undo it."}</p>
+                <Btn disabled={busy} testId="firm-mark-test" onClick={() => void act(() => adminSetFirmsTest({ data: { firmIds: [firmId], isTest: !f.is_test } }), f.is_test ? "Marked as a real firm." : "Marked as a test firm.")}>{f.is_test ? "Mark as real" : "Mark as test"}</Btn>
+              </div>
+            )}
+            {canDelete && (
+              <div className="rounded-xl p-3" style={{ border: "1px solid rgba(138,30,24,.35)", background: "rgba(138,30,24,.04)" }} data-testid="firm-delete-box">
+                <div className="font-semibold mb-1" style={{ color: "#8A1E18" }}>Delete this firm</div>
+                <p className="text-xs mb-2" style={{ color: muted }}>Permanently removes the firm and its clients, documents, reports and chases. This cannot be undone. Firms that have paid cannot be deleted here. If you only want it out of the numbers, use Mark as test.</p>
+                <input className="rounded-lg border px-3 py-2 w-full" placeholder={`Type “${f.firm_name}” to confirm`} value={confirmName} onChange={(e) => setConfirmName(e.target.value)} data-testid="firm-delete-confirm" aria-label="Type the firm name to confirm deletion" />
+                <label className="flex items-center gap-2 mt-2 text-xs"><input type="checkbox" checked={alsoLogin} onChange={(e) => setAlsoLogin(e.target.checked)} /> Also delete the owner&rsquo;s login, so the email can sign up again (only if it belongs to no other firm)</label>
+                <div className="mt-2">
+                  <Btn kind="danger" disabled={busy || confirmName.trim() !== f.firm_name.trim()} testId="firm-delete" onClick={() => void (async () => { await act(() => adminDeleteFirm({ data: { firmId, confirmName, alsoDeleteLogin: alsoLogin } }), "Firm deleted."); onClose(); })()}>Delete firm permanently</Btn>
+                </div>
+              </div>
+            )}
             <div>
               <div className="font-semibold mb-1">Team</div>
               {d.data.members.length === 0 ? <p style={{ color: muted }}>Only the owner.</p> : (
@@ -199,5 +276,45 @@ function Stat({ label, value }: { label: string; value: number }) {
       <div className="text-xs" style={{ color: muted }}>{label}</div>
       <div className="text-lg font-semibold tabular-nums">{value}</div>
     </div>
+  );
+}
+
+function SourcesPanel() {
+  const [days, setDays] = useState(30);
+  const q = useQuery({ queryKey: ["admin", "sources", days], queryFn: () => adminCall(() => adminSignupSources({ data: { days } })) });
+  const d = q.data;
+  return (
+    <Panel
+      title="Sign-ups by source"
+      testId="signup-sources"
+      action={
+        <select className="rounded-lg border px-2 py-1 text-xs" value={days} onChange={(e) => setDays(Number(e.target.value))} aria-label="Period">
+          <option value={7}>Last 7 days</option><option value={30}>Last 30 days</option><option value={90}>Last 90 days</option>
+        </select>
+      }
+    >
+      <ErrorNote error={q.error} />
+      {d && !d.ready && <Empty>Source tracking switches on once the latest database change is applied.</Empty>}
+      {d && d.ready && d.total === 0 && <Empty>No real sign-ups in this period.</Empty>}
+      {d && d.ready && d.total > 0 && (
+        <>
+          <p className="text-xs mb-2" style={{ color: muted }}>{d.total} real sign-ups (test and demo firms left out). {d.tracked} have a recorded source; the rest signed up before tracking or without a trace.</p>
+          <Table head={["Channel", "Sign-ups", "Added a client", "Paying"]}>
+            {d.channels.map((r) => (
+              <tr key={r.label}><Td className="capitalize">{r.label.replace("-", " ")}</Td><Td className="tabular-nums">{r.signups}</Td><Td className="tabular-nums">{r.activated}</Td><Td className="tabular-nums">{r.paid}</Td></tr>
+            ))}
+          </Table>
+          {d.campaigns.length > 0 && (
+            <div className="mt-4">
+              <Table head={["Campaign · who or which ad", "Sign-ups", "Added a client", "Paying"]}>
+                {d.campaigns.map((r) => (
+                  <tr key={r.label}><Td>{r.label}</Td><Td className="tabular-nums">{r.signups}</Td><Td className="tabular-nums">{r.activated}</Td><Td className="tabular-nums">{r.paid}</Td></tr>
+                ))}
+              </Table>
+            </div>
+          )}
+        </>
+      )}
+    </Panel>
   );
 }

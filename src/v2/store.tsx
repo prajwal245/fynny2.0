@@ -8,6 +8,7 @@
  * and reloads the workspace after each action. Figures are always derived
  * from transactions read out of files the practice actually uploaded.
  */
+import { signupAttribution } from "@/lib/attribution";
 import {
   createContext,
   useContext,
@@ -795,6 +796,8 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
             partnerName: patch.partnerName,
             phone: patch.phone,
             whatsappOk: patch.whatsappOk,
+            // Where this firm came from; only used when the firm is first created.
+            attribution: signupAttribution(),
           },
         });
         firmId.current = res.id;

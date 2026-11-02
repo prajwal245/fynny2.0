@@ -673,6 +673,19 @@ export const savePracticeFirm = createServerFn({ method: "POST" })
         whatsappOk: z.boolean().optional(),
         /** Sent by the Settings page: an edit, not joining during onboarding. */
         settings: z.boolean().optional(),
+        /** First-touch source from the browser. Used only when the firm is created. */
+        attribution: z
+          .object({
+            channel: z.enum(["paid-search", "paid-social", "organic-search", "organic-social", "email", "referral", "direct", "other"]),
+            source: z.string().max(100).optional(),
+            medium: z.string().max(100).optional(),
+            campaign: z.string().max(100).optional(),
+            content: z.string().max(100).optional(),
+            term: z.string().max(100).optional(),
+            landing: z.string().max(200).optional(),
+            referrerHost: z.string().max(100).optional(),
+          })
+          .optional(),
       })
       .parse(d),
   )
@@ -758,6 +771,29 @@ export const savePracticeFirm = createServerFn({ method: "POST" })
     if (memberErr) {
       await db.from("ca_firms").delete().eq("id", firm.id);
       throw new Error(`Could not create the practice: ${memberErr.message}`);
+    }
+    // Where the firm came from. Best effort: a failure here (for example before the database change is
+    // applied) must never stop a sign-up.
+    if (data.attribution) {
+      const a = data.attribution;
+      try {
+        await db
+          .from("ca_firms")
+          .update({
+            signup_channel: a.channel,
+            signup_source: a.source ?? null,
+            signup_medium: a.medium ?? null,
+            signup_campaign: a.campaign ?? null,
+            signup_content: a.content ?? null,
+            signup_term: a.term ?? null,
+            signup_landing: a.landing ?? null,
+            signup_referrer_host: a.referrerHost ?? null,
+            signup_attributed_at: new Date().toISOString(),
+          } as never)
+          .eq("id", firm.id);
+      } catch (e) {
+        console.error(`[attribution] not saved: ${(e as Error).message}`);
+      }
     }
     return { id: firm.id as string, created: true };
   });

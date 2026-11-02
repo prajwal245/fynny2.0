@@ -80,6 +80,7 @@ export const adminFirms = createServerFn({ method: "POST" })
         status: z.enum(["active", "suspended", "flagged", ""]).optional(),
         plan: z.enum(["trial", "paid", "paused", "cancelled", ""]).optional(),
         page: z.number().int().min(0).max(1000).optional(),
+        tests: z.boolean().optional(),
       })
       .parse(d ?? {}),
   )
@@ -101,6 +102,21 @@ export const adminExtendTrial = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ firmId: z.string().uuid(), days: z.number().int().min(1).max(60) }).parse(d))
   .handler(async ({ data, context }) => (await import("./admin.server")).extendTrial(await gate(context, "firms.update"), data.firmId, data.days));
+
+export const adminSetFirmsTest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ firmIds: z.array(z.string().uuid()).min(1).max(100), isTest: z.boolean(), note: z.string().max(300).optional() }).parse(d))
+  .handler(async ({ data, context }) => (await import("./admin.server")).setFirmsTest(await gate(context, "firms.update"), data.firmIds, data.isTest, data.note ?? ""));
+
+export const adminDeleteFirm = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ firmId: z.string().uuid(), confirmName: z.string().max(300), alsoDeleteLogin: z.boolean() }).parse(d))
+  .handler(async ({ data, context }) => (await import("./admin.server")).deleteFirm(await gate(context, "firms.delete"), data.firmId, data.confirmName, data.alsoDeleteLogin));
+
+export const adminSignupSources = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ days: z.number().int().min(1).max(365) }).parse(d))
+  .handler(async ({ data, context }) => (await import("./admin.server")).signupSources(await gate(context, "firms.view"), data.days));
 
 /* ── operations ──────────────────────────────────────────── */
 

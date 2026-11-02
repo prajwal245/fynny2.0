@@ -5,6 +5,7 @@
  * server and scopes all reads and writes to it. Server modules are imported
  * inside handlers so nothing server-only reaches the browser bundle.
  */
+import { leadSchema } from "@/lib/leadSchema";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -680,6 +681,8 @@ export const savePracticeFirm = createServerFn({ method: "POST" })
         whatsappOk: z.boolean().optional(),
         /** Sent by the Settings page: an edit, not joining during onboarding. */
         settings: z.boolean().optional(),
+        /** First and last click campaign tags. Used only when the firm is created. */
+        lead: leadSchema.optional(),
         /** First-touch source from the browser. Used only when the firm is created. */
         attribution: z
           .object({
@@ -781,6 +784,13 @@ export const savePracticeFirm = createServerFn({ method: "POST" })
     }
     // Where the firm came from. Best effort: a failure here (for example before the database change is
     // applied) must never stop a sign-up.
+    if (data.lead && (Object.keys(data.lead.first ?? {}).length || Object.keys(data.lead.last ?? {}).length)) {
+      try {
+        await db.from("ca_firms").update({ lead_attribution: data.lead } as never).eq("id", firm.id);
+      } catch (e) {
+        console.error(`[lead] not saved on the firm: ${(e as Error).message}`);
+      }
+    }
     if (data.attribution) {
       const a = data.attribution;
       try {

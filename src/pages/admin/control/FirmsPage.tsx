@@ -228,6 +228,17 @@ function FirmDrawer({ firmId, onClose, canUpdate, canDelete }: { firmId: string;
               ) : (
                 <span style={{ color: muted }}>Not tracked (signed up before source tracking, or the visitor was a tester).</span>
               )}
+              {d.data.lead && (["first", "last"] as const).map((w) => {
+                const t = (d.data.lead as Record<string, Record<string, string>>)[w] ?? {};
+                const line = [t["utm_source"], t["utm_medium"]].filter(Boolean).join(" / ");
+                const ad = [t["utm_campaign"], t["utm_content"], t["utm_term"]].filter(Boolean).join(" · ");
+                if (!line && !ad && !t["gclid"] && !t["fbclid"]) return null;
+                return (
+                  <div key={w} className="text-xs mt-2" style={{ color: muted }}>
+                    <b style={{ color: "#171208" }}>{w === "first" ? "First click" : "Last click"}:</b> {line}{ad ? ` | ${ad}` : ""}{t["gclid"] ? " | gclid" : ""}{t["fbclid"] ? " | fbclid" : ""}
+                  </div>
+                );
+              })}
             </div>
             {canUpdate && (
               <div className="rounded-xl p-3" style={{ border: `1px solid ${line}` }}>

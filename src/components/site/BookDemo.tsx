@@ -6,8 +6,9 @@
 import type { CSSProperties, MouseEvent, ReactNode } from "react";
 import { CALENDLY_URL, trackCta } from "./cta";
 import { track } from "@/lib/analytics";
+import { calendlyUtm } from "@/lib/leadAttribution";
 
-type CalendlyApi = { initPopupWidget: (o: { url: string }) => void };
+type CalendlyApi = { initPopupWidget: (o: { url: string; utm?: Record<string, string> }) => void };
 declare global {
   interface Window {
     Calendly?: CalendlyApi;
@@ -49,7 +50,8 @@ export function openDemo(location: string) {
     });
   }
   loadCalendly()
-    .then((c) => c.initPopupWidget({ url: `${CALENDLY_URL}?hide_gdpr_banner=1` }))
+    // The booking carries the campaign, ad set and ad that brought the visitor (last click).
+    .then((c) => c.initPopupWidget({ url: `${CALENDLY_URL}?hide_gdpr_banner=1`, utm: calendlyUtm() }))
     .catch(() => window.open(CALENDLY_URL, "_blank", "noopener"));
 }
 

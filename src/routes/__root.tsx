@@ -141,10 +141,11 @@ function RootComponent() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const [{ initMobileApp }, { captureUtm }, { captureFirstTouch }, { captureReferral }, { initAnalytics }, { initMonitoring }] = await Promise.all([
+      const [{ initMobileApp }, { captureUtm }, { captureFirstTouch }, { captureLeadAttribution }, { captureReferral }, { initAnalytics }, { initMonitoring }] = await Promise.all([
         import("@/lib/capacitor"),
         import("@/lib/utm"),
         import("@/lib/attribution"),
+        import("@/lib/leadAttribution"),
         import("@/lib/referral"),
         import("@/lib/analytics"),
         import("@/lib/monitoring"),
@@ -153,6 +154,7 @@ function RootComponent() {
       initMobileApp();
       captureUtm();
       captureFirstTouch();
+      captureLeadAttribution();
       captureReferral();
       initAnalytics();
       initMonitoring();

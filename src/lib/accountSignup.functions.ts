@@ -5,6 +5,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { flatLead, leadSchema } from "@/lib/leadSchema";
 
 const accountSchema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -14,6 +15,8 @@ const accountSchema = z.object({
   phone: z.string().trim().min(1).max(24),
   /** The person agreed to setup help and trial updates on WhatsApp. */
   whatsappOk: z.boolean().optional(),
+  /** First click and last click campaign tags, saved on the new user and sent to the lead sheet. */
+  lead: leadSchema.optional(),
   /** Where the visitor came from (first touch), for the team's sign-up email. Not stored here. */
   attribution: z
     .object({
@@ -55,12 +58,16 @@ export const createAccount = createServerFn({ method: "POST" })
       email: data.email,
       password: data.password,
       email_confirm: true,
-      user_metadata: { full_name: data.name, phone: mobile.digits, whatsapp_ok: data.whatsappOk === true },
+      user_metadata: { full_name: data.name, phone: mobile.digits, whatsapp_ok: data.whatsappOk === true, ...(data.lead ? { lead: data.lead } : {}) },
     });
     if (!error) {
       // Tell the FynHelp team. Never blocks or fails the sign-up.
       const { notifyNewSignup } = await import("@/lib/practice/teamNotify.server");
-      await notifyNewSignup({ name: data.name, email: data.email, phone: mobile.digits, whatsappOk: data.whatsappOk === true, ...(data.attribution ?? {}) });
+      const { pushLeadToSheet } = await import("@/lib/practice/leadSheet.server");
+      await Promise.all([
+        notifyNewSignup({ name: data.name, email: data.email, phone: mobile.digits, whatsappOk: data.whatsappOk === true, lead: data.lead, ...(data.attribution ?? {}) }),
+        pushLeadToSheet({ type: "signup", name: data.name, email: data.email, phone: mobile.digits, whatsapp_ok: data.whatsappOk === true, ...flatLead(data.lead) }),
+      ]);
       return { ok: true, existed: false };
     }
     if (/already|exists|registered/i.test(error.message)) {

@@ -5,8 +5,18 @@
 import { brandedEmail } from "./emailLayout";
 import { sendEmail } from "./email.server";
 import { looksLikeTest } from "../admin/testLook";
+import type { LeadInput } from "../leadSchema";
 
 const DEFAULT_TO = ["nidhi@fynhelp.com", "prajwal@fynhelp.com", "adireddytarun@fynhelp.com"];
+
+const clickLines = (label: string, t: NonNullable<LeadInput["first"]> | undefined): [string, string][] => {
+  if (!t) return [];
+  const bits = [t.utm_source, t.utm_medium].filter(Boolean).join(" / ");
+  const ad = [t.utm_campaign, t.utm_content, t.utm_term].filter(Boolean).join(" · ");
+  const ids = [t.gclid ? "gclid" : "", t.fbclid ? "fbclid" : ""].filter(Boolean).join(", ");
+  const v = [bits, ad, ids].filter(Boolean).join(" | ");
+  return v ? [[label, v]] : [];
+};
 
 export const signupRecipients = (): string[] => {
   const set = (process.env["SIGNUP_NOTIFY_EMAILS"] ?? "").split(",").map((e) => e.trim().toLowerCase()).filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
@@ -25,6 +35,8 @@ export interface SignupFacts {
   content?: string;
   landing?: string;
   referrerHost?: string;
+  /** First and last click campaign tags. */
+  lead?: LeadInput;
 }
 
 /** Tells the team a new person signed up. Resolves quickly even if the mail provider is slow. */
@@ -41,6 +53,8 @@ export async function notifyNewSignup(f: SignupFacts): Promise<{ sent: boolean }
       ...(f.campaign ? ([["Campaign", `${f.campaign}${f.content ? ` · ${f.content}` : ""}`]] as [string, string][]) : []),
       ...(f.referrerHost ? ([["Referred by site", f.referrerHost]] as [string, string][]) : []),
       ...(f.landing ? ([["Landed on", f.landing]] as [string, string][]) : []),
+      ...clickLines("First click", f.lead?.first),
+      ...clickLines("Last click", f.lead?.last),
       ["Time (IST)", new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })],
     ];
     const { html, text } = brandedEmail(

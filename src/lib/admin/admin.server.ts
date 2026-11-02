@@ -202,11 +202,15 @@ export async function firmDetail(ctx: AdminCtx, firmId: string) {
     db.from("ca_activity_log").select("description, action_type, created_at").eq("ca_firm_id", firmId).order("created_at", { ascending: false }).limit(25),
   ]);
   if (!firm) throw new PracticeError("not_found", "Firm not found.");
+  // Tolerant: until the database change is applied this simply returns nothing.
+  const { data: leadRow } = await db.from("ca_firms").select("lead_attribution").eq("id", firmId).maybeSingle();
   const showBilling = can(ctx.roles, "billing.view");
   return {
     firm,
     /** Null until the source database change is applied, or for firms from before it. */
     attribution: attr ?? null,
+    /** First click and last click campaign tags (utm_*, gclid, fbclid), when saved. */
+    lead: (leadRow as { lead_attribution?: Record<string, Record<string, string>> } | null)?.lead_attribution ?? null,
     billing: billing ? (showBilling ? billing : { plan: billing.plan, cycle: billing.cycle, status: billing.status, trial_ends_at: billing.trial_ends_at }) : null,
     members: members ?? [],
     clients: clients ?? 0,

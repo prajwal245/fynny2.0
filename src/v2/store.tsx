@@ -9,6 +9,7 @@
  * from transactions read out of files the practice actually uploaded.
  */
 import { signupAttribution } from "@/lib/attribution";
+import { getLeadAttribution } from "@/lib/leadAttribution";
 import {
   createContext,
   useContext,
@@ -800,6 +801,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
             whatsappOk: patch.whatsappOk,
             // Where this firm came from; only used when the firm is first created.
             attribution: signupAttribution(),
+            lead: getLeadAttribution(),
           },
         });
         firmId.current = res.id;

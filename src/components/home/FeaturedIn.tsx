@@ -1,6 +1,6 @@
 import { ArrowUpRight } from "lucide-react";
 import { Link } from "@/lib/router-compat";
-import { PRESS, PRESS_POST_SLUG, featuredPress, pressLogo } from "@/content/press";
+import { isExternal, withLogos, type PressEntry } from "@/lib/press";
 import { C } from "@/lib/sitePalette";
 
 /**
@@ -38,7 +38,10 @@ const CSS = `
 }
 `;
 
-export default function FeaturedIn() {
+export default function FeaturedIn({ items }: { items: PressEntry[] }) {
+  const logos = withLogos(items);
+  // Nothing to show: no empty section.
+  if (logos.length === 0) return null;
   // Two identical halves make the loop seamless; the second half is hidden from assistive tech and the tab order.
   const halves = [0, 1];
   return (
@@ -50,29 +53,29 @@ export default function FeaturedIn() {
           Featured <span className="ital">in</span>
         </h2>
         <p className="fi-head">
-          FynHelp&rsquo;s launch has been covered by {PRESS.length} news outlets. Tap a logo to read the article.
+          FynHelp&rsquo;s launch has been covered by {items.filter((p) => p.kind === "news").length} news outlets. Tap a logo to read the article.
         </p>
       </div>
       <div className="fi-rail">
         <div className="fi-track">
           {halves.map((h) =>
-            featuredPress().map((p) => {
-              const logo = pressLogo(p.id);
+            logos.map((p) => {
+              const logo = p.logo;
               const dup = h === 1;
               return (
                 <a
                   key={`${h}-${p.id}`}
                   className={`fi-card${dup ? " fi-dup" : ""}`}
                   href={p.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={`${p.outlet}: read the FynHelp launch article (opens in a new tab)`}
+                  target={isExternal(p.url) ? "_blank" : undefined}
+                  rel={isExternal(p.url) ? "noopener noreferrer" : undefined}
+                  aria-label={`${p.outlet}: ${p.headline} (opens in a new tab)`}
                   aria-hidden={dup || undefined}
                   tabIndex={dup ? -1 : undefined}
                 >
                   <span className="fi-logo">
                     {logo ? (
-                      <img src={logo} alt={dup ? "" : p.outlet} loading="lazy" className={p.lightLogo ? "fi-light" : undefined} />
+                      <img src={logo} alt={dup ? "" : p.outlet} loading="lazy" className={p.logoInvert ? "fi-light" : undefined} />
                     ) : (
                       <span className="fi-word">{p.outlet}</span>
                     )}
@@ -87,8 +90,8 @@ export default function FeaturedIn() {
         </div>
       </div>
       <div className="fh-wrap">
-        <Link to={`/blog/${PRESS_POST_SLUG}`} className="fi-more">
-          See all {PRESS.length} articles on our blog &rarr;
+        <Link to="/press" className="fi-more">
+          Press &amp; media: all {items.length} articles &rarr;
         </Link>
       </div>
     </section>

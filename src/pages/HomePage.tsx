@@ -27,6 +27,7 @@ import {
 import Navbar from "@/components/Navbar";
 import FynLogo from "@/components/FynLogo";
 import FeaturedIn from "@/components/home/FeaturedIn";
+import type { PressEntry } from "@/lib/press";
 
 import { SiteFooter } from "@/components/site/SiteShell";
 import ProductShot from "@/components/site/ProductShot";
@@ -496,7 +497,7 @@ function Reveal({ children, delay = 0 }: { children: React.ReactNode; delay?: nu
 }
 
 
-export default function HomePage() {
+export default function HomePage({ press = [] }: { press?: PressEntry[] }) {
   const [billing, setBilling] = useState<"monthly" | "annual">("monthly");
   const cur = useCurrency();
 
@@ -920,7 +921,7 @@ export default function HomePage() {
       </section>
 
       {/* ── FEATURED IN ── */}
-      <FeaturedIn />
+      <FeaturedIn items={press} />
 
       {/* ── FAQ ── */}
       <section className="fh-sec" id="faq">

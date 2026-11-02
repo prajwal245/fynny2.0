@@ -27,6 +27,7 @@ export type Permission =
   | "firms.view"
   | "firms.update"
   | "firms.delete"
+  | "press.manage"
   | "kyc.review"
   | "ops.view"
   | "ops.retry"
@@ -39,14 +40,14 @@ export type Permission =
   | "audit.view";
 
 const ALL: Permission[] = [
-  "dashboard.view", "team.manage", "firms.view", "firms.update", "firms.delete", "kyc.review", "ops.view", "ops.retry",
+  "dashboard.view", "team.manage", "firms.view", "firms.update", "firms.delete", "press.manage", "kyc.review", "ops.view", "ops.retry",
   "billing.view", "billing.refund", "billing.refund.unlimited", "billing.export", "coupons.manage", "support.manage", "audit.view",
 ];
 
 export const PERMISSIONS: Record<AdminRole, Permission[]> = {
   super_admin: ALL,
   admin: ALL,
-  ops_admin: ["dashboard.view", "firms.view", "firms.update", "kyc.review", "ops.view", "ops.retry", "support.manage"],
+  ops_admin: ["dashboard.view", "firms.view", "firms.update", "press.manage", "kyc.review", "ops.view", "ops.retry", "support.manage"],
   support_agent: ["dashboard.view", "firms.view", "ops.view", "billing.view", "billing.refund", "support.manage"],
   finance_manager: ["dashboard.view", "billing.view", "billing.refund", "billing.refund.unlimited", "billing.export", "coupons.manage"],
   analyst: ["dashboard.view"],

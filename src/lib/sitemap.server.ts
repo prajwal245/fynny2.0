@@ -20,6 +20,7 @@ export const INDEXABLE_PAGES: { path: string; changefreq: "weekly" | "monthly" |
   { path: "/about", changefreq: "monthly", priority: "0.6" },
   { path: "/contact", changefreq: "yearly", priority: "0.5" },
   { path: "/blog", changefreq: "weekly", priority: "0.7" },
+  { path: "/press", changefreq: "weekly", priority: "0.7" },
   { path: "/guide", changefreq: "monthly", priority: "0.6" },
   { path: "/privacy", changefreq: "yearly", priority: "0.2" },
   { path: "/terms", changefreq: "yearly", priority: "0.2" },
@@ -63,12 +64,26 @@ function withOwn(db: PublishedPost[]): PublishedPost[] {
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const day = (d: string | null | undefined) => (d ? new Date(d).toISOString().slice(0, 10) : null);
 
+/** Date of the newest published press item, for the /press lastmod. Null if it cannot be read. */
+async function newestPress(): Promise<string | null> {
+  const sb = supabaseRest();
+  if (!sb) return null;
+  try {
+    const res = await fetch(`${sb.url}/rest/v1/press_items?select=published_on&status=eq.published&order=published_on.desc&limit=1`, { headers: { apikey: sb.key, Authorization: `Bearer ${sb.key}` } });
+    if (!res.ok) return null;
+    const rows = (await res.json()) as { published_on?: string }[];
+    return rows[0]?.published_on ? day(rows[0].published_on) : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function buildSitemap(): Promise<string> {
-  const posts = await publishedPosts();
+  const [posts, pressDay] = [await publishedPosts(), await newestPress()];
   const newestPost = day(posts[0]?.updated_at ?? posts[0]?.published_at);
   const rows = [
     ...INDEXABLE_PAGES.map((p) => {
-      const lastmod = p.path === "/blog" ? newestPost : null;
+      const lastmod = p.path === "/blog" ? newestPost : p.path === "/press" ? pressDay : null;
       return `  <url><loc>${esc(absoluteUrl(p.path))}</loc>${lastmod ? `<lastmod>${lastmod}</lastmod>` : ""}<changefreq>${p.changefreq}</changefreq><priority>${p.priority}</priority></url>`;
     }),
     ...posts.map((p) => {

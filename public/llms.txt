@@ -23,6 +23,7 @@ Pricing is per active client with unlimited users, and every price excludes GST:
 - [About](https://www.fynhelp.com/about): FynHelp, Bengaluru, India.
 - [Security](https://www.fynhelp.com/security): How client data is protected.
 - [Blog](https://www.fynhelp.com/blog): Guides for CA practices.
+- [Press & media](https://www.fynhelp.com/press): Coverage of FynHelp in the news, press releases, media contact and brand assets.
 - [Contact](https://www.fynhelp.com/contact): support@fynhelp.com.
 - [Privacy](https://www.fynhelp.com/privacy), [Terms](https://www.fynhelp.com/terms) and [Refunds](https://www.fynhelp.com/refund-policy).
 - [Product guide](https://www.fynhelp.com/guide): Every agent, workflow and rule explained.

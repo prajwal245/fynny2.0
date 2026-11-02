@@ -28,6 +28,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/admin/security-log", label: "Security Log", icon: ScrollText, roles: [], perm: "audit.view" },
   { to: "/admin/system-health", label: "System Health", icon: Activity, roles: [], perm: "ops.view" },
   { divider: true },
+  { to: "/admin/press", label: "Press & media", icon: Newspaper, roles: [], perm: "press.manage" },
   { to: "/admin/blog", label: "Blog", icon: Newspaper, roles: ["super_admin","admin","ops_admin","support_agent"] },
   { to: "/admin/content", label: "Resources & Glossary", icon: FileText, roles: ["super_admin","admin","ops_admin","support_agent"] },
   { to: "/admin/media", label: "Media Library", icon: ImageIcon, roles: ["super_admin","admin","ops_admin","support_agent"] },

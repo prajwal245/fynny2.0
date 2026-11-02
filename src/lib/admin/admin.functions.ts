@@ -118,6 +118,59 @@ export const adminSignupSources = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ days: z.number().int().min(1).max(365) }).parse(d))
   .handler(async ({ data, context }) => (await import("./admin.server")).signupSources(await gate(context, "firms.view"), data.days));
 
+/* ── press ───────────────────────────────────────────────── */
+
+const pressInput = z.object({
+  id: z.string().uuid().optional(),
+  kind: z.enum(["news", "release"]),
+  outlet: z.string().max(120),
+  headline: z.string().max(300),
+  summary: z.string().max(400).nullable().optional(),
+  url: z.string().max(1000),
+  publishedOn: z.string().max(10),
+  logoUrl: z.string().max(500).nullable().optional(),
+  logoInvert: z.boolean().optional(),
+  imageUrl: z.string().max(500).nullable().optional(),
+  status: z.enum(["published", "hidden"]),
+});
+
+export const adminPressList = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const ctx = await gate(context, "press.manage");
+    return (await import("../press.server")).listPress(ctx.db as never);
+  });
+
+export const adminPressMeta = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ url: z.string().max(1000) }).parse(d))
+  .handler(async ({ data, context }) => {
+    await gate(context, "press.manage");
+    return (await import("../press.server")).readArticleMeta(data.url);
+  });
+
+export const adminPressSave = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => pressInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const ctx = await gate(context, "press.manage");
+    const r = await (await import("../press.server")).savePress(ctx.db as never, data);
+    const { audit } = await import("./security.server");
+    await audit(ctx, r.created ? "press_added" : "press_updated", "press_item", r.id, { headline: r.headline, status: data.status });
+    return r;
+  });
+
+export const adminPressDelete = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const ctx = await gate(context, "press.manage");
+    const r = await (await import("../press.server")).deletePress(ctx.db as never, data.id);
+    const { audit } = await import("./security.server");
+    await audit(ctx, "press_deleted", "press_item", data.id, { headline: r.headline });
+    return { ok: true };
+  });
+
 /* ── operations ──────────────────────────────────────────── */
 
 export const adminRuns = createServerFn({ method: "POST" })

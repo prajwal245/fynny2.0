@@ -1,5 +1,3 @@
-import { SITE_URL } from "@/lib/seo";
-
 /**
  * Press coverage of the FynHelp launch. One entry per published article.
  * Headlines are taken from the article addresses. The home page strip shows the outlets that have a logo;
@@ -57,28 +55,4 @@ export function pressLogo(id: string): string | undefined {
   if (given) return given;
   const hit = Object.entries(logoFiles).find(([path]) => path.split("/").pop()?.replace(/\.[a-z]+$/, "") === id);
   return hit?.[1];
-}
-
-/** The outlets shown as logos on the home page: those that have one. */
-export const featuredPress = (): PressItem[] => PRESS.filter((p) => pressLogo(p.id));
-
-/** ItemList markup so search engines and AI answers can see the coverage. */
-export function pressLd(): Record<string, unknown> {
-  return {
-    "@context": "https://schema.org",
-    "@type": "ItemList",
-    name: "FynHelp in the news",
-    numberOfItems: PRESS.length,
-    itemListElement: PRESS.map((p, i) => ({
-      "@type": "ListItem",
-      position: i + 1,
-      item: {
-        "@type": "NewsArticle",
-        headline: p.headline,
-        url: p.url,
-        publisher: { "@type": "Organization", name: p.outlet },
-        about: { "@type": "Organization", name: "FynHelp", url: SITE_URL },
-      },
-    })),
-  };
 }

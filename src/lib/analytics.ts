@@ -1,5 +1,5 @@
 import posthog from "posthog-js";
-import { analyticsAllowed, GA_MEASUREMENT_ID, onConsentChange } from "./consent";
+import { analyticsAllowed, GA_MEASUREMENT_ID, marketingAllowed, onConsentChange } from "./consent";
 import { campaignParams } from "./utm";
 import { applyQaFromUrl, isQaMode } from "./qa";
 
@@ -9,13 +9,78 @@ const POSTHOG_HOST = import.meta.env.VITE_POSTHOG_HOST || "https://us.i.posthog.
 /** GA4 measurement ID (G-XXXXXXX). Unset = GA4 off. */
 const GA_ID = (import.meta.env.VITE_GA_MEASUREMENT_ID as string | undefined) || GA_MEASUREMENT_ID;
 
+/** Meta Pixel (Facebook and Instagram ads). Loaded only with the visitor's advertising consent. */
+export const META_PIXEL_ID = "1117288487577710";
+
 type Gtag = (...args: unknown[]) => void;
+type Fbq = ((...args: unknown[]) => void) & { callMethod?: (...a: unknown[]) => void; queue?: unknown[]; loaded?: boolean; version?: string; push?: unknown; disablePushState?: boolean };
 declare global {
   interface Window {
     dataLayer?: unknown[];
     gtag?: Gtag;
+    fbq?: Fbq;
+    _fbq?: Fbq;
   }
 }
+
+let pixelLoaded = false;
+let pixelPagesSeen = 0;
+
+/** The client app, admin and shared links are private: the pixel never records their page views. */
+const isPublicPath = (path: string) => !/^\/(app|admin|ca|dashboard|u|shared)(\/|$)/.test(path);
+
+/** Meta's own loader, started only after consent. Standard events only; no personal data is sent. */
+function loadMetaPixel() {
+  if (typeof window === "undefined" || pixelLoaded) return;
+  pixelLoaded = true;
+  if (!window.fbq) {
+    const n: Fbq = function (...args: unknown[]) {
+      if (n.callMethod) n.callMethod(...args);
+      else (n.queue as unknown[]).push(args);
+    } as Fbq;
+    window.fbq = n;
+    if (!window._fbq) window._fbq = n;
+    n.push = n;
+    n.loaded = true;
+    n.version = "2.0";
+    n.queue = [];
+    const t = document.createElement("script");
+    t.async = true;
+    t.src = "https://connect.facebook.net/en_US/fbevents.js";
+    document.head.appendChild(t);
+  }
+  // Meta's automatic tracking (route changes, button clicks, page metadata) is off: page views are sent below,
+  // for public pages only, and conversions are sent by name.
+  window.fbq.disablePushState = true;
+  window.fbq("set", "autoConfig", false, META_PIXEL_ID);
+  window.fbq("consent", "grant");
+  window.fbq("init", META_PIXEL_ID);
+  if (isPublicPath(window.location.pathname)) window.fbq("track", "PageView");
+}
+
+/** Starts or stops the pixel to match the visitor's current advertising choice. */
+export function syncMetaPixel() {
+  if (typeof window === "undefined" || isQaMode()) return;
+  if (marketingAllowed()) {
+    if (pixelLoaded && window.fbq) window.fbq("consent", "grant");
+    else loadMetaPixel();
+    return;
+  }
+  if (pixelLoaded && window.fbq) window.fbq("consent", "revoke");
+  // Remove the pixel's cookies on this site.
+  for (const c of document.cookie.split(";")) {
+    const name = c.split("=")[0]?.trim();
+    if (name && /^_fb[pc]$/.test(name)) document.cookie = `${name}=; Max-Age=0; path=/`;
+  }
+}
+
+/** Our conversions in Meta's standard event names. */
+const META_EVENT: Partial<Record<string, string>> = {
+  sign_up: "CompleteRegistration",
+  demo_requested: "Lead",
+  waitlist_signup: "Lead",
+  subscription_upgraded: "Subscribe",
+};
 
 /** GA4 conversion names for our events (the rest are sent as they are). */
 const GA_EVENT: Partial<Record<string, string>> = {
@@ -55,8 +120,13 @@ export function initAnalytics() {
   if (isQaMode()) return;
   if (!watching && typeof window !== "undefined") {
     watching = true;
-    onConsentChange((c) => (c.analytics ? initAnalytics() : stopAnalytics()));
+    onConsentChange((c) => {
+      if (c.analytics) initAnalytics();
+      else stopAnalytics();
+      syncMetaPixel();
+    });
   }
+  syncMetaPixel();
   if (!analyticsAllowed() || started) return;
   started = true;
   initGA();
@@ -107,6 +177,8 @@ export function resetAnalytics() {
 export function trackPageView(path: string, properties?: Record<string, unknown>) {
   if (isQaMode()) return;
   const search = safeSearch(properties?.search as string | undefined);
+  // Meta Pixel counts the first page itself on load; later route changes are told here.
+  if (pixelLoaded && marketingAllowed() && window.fbq && isPublicPath(path) && pixelPagesSeen++ > 0) window.fbq("track", "PageView");
   // GA4 counts route changes itself (enhanced measurement, browser history), so only PostHog is told here.
   if (!POSTHOG_KEY) return;
   posthog.capture("$pageview", { $current_url: window.location.origin + path + search, ...properties, search });
@@ -169,6 +241,7 @@ export function track(event: FynHelpEvent, properties?: Record<string, unknown>)
     return;
   }
   if (typeof window !== "undefined" && window.gtag && GA_ID) window.gtag("event", GA_EVENT[event] ?? event, props);
+  if (pixelLoaded && marketingAllowed() && window.fbq && META_EVENT[event]) window.fbq("track", META_EVENT[event]);
   if (!POSTHOG_KEY) return;
   posthog.capture(event, { ...props, timestamp: new Date().toISOString() });
 }

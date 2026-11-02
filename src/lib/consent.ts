@@ -1,11 +1,14 @@
 /**
  * Cookie consent. Strictly necessary storage (sign-in, security) is always on.
- * Analytics (Google Analytics 4, PostHog) loads only after the visitor agrees,
- * and stops again if they withdraw. The choice lives in this browser only.
+ * Analytics (Google Analytics 4, PostHog) and advertising measurement (Meta Pixel) each load only
+ * after the visitor agrees to that kind, and stop again if they withdraw.
+ * The choice lives in this browser only.
  */
 export interface Consent {
   v: 1;
   analytics: boolean;
+  /** Advertising measurement (Meta Pixel). Absent for choices made before it existed: counts as off. */
+  marketing?: boolean;
   at: string;
 }
 
@@ -28,8 +31,8 @@ export function readConsent(): Consent | null {
   }
 }
 
-export function saveConsent(analytics: boolean): Consent {
-  const c: Consent = { v: 1, analytics, at: new Date().toISOString() };
+export function saveConsent(analytics: boolean, marketing = false): Consent {
+  const c: Consent = { v: 1, analytics, marketing, at: new Date().toISOString() };
   try {
     window.localStorage.setItem(KEY, JSON.stringify(c));
   } catch {
@@ -50,3 +53,5 @@ export function openCookieSettings() {
 }
 
 export const analyticsAllowed = () => readConsent()?.analytics === true;
+
+export const marketingAllowed = () => readConsent()?.marketing === true;

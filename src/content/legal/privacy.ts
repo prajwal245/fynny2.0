@@ -265,6 +265,11 @@ export const PRIVACY: LegalDoc = {
      "Usage data"
     ],
     [
+     "Meta Platforms (Meta Pixel)",
+     "Measuring the performance of our advertisements, only with your consent",
+     "Page visits, sign-up and demo-request events, and cookie and device identifiers"
+    ],
+    [
      "Sentry",
      "Error monitoring",
      "Technical error data and limited identifiers"
@@ -364,7 +369,7 @@ export const PRIVACY: LegalDoc = {
   {
    "t": "c",
    "n": "6.2",
-   "text": "We use analytics cookies only with consent obtained through our cookie banner. Preferences may be changed at any time. We do not use advertising cookies and do not sell browsing data."
+   "text": "We use analytics cookies, and an advertising-measurement tag (the Meta Pixel, operated by Meta Platforms), only with consent obtained through our cookie banner, where each can be switched on or off separately. The Meta Pixel tells us which of our advertisements led to a visit or a sign-up; it is not loaded unless you allow it. Preferences may be changed at any time. We do not sell browsing data."
   },
   {
    "t": "h",

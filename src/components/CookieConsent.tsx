@@ -1,7 +1,7 @@
 /**
  * Cookie banner: shown until the visitor chooses, then never again (the choice
- * is kept in this browser). Analytics stays off until "Accept all" or until
- * analytics is switched on in Cookie settings.
+ * is kept in this browser). Analytics and advertising measurement stay off until "Accept all" or
+ * until each is switched on in Cookie settings.
  */
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "@tanstack/react-router";
@@ -26,6 +26,7 @@ export default function CookieConsent() {
   const [showBanner, setShowBanner] = useState(false);
   const [settings, setSettings] = useState(false);
   const [analytics, setAnalytics] = useState(false);
+  const [marketing, setMarketing] = useState(false);
   const dialog = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -33,8 +34,10 @@ export default function CookieConsent() {
     const c = readConsent();
     setShowBanner(!c);
     setAnalytics(c?.analytics ?? false);
+    setMarketing(c?.marketing ?? false);
     const open = () => {
       setAnalytics(readConsent()?.analytics ?? false);
+      setMarketing(readConsent()?.marketing ?? false);
       setSettings(true);
     };
     window.addEventListener(OPEN_SETTINGS_EVENT, open);
@@ -52,9 +55,11 @@ export default function CookieConsent() {
   // The internal admin panel and shared report links carry no analytics choice of their own.
   if (!mounted || pathname.startsWith("/admin")) return null;
 
-  const choose = (allow: boolean) => {
-    saveConsent(allow);
-    setAnalytics(allow);
+  /** "Accept all" / "Reject" set both kinds; "Save choices" keeps each switch as it is. */
+  const choose = (allow: boolean, a: boolean = allow, m: boolean = allow) => {
+    saveConsent(a, m);
+    setAnalytics(a);
+    setMarketing(m);
     setShowBanner(false);
     setSettings(false);
   };
@@ -101,7 +106,7 @@ export default function CookieConsent() {
         >
           <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, flex: "1 1 320px" }}>
             We use essential cookies to keep you signed in and secure. With your permission we also use analytics
-            cookies (Google Analytics, PostHog) to see which pages help. No advertising cookies.{" "}
+            cookies (Google Analytics, PostHog) to see which pages help, and the Meta Pixel to measure our ads.{" "}
             <a href="/privacy#s6" style={{ color: maroon, fontWeight: 600, textDecoration: "underline" }}>Privacy Policy</a>
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, flex: "0 1 auto" }}>
@@ -142,10 +147,19 @@ export default function CookieConsent() {
                 </label>
               }
             />
-            <Row title="Advertising" text="None. FynHelp does not use advertising or cross-site tracking cookies." control={<span style={{ fontSize: 12.5, opacity: 0.7 }}>Not used</span>} />
+            <Row
+              title="Advertising measurement"
+              text="Meta Pixel (Facebook and Instagram) tells us which of our ads brought a visit or a sign-up. Off until you switch it on."
+              control={
+                <label style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13 }}>
+                  <input type="checkbox" checked={marketing} onChange={(e) => setMarketing(e.target.checked)} data-testid="cookie-marketing" style={{ width: 18, height: 18, accentColor: maroon }} />
+                  {marketing ? "On" : "Off"}
+                </label>
+              }
+            />
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "flex-end", marginTop: 18 }}>
               <button type="button" style={btn("ghost")} onClick={() => choose(false)}>Reject non-essential</button>
-              <button type="button" style={btn("ghost")} onClick={() => choose(analytics)} data-testid="cookie-save">Save choices</button>
+              <button type="button" style={btn("ghost")} onClick={() => choose(false, analytics, marketing)} data-testid="cookie-save">Save choices</button>
               <button type="button" style={btn("primary")} onClick={() => choose(true)}>Accept all</button>
             </div>
             <p style={{ margin: "14px 0 0", fontSize: 12.5 }}>

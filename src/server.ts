@@ -57,16 +57,17 @@ function contentSecurityPolicy(): string {
   const supaWs = supa.replace(/^http/, "ws");
   const analytics = "https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://stats.g.doubleclick.net";
   const posthog = "https://us.i.posthog.com https://us-assets.i.posthog.com";
+  const meta = "https://connect.facebook.net https://www.facebook.com";
   const razorpay = "https://checkout.razorpay.com https://api.razorpay.com https://lumberjack.razorpay.com";
   const calendly = "https://calendly.com https://assets.calendly.com";
   const local = /^http:\/\/(127\.0\.0\.1|localhost)/.test(supa) ? " ws://127.0.0.1:* ws://localhost:*" : "";
   return [
     "default-src 'self'",
-    `script-src 'self' 'unsafe-inline' ${analytics} ${posthog} ${razorpay} ${calendly}`,
+    `script-src 'self' 'unsafe-inline' ${analytics} ${posthog} ${meta} ${razorpay} ${calendly}`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.fontshare.com https://assets.calendly.com",
     "font-src 'self' data: https://fonts.gstatic.com https://cdn.fontshare.com https://api.fontshare.com",
     "img-src 'self' data: blob: https:",
-    `connect-src 'self' ${supa} ${supaWs} ${analytics} ${posthog} ${razorpay} https://api.pwnedpasswords.com https://*.ingest.us.sentry.io https://*.ingest.sentry.io${local}`.replace(/\s+/g, " "),
+    `connect-src 'self' ${supa} ${supaWs} ${analytics} ${posthog} ${meta} ${razorpay} https://api.pwnedpasswords.com https://*.ingest.us.sentry.io https://*.ingest.sentry.io${local}`.replace(/\s+/g, " "),
     `frame-src 'self' ${razorpay} ${calendly} https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com`,
     "worker-src 'self' blob:",
     "media-src 'self' blob: https:",

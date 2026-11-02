@@ -14,6 +14,18 @@ const accountSchema = z.object({
   phone: z.string().trim().min(1).max(24),
   /** The person agreed to setup help and trial updates on WhatsApp. */
   whatsappOk: z.boolean().optional(),
+  /** Where the visitor came from (first touch), for the team's sign-up email. Not stored here. */
+  attribution: z
+    .object({
+      channel: z.string().max(40).optional(),
+      source: z.string().max(100).optional(),
+      medium: z.string().max(100).optional(),
+      campaign: z.string().max(100).optional(),
+      content: z.string().max(100).optional(),
+      landing: z.string().max(200).optional(),
+      referrerHost: z.string().max(100).optional(),
+    })
+    .optional(),
 });
 
 export type CreateAccountResult = { ok: true; existed: boolean } | { ok: false; message: string };
@@ -45,7 +57,12 @@ export const createAccount = createServerFn({ method: "POST" })
       email_confirm: true,
       user_metadata: { full_name: data.name, phone: mobile.digits, whatsapp_ok: data.whatsappOk === true },
     });
-    if (!error) return { ok: true, existed: false };
+    if (!error) {
+      // Tell the FynHelp team. Never blocks or fails the sign-up.
+      const { notifyNewSignup } = await import("@/lib/practice/teamNotify.server");
+      await notifyNewSignup({ name: data.name, email: data.email, phone: mobile.digits, whatsappOk: data.whatsappOk === true, ...(data.attribution ?? {}) });
+      return { ok: true, existed: false };
+    }
     if (/already|exists|registered/i.test(error.message)) {
       // The browser signs in with the password next; that decides whether it is theirs.
       await db.rpc("confirm_pending_signup", { p_email: data.email });

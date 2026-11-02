@@ -1,3 +1,4 @@
+import { signupAttribution } from "@/lib/attribution";
 import { startGmailConnect } from "@/lib/caGmail.functions";
 import PasswordInput from "../components/PasswordInput";
 import { PASSWORD_HINT, PASSWORD_MIN } from "@/lib/passwordPolicy";
@@ -172,7 +173,7 @@ export default function OnboardingPage() {
       }
       const mobile = parseMobile(account.phone);
       if (!mobile) { toast.error("Enter a valid mobile number, for example 98200 11223."); return; }
-      const created = await createAccountFn({ data: { name: account.name.trim(), email, password: account.password, phone: account.phone, whatsappOk: account.whatsappOk } }).catch(
+      const created = await createAccountFn({ data: { name: account.name.trim(), email, password: account.password, phone: account.phone, whatsappOk: account.whatsappOk, attribution: signupAttribution() } }).catch(
         () => ({ ok: false as const, message: "We couldn't create your account just now. Check your connection and try again." }),
       );
       if (!created.ok) { toast.error(created.message); return; }

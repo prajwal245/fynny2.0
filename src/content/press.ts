@@ -21,18 +21,18 @@ const SLUG = "every-month-indias-ca-firms-lose-a-week-to-reconciliation-fynhelp-
 export const PRESS: PressItem[] = [
   {
     id: "dailyhunt",
-    outlet: "Dailyhunt (R News India)",
+    outlet: "Dailyhunt",
     url: "https://m.dailyhunt.in/news/india/english/r+news+india-epaper-dhfacc36dfce9c4bb68db0e89d033c921b/every+month+indias+ca+firms+lose+a+week+to+reconciliation+fynhelp+launches+to+win+it+back-newsid-dhfacc36dfce9c4bb68db0e89d033c921b_2299f150d68311f181fe103af9ee8acf?sm=Y",
   },
-  { id: "wowentrepreneurs", outlet: "WOW Entrepreneurs", url: `https://wowentrepreneurs.com/${SLUG}/` },
+  { id: "wowentrepreneurs", outlet: "Wow Entrepreneurs", url: `https://wowentrepreneurs.com/${SLUG}/` },
   { id: "entrepreneursaga", outlet: "Entrepreneur Saga", url: `https://entrepreneursaga.com/${SLUG}/` },
   { id: "deccanbusiness", outlet: "Deccan Business", url: `https://deccanbusiness.com/${SLUG}/` },
   { id: "businessreporter", outlet: "Business Reporter", url: `https://businessreporter.in/${SLUG}/` },
-  { id: "1moneymania", outlet: "1Money Mania", url: `https://1moneymania.in/${SLUG}/` },
+  { id: "1moneymania", outlet: "1MoneyMania", url: `https://1moneymania.in/${SLUG}/` },
   { id: "rdtimes", outlet: "RD Times", url: `https://biz.rdtimes.in/${SLUG}/` },
   { id: "republicnewsindia", outlet: "Republic News India", url: `https://business.republicnewsindia.com/${SLUG}/` },
   { id: "theindianbulletin", outlet: "The Indian Bulletin", url: `https://biz.theindianbulletin.com/${SLUG}/` },
-  { id: "newshead", outlet: "News Head", url: `https://business.newshead.in/${SLUG}/` },
+  { id: "newshead", outlet: "NewsHead", url: `https://business.newshead.in/${SLUG}/` },
   { id: "indianscoops", outlet: "Indian Scoops", url: `https://business.indianscoops.com/${SLUG}/` },
 ];
 

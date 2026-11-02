@@ -9,10 +9,10 @@ export const POSTS_C: StaticPost[] = [
     slug: PRESS_POST_SLUG,
     title: "FynHelp in the news: why India's CA firms lose a week to reconciliation",
     excerpt:
-      "FynHelp's launch has been published by 11 news outlets. Read the coverage, and what FynHelp does for CA firms at month-end.",
+      `FynHelp's launch has been published by ${PRESS.length} news outlets. Read the coverage, and what FynHelp does for CA firms at month-end.`,
     seo_title: "FynHelp in the News: CA Firms Lose a Week to Reconciliation",
     seo_description:
-      "FynHelp's launch coverage from 11 outlets: why CA firms in India lose a week each month to reconciliation, and how FynHelp's four agents win it back.",
+      `FynHelp's launch coverage from ${PRESS.length} outlets: why CA firms in India lose a week each month to reconciliation, and how FynHelp's four agents win it back.`,
     category: "News",
     tags: ["FynHelp in the news", "FynHelp launch", "CA firms reconciliation", "month-end close", "press"],
     reading_time_minutes: 3,

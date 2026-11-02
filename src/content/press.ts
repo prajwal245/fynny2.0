@@ -27,15 +27,10 @@ export const PRESS: PressItem[] = [
     url: "https://m.dailyhunt.in/news/india/english/r+news+india-epaper-dhfacc36dfce9c4bb68db0e89d033c921b/every+month+indias+ca+firms+lose+a+week+to+reconciliation+fynhelp+launches+to+win+it+back-newsid-dhfacc36dfce9c4bb68db0e89d033c921b_2299f150d68311f181fe103af9ee8acf?sm=Y",
   },
   { id: "wowentrepreneurs", logo: "https://res.cloudinary.com/ghxledou/image/upload/v1793602195/Wow-Entrepreneurs-Logo-PNG.png", outlet: "Wow Entrepreneurs", url: `https://wowentrepreneurs.com/${SLUG}/` },
-  { id: "entrepreneursaga", outlet: "Entrepreneur Saga", url: `https://entrepreneursaga.com/${SLUG}/` },
   { id: "deccanbusiness", logo: "https://res.cloudinary.com/ghxledou/image/upload/v1793602195/Deccan-Business-PNG-300x104.png", outlet: "Deccan Business", url: `https://deccanbusiness.com/${SLUG}/` },
   { id: "businessreporter", logo: "https://res.cloudinary.com/ghxledou/image/upload/v1793602654/Unconfirmed_848793.png", outlet: "Business Reporter", url: `https://businessreporter.in/${SLUG}/` },
-  { id: "1moneymania", outlet: "1MoneyMania", url: `https://1moneymania.in/${SLUG}/` },
-  { id: "rdtimes", outlet: "RD Times", url: `https://biz.rdtimes.in/${SLUG}/` },
   { id: "republicnewsindia", logo: "https://res.cloudinary.com/ghxledou/image/upload/v1793602195/cropped-Republic-News-India-New-Logo-PNG.png", outlet: "Republic News India", url: `https://business.republicnewsindia.com/${SLUG}/` },
   { id: "theindianbulletin", logo: "https://res.cloudinary.com/ghxledou/image/upload/v1793602195/cropped-The-Indian-Bulletin-LOGO-PNG.png", outlet: "The Indian Bulletin", url: `https://biz.theindianbulletin.com/${SLUG}/` },
-  { id: "newshead", outlet: "NewsHead", url: `https://business.newshead.in/${SLUG}/` },
-  { id: "indianscoops", outlet: "Indian Scoops", url: `https://business.indianscoops.com/${SLUG}/` },
 ];
 
 const logoFiles = import.meta.glob("/src/assets/press/*.{svg,png,webp,jpg}", {

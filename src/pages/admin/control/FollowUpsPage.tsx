@@ -76,9 +76,10 @@ export default function FollowUpsPage() {
             <div className="grid gap-2">
               {d.whatsapp.templates.map((t) => (
                 <div key={t.key} className="flex flex-wrap items-center gap-2 text-sm">
-                  <Pill tone={t.ok ? "good" : "warn"}>{t.ok ? "Ready" : "Not ready"}</Pill>
+                  <Pill tone={t.ok ? (t.marketing ? "warn" : "good") : "bad"}>{t.ok ? (t.marketing ? "Sending, Marketing rate" : "Ready") : "Not ready"}</Pill>
                   <code>{t.name}</code>
-                  {!t.ok && <span style={{ color: muted }}>{t.why}. Messages that need it wait and are left to a person.</span>}
+                  {!t.ok && <span style={{ color: muted }}>{t.why}. Messages that need it wait and are left to a person. Submit <code>{t.submitName}</code> as Utility (wording in the guide).</span>}
+                  {t.ok && t.marketing && <span style={{ color: muted }}>Meta classed this as Marketing, so each message costs more. Submit <code>{t.submitName}</code> as Utility and it is used automatically once approved.</span>}
                 </div>
               ))}
             </div>

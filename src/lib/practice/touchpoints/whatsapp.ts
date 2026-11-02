@@ -32,6 +32,29 @@ export const TOUCH_TEMPLATES: Record<TouchTemplateKey, { name: string; body: str
 /** The buttons on all three: one fixed link, and three quick replies that reach a person. */
 export const TOUCH_BUTTONS = { url: { text: "Open FynHelp", url: "https://fynhelp.com/app" }, replies: ["Call me", "Not now", "Stop messages"] as const };
 
+/**
+ * Plainer wording for the same three messages, to submit as Utility under new names (Meta locks a name's
+ * category once it is approved, so a reclassified template needs a new name). They say only what happened on the
+ * person's own account and what the buttons do: no question, no offer. The variables mean the same as above.
+ */
+export const TOUCH_TEMPLATES_UTILITY: Record<TouchTemplateKey, { name: string; body: string; example: [string, string, string] }> = {
+  setup: {
+    name: "fh_setup_help_v2",
+    body: "Hello {{1}}, this is FynHelp about your account for {{2}}. Set-up is not finished yet. {{3}} The buttons below let you ask us to call, pause these messages or stop them.",
+    example: TOUCH_TEMPLATES.setup.example,
+  },
+  trial: {
+    name: "fh_trial_update_v2",
+    body: "Hello {{1}}, this is an update about the FynHelp trial for {{2}}. The trial {{3}}. Your data is saved. The buttons below let you ask us to call, pause these messages or stop them.",
+    example: TOUCH_TEMPLATES.trial.example,
+  },
+  plan: {
+    name: "fh_plan_help_v2",
+    body: "Hello {{1}}, this is an update about the FynHelp plan for {{2}}. The payment {{3}}. Your data is saved. The buttons below let you ask us to call, pause these messages or stop them.",
+    example: TOUCH_TEMPLATES.plan.example,
+  },
+};
+
 export const templateNameFor = (key: TouchTemplateKey, env: Partial<Record<TouchTemplateKey, string | undefined>> = {}) => env[key] || TOUCH_TEMPLATES[key].name;
 
 /** Which template a stall uses, and how long after the follow-up opens it goes (the email, where there is one, goes first). */
@@ -129,12 +152,34 @@ export function touchButtonComponents(buttons: Btn[], id: string): Record<string
   return qrs.map((x, n) => ({ type: "button", sub_type: "quick_reply", index: String(x.i), parameters: [{ type: "payload", payload: touchPayload(id, TOUCH_ACTIONS[n]) }] }));
 }
 
-/** Approved, not Marketing, and with exactly the buttons we can fill. */
-export function touchTemplateUsable(t: MetaTemplate | undefined): { ok: boolean; why?: string } {
+/** Approved, not Marketing (unless `allowMarketing`), and with exactly the buttons we can fill. */
+export function touchTemplateUsable(t: MetaTemplate | undefined, opts: { allowMarketing?: boolean } = {}): { ok: boolean; why?: string } {
   if (!t) return { ok: false, why: "does not exist in WhatsApp Manager" };
   if (t.status.toUpperCase() !== "APPROVED") return { ok: false, why: `is ${t.status.toLowerCase().replace("_", " ")}` };
-  if ((t.category ?? "").toUpperCase() === "MARKETING") return { ok: false, why: "was classed as Marketing" };
+  if (!opts.allowMarketing && (t.category ?? "").toUpperCase() === "MARKETING") return { ok: false, why: "was classed as Marketing" };
   const bar = (t.components ?? []).find((c) => c.type === "BUTTONS");
   if (!bar?.buttons || !touchButtonComponents(bar.buttons, "00000000-0000-0000-0000-000000000000")) return { ok: false, why: "does not have the three quick-reply buttons" };
   return { ok: true };
+}
+
+/** Marketing templates may be used unless WHATSAPP_TOUCH_ALLOW_MARKETING is 0 or false. They cost more per message. */
+export const marketingAllowed = (flag: string | undefined) => !/^(0|false|no|off)$/i.test((flag ?? "").trim());
+
+/**
+ * The template to send a follow-up with. Utility wins: the plain wording (`_v2` name, or the name in the environment
+ * setting) is tried first, then the original name. A Marketing template is used only when nothing Utility works and
+ * Marketing is allowed.
+ */
+export function pickTouchTemplate(
+  key: TouchTemplateKey,
+  list: MetaTemplate[],
+  o: { envName?: string; language: string; allowMarketing: boolean },
+): { name: string; template?: MetaTemplate; marketing: boolean; why: string | null } {
+  const names = [...new Set([o.envName || TOUCH_TEMPLATES_UTILITY[key].name, TOUCH_TEMPLATES[key].name])];
+  const find = (n: string) => list.find((x) => x.name === n && (x.language === o.language || x.language.startsWith(o.language)));
+  for (const n of names) if (touchTemplateUsable(find(n)).ok) return { name: n, template: find(n), marketing: false, why: null };
+  if (o.allowMarketing)
+    for (const n of names) if (touchTemplateUsable(find(n), { allowMarketing: true }).ok) return { name: n, template: find(n), marketing: true, why: null };
+  const first = names[0];
+  return { name: first, marketing: false, why: touchTemplateUsable(find(first)).why ?? "not usable" };
 }

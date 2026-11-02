@@ -805,17 +805,29 @@ export async function followUps(ctx: AdminCtx, status: "open" | "closed") {
   // Is WhatsApp ready for follow-ups? One line per template, in words.
   const { touchSender } = await import("../practice/touchpoints/whatsapp.server");
   const { listTemplates } = await import("../practice/whatsappTemplates.server");
-  const { TOUCH_TEMPLATES, templateNameFor, touchTemplateUsable } = await import("../practice/touchpoints/whatsapp");
+  const { TOUCH_TEMPLATES_UTILITY, pickTouchTemplate, marketingAllowed } = await import("../practice/touchpoints/whatsapp");
   const sender = touchSender();
   const metaList = sender?.wabaId ? await listTemplates({ wabaId: sender.wabaId, token: sender.token }) : null;
   const names = { setup: process.env["WHATSAPP_TOUCH_SETUP_TEMPLATE"], trial: process.env["WHATSAPP_TOUCH_TRIAL_TEMPLATE"], plan: process.env["WHATSAPP_TOUCH_PLAN_TEMPLATE"] };
   const whatsapp = {
     ready: Boolean(sender?.wabaId && metaList),
     problem: !sender ? "FynHelp's WhatsApp number or token is not set up." : !sender.wabaId ? "Add WHATSAPP_WABA_ID so FynHelp can check the templates." : !metaList ? "Could not read the templates from Meta." : null,
+    marketingAllowed: marketingAllowed(process.env["WHATSAPP_TOUCH_ALLOW_MARKETING"]),
     templates: (["setup", "trial", "plan"] as const).map((k) => {
-      const name = templateNameFor(k, names);
-      const u = metaList ? touchTemplateUsable(metaList.find((t) => t.name === name && t.language.startsWith("en"))) : { ok: false, why: "not checked" };
-      return { key: k, name, ok: u.ok, why: u.why ?? null, body: TOUCH_TEMPLATES[k].body };
+      const pick = metaList
+        ? pickTouchTemplate(k, metaList, { envName: names[k], language: "en", allowMarketing: marketingAllowed(process.env["WHATSAPP_TOUCH_ALLOW_MARKETING"]) })
+        : { name: names[k] || TOUCH_TEMPLATES_UTILITY[k].name, template: undefined, marketing: false, why: "not checked" };
+      return {
+        key: k,
+        /** The template that will be used (or the one to submit, when none works). */
+        name: pick.name,
+        ok: Boolean(pick.template),
+        /** Sending, but at the Marketing rate: submit the plain wording as Utility to bring the cost down. */
+        marketing: pick.marketing,
+        why: pick.template ? null : pick.why,
+        submitName: TOUCH_TEMPLATES_UTILITY[k].name,
+        body: TOUCH_TEMPLATES_UTILITY[k].body,
+      };
     }),
   };
 

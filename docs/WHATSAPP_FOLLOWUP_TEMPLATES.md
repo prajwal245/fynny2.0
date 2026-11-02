@@ -39,6 +39,19 @@ Hello {{1}}, this is FynHelp about the plan for {{2}}. The payment {{3}}. Nothin
 
 Keep the wording plain: no emojis, offers, discounts or urgency. If Meta classes one as Marketing, reword it and resubmit; FynHelp will not use it until it is Utility.
 
+## If Meta classes a template as Marketing
+Meta sometimes reclassifies a Utility template as Marketing after approval, and the category cannot be changed on an approved template. FynHelp handles it two ways:
+- **Marketing is allowed by default**, so follow-ups still go out with the approved template, at the Marketing rate (a few times the Utility rate). To forbid it, set `WHATSAPP_TOUCH_ALLOW_MARKETING=0` in Vercel; those follow-ups then wait for a person.
+- **Utility is always preferred.** Submit plainer versions under new names and FynHelp switches to them by itself once they are approved as Utility. Category **Utility**, language `en`, the same four buttons as above. `{{1}}` name, `{{2}}` firm, `{{3}}` as before:
+
+| Name | Body |
+|---|---|
+| `fh_setup_help_v2` | `Hello {{1}}, this is FynHelp about your account for {{2}}. Set-up is not finished yet. {{3}} The buttons below let you ask us to call, pause these messages or stop them.` |
+| `fh_trial_update_v2` | `Hello {{1}}, this is an update about the FynHelp trial for {{2}}. The trial {{3}}. Your data is saved. The buttons below let you ask us to call, pause these messages or stop them.` |
+| `fh_plan_help_v2` | `Hello {{1}}, this is an update about the FynHelp plan for {{2}}. The payment {{3}}. Your data is saved. The buttons below let you ask us to call, pause these messages or stop them.` |
+
+They state only what happened on the person's own account and what the buttons do: no question and no offer, which is what pushes Meta towards Marketing. Meta may still reclassify; if so the original templates keep working.
+
 ## Switch it on
 1. Make sure these are set in Vercel (they are the same ones the Chaser uses): `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_DEFAULT_PHONE_NUMBER_ID`, **`WHATSAPP_WABA_ID`** (needed so FynHelp can check each template is approved and Utility).
 2. Optional, only if you used other template names: `WHATSAPP_TOUCH_SETUP_TEMPLATE`, `WHATSAPP_TOUCH_TRIAL_TEMPLATE`, `WHATSAPP_TOUCH_PLAN_TEMPLATE`.

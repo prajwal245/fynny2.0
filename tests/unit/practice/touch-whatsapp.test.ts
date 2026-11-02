@@ -10,6 +10,8 @@ import {
   touchParams,
   touchPayload,
   touchTemplateUsable,
+  pickTouchTemplate,
+  marketingAllowed,
 } from "@/lib/practice/touchpoints/whatsapp";
 import type { MetaTemplate } from "@/lib/practice/whatsappFlow";
 
@@ -71,6 +73,18 @@ describe("follow-up messages on WhatsApp", () => {
     expect(touchTemplateUsable(tpl("a", { status: "PENDING" })).why).toContain("pending");
     expect(touchTemplateUsable(tpl("a", { category: "MARKETING" })).why).toContain("Marketing");
     expect(touchTemplateUsable(tpl("a", { components: [{ type: "BODY" }] })).ok).toBe(false);
+  });
+
+  it("prefers a Utility template, and uses Marketing only when allowed and nothing else works", () => {
+    const o = { language: "en", allowMarketing: true };
+    const mkt = tpl("fh_setup_help", { category: "MARKETING" });
+    expect(pickTouchTemplate("setup", [mkt], o)).toMatchObject({ name: "fh_setup_help", marketing: true });
+    expect(pickTouchTemplate("setup", [mkt], { ...o, allowMarketing: false }).template).toBeUndefined();
+    expect(pickTouchTemplate("setup", [mkt, tpl("fh_setup_help_v2")], o)).toMatchObject({ name: "fh_setup_help_v2", marketing: false });
+    expect(pickTouchTemplate("setup", [], o).why).toContain("does not exist");
+    expect(marketingAllowed(undefined)).toBe(true);
+    expect(marketingAllowed("0")).toBe(false);
+    expect(marketingAllowed("false")).toBe(false);
   });
 
   it("the sending rules: consent, a valid number, no opt-out, not twice in 3 days, daytime only", () => {

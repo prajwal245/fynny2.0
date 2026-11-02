@@ -12,10 +12,10 @@ import {
   mayMessage,
   parseTouchPayload,
   phoneKey,
-  templateNameFor,
+  pickTouchTemplate,
+  marketingAllowed,
   touchButtonComponents,
   touchParams,
-  touchTemplateUsable,
   WA_PLAN,
 } from "./whatsapp";
 import type { TouchKind } from "./rules";
@@ -81,9 +81,10 @@ export async function sendTouchWhatsapps(db: Db, subjects: Subject[], now: Date,
     const key = phoneKey(r.phone as string);
     const ok = mayMessage({ consent: s.facts.whatsappOk, phone: r.phone as string, optedOut: !!key && stopped.has(key), sentToThisNumberRecently: !!key && recently.has(key), hour });
     if (!ok.ok) continue;
-    const name = templateNameFor(plan.template, templateEnv());
-    const t = list.find((x) => x.name === name && (x.language === lang() || x.language.startsWith(lang())));
-    if (!touchTemplateUsable(t).ok) continue;
+    const pick = pickTouchTemplate(plan.template, list, { envName: templateEnv()[plan.template], language: lang(), allowMarketing: marketingAllowed(env("WHATSAPP_TOUCH_ALLOW_MARKETING")) });
+    const name = pick.name;
+    const t = pick.template;
+    if (!t) continue;
     const params = touchParams(r.kind as TouchKind, s.facts, (r.detail ?? {}) as Record<string, unknown>);
     if (!params) continue;
     const bar = t!.components?.find((c) => c.type === "BUTTONS");

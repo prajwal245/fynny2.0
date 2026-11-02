@@ -459,6 +459,13 @@ export const getPracticeNumberSources = createServerFn({ method: "POST" })
     ),
   );
 
+export const requestPracticeSignoff = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: uuid, partnerMemberId: uuid, note: z.string().max(500).optional() }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./narrate.server")).requestSignoff(db, ctx, data.id, data.partnerMemberId, data.note ?? "")),
+  );
+
 export const signOffPracticeReport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) =>

@@ -781,6 +781,7 @@ export async function signOffReport(
     "narrate",
     `${by} signed off the ${data.report_type} for ${data.period}.`,
   );
+  await tellRequester(db, ctx, data as never, "signed_off", note ?? null);
   return { ok: true };
 }
 
@@ -824,6 +825,7 @@ export async function requestCorrection(
     "narrate",
     `${byName} asked for a correction on the ${data.report_type} for ${data.period}: ${note}`,
   );
+  await tellRequester(db, ctx, data as never, "sent_back", note);
   return { ok: true };
 }
 
@@ -854,6 +856,112 @@ export async function markCorrected(db: Db, ctx: FirmContext, reportId: string, 
     `${byName} marked the correction on the ${data.report_type} for ${data.period} as done${what?.trim() ? `: ${what.trim()}` : ""}. Ready for the partner to sign off.`,
   );
   return { ok: true };
+}
+
+const appBase = () => (process.env["PUBLIC_APP_URL"] || "https://www.fynhelp.com").replace(/\/$/, "");
+
+async function personEmail(db: Db, userId: string): Promise<string | null> {
+  try {
+    const { data } = await db.auth.admin.getUserById(userId);
+    return data?.user?.email ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** A short email about a report, in FynHelp's standard design. Never throws: email trouble must not undo the work. */
+async function mailAboutReport(
+  db: Db,
+  ctx: FirmContext,
+  to: string | null,
+  m: { subject: string; heading: string; greetingName: string; paragraphs: string[]; figures: [string, string][]; reportId: string; button: string; note?: string },
+) {
+  if (!to) return;
+  try {
+    const { brandedEmail } = await import("./emailLayout");
+    const { sendFirmEmail } = await import("./testMode.server");
+    const url = `${appBase()}/app/reports/${m.reportId}`;
+    const { html, text } = brandedEmail(
+      { preheader: m.paragraphs[0] ?? m.heading, greeting: `Hello ${m.greetingName},`, heading: m.heading, paragraphs: m.paragraphs, figures: m.figures, cta: { label: m.button, url }, note: m.note, signoff: ctx.firmName },
+      { footer: `You get this email because you work at ${ctx.firmName} on FynHelp.` },
+    );
+    await sendFirmEmail(db, ctx.firmId, { to, subject: m.subject, html, text, replyTo: ctx.firmEmail ?? undefined, fromName: ctx.firmName });
+  } catch (e) {
+    console.error(`[signoff email] ${(e as Error).message}`);
+  }
+}
+
+/**
+ * Someone preparing the MIS sends it to a named partner to sign off. The partner is emailed a link straight
+ * to the report; the request is kept on the report so both sides see who is waiting on whom.
+ */
+export async function requestSignoff(db: Db, ctx: FirmContext, reportId: string, partnerMemberId: string, note: string) {
+  const { data } = await db
+    .from("ca_reports_log")
+    .select("id, business_id, content, report_type, period, status, signed_off_at")
+    .eq("id", reportId)
+    .eq("ca_firm_id", ctx.firmId)
+    .maybeSingle();
+  if (!data) throw new PracticeError("not_found", "Report not found.");
+  if (data.signed_off_at) throw new PracticeError("already_signed_off", "This report is already signed off.");
+  const { data: member } = await db
+    .from("ca_firm_members")
+    .select("id, user_id, role, status")
+    .eq("id", partnerMemberId)
+    .eq("ca_firm_id", ctx.firmId)
+    .maybeSingle();
+  if (!member || member.status === "revoked" || !member.user_id) throw new PracticeError("bad_partner", "Pick a partner who has joined the firm.");
+  if (!["owner", "admin", "partner"].includes(String(member.role))) throw new PracticeError("not_partner", "Only a partner can sign off. Pick a partner.");
+  const [partnerName, partnerEmail, byName] = await Promise.all([personName(db, member.user_id as string), personEmail(db, member.user_id as string), personName(db, ctx.userId)]);
+  const { data: cl } = data.business_id
+    ? await db.from("ca_clients").select("client_name").eq("ca_firm_id", ctx.firmId).eq("business_id", data.business_id).maybeSingle()
+    : { data: null };
+  const clientName = (cl?.client_name as string | undefined) ?? "your client";
+  const request = {
+    partner_user_id: member.user_id,
+    partner_name: partnerName,
+    requested_by: ctx.userId,
+    requested_by_name: byName,
+    requested_at: new Date().toISOString(),
+    note: note.trim() || null,
+  };
+  await db
+    .from("ca_reports_log")
+    .update({ content: { ...((data.content ?? {}) as Record<string, unknown>), signoff_request: request } })
+    .eq("id", reportId);
+  await logActivity(db, ctx.firmId, data.business_id, "narrate", `${byName} asked ${partnerName} to sign off the ${data.report_type} for ${data.period}.`);
+  if (member.user_id !== ctx.userId) {
+    await mailAboutReport(db, ctx, partnerEmail, {
+      subject: `Sign-off needed: ${clientName}, ${data.period}`,
+      heading: `${byName} is waiting for your sign-off`,
+      greetingName: partnerName,
+      paragraphs: [`The ${data.report_type} for ${clientName} (${data.period}) is ready for your review. Open any figure to see the transactions behind it, then sign off or send it back with a note.`],
+      figures: [["Client", clientName], ["Period", String(data.period)], ["Prepared by", byName], ...(request.note ? ([["Note", request.note]] as [string, string][]) : [])],
+      reportId,
+      button: "Review and sign off",
+    });
+  }
+  return { ok: true, partnerName };
+}
+
+/** Tells whoever asked for the sign-off that it is done, or was sent back. Quiet if nobody asked. */
+async function tellRequester(db: Db, ctx: FirmContext, reportRow: { id: string; business_id: string | null; content: unknown; report_type: string | null; period: string | null }, outcome: "signed_off" | "sent_back", note?: string | null) {
+  const req = (reportRow.content as { signoff_request?: { requested_by?: string; requested_by_name?: string } } | null)?.signoff_request;
+  if (!req?.requested_by || req.requested_by === ctx.userId) return;
+  const [to, who] = await Promise.all([personEmail(db, req.requested_by), personName(db, ctx.userId)]);
+  const { data: cl } = reportRow.business_id
+    ? await db.from("ca_clients").select("client_name").eq("ca_firm_id", ctx.firmId).eq("business_id", reportRow.business_id).maybeSingle()
+    : { data: null };
+  const clientName = (cl?.client_name as string | undefined) ?? "your client";
+  await mailAboutReport(db, ctx, to, {
+    subject: outcome === "signed_off" ? `Signed off: ${clientName}, ${reportRow.period}` : `Changes needed: ${clientName}, ${reportRow.period}`,
+    heading: outcome === "signed_off" ? `${who} signed off the MIS` : `${who} sent the MIS back`,
+    greetingName: req.requested_by_name ?? "there",
+    paragraphs: [outcome === "signed_off" ? `The ${reportRow.report_type} for ${clientName} (${reportRow.period}) is signed off. That closes the month for this client.` : `The ${reportRow.report_type} for ${clientName} (${reportRow.period}) needs a change before it can be signed off.`, ...(note ? [`${who}: "${note}"`] : [])],
+    figures: [["Client", clientName], ["Period", String(reportRow.period ?? "")]],
+    reportId: reportRow.id,
+    button: outcome === "signed_off" ? "Open the report" : "See what to change",
+  });
 }
 
 async function personName(db: Db, userId: string): Promise<string> {

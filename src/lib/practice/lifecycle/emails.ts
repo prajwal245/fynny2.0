@@ -8,6 +8,7 @@
 import { monthName, arrearsLines, type Arrears } from "../billing/arrears";
 import { PLANS, TRIAL_MAX_ACTIVE_CLIENTS, TRIAL_MAX_DOCUMENTS, type Cycle, type PlanKey } from "../billing/plans";
 import type { LifecycleKind } from "./schedule";
+import { brandedEmail } from "../emailLayout";
 
 export interface EmailParts {
   subject: string;
@@ -277,8 +278,6 @@ export function lifecycleEmail(kind: LifecycleKind, c: EmailContext): EmailParts
   }
 }
 
-const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-
 /** HTML and text versions of an email. `appUrl` turns relative button paths into links. */
 export function renderEmail(parts: EmailParts, opts: { appUrl: string; firmName: string; unsubscribeUrl: string | null; category: "billing" | "lifecycle" }) {
   const link = (path: string) => (/^https?:\/\//.test(path) ? path : `${opts.appUrl.replace(/\/$/, "")}${path}`);
@@ -289,53 +288,17 @@ export function renderEmail(parts: EmailParts, opts: { appUrl: string; firmName:
         ? "You get these emails to help your firm get the most out of FynHelp."
         : "You get these emails to help your firm get the most out of FynHelp. A partner can turn them off in Settings.";
 
-  const text = [
-    `Hello ${opts.firmName},`,
-    "",
-    parts.heading,
-    "",
-    ...parts.paragraphs.flatMap((p) => [p, ""]),
-    ...(parts.figures?.length ? [...parts.figures.map(([k, v]) => `${k}: ${v}`), ""] : []),
-    ...(parts.bullets?.length ? [...parts.bullets.map((b) => `- ${b}`), ""] : []),
-    ...(parts.cta ? [`${parts.cta.label}: ${link(parts.cta.path)}`, ""] : []),
-    ...(parts.note ? [parts.note, ""] : []),
-    "The FynHelp team",
-    "",
-    "--",
-    footer,
-    ...(opts.category === "lifecycle" && opts.unsubscribeUrl ? [`Stop these emails: ${opts.unsubscribeUrl}`] : []),
-  ].join("\n");
-
-  const fig = parts.figures?.length
-    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:6px 0 18px;background:#F6F1E8;border-radius:12px">${parts.figures
-        .map(
-          ([k, v], i) =>
-            `<tr><td style="padding:10px 16px;font-size:14px;color:#5A534A;${i ? "border-top:1px solid #E9E1D3;" : ""}">${esc(k)}</td><td style="padding:10px 16px;font-size:14px;font-weight:600;text-align:right;color:#171208;${i ? "border-top:1px solid #E9E1D3;" : ""}">${esc(v)}</td></tr>`,
-        )
-        .join("")}</table>`
-    : "";
-  const bullets = parts.bullets?.length
-    ? `<ul style="margin:0 0 18px;padding-left:20px;color:#3A342C">${parts.bullets.map((b) => `<li style="margin:4px 0">${esc(b)}</li>`).join("")}</ul>`
-    : "";
-  const cta = parts.cta
-    ? `<p style="margin:22px 0 8px"><a href="${esc(link(parts.cta.path))}" style="display:inline-block;background:#E2673F;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 22px;border-radius:999px;font-size:15px">${esc(parts.cta.label)}</a></p>`
-    : "";
-  const html = `<!doctype html><html><body style="margin:0;padding:0;background:#F2EDE4">
-<span style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(parts.preheader)}</span>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F2EDE4"><tr><td align="center" style="padding:28px 14px">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#FFFDF9;border-radius:18px;border:1px solid #E9E1D3">
-<tr><td style="padding:26px 28px 6px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-weight:700;font-size:18px;color:#171208">FynHelp</td></tr>
-<tr><td style="padding:6px 28px 26px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-size:15px;line-height:1.6;color:#3A342C">
-<p style="margin:0 0 14px">Hello ${esc(opts.firmName)},</p>
-<h1 style="margin:0 0 12px;font-size:22px;line-height:1.3;color:#171208">${esc(parts.heading)}</h1>
-${parts.paragraphs.map((p) => `<p style="margin:0 0 14px">${esc(p)}</p>`).join("")}
-${fig}${bullets}${cta}
-${parts.note ? `<p style="margin:10px 0 0;font-size:13px;color:#6B645A">${esc(parts.note)}</p>` : ""}
-<p style="margin:22px 0 0">The FynHelp team</p>
-</td></tr></table>
-<p style="max-width:560px;margin:14px auto 0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-size:12px;line-height:1.5;color:#8A8276">${esc(footer)}${
-    opts.category === "lifecycle" && opts.unsubscribeUrl ? ` <a href="${esc(opts.unsubscribeUrl)}" style="color:#8A8276">Stop these emails</a>.` : ""
-  }</p>
-</td></tr></table></body></html>`;
-  return { html, text };
+  return brandedEmail(
+    {
+      preheader: parts.preheader,
+      greeting: `Hello ${opts.firmName},`,
+      heading: parts.heading,
+      paragraphs: parts.paragraphs,
+      figures: parts.figures,
+      bullets: parts.bullets,
+      cta: parts.cta ? { label: parts.cta.label, url: link(parts.cta.path) } : undefined,
+      note: parts.note,
+    },
+    { footer, unsubscribeUrl: opts.category === "lifecycle" ? opts.unsubscribeUrl : null },
+  );
 }

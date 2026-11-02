@@ -116,7 +116,10 @@ async function tell(db: Db, firmId: string, otherName: string, role: "referrer" 
       to: f.email as string,
       subject: "You earned a free month on FynHelp",
       text: `Hello ${f.firm_name},\n\n${message}\n\nThank you for spreading the word.\n\nFynHelp`,
-      html: `<div style="font-family:system-ui,Arial,sans-serif;font-size:15px;line-height:1.6;color:#141414"><p>Hello ${String(f.firm_name).replace(/[<&]/g, "")},</p><p>${message.replace(/[<&]/g, "")}</p><p>Thank you for spreading the word.</p><p>FynHelp</p></div>`,
+      html: (await import("./emailLayout")).brandedEmail(
+        { preheader: message, greeting: `Hello ${f.firm_name},`, heading: "You earned a free month", paragraphs: [message, "Thank you for spreading the word."] },
+        { footer: "You get this email because your firm took part in the FynHelp referral programme." },
+      ).html,
     }).catch(() => undefined);
 }
 

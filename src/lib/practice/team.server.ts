@@ -101,13 +101,19 @@ export async function inviteMember(
     to: email,
     subject: `${ctx.firmName} invited you to FynHelp`,
     text,
-    html: `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6">${text
-      .split("\n\n")
-      .map(
-        (p) =>
-          `<p>${p.replace(/\n/g, "<br>").replace(link, `<a href="${link}">${link}</a>`)}</p>`,
-      )
-      .join("")}</div>`,
+    html: (await import("./emailLayout")).brandedEmail(
+      {
+        preheader: `${ctx.firmName} invited you to work on their month-end close in FynHelp.`,
+        heading: `${ctx.firmName} invited you to FynHelp`,
+        paragraphs: [
+          `You have been invited to join ${ctx.firmName} on FynHelp as ${role}.`,
+          `Create your account with this email address (${email}). You will join the practice automatically.`,
+        ],
+        cta: { label: "Create your account", url: link },
+        signoff: ctx.firmName,
+      },
+      { footer: `You get this email because ${ctx.firmName} invited ${email} to FynHelp.` },
+    ).html,
     replyTo: ctx.firmEmail,
     fromName: ctx.firmName,
   });

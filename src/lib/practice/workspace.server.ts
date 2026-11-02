@@ -440,6 +440,15 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
             at: String(r.signed_off_at).slice(0, 10),
           }
         : undefined,
+      signoffRequest: (c.signoff_request as { partner_name?: string; partner_user_id?: string; requested_by_name?: string; requested_at?: string; note?: string | null } | null)?.partner_name
+        ? {
+            partnerName: (c.signoff_request as { partner_name: string }).partner_name,
+            partnerUserId: (c.signoff_request as { partner_user_id?: string }).partner_user_id ?? null,
+            byName: (c.signoff_request as { requested_by_name?: string }).requested_by_name ?? null,
+            at: (c.signoff_request as { requested_at?: string }).requested_at ?? null,
+            note: (c.signoff_request as { note?: string | null }).note ?? null,
+          }
+        : undefined,
       stale: staleIds.has(r.id),
       status: r.status ?? "generated",
       correction: (c.correction as Record<string, string | null> | null)?.note

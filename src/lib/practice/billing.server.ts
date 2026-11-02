@@ -589,8 +589,18 @@ const planLabel = (plan: PlanKey, cycle: Cycle) => `${PLANS[plan].name}, ${cycle
 async function billingMail(ctx: FirmContext, subject: string, lines: string[]) {
   if (!ctx.firmEmail) return;
   const text = [...lines, "", "Questions about billing: billing@fynhelp.com", "Refund and Cancellation Policy: https://fynhelp.com/refund-policy"].join("\n");
-  const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;");
-  const html = `<div style="font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;font-size:15px;line-height:1.6;color:#141414">${lines.map((l) => `<p>${esc(l)}</p>`).join("")}<p style="color:#666;font-size:13px">Questions about billing: <a href="mailto:billing@fynhelp.com">billing@fynhelp.com</a> · <a href="https://fynhelp.com/refund-policy">Refund and Cancellation Policy</a></p></div>`;
+  const { brandedEmail } = await import("./emailLayout");
+  const [first, ...rest] = lines;
+  const { html } = brandedEmail(
+    {
+      preheader: first ?? subject,
+      greeting: `Hello ${ctx.firmName},`,
+      heading: subject,
+      paragraphs: [first, ...rest].filter((l): l is string => Boolean(l)),
+      secondary: { label: "Refund and Cancellation Policy", url: "https://fynhelp.com/refund-policy" },
+    },
+    { footer: "You get this email because your firm has a FynHelp plan. Questions about billing: billing@fynhelp.com." },
+  );
   await sendEmail({ to: ctx.firmEmail, subject, text, html }).catch((e) => console.error(`[billing] email failed: ${(e as Error).message}`));
 }
 

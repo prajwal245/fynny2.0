@@ -6,6 +6,7 @@
  * escalates to a person instead of sending a third message. A resolved item,
  * a do-not-disturb client or a same-day repeat never sends anything.
  */
+import { plainEmailBody } from "../emailLayout";
 
 /** How a chase reaches the client. */
 export type ChaseChannel = "email" | "whatsapp" | "both";
@@ -135,13 +136,6 @@ export interface RenderedEmail {
   html: string;
 }
 
-const esc = (s: string) =>
-  s.replace(
-    /[&<>"]/g,
-    (c) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] as string,
-  );
-
 const what = (t: TemplateInput) =>
   `${t.item.toLowerCase()}${t.period ? ` for ${t.period}` : ""}`;
 
@@ -151,11 +145,7 @@ export interface GroupItem {
   dueDate: string | null;
 }
 
-const wrapHtml = (text: string) =>
-  `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#1a1a1a">${text
-    .split("\n\n")
-    .map((p) => `<p style="margin:0 0 12px">${esc(p).replace(/\n/g, "<br>")}</p>`)
-    .join("")}</div>`;
+const wrapHtml = (text: string) => plainEmailBody(text);
 
 const REPLY_LINE = "You can simply reply to this email with the document attached.";
 

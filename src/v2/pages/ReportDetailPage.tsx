@@ -11,6 +11,7 @@ import { openExceptions } from "../lib/exceptions";
 import { latestIds } from "../lib/reportStatus";
 import { useBilling } from "../lib/billing";
 import { PLANS } from "@/lib/practice/billing/plans";
+import { listPracticeTeam, requestPracticeSignoff } from "@/lib/practice/practice.functions";
 
 /** Older reports stored "SALARY — SALARY": show the text once. */
 function dedupeParticulars(p: string): string {
@@ -212,6 +213,11 @@ export default function ReportDetailPage() {
         ) : partnerView ? (
           <div>
             <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: V.muted, fontWeight: 700 }}>Partner review</div>
+            {report.signoffRequest && (
+              <div style={{ marginTop: 8, fontSize: 15, color: V.body }} data-testid="signoff-requested">
+                <b>{report.signoffRequest.byName ?? "A teammate"}</b> asked {report.signoffRequest.partnerName} to sign this off{report.signoffRequest.note ? `: "${report.signoffRequest.note}"` : "."}
+              </div>
+            )}
             <div style={{ fontSize: 14, marginTop: 6, marginBottom: 12 }}>Open any number to see the transactions behind it, then accept or send it back.</div>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
               <button className="v2-btn v2-btn-primary" onClick={() => setConfirming(true)} disabled={confirming}>Sign off</button>
@@ -220,7 +226,7 @@ export default function ReportDetailPage() {
             </div>
           </div>
         ) : (
-          <div style={{ fontSize: 13.5, color: V.body }} data-testid="awaiting-signoff">Waiting for partner sign off. Only a partner can sign off an MIS. Tally or Zoho stays the source of truth for the books.</div>
+          <SignoffRequest reportId={report.id} existing={report.signoffRequest} />
         )}
       </Card>
 
@@ -459,5 +465,61 @@ export default function ReportDetailPage() {
         )}
       </Drawer>
     </>
+  );
+}
+
+/** The preparer sends the MIS to a named partner, who is emailed a link straight to it. */
+function SignoffRequest({ reportId, existing }: { reportId: string; existing?: { partnerName: string; note?: string | null; at?: string | null } }) {
+  const [partners, setPartners] = useState<{ id: string; name: string }[]>([]);
+  const [partnerId, setPartnerId] = useState("");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [sentTo, setSentTo] = useState<string | null>(existing?.partnerName ?? null);
+  useEffect(() => {
+    let live = true;
+    void listPracticeTeam()
+      .then((t) => {
+        if (!live) return;
+        const list = t.members
+          .filter((m) => ["partner", "owner", "admin"].includes(String(m.role)) && m.status !== "pending" && !m.isYou)
+          .map((m) => ({ id: m.id as string, name: m.name || m.email || "Partner" }));
+        setPartners(list);
+        if (list.length === 1) setPartnerId(list[0].id);
+      })
+      .catch(() => undefined);
+    return () => { live = false; };
+  }, []);
+  const send = async () => {
+    setBusy(true);
+    try {
+      const r = await requestPracticeSignoff({ data: { id: reportId, partnerMemberId: partnerId, note: note.trim() || undefined } });
+      setSentTo(r.partnerName);
+      setNote("");
+      toast.success(`Sent to ${r.partnerName}. They have been emailed a link.`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not send it. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div data-testid="awaiting-signoff">
+      <div style={{ fontSize: 12, letterSpacing: ".12em", textTransform: "uppercase", color: V.muted, fontWeight: 700 }}>Waiting for partner sign off</div>
+      <div style={{ fontSize: 15.5, lineHeight: 1.6, color: V.body, marginTop: 6 }}>
+        {sentTo ? <>Sent to <b>{sentTo}</b> for sign off{existing?.at ? ` on ${formatDate(existing.at)}` : ""}. You will be emailed when it is signed off or sent back.</> : "Only a partner can sign off an MIS. Send it to a partner and they will get an email with a link straight to this report."}
+      </div>
+      {partners.length > 0 ? (
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
+          <select className="v2-input" style={{ minWidth: 200, fontSize: 15.5 }} value={partnerId} onChange={(e) => setPartnerId(e.target.value)} aria-label="Partner to sign off">
+            <option value="">Choose a partner</option>
+            {partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          <input className="v2-input" style={{ flex: "1 1 220px", minWidth: 0, fontSize: 15.5 }} placeholder="Note for the partner (optional)" value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} />
+          <button className="v2-btn v2-btn-primary" disabled={!partnerId || busy} data-busy={busy} onClick={() => void send()} data-testid="send-signoff">{sentTo ? "Send again" : "Send for sign off"}</button>
+        </div>
+      ) : (
+        <div style={{ fontSize: 14.5, color: V.muted, marginTop: 8 }}>No other partner has joined this firm yet. Invite one in Settings, Team.</div>
+      )}
+    </div>
   );
 }

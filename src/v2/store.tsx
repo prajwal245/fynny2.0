@@ -155,6 +155,8 @@ export type Report = {
   /** Matched lines for the month changed after this report was generated. */
   stale?: boolean;
   status?: string;
+  /** Who the MIS was sent to for sign-off, and by whom. */
+  signoffRequest?: { partnerName: string; partnerUserId?: string | null; byName?: string | null; at?: string | null; note?: string | null };
   correction?: { note: string; at: string; byName?: string | null; resolvedAt?: string | null; resolvedByName?: string | null; resolution?: string | null };
   revenue: number;
   expenses: number;

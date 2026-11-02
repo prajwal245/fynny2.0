@@ -24,11 +24,11 @@ const CSS = `
 .fi-logo { height:48px; display:flex; align-items:center; }
 .fi-logo img { max-height:44px; max-width:168px; width:auto; height:auto; object-fit:contain; display:block; }
 .fi-logo img.fi-light { filter:invert(1) hue-rotate(180deg); }
-.fi-word { font-family:'Fraunces',Georgia,serif; font-weight:600; font-size:20px; letter-spacing:-.01em; line-height:1.1; }
-.fi-read { display:inline-flex; align-items:center; gap:5px; font-size:12.5px; font-weight:600; color:${C.muted}; transition:color .25s ease, gap .25s ease; }
+.fi-word { font-family:'Fraunces',Georgia,serif; font-weight:600; font-size:21px; letter-spacing:-.01em; line-height:1.1; }
+.fi-read { display:inline-flex; align-items:center; gap:5px; font-size:14px; font-weight:600; color:${C.muted}; transition:color .25s ease, gap .25s ease; }
 .fi-card:hover .fi-read, .fi-card:focus-visible .fi-read { color:#A93838; gap:8px; }
-.fi-head { font-size:15px; line-height:1.6; color:${C.body}; max-width:62ch; margin-top:14px; }
-.fi-more { display:inline-block; margin-top:20px; font-size:14px; font-weight:600; color:#A93838; }
+.fi-head { font-size:16.5px; line-height:1.6; color:${C.body}; max-width:62ch; margin-top:14px; }
+.fi-more { display:inline-block; margin-top:20px; font-size:15.5px; font-weight:600; color:#A93838; }
 @media (max-width:640px){ .fi-card{ width:210px; height:136px; padding:16px 18px 14px; } .fi-track{ gap:14px; } }
 @media (prefers-reduced-motion: reduce){
   .fi-rail { -webkit-mask-image:none; mask-image:none; }

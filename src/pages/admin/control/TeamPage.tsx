@@ -40,7 +40,7 @@ export default function TeamPage() {
           </Btn>
         </div>
         <p className="text-xs mt-2" style={{ color: muted }}>
-          Super Admin: everything. Operations Manager: firms, operations, CA verification, support. Support Agent: view firms and billing, support tickets, refunds up to ₹5,000. Finance Manager: billing, refunds, exports, coupons.
+          Super Admin: everything. Operations Manager: firms, operations, CA verification, support. Support Agent: view firms and billing, support tickets, refunds up to ₹5,000. Finance Manager: billing, refunds, exports, coupons. Content Collaborator: the blog, press and media, resources and glossary only; no customers, firms, billing or support.
         </p>
       </Panel>
       <Panel>

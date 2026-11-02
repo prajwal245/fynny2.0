@@ -597,11 +597,11 @@ async function superAdmins(ctx: AdminCtx) {
 }
 
 export async function setRole(ctx: AdminCtx, userId: string, role: AdminRole) {
-  if (!ASSIGNABLE_ROLES.includes(role)) throw new PracticeError("bad_role", "Pick one of the four roles.");
+  if (!ASSIGNABLE_ROLES.includes(role)) throw new PracticeError("bad_role", "Pick one of the available roles.");
   if (userId === ctx.userId) throw new PracticeError("self", "Ask another Super Admin to change your own role.");
   const supers = await superAdmins(ctx);
   if (supers.has(userId) && role !== "super_admin" && supers.size <= 1) throw new PracticeError("last_super", "Keep at least one Super Admin.");
-  await ctx.db.from("user_roles").delete().eq("user_id", userId).in("role", ["super_admin", "admin", "ops_admin", "support_agent", "finance_manager", "analyst"]);
+  await ctx.db.from("user_roles").delete().eq("user_id", userId).in("role", ["super_admin", "admin", "ops_admin", "support_agent", "finance_manager", "analyst", "content_collaborator"]);
   const { error } = await ctx.db.from("user_roles").insert({ user_id: userId, role });
   if (error) throw new PracticeError("db_error", error.message);
   await ctx.db.rpc("admin_revoke_sessions", { target: userId });
@@ -610,7 +610,7 @@ export async function setRole(ctx: AdminCtx, userId: string, role: AdminRole) {
 }
 
 export async function inviteAdmin(ctx: AdminCtx, email: string, role: AdminRole) {
-  if (!ASSIGNABLE_ROLES.includes(role)) throw new PracticeError("bad_role", "Pick one of the four roles.");
+  if (!ASSIGNABLE_ROLES.includes(role)) throw new PracticeError("bad_role", "Pick one of the available roles.");
   const addr = email.trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addr)) throw new PracticeError("bad_email", "Enter a work email.");
   const site = process.env["SITE_URL"] || process.env["PUBLIC_SITE_URL"] || "https://fynhelp.com";
@@ -623,7 +623,7 @@ export async function inviteAdmin(ctx: AdminCtx, email: string, role: AdminRole)
     userId = list?.users.find((u) => u.email?.toLowerCase() === addr)?.id ?? null;
   }
   if (!userId) throw new PracticeError("invite_failed", invited.error?.message ?? "The invite could not be sent.");
-  await ctx.db.from("user_roles").delete().eq("user_id", userId).in("role", ["super_admin", "admin", "ops_admin", "support_agent", "finance_manager", "analyst"]);
+  await ctx.db.from("user_roles").delete().eq("user_id", userId).in("role", ["super_admin", "admin", "ops_admin", "support_agent", "finance_manager", "analyst", "content_collaborator"]);
   const { error } = await ctx.db.from("user_roles").insert({ user_id: userId, role });
   if (error) throw new PracticeError("db_error", error.message);
   await audit(ctx, "admin_invited", "user", userId, { email: addr, role });
@@ -640,7 +640,7 @@ export async function deactivateAdmin(ctx: AdminCtx, userId: string) {
   if (userId === ctx.userId) throw new PracticeError("self", "You cannot deactivate yourself.");
   const supers = await superAdmins(ctx);
   if (supers.has(userId) && supers.size <= 1) throw new PracticeError("last_super", "Keep at least one Super Admin.");
-  await ctx.db.from("user_roles").delete().eq("user_id", userId).in("role", ["super_admin", "admin", "ops_admin", "support_agent", "finance_manager", "analyst"]);
+  await ctx.db.from("user_roles").delete().eq("user_id", userId).in("role", ["super_admin", "admin", "ops_admin", "support_agent", "finance_manager", "analyst", "content_collaborator"]);
   await ctx.db.rpc("admin_revoke_sessions", { target: userId });
   await audit(ctx, "admin_deactivated", "user", userId, {});
   return { ok: true };

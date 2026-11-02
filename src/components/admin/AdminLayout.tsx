@@ -29,9 +29,9 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/admin/system-health", label: "System Health", icon: Activity, roles: [], perm: "ops.view" },
   { divider: true },
   { to: "/admin/press", label: "Press & media", icon: Newspaper, roles: [], perm: "press.manage" },
-  { to: "/admin/blog", label: "Blog", icon: Newspaper, roles: ["super_admin","admin","ops_admin","support_agent"] },
-  { to: "/admin/content", label: "Resources & Glossary", icon: FileText, roles: ["super_admin","admin","ops_admin","support_agent"] },
-  { to: "/admin/media", label: "Media Library", icon: ImageIcon, roles: ["super_admin","admin","ops_admin","support_agent"] },
+  { to: "/admin/blog", label: "Blog", icon: Newspaper, roles: ["super_admin","admin","ops_admin","support_agent","content_collaborator"] },
+  { to: "/admin/content", label: "Resources & Glossary", icon: FileText, roles: ["super_admin","admin","ops_admin","support_agent","content_collaborator"] },
+  { to: "/admin/media", label: "Media Library", icon: ImageIcon, roles: ["super_admin","admin","ops_admin","support_agent","content_collaborator"] },
   { to: "/admin/waitlist", label: "Waitlist", icon: UserPlus, roles: ["super_admin","admin","ops_admin","support_agent","analyst"] },
   { divider: true },
   { to: "/admin/settings", label: "Settings", icon: Settings, roles: ["super_admin","admin","ops_admin","support_agent","finance_manager","analyst"] },
@@ -42,7 +42,7 @@ const SUPPORT_ALLOWED_PATHS = ["/admin/content", "/admin/media", "/admin/communi
 
 const ROLE_LABEL: Record<AdminRole, string> = {
   super_admin: "Super Admin", admin: "Admin", ops_admin: "Ops Admin",
-  support_agent: "Support Agent", finance_manager: "Finance Manager", analyst: "Analyst", user: "User",
+  support_agent: "Support Agent", finance_manager: "Finance Manager", analyst: "Analyst", content_collaborator: "Content Collaborator", user: "User",
 };
 
 export function AdminProtected({ children, allowed }: { children?: ReactNode; allowed?: AdminRole[] }) {
@@ -82,6 +82,13 @@ export default function AdminLayout() {
   // Roles arrive asynchronously after sign-in; running the guards before they
   // land caused a redirect/toast loop on every admin page load.
   const rolesReady = !loading && roles.length > 0;
+  // A Content Collaborator has no business dashboard: they start in the blog.
+  const contentOnly = roles.length > 0 && roles.every((r) => r === "content_collaborator");
+  useEffect(() => {
+    if (rolesReady && contentOnly && (location.pathname === "/admin" || location.pathname === "/admin/" || location.pathname === "/admin/control")) {
+      nav("/admin/blog", { replace: true });
+    }
+  }, [rolesReady, contentOnly, location.pathname, nav]);
 
   useEffect(() => {
     if (!rolesReady) return;

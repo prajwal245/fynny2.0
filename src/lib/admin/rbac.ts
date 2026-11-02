@@ -5,12 +5,12 @@
  * Database role names are kept from the earlier admin: ops_admin is the
  * Operations Manager. The legacy "admin" role has Super Admin rights.
  */
-export type AdminRole = "super_admin" | "ops_admin" | "support_agent" | "finance_manager" | "admin" | "analyst";
+export type AdminRole = "super_admin" | "ops_admin" | "support_agent" | "finance_manager" | "admin" | "analyst" | "content_collaborator";
 
-export const ADMIN_ROLES: AdminRole[] = ["super_admin", "admin", "ops_admin", "support_agent", "finance_manager", "analyst"];
+export const ADMIN_ROLES: AdminRole[] = ["super_admin", "admin", "ops_admin", "support_agent", "finance_manager", "analyst", "content_collaborator"];
 
 /** Roles a Super Admin can hand out from Admin Team. */
-export const ASSIGNABLE_ROLES: AdminRole[] = ["super_admin", "ops_admin", "support_agent", "finance_manager"];
+export const ASSIGNABLE_ROLES: AdminRole[] = ["super_admin", "ops_admin", "support_agent", "finance_manager", "content_collaborator"];
 
 export const ROLE_LABEL: Record<AdminRole, string> = {
   super_admin: "Super Admin",
@@ -19,6 +19,7 @@ export const ROLE_LABEL: Record<AdminRole, string> = {
   support_agent: "Support Agent",
   finance_manager: "Finance Manager",
   analyst: "Analyst (read only)",
+  content_collaborator: "Content Collaborator",
 };
 
 export type Permission =
@@ -51,6 +52,8 @@ export const PERMISSIONS: Record<AdminRole, Permission[]> = {
   support_agent: ["dashboard.view", "firms.view", "ops.view", "billing.view", "billing.refund", "support.manage"],
   finance_manager: ["dashboard.view", "billing.view", "billing.refund", "billing.refund.unlimited", "billing.export", "coupons.manage"],
   analyst: ["dashboard.view"],
+  // Writes the blog, press and resources. No customers, billing, firms or support data.
+  content_collaborator: ["press.manage"],
 };
 
 /** The most a Support Agent may refund in one go, in rupees. */

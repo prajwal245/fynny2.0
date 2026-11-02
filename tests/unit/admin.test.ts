@@ -53,4 +53,10 @@ describe("billing ledger", () => {
     ]);
     expect(rows[0].firm).toBe("Firm A");
   });
+
+  it("a Content Collaborator can manage press and nothing about customers or money", () => {
+    expect(can(["content_collaborator"], "press.manage")).toBe(true);
+    for (const p of ["firms.view", "firms.update", "firms.delete", "billing.view", "billing.refund", "team.manage", "support.manage", "dashboard.view", "audit.view", "coupons.manage"] as const)
+      expect(can(["content_collaborator"], p), p).toBe(false);
+  });
 });

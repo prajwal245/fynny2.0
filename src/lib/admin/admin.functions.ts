@@ -9,7 +9,7 @@ import type { Permission } from "./rbac";
 
 type Ctx = { userId: string; claims: Record<string, unknown> };
 
-async function gate(context: Ctx, perm: Permission) {
+async function gate(context: Ctx, perm: Permission | null) {
   const { requireAdmin } = await import("./security.server");
   return requireAdmin(context.userId, context.claims as never, perm);
 }
@@ -40,7 +40,8 @@ export const adminStartSession = createServerFn({ method: "POST" })
 export const adminWhoAmI = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const ctx = await gate(context, "dashboard.view");
+    // Any signed-in admin may ask who they are; the business dashboard has its own permission.
+    const ctx = await gate(context, null);
     const { PERMISSIONS } = await import("./rbac");
     return { userId: ctx.userId, email: ctx.email, roles: ctx.roles, permissions: [...new Set(ctx.roles.flatMap((r) => PERMISSIONS[r]))], ip: ctx.ip };
   });

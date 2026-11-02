@@ -236,7 +236,8 @@ export async function startAdminSession(userId: string, claims: Claims) {
  * Every admin call goes through here. Throws AdminDenied (with the REAUTH
  * prefix where the person must sign in again) or returns the admin context.
  */
-export async function requireAdmin(userId: string, claims: Claims, perm: Permission): Promise<AdminCtx> {
+/** `perm` null: any signed-in admin (used to say who they are); every real action names its permission. */
+export async function requireAdmin(userId: string, claims: Claims, perm: Permission | null): Promise<AdminCtx> {
   const ip = clientIp();
   if (!networkAllowed(ip)) throw new AdminDenied("ip_blocked", "The admin panel cannot be reached from this network.");
   const db = await adminDb();
@@ -259,7 +260,7 @@ export async function requireAdmin(userId: string, claims: Claims, perm: Permiss
     throw new AdminDenied("session", "You were signed out after 15 minutes without activity.");
   }
   const ctx: AdminCtx = { db, userId, email: claims.email ?? null, roles, adminSessionId: row.id, ip };
-  if (!can(roles, perm)) {
+  if (perm && !can(roles, perm)) {
     await audit(ctx, "admin_denied", "permission", null, { perm });
     throw new AdminDenied("forbidden", "Your role does not allow this.");
   }

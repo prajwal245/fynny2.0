@@ -36,19 +36,36 @@ describe("Meta Pixel", () => {
     m.syncMetaPixel();
     expect(document.head.querySelector('script[src="https://connect.facebook.net/en_US/fbevents.js"]')).not.toBeNull();
     const q = queue();
-    expect(q).toContainEqual(["init", m.META_PIXEL_ID]);
-    expect(q).toContainEqual(["track", "PageView"]);
-    expect(m.META_PIXEL_ID).toBe("1117288487577710");
+    expect(q).toContainEqual(["init", "1117288487577710"]);
+    expect(q).toContainEqual(["init", "1746808626400829"]);
+    // A public page is counted by the site pixel only.
+    expect(q).toContainEqual(["trackSingle", "1117288487577710", "PageView"]);
+    expect(q).not.toContainEqual(["trackSingle", "1746808626400829", "PageView"]);
+  });
+
+  it("counts web app screens with the app pixel, but not screens that name a client or record", async () => {
+    const m = await load();
+    expect(m.pixelFor("/")).toBe("site");
+    expect(m.pixelFor("/pricing")).toBe("site");
+    expect(m.pixelFor("/app")).toBe("app");
+    expect(m.pixelFor("/app/onboarding")).toBe("app");
+    expect(m.pixelFor("/app/clients/3f2b8c1e-5a4d-4e6f-9a7b-1c2d3e4f5a6b")).toBeNull();
+    for (const p of ["/admin/firms", "/ca/portal", "/dashboard", "/u/abc", "/shared/mis/xyz"]) expect(m.pixelFor(p), p).toBeNull();
+    window.history.replaceState({}, "", "/app/onboarding");
+    m.saveConsent(true, true);
+    m.syncMetaPixel();
+    expect(queue()).toContainEqual(["trackSingle", "1746808626400829", "PageView"]);
   });
 
   it("does not record a page view on a private screen, and turns off Meta's automatic tracking", async () => {
-    window.history.replaceState({}, "", "/app/clients/abc");
+    window.history.replaceState({}, "", "/app/clients/3f2b8c1e-5a4d-4e6f-9a7b-1c2d3e4f5a6b");
     const m = await load();
     m.saveConsent(true, true);
     m.syncMetaPixel();
-    expect(queue()).not.toContainEqual(["track", "PageView"]);
+    expect(queue().filter((q) => q.includes("PageView"))).toEqual([]);
     expect(window.fbq?.disablePushState).toBe(true);
-    expect(queue()).toContainEqual(["set", "autoConfig", false, m.META_PIXEL_ID]);
+    expect(queue()).toContainEqual(["set", "autoConfig", false, "1117288487577710"]);
+    expect(queue()).toContainEqual(["set", "autoConfig", false, "1746808626400829"]);
   });
 
   it("treats older consent choices as advertising off", async () => {

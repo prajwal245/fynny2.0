@@ -9,8 +9,12 @@ const POSTHOG_HOST = import.meta.env.VITE_POSTHOG_HOST || "https://us.i.posthog.
 /** GA4 measurement ID (G-XXXXXXX). Unset = GA4 off. */
 const GA_ID = (import.meta.env.VITE_GA_MEASUREMENT_ID as string | undefined) || GA_MEASUREMENT_ID;
 
-/** Meta Pixel (Facebook and Instagram ads). Loaded only with the visitor's advertising consent. */
-export const META_PIXEL_ID = "1117288487577710";
+/**
+ * Meta Pixels (Facebook and Instagram ads), loaded only with the visitor's advertising consent.
+ * The site pixel sees the public website; the app pixel sees the web app (/app). Conversions go to both.
+ */
+export const META_SITE_PIXEL_ID = "1117288487577710";
+export const META_APP_PIXEL_ID = "1746808626400829";
 
 type Gtag = (...args: unknown[]) => void;
 type Fbq = ((...args: unknown[]) => void) & { callMethod?: (...a: unknown[]) => void; queue?: unknown[]; loaded?: boolean; version?: string; push?: unknown; disablePushState?: boolean };
@@ -26,8 +30,20 @@ declare global {
 let pixelLoaded = false;
 let pixelPagesSeen = 0;
 
-/** The client app, admin and shared links are private: the pixel never records their page views. */
-const isPublicPath = (path: string) => !/^\/(app|admin|ca|dashboard|u|shared)(\/|$)/.test(path);
+/**
+ * Which pixel, if any, records a page view. Public pages: the site pixel. The web app: the app pixel, but not
+ * a screen whose address names one client or record (an id), nor admin, CA portal, shared links or dashboards.
+ */
+export function pixelFor(path: string): "site" | "app" | null {
+  if (/^\/(admin|ca|dashboard|u|shared)(\/|$)/.test(path)) return null;
+  if (/^\/app(\/|$)/.test(path)) return /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(path) ? null : "app";
+  return "site";
+}
+
+function pageViewFor(path: string) {
+  const which = pixelFor(path);
+  if (which && window.fbq) window.fbq("trackSingle", which === "app" ? META_APP_PIXEL_ID : META_SITE_PIXEL_ID, "PageView");
+}
 
 /** Meta's own loader, started only after consent. Standard events only; no personal data is sent. */
 function loadMetaPixel() {
@@ -52,10 +68,12 @@ function loadMetaPixel() {
   // Meta's automatic tracking (route changes, button clicks, page metadata) is off: page views are sent below,
   // for public pages only, and conversions are sent by name.
   window.fbq.disablePushState = true;
-  window.fbq("set", "autoConfig", false, META_PIXEL_ID);
+  window.fbq("set", "autoConfig", false, META_SITE_PIXEL_ID);
+  window.fbq("set", "autoConfig", false, META_APP_PIXEL_ID);
   window.fbq("consent", "grant");
-  window.fbq("init", META_PIXEL_ID);
-  if (isPublicPath(window.location.pathname)) window.fbq("track", "PageView");
+  window.fbq("init", META_SITE_PIXEL_ID);
+  window.fbq("init", META_APP_PIXEL_ID);
+  pageViewFor(window.location.pathname);
 }
 
 /** Starts or stops the pixel to match the visitor's current advertising choice. */
@@ -178,7 +196,7 @@ export function trackPageView(path: string, properties?: Record<string, unknown>
   if (isQaMode()) return;
   const search = safeSearch(properties?.search as string | undefined);
   // Meta Pixel counts the first page itself on load; later route changes are told here.
-  if (pixelLoaded && marketingAllowed() && window.fbq && isPublicPath(path) && pixelPagesSeen++ > 0) window.fbq("track", "PageView");
+  if (pixelLoaded && marketingAllowed() && window.fbq && pixelPagesSeen++ > 0) pageViewFor(path);
   // GA4 counts route changes itself (enhanced measurement, browser history), so only PostHog is told here.
   if (!POSTHOG_KEY) return;
   posthog.capture("$pageview", { $current_url: window.location.origin + path + search, ...properties, search });

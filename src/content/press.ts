@@ -29,7 +29,7 @@ export const PRESS: PressItem[] = [
   { id: "wowentrepreneurs", logo: "https://res.cloudinary.com/ghxledou/image/upload/v1793602195/Wow-Entrepreneurs-Logo-PNG.png", outlet: "Wow Entrepreneurs", url: `https://wowentrepreneurs.com/${SLUG}/` },
   { id: "entrepreneursaga", outlet: "Entrepreneur Saga", url: `https://entrepreneursaga.com/${SLUG}/` },
   { id: "deccanbusiness", logo: "https://res.cloudinary.com/ghxledou/image/upload/v1793602195/Deccan-Business-PNG-300x104.png", outlet: "Deccan Business", url: `https://deccanbusiness.com/${SLUG}/` },
-  { id: "businessreporter", outlet: "Business Reporter", url: `https://businessreporter.in/${SLUG}/` },
+  { id: "businessreporter", logo: "https://res.cloudinary.com/ghxledou/image/upload/v1793602654/Unconfirmed_848793.png", outlet: "Business Reporter", url: `https://businessreporter.in/${SLUG}/` },
   { id: "1moneymania", outlet: "1MoneyMania", url: `https://1moneymania.in/${SLUG}/` },
   { id: "rdtimes", outlet: "RD Times", url: `https://biz.rdtimes.in/${SLUG}/` },
   { id: "republicnewsindia", logo: "https://res.cloudinary.com/ghxledou/image/upload/v1793602195/cropped-Republic-News-India-New-Logo-PNG.png", outlet: "Republic News India", url: `https://business.republicnewsindia.com/${SLUG}/` },

@@ -554,7 +554,30 @@ export default function HomePage() {
           </Reveal>
           <Reveal delay={140}>
             <div style={{ maxWidth: 1080, margin: "44px auto 0" }}>
-              <ProductShot eager src="/guide/09-recon-results.jpg" alt="FynHelp reconciliation screen: bank and book lines for July, matched and unmatched counts, and the lines that still need a decision" />
+              <figure style={{ margin: 0 }}>
+                <div
+                  style={{
+                    borderRadius: "clamp(10px, 2vw, 16px)",
+                    overflow: "hidden",
+                    border: "1px solid rgba(23,18,8,.12)",
+                    boxShadow: "0 30px 60px -30px rgba(42,17,9,.35), 0 8px 20px -12px rgba(42,17,9,.2)",
+                    background: "#171208",
+                  }}
+                >
+                  <video
+                    src="https://res.cloudinary.com/ghxledou/video/upload/v1793529574/launch%20video.mp4"
+                    poster="/guide/09-recon-results.jpg"
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    controls
+                    preload="metadata"
+                    aria-label="FynHelp launch video"
+                    style={{ display: "block", width: "100%", aspectRatio: "16 / 9", height: "auto", objectFit: "cover" }}
+                  />
+                </div>
+              </figure>
             </div>
           </Reveal>
         </div>

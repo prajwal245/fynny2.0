@@ -1,6 +1,6 @@
 import { ArrowUpRight } from "lucide-react";
 import { Link } from "@/lib/router-compat";
-import { PRESS, PRESS_HEADLINE, PRESS_POST_SLUG, pressLogo } from "@/content/press";
+import { PRESS, PRESS_POST_SLUG, featuredPress, pressLogo } from "@/content/press";
 import { C } from "@/lib/sitePalette";
 
 /**
@@ -50,13 +50,13 @@ export default function FeaturedIn() {
           Featured <span className="ital">in</span>
         </h2>
         <p className="fi-head">
-          &ldquo;{PRESS_HEADLINE}&rdquo; was published by {PRESS.length} outlets.
+          FynHelp&rsquo;s launch has been covered by {PRESS.length} news outlets. Tap a logo to read the article.
         </p>
       </div>
       <div className="fi-rail">
         <div className="fi-track">
           {halves.map((h) =>
-            PRESS.map((p) => {
+            featuredPress().map((p) => {
               const logo = pressLogo(p.id);
               const dup = h === 1;
               return (
@@ -88,7 +88,7 @@ export default function FeaturedIn() {
       </div>
       <div className="fh-wrap">
         <Link to={`/blog/${PRESS_POST_SLUG}`} className="fi-more">
-          See all the coverage on our blog &rarr;
+          See all {PRESS.length} articles on our blog &rarr;
         </Link>
       </div>
     </section>

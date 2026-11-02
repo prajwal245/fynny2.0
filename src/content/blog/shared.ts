@@ -13,6 +13,8 @@ export interface StaticPost {
   reading_time_minutes: number;
   /** ISO date. A post is shown from this day. */
   published_at: string;
+  /** ISO date of the latest real change, for the sitemap and article markup. Defaults to published_at. */
+  updated_at?: string;
   content: string;
 }
 

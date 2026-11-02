@@ -82,7 +82,7 @@ const asBlogPost = (p: StaticPost): BlogPost => ({
   seo_title: p.seo_title,
   seo_description: p.seo_description,
   og_image: null,
-  updated_at: p.published_at,
+  updated_at: p.updated_at ?? p.published_at,
 });
 
 export async function fetchPublishedPosts(): Promise<ListPost[]> {

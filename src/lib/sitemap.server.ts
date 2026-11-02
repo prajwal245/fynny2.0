@@ -56,7 +56,7 @@ export async function publishedPosts(): Promise<PublishedPost[]> {
 /** Articles kept in the codebase are in the sitemap too, even if the database cannot be reached. */
 function withOwn(db: PublishedPost[]): PublishedPost[] {
   const have = new Set(db.map((p) => p.slug));
-  const own = publishedStatic().filter((p) => !have.has(p.slug)).map((p) => ({ slug: p.slug, updated_at: p.published_at, published_at: p.published_at }));
+  const own = publishedStatic().filter((p) => !have.has(p.slug)).map((p) => ({ slug: p.slug, updated_at: p.updated_at ?? p.published_at, published_at: p.published_at }));
   return [...db, ...own].sort((a, b) => new Date(b.updated_at ?? b.published_at ?? 0).getTime() - new Date(a.updated_at ?? a.published_at ?? 0).getTime());
 }
 

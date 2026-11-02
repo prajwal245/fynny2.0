@@ -27,6 +27,10 @@ Pricing is per active client with unlimited users, and every price excludes GST:
 - [Privacy](https://www.fynhelp.com/privacy), [Terms](https://www.fynhelp.com/terms) and [Refunds](https://www.fynhelp.com/refund-policy).
 - [Product guide](https://www.fynhelp.com/guide): Every agent, workflow and rule explained.
 
+## In the news
+
+- [FynHelp in the news](https://www.fynhelp.com/blog/fynhelp-in-the-news-ca-firms-reconciliation-launch): "Every Month, India's CA Firms Lose a Week to Reconciliation. FynHelp Launches to Win It Back", published by 11 outlets (Dailyhunt, WOW Entrepreneurs, Entrepreneur Saga, Deccan Business, Business Reporter, 1Money Mania, RD Times, Republic News India, The Indian Bulletin, News Head, Indian Scoops).
+
 ## Guides
 
 - [Bank reconciliation in TallyPrime](https://www.fynhelp.com/blog/bank-reconciliation-in-tally-prime): Step by step, and where it breaks for a CA firm.

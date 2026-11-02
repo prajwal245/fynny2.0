@@ -14,12 +14,12 @@ const DB_SLUGS = [
   "best-bank-reconciliation-software-ca-firms-india",
   "month-end-close-walkthrough-sample-files",
 ];
-const PAGES = ["/launch", "/pricing", "/samples", "/agents/recon", "/agents/narrate", "/agents/chaser"];
+const PAGES = ["/launch", "/pricing", "/samples", "/agents/extract", "/agents/recon", "/agents/narrate", "/agents/chaser"];
 
 describe("launch articles", () => {
-  it("are ten, each with its own address", () => {
-    expect(STATIC_POSTS).toHaveLength(10);
-    expect(new Set(STATIC_POSTS.map((p) => p.slug)).size).toBe(10);
+  it("are eleven, each with its own address", () => {
+    expect(STATIC_POSTS).toHaveLength(11);
+    expect(new Set(STATIC_POSTS.map((p) => p.slug)).size).toBe(11);
     for (const p of STATIC_POSTS) expect(p.slug).toMatch(/^[a-z0-9-]+$/);
   });
 
@@ -57,6 +57,6 @@ describe("launch articles", () => {
   });
 
   it("are all live now", () => {
-    expect(publishedStatic()).toHaveLength(10);
+    expect(publishedStatic()).toHaveLength(11);
   });
 });

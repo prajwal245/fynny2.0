@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import FynLogo from "@/components/FynLogo";
+import FeaturedIn from "@/components/home/FeaturedIn";
 
 import { SiteFooter } from "@/components/site/SiteShell";
 import ProductShot from "@/components/site/ProductShot";
@@ -892,6 +893,9 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* ── FEATURED IN ── */}
+      <FeaturedIn />
 
       {/* ── FAQ ── */}
       <section className="fh-sec" id="faq">

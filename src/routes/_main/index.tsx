@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import Index from "@/pages/Index";
 import { HOME_FAQS } from "@/content/faqs";
+import { pressLd } from "@/content/press";
 import { faqLd, seo, softwareLd, webPageLd } from "@/lib/seo";
 
 const description =
@@ -13,7 +14,7 @@ export const Route = createFileRoute("/_main/")({
       rawTitle: true,
       description,
       path: "/",
-      jsonLd: [softwareLd(), webPageLd({ name: "FynHelp", description, path: "/" }), faqLd(HOME_FAQS)],
+      jsonLd: [softwareLd(), webPageLd({ name: "FynHelp", description, path: "/" }), faqLd(HOME_FAQS), pressLd()],
     }),
   component: Index,
 });

@@ -320,7 +320,7 @@ export default function SettingsPage() {
             </div>
             <div style={{ marginTop: 14 }}>
               <Checkbox checked={form.whatsappOk} onChange={(v) => setForm({ ...form, whatsappOk: v })}>
-                Setup tips and trial alerts on WhatsApp. Reply STOP anytime to opt out.
+                Send me account set-up and trial updates on WhatsApp (no promotions). Reply STOP anytime.
               </Checkbox>
             </div>
             <div style={{ marginTop: 16 }}>

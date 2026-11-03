@@ -537,3 +537,23 @@ select firm_name, is_test from public.ca_firms where is_test order by 1;
 
 ## Checked
 I ran this exact script twice, back to back, on a local Postgres with no errors. That proves the script is repeatable and in the right order. It does not prove it against your real database, which is why the checks in Part 3 matter.
+
+---
+
+# November 2026 additions (run after the October script)
+
+Two small scripts, in the repo as `supabase/apply_nov_2026_part1.sql` and `supabase/apply_nov_2026_part2.sql`. Both are safe to run again.
+
+1. Supabase → **SQL Editor** → **New query**. Paste **all** of `apply_nov_2026_part1.sql`, press **Run**, wait for "Success".
+2. New query again. Paste **all** of `apply_nov_2026_part2.sql`, press **Run**.
+
+Run them in this order and as two separate queries: part 1 adds the Content Collaborator role, which the database has to save before part 2 can use it.
+
+| Part | What it is for |
+|---|---|
+| `firm_attribution` | Where each firm signed up from, shown in Admin, Firms |
+| `press_items` | The Press & media table, so articles can be added and edited in Admin |
+| `content_collaborator_access` | What the Content Collaborator role may open (blog, media, resources) |
+| `lead_attribution` | First click and last click campaign tags on each firm |
+
+Nothing here deletes data. The site keeps working without them; these only switch on the features above.

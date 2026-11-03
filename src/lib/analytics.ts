@@ -9,13 +9,8 @@ const POSTHOG_HOST = import.meta.env.VITE_POSTHOG_HOST || "https://us.i.posthog.
 /** GA4 measurement ID (G-XXXXXXX). Unset = GA4 off. */
 const GA_ID = (import.meta.env.VITE_GA_MEASUREMENT_ID as string | undefined) || GA_MEASUREMENT_ID;
 
-/**
- * Meta Pixels (Facebook and Instagram ads), loaded only with the visitor's advertising consent.
- * The two site pixels see the public website; the app pixel sees the web app (/app). Conversions go to all.
- */
-export const META_SITE_PIXEL_IDS = ["1117288487577710", "2251839838719101"] as const;
-export const META_APP_PIXEL_ID = "1746808626400829";
-const ALL_PIXELS = [...META_SITE_PIXEL_IDS, META_APP_PIXEL_ID];
+/** Meta Pixel (Facebook and Instagram ads), loaded only with the visitor's advertising consent. One pixel for the whole product. */
+export const META_PIXEL_ID = "2251839838719101";
 
 type Gtag = (...args: unknown[]) => void;
 type Fbq = ((...args: unknown[]) => void) & { callMethod?: (...a: unknown[]) => void; queue?: unknown[]; loaded?: boolean; version?: string; push?: unknown; disablePushState?: boolean };
@@ -32,19 +27,17 @@ let pixelLoaded = false;
 let pixelPagesSeen = 0;
 
 /**
- * Which pixel, if any, records a page view. Public pages: the site pixel. The web app: the app pixel, but not
- * a screen whose address names one client or record (an id), nor admin, CA portal, shared links or dashboards.
+ * Whether a screen may be counted as a page view: the public website and the web app, but not a screen whose
+ * address names one client or record (an id), nor admin, CA portal, shared links or dashboards.
  */
-export function pixelFor(path: string): "site" | "app" | null {
-  if (/^\/(admin|ca|dashboard|u|shared)(\/|$)/.test(path)) return null;
-  if (/^\/app(\/|$)/.test(path)) return /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(path) ? null : "app";
-  return "site";
+export function countsAsPageView(path: string): boolean {
+  if (/^\/(admin|ca|dashboard|u|shared)(\/|$)/.test(path)) return false;
+  if (/^\/app(\/|$)/.test(path)) return !/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(path);
+  return true;
 }
 
 function pageViewFor(path: string) {
-  const which = pixelFor(path);
-  if (!which || !window.fbq) return;
-  for (const id of which === "app" ? [META_APP_PIXEL_ID] : META_SITE_PIXEL_IDS) window.fbq("trackSingle", id, "PageView");
+  if (window.fbq && countsAsPageView(path)) window.fbq("track", "PageView");
 }
 
 /** Meta's own loader, started only after consent. Standard events only; no personal data is sent. */
@@ -68,11 +61,11 @@ function loadMetaPixel() {
     document.head.appendChild(t);
   }
   // Meta's automatic tracking (route changes, button clicks, page metadata) is off: page views are sent below,
-  // for public pages only, and conversions are sent by name.
+  // for the website and web app screens that do not name a record, and conversions are sent by name.
   window.fbq.disablePushState = true;
-  for (const id of ALL_PIXELS) window.fbq("set", "autoConfig", false, id);
+  window.fbq("set", "autoConfig", false, META_PIXEL_ID);
   window.fbq("consent", "grant");
-  for (const id of ALL_PIXELS) window.fbq("init", id);
+  window.fbq("init", META_PIXEL_ID);
   pageViewFor(window.location.pathname);
 }
 

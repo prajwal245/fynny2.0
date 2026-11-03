@@ -11,10 +11,11 @@ const GA_ID = (import.meta.env.VITE_GA_MEASUREMENT_ID as string | undefined) || 
 
 /**
  * Meta Pixels (Facebook and Instagram ads), loaded only with the visitor's advertising consent.
- * The site pixel sees the public website; the app pixel sees the web app (/app). Conversions go to both.
+ * The two site pixels see the public website; the app pixel sees the web app (/app). Conversions go to all.
  */
-export const META_SITE_PIXEL_ID = "1117288487577710";
+export const META_SITE_PIXEL_IDS = ["1117288487577710", "2251839838719101"] as const;
 export const META_APP_PIXEL_ID = "1746808626400829";
+const ALL_PIXELS = [...META_SITE_PIXEL_IDS, META_APP_PIXEL_ID];
 
 type Gtag = (...args: unknown[]) => void;
 type Fbq = ((...args: unknown[]) => void) & { callMethod?: (...a: unknown[]) => void; queue?: unknown[]; loaded?: boolean; version?: string; push?: unknown; disablePushState?: boolean };
@@ -42,7 +43,8 @@ export function pixelFor(path: string): "site" | "app" | null {
 
 function pageViewFor(path: string) {
   const which = pixelFor(path);
-  if (which && window.fbq) window.fbq("trackSingle", which === "app" ? META_APP_PIXEL_ID : META_SITE_PIXEL_ID, "PageView");
+  if (!which || !window.fbq) return;
+  for (const id of which === "app" ? [META_APP_PIXEL_ID] : META_SITE_PIXEL_IDS) window.fbq("trackSingle", id, "PageView");
 }
 
 /** Meta's own loader, started only after consent. Standard events only; no personal data is sent. */
@@ -68,11 +70,9 @@ function loadMetaPixel() {
   // Meta's automatic tracking (route changes, button clicks, page metadata) is off: page views are sent below,
   // for public pages only, and conversions are sent by name.
   window.fbq.disablePushState = true;
-  window.fbq("set", "autoConfig", false, META_SITE_PIXEL_ID);
-  window.fbq("set", "autoConfig", false, META_APP_PIXEL_ID);
+  for (const id of ALL_PIXELS) window.fbq("set", "autoConfig", false, id);
   window.fbq("consent", "grant");
-  window.fbq("init", META_SITE_PIXEL_ID);
-  window.fbq("init", META_APP_PIXEL_ID);
+  for (const id of ALL_PIXELS) window.fbq("init", id);
   pageViewFor(window.location.pathname);
 }
 

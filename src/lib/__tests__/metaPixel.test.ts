@@ -37,9 +37,11 @@ describe("Meta Pixel", () => {
     expect(document.head.querySelector('script[src="https://connect.facebook.net/en_US/fbevents.js"]')).not.toBeNull();
     const q = queue();
     expect(q).toContainEqual(["init", "1117288487577710"]);
+    expect(q).toContainEqual(["init", "2251839838719101"]);
     expect(q).toContainEqual(["init", "1746808626400829"]);
-    // A public page is counted by the site pixel only.
+    // A public page is counted by both site pixels, and not by the app pixel.
     expect(q).toContainEqual(["trackSingle", "1117288487577710", "PageView"]);
+    expect(q).toContainEqual(["trackSingle", "2251839838719101", "PageView"]);
     expect(q).not.toContainEqual(["trackSingle", "1746808626400829", "PageView"]);
   });
 
@@ -65,6 +67,7 @@ describe("Meta Pixel", () => {
     expect(queue().filter((q) => q.includes("PageView"))).toEqual([]);
     expect(window.fbq?.disablePushState).toBe(true);
     expect(queue()).toContainEqual(["set", "autoConfig", false, "1117288487577710"]);
+    expect(queue()).toContainEqual(["set", "autoConfig", false, "2251839838719101"]);
     expect(queue()).toContainEqual(["set", "autoConfig", false, "1746808626400829"]);
   });
 

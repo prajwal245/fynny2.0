@@ -11,6 +11,8 @@ export interface PressItem {
   url: string;
   /** The article's headline. */
   headline: string;
+  /** Publish date, YYYY-MM-DD. Defaults to the launch day. */
+  date?: string;
   /** Logo address. Optional: without one the outlet's name is shown. */
   logo?: string;
   /** The logo file is white-on-dark. Turn its white to black for light backgrounds. */
@@ -39,7 +41,7 @@ export const PRESS: PressItem[] = [
   { id: "businessreporter", logo: "https://res.cloudinary.com/ghxledou/image/upload/v1793602654/Unconfirmed_848793.png", outlet: "Business Reporter", headline: PRESS_HEADLINE, url: `https://businessreporter.in/${SLUG}/` },
   { id: "republicnewsindia", logo: "https://res.cloudinary.com/ghxledou/image/upload/v1793602195/cropped-Republic-News-India-New-Logo-PNG.png", outlet: "Republic News India", headline: PRESS_HEADLINE, url: `https://business.republicnewsindia.com/${SLUG}/` },
   { id: "theindianbulletin", logo: "https://res.cloudinary.com/ghxledou/image/upload/v1793602195/cropped-The-Indian-Bulletin-LOGO-PNG.png", outlet: "The Indian Bulletin", headline: PRESS_HEADLINE, url: `https://biz.theindianbulletin.com/${SLUG}/` },
-  { id: "hindustanmetro", logo: "/press/logos/hindustanmetro.png", outlet: "Hindustan Metro", headline: PRESS_HEADLINE_4, url: "https://hindustanmetro.com/fynhelp-launch-ai-agents-for-india-ca-firms" },
+  { id: "hindustanmetro", logo: "/press/logos/hindustanmetro.png", outlet: "Hindustan Metro", headline: PRESS_HEADLINE_4, date: "2026-11-03", url: "https://hindustanmetro.com/fynhelp-launch-ai-agents-for-india-ca-firms" },
   { id: "orangecitytimes", outlet: "Orange City Times", headline: PRESS_HEADLINE_2, url: "https://orangecitytimes.com/ca-firms-dont-need-another-accounting-software-fynhelp-is-betting-its-launch-on-it/" },
   { id: "primepostdaily", outlet: "Prime Post Daily", headline: PRESS_HEADLINE_2, url: "https://primepostdaily.com/ca-firms-dont-need-another-accounting-software-fynhelp-is-betting-its-launch-on-it/" },
   { id: "nationnewsbrief", outlet: "Nation News Brief", headline: PRESS_HEADLINE_3, url: "https://www.nationnewsbrief.com/the-junior-accountants-job-is-about-to-change-fynhelps-launch-shows-what-comes-next/" },

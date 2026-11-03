@@ -1,7 +1,6 @@
 /**
  * Press data for the /press page and the home page "Featured in" strip.
- * Read from the press_items table (added in Admin, or automatically), with the launch coverage kept in
- * code as a fallback so the page is never empty if the database cannot be reached.
+ * The launch coverage kept in code, plus anything added in Admin or automatically (the press_items table).
  */
 import { supabase } from "@/integrations/supabase/client";
 import { PRESS as STATIC, pressLogo } from "@/content/press";
@@ -61,14 +60,19 @@ const fromStatic = (): PressEntry[] =>
     headline: p.headline,
     summary: null,
     url: p.url,
-    publishedOn: "2026-11-02",
+    publishedOn: p.date ?? "2026-11-02",
     logo: pressLogo(p.id) ?? null,
     logoInvert: Boolean(p.lightLogo),
     image: null,
   }));
 
-/** Newest first. Never throws: a database problem returns the coverage kept in code. */
+/**
+ * Newest first. The coverage kept in code always shows, so adding an article here needs no database change.
+ * Articles added in Admin join it (and win if the link is the same). Never throws.
+ */
 export async function fetchPress(): Promise<PressEntry[]> {
+  const own = fromStatic();
+  let db: PressEntry[] = [];
   try {
     // The table comes with a database change, so it is not in the generated types yet.
     const sb = supabase as unknown as { from: (t: string) => { select: (c: string) => { eq: (k: string, v: string) => { order: (k: string, o: { ascending: boolean }) => Promise<{ data: Row[] | null; error: unknown }> } } } };
@@ -77,11 +81,12 @@ export async function fetchPress(): Promise<PressEntry[]> {
       .select("id, kind, outlet, headline, summary, url, published_on, logo_url, logo_invert, image_url")
       .eq("status", "published")
       .order("published_on", { ascending: false });
-    if (error || !data?.length) return fromStatic();
-    return data.map(fromRow);
+    if (!error && data?.length) db = data.map(fromRow);
   } catch {
-    return fromStatic();
+    db = [];
   }
+  const seen = new Set(db.map((p) => p.url));
+  return [...db, ...own.filter((p) => !seen.has(p.url))].sort((a, b) => b.publishedOn.localeCompare(a.publishedOn));
 }
 
 /** Outlets with a logo, for the home page strip. */

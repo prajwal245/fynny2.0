@@ -3,7 +3,7 @@ import { PRESS, PRESS_POST_SLUG } from "@/content/press";
 
 /** The launch coverage, listed in one place with the outlets' own links, grouped by headline. */
 const PRESS_PUBLISHED = "2026-11-02T00:00:00.000Z";
-const PRESS_UPDATED = "2026-11-02T07:46:31.000Z";
+const PRESS_UPDATED = "2026-11-03T05:51:28.000Z";
 
 const headlines = [...new Set(PRESS.map((p) => p.headline))];
 const outlets = (h: string) => PRESS.filter((p) => p.headline === h);

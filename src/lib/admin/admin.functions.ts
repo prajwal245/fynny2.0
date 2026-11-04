@@ -92,6 +92,16 @@ export const adminFirm = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ firmId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => (await import("./admin.server")).firmDetail(await gate(context, "firms.view"), data.firmId));
 
+export const adminFirmActivity = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ firmId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => (await import("./firmActivity.server")).firmActivity(await gate(context, "firms.view"), data.firmId));
+
+export const adminFirmReport = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ firmId: z.string().uuid(), reportId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => (await import("./firmActivity.server")).firmReport(await gate(context, "firms.view"), data.firmId, data.reportId));
+
 export const adminSetFirmStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ firmId: z.string().uuid(), status: z.enum(["active", "suspended", "flagged"]), note: z.string().max(500) }).parse(d))

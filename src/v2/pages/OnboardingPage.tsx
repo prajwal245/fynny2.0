@@ -24,7 +24,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { redeemPracticeTrialCode, referralApply, updatePracticePipelineSettings } from "@/lib/practice/practice.functions";
 import { LAUNCH_CODE, LAUNCH_DAYS, captureLaunchCode, clearLaunchCode } from "@/lib/launchCode";
 import { clearReferralCode, getReferralCode } from "@/lib/referral";
-import { confirmPendingAccount, createAccount } from "@/lib/accountSignup.functions";
+import { confirmPendingAccount, createAccount, sendSignupCode, verifySignupCode } from "@/lib/accountSignup.functions";
 import { MOBILE_HINT, parseMobile } from "@/lib/practice/mobile";
 import { ENTITY_TYPES, useV2 } from "../store";
 import { OnboardingPanel } from "../components/OnboardingPanel";
@@ -51,6 +51,10 @@ export default function OnboardingPage() {
   // Arrived from the launch page (or a link with ?code=): the 30-day offer is applied for them.
   const [launch] = useState(() => (typeof window === "undefined" ? null : captureLaunchCode()));
   const createAccountFn = useServerFn(createAccount);
+  const sendCodeFn = useServerFn(sendSignupCode);
+  const verifyCodeFn = useServerFn(verifySignupCode);
+  // WhatsApp verification of the mobile number: the code step opens once a code was sent.
+  const [otp, setOtp] = useState<{ sent: boolean; code: string; proof: string; for: string }>({ sent: false, code: "", proof: "", for: "" });
   const confirmPendingFn = useServerFn(confirmPendingAccount);
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -174,7 +178,25 @@ export default function OnboardingPage() {
       }
       const mobile = parseMobile(account.phone);
       if (!mobile) { toast.error("Enter a valid mobile number, for example 98200 11223."); return; }
-      const created = await createAccountFn({ data: { name: account.name.trim(), email, password: account.password, phone: account.phone, whatsappOk: account.whatsappOk, attribution: signupAttribution(), lead: getLeadAttribution() } }).catch(
+      // Verify the number on WhatsApp first (when switched on), so every account has a real, reachable number.
+      let proof = otp.for === mobile.digits ? otp.proof : "";
+      if (!proof) {
+        if (!otp.sent || otp.for !== mobile.digits) {
+          const sent = await sendCodeFn({ data: { phone: account.phone } }).catch(() => ({ ok: false as const, message: "We couldn't send the code. Check your connection and try again." }));
+          if (!sent.ok) { toast.error(sent.message); return; }
+          if (sent.required) {
+            setOtp({ sent: true, code: "", proof: "", for: mobile.digits });
+            toast.success(`We sent a 6-digit code on WhatsApp to ${sent.display ?? "your number"}.`);
+            return;
+          }
+        } else {
+          const checked = await verifyCodeFn({ data: { phone: account.phone, code: otp.code } }).catch(() => ({ ok: false as const, message: "We couldn't check the code. Try again." }));
+          if (!checked.ok) { toast.error(checked.message); return; }
+          proof = checked.proof;
+          setOtp((o) => ({ ...o, proof }));
+        }
+      }
+      const created = await createAccountFn({ data: { name: account.name.trim(), phoneProof: proof || undefined, email, password: account.password, phone: account.phone, whatsappOk: account.whatsappOk, attribution: signupAttribution(), lead: getLeadAttribution() } }).catch(
         () => ({ ok: false as const, message: "We couldn't create your account just now. Check your connection and try again." }),
       );
       if (!created.ok) { toast.error(created.message); return; }
@@ -378,8 +400,17 @@ export default function OnboardingPage() {
                     <PasswordInput className="v2-input" required minLength={mode === "signin" ? 1 : PASSWORD_MIN} autoComplete={mode === "signin" ? "current-password" : "new-password"} value={account.password} onChange={(e) => setAccount({ ...account, password: e.target.value })} placeholder={mode === "signin" ? "Your password" : PASSWORD_HINT} />
                   </Field>
                 )}
-                <button className="v2-btn v2-btn-primary v2-btn-lg v2-btn-block" type="submit" data-busy={busy} disabled={busy}>
-                  {mode === "signin" ? "Sign in" : mode === "forgot" ? "Send reset link" : "Create account"}
+                {mode === "signup" && otp.sent && (
+                  <Field label="Code from WhatsApp" hint="6 digits, valid for 10 minutes.">
+                    <input className="v2-input" inputMode="numeric" autoComplete="one-time-code" maxLength={6} required autoFocus value={otp.code} onChange={(e) => setOtp({ ...otp, code: e.target.value.replace(/\D/g, "") })} placeholder="123456" data-testid="otp-code" />
+                    <span style={{ fontSize: 12.5 }}>
+                      Wrong number or no message?{" "}
+                      <button type="button" className="v2-link" onClick={() => setOtp({ sent: false, code: "", proof: "", for: "" })}>Change number or resend</button>
+                    </span>
+                  </Field>
+                )}
+                <button className="v2-btn v2-btn-primary v2-btn-lg v2-btn-block" type="submit" data-busy={busy} disabled={busy || (mode === "signup" && otp.sent && otp.code.length !== 6)}>
+                  {mode === "signin" ? "Sign in" : mode === "forgot" ? "Send reset link" : mode === "signup" && otp.sent ? "Verify and create account" : "Create account"}
                 </button>
                 <p className="onb-foot" style={{ textAlign: "center" }}>
                   {mode === "signup" ? (

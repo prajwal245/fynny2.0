@@ -13,6 +13,8 @@ const accountSchema = z.object({
   password: z.string().min(1).max(72),
   /** Mobile number, collected so a person can help if setup stalls. */
   phone: z.string().trim().min(1).max(24),
+  /** Proof from the WhatsApp code step; required once WhatsApp verification is on. */
+  phoneProof: z.string().max(200).optional(),
   /** The person agreed to setup help and trial updates on WhatsApp. */
   whatsappOk: z.boolean().optional(),
   /** First click and last click campaign tags, saved on the new user and sent to the lead sheet. */
@@ -42,6 +44,10 @@ export const createAccount = createServerFn({ method: "POST" })
     const { parseMobile } = await import("@/lib/practice/mobile");
     const mobile = parseMobile(data.phone);
     if (!mobile) return { ok: false, message: "Enter a valid mobile number, for example 98200 11223." };
+    const { looksFake } = await import("@/lib/practice/signupOtp");
+    if (mobile.digits.startsWith("91") && looksFake(mobile.digits.slice(2))) return { ok: false, message: "That does not look like a real mobile number. Please check it." };
+    const { phoneProofOk } = await import("@/lib/practice/signupOtp.server");
+    if (!phoneProofOk(mobile.digits, data.phoneProof)) return { ok: false, message: "Please verify your mobile number with the code we send on WhatsApp." };
     const { adminDb } = await import("@/lib/practice/db.server");
     const db = await adminDb();
     // At most 10 sign-ups an hour from one network.
@@ -79,6 +85,22 @@ export const createAccount = createServerFn({ method: "POST" })
     if (/password/i.test(error.message)) return { ok: false, message: "Use a stronger password of at least 10 characters." };
     return { ok: false, message: "We couldn't create your account just now. Try again in a minute." };
   });
+
+/** Step 1 of WhatsApp verification: sends the code. `required: false` means verification is not switched on yet. */
+export const sendSignupCode = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ phone: z.string().trim().min(1).max(24) }).parse(data))
+  .handler(async ({ data }) => {
+    const { requestIp } = await import("@/lib/rateLimit.server");
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const { sendSignupOtp } = await import("@/lib/practice/signupOtp.server");
+    const req = getRequest();
+    return sendSignupOtp(data.phone, req ? requestIp(req) : "unknown");
+  });
+
+/** Step 2: checks the code and returns the proof that createAccount asks for. */
+export const verifySignupCode = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ phone: z.string().trim().min(1).max(24), code: z.string().trim().min(1).max(12) }).parse(data))
+  .handler(async ({ data }) => (await import("@/lib/practice/signupOtp.server")).verifySignupOtp(data.phone, data.code));
 
 /** Confirms an account left waiting for a confirmation link from before sign-up became instant. */
 export const confirmPendingAccount = createServerFn({ method: "POST" })

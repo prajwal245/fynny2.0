@@ -34,6 +34,11 @@ export const POLICIES = {
   publicIp: { name: "public_ip", limit: 120, windowSec: 60 },
   /** Provider webhooks (Meta, Razorpay) share addresses across many firms. */
   webhookIp: { name: "webhook_ip", limit: 3000, windowSec: 60 },
+  /** WhatsApp sign-up codes: one per 30 seconds and 3 a day per number, 15 an hour per address, 8 tries per 10 minutes. */
+  otpGap: { name: "otp_gap", limit: 1, windowSec: 30 },
+  otpPhone: { name: "otp_phone", limit: 3, windowSec: 86400 },
+  otpIp: { name: "otp_ip", limit: 15, windowSec: 3600 },
+  otpVerify: { name: "otp_verify", limit: 8, windowSec: 600 },
   /** Anonymous forms (waitlist, callbacks), per address. */
   anonForm: { name: "anon_form", limit: 20, windowSec: 3600 },
   /** No-login upload links: per address and per link. */

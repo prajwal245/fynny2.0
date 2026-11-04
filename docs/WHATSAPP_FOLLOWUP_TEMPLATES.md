@@ -86,3 +86,12 @@ The reply to a tap goes inside the 24-hour window the tap opened, so it costs no
 1. Set up a test sign-up on your own phone with the WhatsApp box ticked, and stop at the "Set up your firm" step. An hour or so later (daytime, once the templates are Ready) you get `fh_setup_help` after the email.
 2. Tap **Call me**: Admin → Follow-ups shows it hot with "Asked for a call".
 3. Tap **Stop messages**: no further WhatsApp arrives, and the follow-up shows "WhatsApp stopped".
+
+
+## Sign-up verification code: `fh_signup_otp` (Authentication)
+New sign-ups prove their mobile number with a 6-digit code sent on WhatsApp. Create it in WhatsApp Manager as category **Authentication**, language `en`, with the **Copy code** button (Meta fixes the wording: "*{{1}}* is your verification code."; tick "Add security recommendation" and a 10-minute expiry). Then set `WHATSAPP_OTP_TEMPLATE=fh_signup_otp` in Vercel and redeploy.
+
+- **Off until set.** While `WHATSAPP_OTP_TEMPLATE` is empty, sign-up works as before (nobody is locked out before Meta approves the template). Optional: `SIGNUP_OTP_SECRET` (any long random string; the service-role key is used if absent).
+- **Cost.** Meta charges an Authentication message only when it is delivered. A number that is not on WhatsApp fails at once and the person is told to correct it.
+- **Limits.** 1 code per number every 30 seconds, 3 per number per day, 15 per network address per hour, 8 wrong tries per 10 minutes. Obviously fake numbers (9999999999, 9876543210) are refused before any code is sent.
+- **Google sign-in** does not pass through this step; those people are asked for their number afterwards.

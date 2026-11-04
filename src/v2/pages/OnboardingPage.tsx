@@ -397,7 +397,7 @@ export default function OnboardingPage() {
                     </Field>
                     <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 12.5, color: V.body, lineHeight: 1.5, marginTop: -6 }}>
                       <input type="checkbox" checked={account.whatsappOk} onChange={(e) => setAccount({ ...account, whatsappOk: e.target.checked })} style={{ marginTop: 3 }} />
-                      <span id="mobile-why">WhatsApp updates from FynHelp: setup help, trial alerts, and a note if a document could not be read. Untick if you prefer not to get them, or reply STOP anytime. We never share your number.</span>
+                      <span id="mobile-why">Receive updates and alerts on WhatsApp</span>
                     </label>
                   </>
                 )}

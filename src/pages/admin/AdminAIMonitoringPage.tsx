@@ -7,6 +7,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { Card, PageHeader } from "./AdminDashboardPage";
 import { EmptyState } from "@/components/admin/EmptyState";
+import PracticeAiUsage from "./PracticeAiUsage";
 
 type Log = {
   id: string; user_id: string | null; business_id: string | null;
@@ -228,6 +229,10 @@ export default function AdminAIMonitoringPage() {
             </div>
           </Card>
         </div>
+      </Section>
+
+      <Section title="Document reading & report AI (last 30 days)">
+        <PracticeAiUsage />
       </Section>
 
       <Section title="Recent Errors">

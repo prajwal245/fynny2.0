@@ -140,6 +140,7 @@ async function callProvider(
       );
     const body = (await res.json()) as {
       choices?: { message?: { content?: string } }[];
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
     };
     const raw = body.choices?.[0]?.message?.content ?? "";
     return {
@@ -148,6 +149,10 @@ async function callProvider(
       model: p.model,
       latency_ms: Date.now() - started,
       raw,
+      usage: {
+        input_tokens: typeof body.usage?.prompt_tokens === "number" ? body.usage.prompt_tokens : null,
+        output_tokens: typeof body.usage?.completion_tokens === "number" ? body.usage.completion_tokens : null,
+      },
     };
   } catch (e) {
     if ((e as Error).name === "AbortError")
@@ -183,6 +188,7 @@ async function viaEdgeFunction(req: LlmJsonRequest, timeoutMs = 30_000): Promise
     provider?: string;
     model?: string;
     error?: string;
+    usage?: { input_tokens?: number | null; output_tokens?: number | null };
   };
   if (!res.ok || !body.content)
     throw new Error(body.error ?? `practice-ai ${res.status}`);
@@ -192,6 +198,7 @@ async function viaEdgeFunction(req: LlmJsonRequest, timeoutMs = 30_000): Promise
     model: body.model ?? "unknown",
     latency_ms: Date.now() - started,
     raw: body.content,
+    usage: { input_tokens: body.usage?.input_tokens ?? null, output_tokens: body.usage?.output_tokens ?? null },
   };
 }
 

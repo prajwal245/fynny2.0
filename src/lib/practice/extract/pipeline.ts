@@ -8,6 +8,7 @@
  *
  * All I/O is injected so the pipeline is testable and replayable.
  */
+import { ocrCostUsd, usageFields } from "../aiPricing";
 import { dedupeKey, type ExtractedRow, type Side } from "../core";
 import {
   CLASSIFY_SYSTEM_PROMPT,
@@ -48,6 +49,8 @@ export interface LlmJsonResult {
   model: string;
   latency_ms: number;
   raw: string;
+  /** Token counts the provider reported, when it reported them. */
+  usage?: { input_tokens: number | null; output_tokens: number | null } | null;
 }
 
 export interface LlmClient {
@@ -64,6 +67,12 @@ export interface AiCallRecord {
   latency_ms: number | null;
   status: "success" | "error";
   error: string | null;
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+  /** Estimated USD for this call (see aiPricing.ts). */
+  cost_usd?: number | null;
+  /** Billable units that are not tokens, for example OCR calls. */
+  units?: number | null;
 }
 
 export interface ExtractDeps {
@@ -218,6 +227,7 @@ async function aiRead(
       latency_ms: res.latency_ms,
       status: "success",
       error: null,
+      ...usageFields(res),
     });
     return {
       rows: Array.isArray(data.rows) ? data.rows : [],
@@ -279,6 +289,7 @@ async function aiClassify(
         latency_ms: res.latency_ms,
         status: "success",
         error: null,
+        ...usageFields(res),
       });
     } catch (e) {
       // Rate limited or down: rules-only for this batch, and stop asking.
@@ -354,9 +365,9 @@ async function readViaOcr(
   const started = Date.now();
   try {
     text = (await deps.ocr(bytes, mime)).slice(0, MAX_TEXT_CHARS);
-    calls.push({ purpose: "extract_ocr", provider: "ocr.space", model: null, input: mime, output: text.slice(0, 2000), latency_ms: Date.now() - started, status: "success", error: null });
+    calls.push({ purpose: "extract_ocr", provider: "ocr.space", model: null, input: mime, output: text.slice(0, 2000), latency_ms: Date.now() - started, status: "success", error: null, units: 1, cost_usd: ocrCostUsd() });
   } catch (e) {
-    calls.push({ purpose: "extract_ocr", provider: "ocr.space", model: null, input: mime, output: null, latency_ms: Date.now() - started, status: "error", error: e instanceof Error ? e.message : String(e) });
+    calls.push({ purpose: "extract_ocr", provider: "ocr.space", model: null, input: mime, output: null, latency_ms: Date.now() - started, status: "error", error: e instanceof Error ? e.message : String(e), units: 1, cost_usd: 0 });
     return null;
   }
   if (text.replace(/\s/g, "").length < MIN_OCR_CHARS) return null;

@@ -3,6 +3,7 @@
  * transactions only, stores it in ca_reports_log, and serves the
  * click-through from any figure to the transactions behind it.
  */
+import { usageFields } from "./aiPricing";
 import {
   PracticeError,
   parsePeriod,
@@ -246,6 +247,7 @@ export async function generateReport(
         latency_ms: res.latency_ms,
         status: "success",
         error: null,
+        ...usageFields(res),
       };
     } catch (e) {
       aiMeta.error = (e as Error).message;
@@ -610,10 +612,15 @@ export async function generateReport(
     .select("id, created_at")
     .single();
   if (error) throw new PracticeError("db_error", error.message);
-  if (aiCall)
-    await db
-      .from("ca_ai_calls")
-      .insert({ ...aiCall, ca_firm_id: ctx.firmId, report_id: report.id });
+  if (aiCall) {
+    const row = { ...aiCall, ca_firm_id: ctx.firmId, report_id: report.id };
+    const { error: logError } = await db.from("ca_ai_calls").insert(row);
+    if (logError && /input_tokens|output_tokens|cost_usd|units/.test(logError.message)) {
+      // Cost columns arrive with a migration; keep the log without them until it is applied.
+      const { input_tokens: _i, output_tokens: _o, cost_usd: _c, units: _u, ...rest } = row as Record<string, unknown>;
+      await db.from("ca_ai_calls").insert(rest);
+    }
+  }
 
   const meta = clientMeta(client.notes);
   await db

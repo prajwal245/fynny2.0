@@ -26,6 +26,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/admin/coupons", label: "Coupons", icon: TicketPercent, roles: [], perm: "coupons.manage" },
   { to: "/admin/team", label: "Admin Team", icon: UserCog, roles: [], perm: "team.manage" },
   { to: "/admin/security-log", label: "Security Log", icon: ScrollText, roles: [], perm: "audit.view" },
+  { to: "/admin/api-usage", label: "API usage & cost", icon: Cpu, roles: [], perm: "ops.view" },
   { to: "/admin/system-health", label: "System Health", icon: Activity, roles: [], perm: "ops.view" },
   { divider: true },
   { to: "/admin/press", label: "Press & media", icon: Newspaper, roles: [], perm: "press.manage" },

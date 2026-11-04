@@ -28,6 +28,9 @@ export interface SignupFacts {
   email: string;
   phone: string;
   whatsappOk: boolean;
+  firmName?: string;
+  /** ICAI membership number as entered (format checked, not verified). */
+  icai?: string;
   channel?: string;
   source?: string;
   medium?: string;
@@ -47,6 +50,8 @@ export async function notifyNewSignup(f: SignupFacts): Promise<{ sent: boolean }
     const figures: [string, string][] = [
       ["Name", f.name],
       ["Email", f.email],
+      ...(f.firmName ? ([["Firm", f.firmName]] as [string, string][]) : []),
+      ...(f.icai ? ([["ICAI membership no.", f.icai]] as [string, string][]) : []),
       ["Mobile", f.phone ? `+${f.phone}` : "—"],
       ["WhatsApp help", f.whatsappOk ? "agreed" : "not agreed"],
       ["Came from", f.channel ? `${f.channel.replace("-", " ")}${from ? ` (${from})` : ""}` : "not tracked"],

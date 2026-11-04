@@ -8,7 +8,7 @@
  */
 import { firstName, type SubjectFacts, type TouchKind } from "./rules";
 
-export type TouchTemplateKey = "setup" | "trial" | "plan";
+export type TouchTemplateKey = "setup" | "trial" | "plan" | "issue" | "ready";
 
 /** The three templates to create in WhatsApp Manager (Utility). `{{1}}` name, `{{2}}` firm, `{{3}}` the one thing that happened. */
 export const TOUCH_TEMPLATES: Record<TouchTemplateKey, { name: string; body: string; example: [string, string, string] }> = {
@@ -26,6 +26,16 @@ export const TOUCH_TEMPLATES: Record<TouchTemplateKey, { name: string; body: str
     name: "fh_plan_help",
     body: "Hello {{1}}, this is FynHelp about the plan for {{2}}. The payment {{3}}. Nothing is lost, and we can help you finish. Tap a button below.",
     example: ["Asha", "Rao & Co", "was not completed"],
+  },
+  issue: {
+    name: "fh_account_update",
+    body: "Hello {{1}}, this is FynHelp with an update on {{2}}. {{3}} The details are in your FynHelp account. The buttons below let you open it, ask us to call, pause these messages or stop them.",
+    example: ["Asha", "Rao & Co", "1 document could not be read. Uploading it again as a PDF, Excel or CSV usually fixes this."],
+  },
+  ready: {
+    name: "fh_results_ready",
+    body: "Hello {{1}}, this is FynHelp with an update on {{2}}. {{3}} You can view the results in your FynHelp account. The buttons below let you open it, ask us to call, pause these messages or stop them.",
+    example: ["Asha", "Rao & Co", "3 documents were read and 1 report is ready."],
   },
 };
 
@@ -53,6 +63,16 @@ export const TOUCH_TEMPLATES_UTILITY: Record<TouchTemplateKey, { name: string; b
     body: "Hello {{1}}, this is an update about the FynHelp plan for {{2}}. The payment {{3}}. Your data is saved. The buttons below let you ask us to call, pause these messages or stop them.",
     example: TOUCH_TEMPLATES.plan.example,
   },
+  issue: {
+    name: "fh_account_update",
+    body: "Hello {{1}}, this is FynHelp with an update on {{2}}. {{3}} The details are in your FynHelp account. The buttons below let you open it, ask us to call, pause these messages or stop them.",
+    example: ["Asha", "Rao & Co", "1 document could not be read. Uploading it again as a PDF, Excel or CSV usually fixes this."],
+  },
+  ready: {
+    name: "fh_results_ready",
+    body: "Hello {{1}}, this is FynHelp with an update on {{2}}. {{3}} You can view the results in your FynHelp account. The buttons below let you open it, ask us to call, pause these messages or stop them.",
+    example: ["Asha", "Rao & Co", "3 documents were read and 1 report is ready."],
+  },
 };
 
 export const templateNameFor = (key: TouchTemplateKey, env: Partial<Record<TouchTemplateKey, string | undefined>> = {}) => env[key] || TOUCH_TEMPLATES[key].name;
@@ -67,6 +87,8 @@ export const WA_PLAN: Record<TouchKind, { template: TouchTemplateKey; delayHours
   trial_ended_unpaid: { template: "trial", delayHours: 0 },
   checkout_abandoned: { template: "plan", delayHours: 4 },
   payment_failed: { template: "plan", delayHours: 0 },
+  processing_issue: { template: "issue", delayHours: 1 },
+  results_ready: { template: "ready", delayHours: 1 },
   // A check-in with nothing of theirs in it: a person decides, WhatsApp does not.
   paid_quiet: null,
 };
@@ -94,6 +116,16 @@ export function touchParams(kind: TouchKind, f: Pick<SubjectFacts, "name" | "fir
       return [who, firm, "was not completed"];
     case "payment_failed":
       return [who, firm, "did not go through"];
+    case "processing_issue": {
+      const n = Number(detail["failedDocs"]) || 1;
+      return [who, firm, `${n} document${n === 1 ? "" : "s"} could not be read. Uploading ${n === 1 ? "it" : "them"} again as a PDF, Excel or CSV usually fixes this.`];
+    }
+    case "results_ready": {
+      const d = Number(detail["readyDocs"]) || 0;
+      const rp = Number(detail["readyReports"]) || 0;
+      const parts = [d ? `${d} document${d === 1 ? " was" : "s were"} read` : "", rp ? `${rp} report${rp === 1 ? " is" : "s are"} ready` : ""].filter(Boolean);
+      return [who, firm, `${parts.join(" and ") || "New results are ready"}.`.replace(/^./, (c) => c.toUpperCase())];
+    }
     case "paid_quiet":
       return null;
   }

@@ -185,13 +185,13 @@ async function logAiCalls(
   calls: AiCallRecord[],
 ) {
   if (!calls.length) return;
-  const { error } = await db.from("ca_ai_calls").insert(
-    calls.map((c) => ({
-      ...c,
-      ca_firm_id: firmId,
-      extraction_id: extractionId,
-    })),
-  );
+  const rows = calls.map((c) => ({ ...c, ca_firm_id: firmId, extraction_id: extractionId }));
+  let { error } = await db.from("ca_ai_calls").insert(rows);
+  if (error && /input_tokens|output_tokens|cost_usd|units/.test(error.message)) {
+    // The cost columns arrive with a database migration; until it is applied, keep the log without them.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    ({ error } = await db.from("ca_ai_calls").insert(rows.map(({ input_tokens, output_tokens, cost_usd, units, ...rest }) => rest)));
+  }
   if (error) console.error(`[practice] ai call log failed: ${error.message}`);
 }
 

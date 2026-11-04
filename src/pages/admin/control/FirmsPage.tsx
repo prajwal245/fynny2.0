@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { adminDeleteFirm, adminExtendTrial, adminFirm, adminFirms, adminSetFirmStatus, adminSetFirmsTest, adminSignupSources } from "@/lib/admin/admin.functions";
 import { adminCall, adminError } from "@/components/admin/adminClient";
 import { useAdminSession } from "@/components/admin/AdminSessionGate";
+import { FirmActivityPanel } from "./FirmActivityPanel";
 import { Btn, Empty, ErrorNote, PageHead, Panel, Pill, Table, Td, day, line, muted, when } from "./ui";
 
 type Status = "" | "active" | "suspended" | "flagged";
@@ -264,16 +265,7 @@ function FirmDrawer({ firmId, onClose, canUpdate, canDelete }: { firmId: string;
                 <ul>{d.data.members.map((m, i) => <li key={i}>{m.invited_email} · {m.role} · {m.status}</li>)}</ul>
               )}
             </div>
-            <div>
-              <div className="font-semibold mb-1">Recent MIS</div>
-              {d.data.reports.length === 0 ? <p style={{ color: muted }}>None yet.</p> : (
-                <ul>{d.data.reports.map((r) => <li key={r.id}>{r.report_name ?? "MIS"} · {r.period} · {r.status} · {day(r.created_at)}</li>)}</ul>
-              )}
-            </div>
-            <div>
-              <div className="font-semibold mb-1">Activity</div>
-              <ul className="grid gap-1">{d.data.activity.map((a, i) => <li key={i}><span className="text-xs" style={{ color: muted }}>{when(a.created_at)}</span> {a.description}</li>)}</ul>
-            </div>
+            <FirmActivityPanel firmId={firmId} />
           </div>
         )}
       </aside>

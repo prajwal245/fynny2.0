@@ -68,5 +68,6 @@ Deno.serve(async (req) => {
   }
   const out = await res.json();
   const content = out?.choices?.[0]?.message?.content ?? "";
-  return json({ content, provider: useGroq ? "groq" : "lovable", model });
+  const usage = { input_tokens: out?.usage?.prompt_tokens ?? null, output_tokens: out?.usage?.completion_tokens ?? null };
+  return json({ content, provider: useGroq ? "groq" : "lovable", model, usage });
 });

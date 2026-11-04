@@ -82,3 +82,14 @@ describe("who needs a human touch", () => {
     expect(scriptFor("no_client", { name: null, firmName: null, clients: 0, documents: 0 })).toContain("Hi there, it's the team at FynHelp");
   });
 });
+
+describe("processing_issue", () => {
+  const base = { type: "firm" as const, createdAt: "2026-10-01T00:00:00Z", name: "Asha Rao", email: "a@x.in", phone: "9820011223", firmName: "Rao & Co", whatsappOk: true, clients: 1, documents: 2, lastActivityAt: "2026-11-03T00:00:00Z" };
+  it("is wanted only while a document is still unread", () => {
+    const now = new Date("2026-11-04T06:00:00Z");
+    expect(wanted({ ...base, failedDocs: 0 }, now).some((w) => w.kind === "processing_issue")).toBe(false);
+    const w = wanted({ ...base, failedDocs: 2 }, now).find((x) => x.kind === "processing_issue");
+    expect(w?.detail).toEqual({ failedDocs: 2 });
+    expect(w?.key).toBe("2026-11-04");
+  });
+});

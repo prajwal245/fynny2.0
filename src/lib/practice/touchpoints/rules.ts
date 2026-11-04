@@ -20,6 +20,7 @@ export type TouchKind =
   | "trial_ending_unpaid"
   | "trial_ended_unpaid"
   | "payment_failed"
+  | "processing_issue"
   | "paid_quiet";
 
 export const KIND_LABEL: Record<TouchKind, string> = {
@@ -31,6 +32,7 @@ export const KIND_LABEL: Record<TouchKind, string> = {
   trial_ending_unpaid: "Trial ending",
   trial_ended_unpaid: "Trial ended, not paid",
   payment_failed: "Payment failing",
+  processing_issue: "Document could not be read",
   paid_quiet: "Paying but quiet",
 };
 
@@ -48,6 +50,8 @@ export interface SubjectFacts {
   whatsappOk: boolean;
   clients: number;
   documents: number;
+  /** Documents whose reading failed and have not been read since (last 3 days). */
+  failedDocs?: number;
   lastActivityAt: string | null;
   billing?: BillingRow & {
     pending_plan?: string | null;
@@ -124,6 +128,10 @@ export function wanted(f: SubjectFacts, now: Date = new Date()): Want[] {
       out.push({ kind: "checkout_abandoned", key: String(b.pending_plan), headline: `${who} chose the ${b.pending_plan} plan ${ago(idle)} ago but did not finish paying.`, hot: true, dueAt: new Date(new Date(b.updated_at!).getTime() + 45 * MIN), email: idle >= HOUR ? "checkout_abandoned" : null, detail: { plan: b.pending_plan, cycle: b.cycle } });
   }
 
+  // A document could not be read: tell them once a day at most, in plain words, while it is still unread.
+  if ((f.failedDocs ?? 0) > 0)
+    out.push({ kind: "processing_issue", key: now.toISOString().slice(0, 10), headline: `${who} has ${plural(f.failedDocs ?? 0, "document")} that FynHelp could not read.`, hot: false, dueAt: now, email: null, detail: { failedDocs: f.failedDocs ?? 0 } });
+
   if (b && (b.status === "past_due" || b.status === "halted"))
     out.push({ kind: "payment_failed", key: b.status, headline: `${who}'s plan payment ${b.status === "halted" ? "failed several times and the plan is paused" : "failed and is being retried"}.`, hot: true, dueAt: now, email: null, detail: { status: b.status, plan: b.plan } });
 
@@ -163,6 +171,8 @@ export function scriptFor(kind: TouchKind, f: Pick<SubjectFacts, "name" | "firmN
       return `${hi} ${firm}'s FynHelp trial has ended. Your data is safe and readable for 30 days. If it was not the right fit, I would value hearing why. If you would like to continue, I can help you choose a plan.`;
     case "payment_failed":
       return `${hi} The payment for ${firm}'s FynHelp plan did not go through. It is usually a card limit or an expired UPI mandate. I can send you a fresh payment link, or you can update it in Settings, Billing.`;
+    case "processing_issue":
+      return `${hi} One of the documents for ${firm} could not be read by FynHelp. It usually helps to upload it again as a PDF, Excel or CSV, or a clearer photo. Shall I take a look with you?`;
     case "paid_quiet":
       return `${hi} I noticed ${firm} has not used FynHelp for a while. Is everything working for you? If a client or a report is giving trouble, I would be glad to help.`;
   }

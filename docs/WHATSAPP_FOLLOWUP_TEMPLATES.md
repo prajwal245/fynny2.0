@@ -50,6 +50,13 @@ Meta sometimes reclassifies a Utility template as Marketing after approval, and 
 | `fh_trial_update_v2` | `Hello {{1}}, this is an update about the FynHelp trial for {{2}}. The trial {{3}}. Your data is saved. The buttons below let you ask us to call, pause these messages or stop them.` |
 | `fh_plan_help_v2` | `Hello {{1}}, this is an update about the FynHelp plan for {{2}}. The payment {{3}}. Your data is saved. The buttons below let you ask us to call, pause these messages or stop them.` |
 
+### Document problems: `fh_account_update` (Utility)
+Sent when a firm has a document FynHelp could not read (photo too blurred, scan unreadable, unsupported file), at most once a day, 1 hour after it fails, only inside 9 am to 8 pm IST, and only to people who ticked WhatsApp (the sign-up box is ticked by default and can be unticked). Same four buttons as above (Open FynHelp, Call me, Not now, Stop messages). Category **Utility**, language `en`:
+
+`Hello {{1}}, this is FynHelp with an update on {{2}}. {{3}} The details are in your FynHelp account. The buttons below let you open it, ask us to call, pause these messages or stop them.`
+
+Sample values: `Asha`, `Rao & Co`, `1 document could not be read. Uploading it again as a PDF, Excel or CSV usually fixes this.` The follow-up stops by itself once the document is read. Optional override: `WHATSAPP_TOUCH_ISSUE_TEMPLATE`.
+
 They state only what happened on the person's own account and what the buttons do: no question and no offer, which is what pushes Meta towards Marketing. Meta may still reclassify; if so the original templates keep working.
 
 ## Switch it on

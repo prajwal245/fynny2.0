@@ -179,18 +179,21 @@ async function firmSubjects(db: Db, now: Date): Promise<Subject[]> {
   const ids = list.map((x) => x.firm.id);
   const [clients, docs, runs] = await Promise.all([
     db.from("ca_clients").select("ca_firm_id").in("ca_firm_id", ids).neq("client_status", "archived").limit(50000),
-    db.from("ca_document_extractions").select("ca_firm_id, created_at").in("ca_firm_id", ids).order("created_at", { ascending: false }).limit(50000),
+    db.from("ca_document_extractions").select("ca_firm_id, created_at, extract_status").in("ca_firm_id", ids).order("created_at", { ascending: false }).limit(50000),
     db.from("ca_agent_runs").select("ca_firm_id, started_at").in("ca_firm_id", ids).eq("agent", "recon").order("started_at", { ascending: false }).limit(20000),
   ]);
   const clientN = new Map<string, number>();
   for (const r of clients.data ?? []) clientN.set(String(r.ca_firm_id), (clientN.get(String(r.ca_firm_id)) ?? 0) + 1);
   const docN = new Map<string, number>();
+  const failedN = new Map<string, number>();
+  const failedSince = new Date(Date.now() - 3 * 86_400_000).toISOString();
   const last = new Map<string, string>();
   const bump = (id: string, at: string) => {
     if (!last.has(id) || at > last.get(id)!) last.set(id, at);
   };
   for (const r of docs.data ?? []) {
     docN.set(String(r.ca_firm_id), (docN.get(String(r.ca_firm_id)) ?? 0) + 1);
+    if (r.extract_status === "failed" && String(r.created_at) >= failedSince) failedN.set(String(r.ca_firm_id), (failedN.get(String(r.ca_firm_id)) ?? 0) + 1);
     bump(String(r.ca_firm_id), String(r.created_at));
   }
   for (const r of runs.data ?? []) bump(String(r.ca_firm_id), String(r.started_at));
@@ -209,6 +212,7 @@ async function firmSubjects(db: Db, now: Date): Promise<Subject[]> {
       whatsappOk: Boolean(((firm.notification_prefs ?? {}) as Record<string, unknown>)["touch_whatsapp_ok"]),
       clients: clientN.get(firm.id) ?? 0,
       documents: docN.get(firm.id) ?? 0,
+      failedDocs: failedN.get(firm.id) ?? 0,
       lastActivityAt: last.get(firm.id) ?? null,
       billing: billing as never,
     },

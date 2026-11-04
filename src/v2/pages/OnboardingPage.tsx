@@ -117,7 +117,7 @@ export default function OnboardingPage() {
     try {
       if (typeof window !== "undefined") fromName = new URLSearchParams(window.location.search).get("name")?.trim().slice(0, 120) ?? "";
     } catch { /* no address to read */ }
-    return { name: session?.name ?? fromName, email: session?.email ?? fromLink, password: "", phone: session?.phone ?? "", whatsappOk: false };
+    return { name: session?.name ?? fromName, email: session?.email ?? fromLink, password: "", phone: session?.phone ?? "", whatsappOk: session?.whatsappOk ?? true };
   });
   const [firmForm, setFirmForm] = useState({ name: firm?.name ?? (typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("firm")?.trim().slice(0, 120) ?? ""), city: firm?.city ?? "", frn: firm?.frn ?? "", phone: firm?.phone ?? session?.phone ?? "", ref: getReferralCode() ?? "" });
   const [gstinErr, setGstinErr] = useState<string | null>(null);
@@ -365,7 +365,7 @@ export default function OnboardingPage() {
                     </Field>
                     <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 12.5, color: V.body, lineHeight: 1.5, marginTop: -6 }}>
                       <input type="checkbox" checked={account.whatsappOk} onChange={(e) => setAccount({ ...account, whatsappOk: e.target.checked })} style={{ marginTop: 3 }} />
-                      <span id="mobile-why">Setup tips and trial alerts on WhatsApp. Reply STOP anytime to opt out. (Optional. We never share your number.)</span>
+                      <span id="mobile-why">WhatsApp updates from FynHelp: setup help, trial alerts, and a note if a document could not be read. Untick if you prefer not to get them, or reply STOP anytime. We never share your number.</span>
                     </label>
                   </>
                 )}

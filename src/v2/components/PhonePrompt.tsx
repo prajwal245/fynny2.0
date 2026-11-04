@@ -12,7 +12,7 @@ import { MOBILE_HINT, parseMobile } from "@/lib/practice/mobile";
 export function PhonePrompt() {
   const { firm, firmRole, saveFirm } = useV2();
   const [value, setValue] = useState("");
-  const [wa, setWa] = useState(false);
+  const [wa, setWa] = useState(true);
   const [hidden, setHidden] = useState(() => {
     try {
       return sessionStorage.getItem("fynhelp.phone.dismissed") === "1";

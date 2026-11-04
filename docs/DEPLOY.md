@@ -111,3 +111,15 @@ someone clicks **Check now** in Settings.
    sign off the MIS.
 4. `curl -H "Authorization: Bearer $CRON_SECRET" https://<domain>/api/public/practice-tick`
    returns `200` with a JSON summary.
+
+## Rate limits
+
+Every server function and `/api/*` route is rate limited (`src/start.ts`, policies in
+`src/lib/rateLimit.server.ts`). A caller over a limit gets HTTP 429 with a `Retry-After` header.
+
+- Counters live in Postgres by default (run migration `20261108090000_api_rate_limits.sql`;
+  the daily practice tick prunes old rows). For very high traffic, set
+  `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` and counters move to Redis with no code change.
+- If the store is unreachable the limiter falls back to per-instance memory, so an outage never blocks users.
+- `RATE_LIMIT_DISABLED=1` turns it off (local debugging only).
+- Change a limit by editing its entry in `POLICIES`.

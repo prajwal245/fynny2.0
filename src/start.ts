@@ -52,6 +52,45 @@ const adminNetworkMiddleware = createMiddleware().server(async ({ next, request 
   return next();
 });
 
+// Rate limits for every API action: server functions (per address, per signed-in
+// user and per function) and /api routes (per address; webhooks get a higher
+// ceiling because providers share addresses across many firms). Pages and
+// static files are not counted. Policies live in lib/rateLimit.server.ts.
+const WEBHOOK_PATHS = ["/api/public/whatsapp-webhook", "/api/public/razorpay-webhook", "/api/public/ca-invoice-payment-webhook"];
+const rateLimitMiddleware = createMiddleware().server(async ({ next, request }) => {
+  const path = new URL(request.url).pathname;
+  const isFn = path.startsWith("/_serverFn/");
+  const isApi = path.startsWith("/api/");
+  if (!isFn && !isApi) return next();
+  const rl = await import("./lib/rateLimit.server");
+  const ip = rl.requestIp(request);
+  const checks: [(typeof rl.POLICIES)[keyof typeof rl.POLICIES], string][] = [];
+  if (isApi) checks.push([WEBHOOK_PATHS.includes(path) ? rl.POLICIES.webhookIp : rl.POLICIES.publicIp, `${ip}:${path}`]);
+  else {
+    checks.push([rl.POLICIES.sfnIp, ip]);
+    // The user is read from the token only to name a bucket; the signature tail is
+    // part of the name, so nobody can use up another person's allowance by guessing their id.
+    const token = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+    const parts = token.split(".");
+    if (parts.length === 3) {
+      try {
+        const sub = (JSON.parse(atob((parts[1] ?? "").replace(/-/g, "+").replace(/_/g, "/"))) as { sub?: string }).sub;
+        if (sub) {
+          const who = `${sub}:${(parts[2] ?? "").slice(0, 12)}`;
+          checks.push([rl.POLICIES.sfnUser, who], [rl.POLICIES.sfnUserFn, `${who}:${path}`]);
+        }
+      } catch {
+        /* not a readable token: the address limit still applies */
+      }
+    }
+  }
+  for (const [policy, subject] of checks) {
+    const d = await rl.checkRateLimit(policy, subject);
+    if (!d.allowed) return rl.tooManyResponse(d);
+  }
+  return next();
+});
+
 // Start installs this automatically when src/start.ts is absent; defining the
 // file opts out, so re-add it explicitly to keep server functions protected
 // from cross-site requests.
@@ -60,6 +99,6 @@ const csrfMiddleware = createCsrfMiddleware({
 });
 
 export const startInstance = createStart(() => ({
-  requestMiddleware: [errorMiddleware, hostMiddleware, adminNetworkMiddleware, csrfMiddleware],
+  requestMiddleware: [errorMiddleware, hostMiddleware, adminNetworkMiddleware, rateLimitMiddleware, csrfMiddleware],
   functionMiddleware: [attachSupabaseAuth],
 }));

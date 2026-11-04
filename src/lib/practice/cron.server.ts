@@ -19,6 +19,7 @@ export async function practiceTick(
 ) {
   const started = Date.now();
   const now = opts.now ?? new Date();
+  void import("@/lib/rateLimit.server").then((m) => m.pruneRateLimits()).catch(() => undefined);
   // Gmail first, so documents that just arrived are read in this same run.
   const gmail = await pollGmailInboxes({ budgetMs: opts.gmailBudgetMs ?? 20_000 })
     .then((g) => ({ inboxes: g.inboxes.length, documents: g.documents, errors: g.inboxes.filter((i) => i.error).length }))

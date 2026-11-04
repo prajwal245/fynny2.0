@@ -19,6 +19,9 @@ export const Route = createFileRoute("/api/public/tally-hello")({
         const db = await adminDb();
         const connector = await t.authConnector(db, request.headers.get("authorization"));
         if (!connector) return json({ error: "Unknown or revoked connector token" }, 401);
+        const { limitRequest, POLICIES } = await import("@/lib/rateLimit.server");
+        const limited = await limitRequest(POLICIES.connectorHello, connector.id, "This connector is checking in too often.");
+        if (limited) return limited;
         let body: Record<string, unknown> = {};
         try {
           body = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};

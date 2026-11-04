@@ -95,3 +95,12 @@ New sign-ups prove their mobile number with a 6-digit code sent on WhatsApp. Cre
 - **Cost.** Meta charges an Authentication message only when it is delivered. A number that is not on WhatsApp fails at once and the person is told to correct it.
 - **Limits.** 1 code per number every 30 seconds, 3 per number per day, 15 per network address per hour, 8 wrong tries per 10 minutes. Obviously fake numbers (9999999999, 9876543210) are refused before any code is sent.
 - **Google sign-in** does not pass through this step; those people are asked for their number afterwards.
+
+**If WhatsApp Manager refuses ("not enabled for this account")**, try creating all three new templates through Meta's API instead, which sometimes works when the screen does not:
+
+```
+WHATSAPP_ACCESS_TOKEN=<your token> node scripts/whatsapp-templates.mjs           # shows what is missing
+WHATSAPP_ACCESS_TOKEN=<your token> node scripts/whatsapp-templates.mjs --apply   # submits fh_signup_otp, fh_account_update, fh_results_ready
+```
+
+If the API refuses too, the error text names the reason; the usual ones are Meta Business Verification not complete, an account restriction, or a partner-owned account without template rights. Only Meta (Business Settings → Security Center, or Meta support) can lift that.

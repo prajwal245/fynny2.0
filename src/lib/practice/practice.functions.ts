@@ -755,11 +755,15 @@ export const savePracticeFirm = createServerFn({ method: "POST" })
       }
       return { id: firmId, created: false };
     }
+    // The ICAI number given at sign-up travels in the login's metadata; keep it on the firm for the admin to check.
+    const meta = ((context.claims as { user_metadata?: Record<string, unknown> } | undefined)?.user_metadata ?? {}) as Record<string, unknown>;
+    const icai = typeof meta["icai_membership_number"] === "string" ? (meta["icai_membership_number"] as string) : null;
     const { data: firm, error } = await db
       .from("ca_firms")
       .insert({
         user_id: context.userId,
         firm_name: "My practice",
+        ...(icai ? { icai_membership_number: icai } : {}),
         verification_status: "approved",
         is_verified: true,
         ...payload,

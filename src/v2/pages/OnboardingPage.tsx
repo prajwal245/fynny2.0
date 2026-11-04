@@ -24,6 +24,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { redeemPracticeTrialCode, referralApply, updatePracticePipelineSettings } from "@/lib/practice/practice.functions";
 import { LAUNCH_CODE, LAUNCH_DAYS, captureLaunchCode, clearLaunchCode } from "@/lib/launchCode";
 import { clearReferralCode, getReferralCode } from "@/lib/referral";
+import { ICAI_HINT, cleanFirmName, cleanIcai } from "@/lib/practice/icai";
 import { confirmPendingAccount, createAccount, sendSignupCode, verifySignupCode } from "@/lib/accountSignup.functions";
 import { MOBILE_HINT, parseMobile } from "@/lib/practice/mobile";
 import { ENTITY_TYPES, useV2 } from "../store";
@@ -121,7 +122,7 @@ export default function OnboardingPage() {
     try {
       if (typeof window !== "undefined") fromName = new URLSearchParams(window.location.search).get("name")?.trim().slice(0, 120) ?? "";
     } catch { /* no address to read */ }
-    return { name: session?.name ?? fromName, email: session?.email ?? fromLink, password: "", phone: session?.phone ?? "", whatsappOk: session?.whatsappOk ?? true };
+    return { name: session?.name ?? fromName, firm: "", icai: "", email: session?.email ?? fromLink, password: "", phone: session?.phone ?? "", whatsappOk: session?.whatsappOk ?? true };
   });
   const [firmForm, setFirmForm] = useState({ name: firm?.name ?? (typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("firm")?.trim().slice(0, 120) ?? ""), city: firm?.city ?? "", frn: firm?.frn ?? "", phone: firm?.phone ?? session?.phone ?? "", ref: getReferralCode() ?? "" });
   const [gstinErr, setGstinErr] = useState<string | null>(null);
@@ -178,6 +179,8 @@ export default function OnboardingPage() {
       }
       const mobile = parseMobile(account.phone);
       if (!mobile) { toast.error("Enter a valid mobile number, for example 98200 11223."); return; }
+      if (!cleanFirmName(account.firm)) { toast.error("Enter your firm's name."); return; }
+      if (!cleanIcai(account.icai)) { toast.error("Enter your ICAI membership number: 5 or 6 digits, as on your membership card."); return; }
       // Verify the number on WhatsApp first (when switched on), so every account has a real, reachable number.
       let proof = otp.for === mobile.digits ? otp.proof : "";
       if (!proof) {
@@ -196,7 +199,7 @@ export default function OnboardingPage() {
           setOtp((o) => ({ ...o, proof }));
         }
       }
-      const created = await createAccountFn({ data: { name: account.name.trim(), phoneProof: proof || undefined, email, password: account.password, phone: account.phone, whatsappOk: account.whatsappOk, attribution: signupAttribution(), lead: getLeadAttribution() } }).catch(
+      const created = await createAccountFn({ data: { name: account.name.trim(), firmName: account.firm.trim(), icai: account.icai.trim(), phoneProof: proof || undefined, email, password: account.password, phone: account.phone, whatsappOk: account.whatsappOk, attribution: signupAttribution(), lead: getLeadAttribution() } }).catch(
         () => ({ ok: false as const, message: "We couldn't create your account just now. Check your connection and try again." }),
       );
       if (!created.ok) { toast.error(created.message); return; }
@@ -209,7 +212,7 @@ export default function OnboardingPage() {
       }
       if (!created.existed) {
         track("sign_up", { method: "email" });
-        setFirmForm((f) => ({ ...f, phone: f.phone || mobile.digits }));
+        setFirmForm((f) => ({ ...f, phone: f.phone || mobile.digits, name: f.name || account.firm.trim() }));
       }
       setStep((s) => Math.max(s, 1));
     } finally {
@@ -382,6 +385,8 @@ export default function OnboardingPage() {
                 )}
                 {mode === "signup" && (
                   <>
+                    <Field label="Firm name"><input className="v2-input" required autoComplete="organization" value={account.firm} onChange={(e) => setAccount({ ...account, firm: e.target.value })} placeholder="Mehta and Associates" /></Field>
+                    <Field label="ICAI membership number" hint={ICAI_HINT}><input className="v2-input" required inputMode="numeric" maxLength={8} value={account.icai} onChange={(e) => setAccount({ ...account, icai: e.target.value })} placeholder="245981" data-testid="icai-number" /></Field>
                     <Field label="Mobile number" hint={MOBILE_HINT}>
                       <input className="v2-input" type="tel" inputMode="tel" required autoComplete="tel" value={account.phone} onChange={(e) => setAccount({ ...account, phone: e.target.value })} placeholder="98200 11223" aria-describedby="mobile-why" />
                     </Field>

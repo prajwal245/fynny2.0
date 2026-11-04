@@ -177,15 +177,20 @@ async function firmSubjects(db: Db, now: Date): Promise<Subject[]> {
   const list = [...byFirm.values()].filter((x) => !x.firm.is_demo && !x.firm.is_test);
   if (!list.length) return [];
   const ids = list.map((x) => x.firm.id);
-  const [clients, docs, runs] = await Promise.all([
+  const [clients, docs, runs, reps] = await Promise.all([
     db.from("ca_clients").select("ca_firm_id").in("ca_firm_id", ids).neq("client_status", "archived").limit(50000),
-    db.from("ca_document_extractions").select("ca_firm_id, created_at, extract_status").in("ca_firm_id", ids).order("created_at", { ascending: false }).limit(50000),
+    db.from("ca_document_extractions").select("ca_firm_id, created_at, extract_status, source_type, extract_finished_at").in("ca_firm_id", ids).order("created_at", { ascending: false }).limit(50000),
     db.from("ca_agent_runs").select("ca_firm_id, started_at").in("ca_firm_id", ids).eq("agent", "recon").order("started_at", { ascending: false }).limit(20000),
+    db.from("ca_reports_log").select("ca_firm_id").in("ca_firm_id", ids).gte("created_at", new Date(Date.now() - 86_400_000).toISOString()).limit(20000),
   ]);
+  const reportN = new Map<string, number>();
+  for (const r of reps.data ?? []) reportN.set(String(r.ca_firm_id), (reportN.get(String(r.ca_firm_id)) ?? 0) + 1);
   const clientN = new Map<string, number>();
   for (const r of clients.data ?? []) clientN.set(String(r.ca_firm_id), (clientN.get(String(r.ca_firm_id)) ?? 0) + 1);
   const docN = new Map<string, number>();
   const failedN = new Map<string, number>();
+  const readyN = new Map<string, number>();
+  const readySince = new Date(Date.now() - 86_400_000).toISOString();
   const failedSince = new Date(Date.now() - 3 * 86_400_000).toISOString();
   const last = new Map<string, string>();
   const bump = (id: string, at: string) => {
@@ -193,6 +198,7 @@ async function firmSubjects(db: Db, now: Date): Promise<Subject[]> {
   };
   for (const r of docs.data ?? []) {
     docN.set(String(r.ca_firm_id), (docN.get(String(r.ca_firm_id)) ?? 0) + 1);
+    if (["parsed", "needs_review"].includes(String(r.extract_status)) && r.source_type && r.source_type !== "upload" && String(r.extract_finished_at ?? r.created_at) >= readySince) readyN.set(String(r.ca_firm_id), (readyN.get(String(r.ca_firm_id)) ?? 0) + 1);
     if (r.extract_status === "failed" && String(r.created_at) >= failedSince) failedN.set(String(r.ca_firm_id), (failedN.get(String(r.ca_firm_id)) ?? 0) + 1);
     bump(String(r.ca_firm_id), String(r.created_at));
   }
@@ -213,6 +219,8 @@ async function firmSubjects(db: Db, now: Date): Promise<Subject[]> {
       clients: clientN.get(firm.id) ?? 0,
       documents: docN.get(firm.id) ?? 0,
       failedDocs: failedN.get(firm.id) ?? 0,
+      readyDocs: readyN.get(firm.id) ?? 0,
+      readyReports: reportN.get(firm.id) ?? 0,
       lastActivityAt: last.get(firm.id) ?? null,
       billing: billing as never,
     },

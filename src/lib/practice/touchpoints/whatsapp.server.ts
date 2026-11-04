@@ -25,7 +25,7 @@ const env = (n: string) => (process.env[n] ?? "").trim() || undefined;
 const DAY = 86_400_000;
 const subjectOf = (r: { ca_firm_id?: string | null; user_id?: string | null }) => String(r.ca_firm_id ?? r.user_id ?? "");
 const lang = () => env("WHATSAPP_TEMPLATE_LANG") ?? "en";
-const templateEnv = () => ({ setup: env("WHATSAPP_TOUCH_SETUP_TEMPLATE"), trial: env("WHATSAPP_TOUCH_TRIAL_TEMPLATE"), plan: env("WHATSAPP_TOUCH_PLAN_TEMPLATE"), issue: env("WHATSAPP_TOUCH_ISSUE_TEMPLATE") });
+const templateEnv = () => ({ setup: env("WHATSAPP_TOUCH_SETUP_TEMPLATE"), trial: env("WHATSAPP_TOUCH_TRIAL_TEMPLATE"), plan: env("WHATSAPP_TOUCH_PLAN_TEMPLATE"), issue: env("WHATSAPP_TOUCH_ISSUE_TEMPLATE"), ready: env("WHATSAPP_TOUCH_READY_TEMPLATE") });
 
 /** FynHelp's own number, used for these messages. Null when it is not set up. */
 export function touchSender() {

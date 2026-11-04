@@ -93,3 +93,13 @@ describe("processing_issue", () => {
     expect(w?.key).toBe("2026-11-04");
   });
 });
+
+describe("results_ready", () => {
+  const base = { type: "firm" as const, createdAt: "2026-10-01T00:00:00Z", name: "Asha Rao", email: "a@x.in", phone: "9820011223", firmName: "Rao & Co", whatsappOk: true, clients: 1, documents: 2, lastActivityAt: "2026-11-03T00:00:00Z" };
+  const now = new Date("2026-11-04T06:00:00Z");
+  it("is wanted when background work finished, and not on top of an error notice", () => {
+    expect(wanted({ ...base, readyDocs: 3, readyReports: 1 }, now).some((w) => w.kind === "results_ready")).toBe(true);
+    expect(wanted({ ...base, readyDocs: 0, readyReports: 0 }, now).some((w) => w.kind === "results_ready")).toBe(false);
+    expect(wanted({ ...base, readyDocs: 3, failedDocs: 1 }, now).some((w) => w.kind === "results_ready")).toBe(false);
+  });
+});

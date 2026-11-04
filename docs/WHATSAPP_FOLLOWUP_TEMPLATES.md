@@ -57,6 +57,13 @@ Sent when a firm has a document FynHelp could not read (photo too blurred, scan 
 
 Sample values: `Asha`, `Rao & Co`, `1 document could not be read. Uploading it again as a PDF, Excel or CSV usually fixes this.` The follow-up stops by itself once the document is read. Optional override: `WHATSAPP_TOUCH_ISSUE_TEMPLATE`.
 
+### Background results: `fh_results_ready` (Utility)
+Sent when background agents (email intake, WhatsApp and upload-link documents, reports) finished and produced results the firm has not been told about: at most once a day, 1 hour after, 9 am to 8 pm IST, only to people who ticked WhatsApp, and not when a document error notice is due. Same four buttons. Category **Utility**, language `en`:
+
+`Hello {{1}}, this is FynHelp with an update on {{2}}. {{3}} You can view the results in your FynHelp account. The buttons below let you open it, ask us to call, pause these messages or stop them.`
+
+Sample values: `Asha`, `Rao & Co`, `3 documents were read and 1 report is ready.` Optional override: `WHATSAPP_TOUCH_READY_TEMPLATE`. Note: one WhatsApp follow-up per number per 3 days applies across all follow-up types.
+
 They state only what happened on the person's own account and what the buttons do: no question and no offer, which is what pushes Meta towards Marketing. Meta may still reclassify; if so the original templates keep working.
 
 ## Switch it on

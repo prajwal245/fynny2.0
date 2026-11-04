@@ -21,6 +21,7 @@ export type TouchKind =
   | "trial_ended_unpaid"
   | "payment_failed"
   | "processing_issue"
+  | "results_ready"
   | "paid_quiet";
 
 export const KIND_LABEL: Record<TouchKind, string> = {
@@ -33,6 +34,7 @@ export const KIND_LABEL: Record<TouchKind, string> = {
   trial_ended_unpaid: "Trial ended, not paid",
   payment_failed: "Payment failing",
   processing_issue: "Document could not be read",
+  results_ready: "Background results ready",
   paid_quiet: "Paying but quiet",
 };
 
@@ -52,6 +54,10 @@ export interface SubjectFacts {
   documents: number;
   /** Documents whose reading failed and have not been read since (last 3 days). */
   failedDocs?: number;
+  /** Documents read in the background (email, WhatsApp, upload link, Tally) in the last day. */
+  readyDocs?: number;
+  /** MIS reports generated in the last day. */
+  readyReports?: number;
   lastActivityAt: string | null;
   billing?: BillingRow & {
     pending_plan?: string | null;
@@ -132,6 +138,10 @@ export function wanted(f: SubjectFacts, now: Date = new Date()): Want[] {
   if ((f.failedDocs ?? 0) > 0)
     out.push({ kind: "processing_issue", key: now.toISOString().slice(0, 10), headline: `${who} has ${plural(f.failedDocs ?? 0, "document")} that FynHelp could not read.`, hot: false, dueAt: now, email: null, detail: { failedDocs: f.failedDocs ?? 0 } });
 
+  // Background agents finished and produced results nobody has been told about: say so once a day, and not on top of an error notice.
+  if ((f.failedDocs ?? 0) === 0 && ((f.readyDocs ?? 0) > 0 || (f.readyReports ?? 0) > 0))
+    out.push({ kind: "results_ready", key: now.toISOString().slice(0, 10), headline: `${who} has new results from background work: ${plural(f.readyDocs ?? 0, "document")} read, ${plural(f.readyReports ?? 0, "report")} ready.`, hot: false, dueAt: now, email: null, detail: { readyDocs: f.readyDocs ?? 0, readyReports: f.readyReports ?? 0 } });
+
   if (b && (b.status === "past_due" || b.status === "halted"))
     out.push({ kind: "payment_failed", key: b.status, headline: `${who}'s plan payment ${b.status === "halted" ? "failed several times and the plan is paused" : "failed and is being retried"}.`, hot: true, dueAt: now, email: null, detail: { status: b.status, plan: b.plan } });
 
@@ -173,6 +183,8 @@ export function scriptFor(kind: TouchKind, f: Pick<SubjectFacts, "name" | "firmN
       return `${hi} The payment for ${firm}'s FynHelp plan did not go through. It is usually a card limit or an expired UPI mandate. I can send you a fresh payment link, or you can update it in Settings, Billing.`;
     case "processing_issue":
       return `${hi} One of the documents for ${firm} could not be read by FynHelp. It usually helps to upload it again as a PDF, Excel or CSV, or a clearer photo. Shall I take a look with you?`;
+    case "results_ready":
+      return `${hi} FynHelp finished some work for ${firm} in the background and the results are ready to view. Shall I walk you through them?`;
     case "paid_quiet":
       return `${hi} I noticed ${firm} has not used FynHelp for a while. Is everything working for you? If a client or a report is giving trouble, I would be glad to help.`;
   }

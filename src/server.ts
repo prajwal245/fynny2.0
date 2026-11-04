@@ -60,17 +60,18 @@ function contentSecurityPolicy(): string {
   const meta = "https://connect.facebook.net https://www.facebook.com";
   const razorpay = "https://checkout.razorpay.com https://api.razorpay.com https://lumberjack.razorpay.com";
   const calendly = "https://calendly.com https://assets.calendly.com";
+  const crisp = { script: "https://client.crisp.chat https://settings.crisp.chat", img: "https://client.crisp.chat https://image.crisp.chat https://storage.crisp.chat", connect: "https://client.crisp.chat https://storage.crisp.chat wss://client.relay.crisp.chat wss://stream.relay.crisp.chat" };
   const local = /^http:\/\/(127\.0\.0\.1|localhost)/.test(supa) ? " ws://127.0.0.1:* ws://localhost:*" : "";
   return [
     "default-src 'self'",
-    `script-src 'self' 'unsafe-inline' ${analytics} ${posthog} ${meta} ${razorpay} ${calendly}`,
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.fontshare.com https://assets.calendly.com",
-    "font-src 'self' data: https://fonts.gstatic.com https://cdn.fontshare.com https://api.fontshare.com",
-    "img-src 'self' data: blob: https:",
-    `connect-src 'self' ${supa} ${supaWs} ${analytics} ${posthog} ${meta} ${razorpay} https://api.pwnedpasswords.com https://*.ingest.us.sentry.io https://*.ingest.sentry.io${local}`.replace(/\s+/g, " "),
-    `frame-src 'self' ${razorpay} ${calendly} https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com`,
+    `script-src 'self' 'unsafe-inline' ${analytics} ${posthog} ${meta} ${razorpay} ${calendly} ${crisp.script}`,
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.fontshare.com https://assets.calendly.com https://client.crisp.chat",
+    "font-src 'self' data: https://fonts.gstatic.com https://cdn.fontshare.com https://api.fontshare.com https://client.crisp.chat",
+    `img-src 'self' data: blob: https: ${crisp.img}`,
+    `connect-src 'self' ${supa} ${supaWs} ${analytics} ${posthog} ${meta} ${razorpay} ${crisp.connect} https://api.pwnedpasswords.com https://*.ingest.us.sentry.io https://*.ingest.sentry.io${local}`.replace(/\s+/g, " "),
+    `frame-src 'self' ${razorpay} ${calendly} https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com https://game.crisp.chat`,
     "worker-src 'self' blob:",
-    "media-src 'self' blob: https:",
+    "media-src 'self' blob: https: https://client.crisp.chat",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self' https://api.razorpay.com",

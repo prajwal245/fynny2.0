@@ -20,6 +20,7 @@ import SkipToContent from "@/components/system/SkipToContent";
 import ScrollManager from "@/components/system/ScrollManager";
 import SearchPalette from "@/components/system/SearchPalette";
 import FloatingContact from "@/components/system/FloatingContact";
+import CrispChat from "@/components/system/CrispChat";
 import NotFound from "@/pages/NotFound";
 import { Sentry } from "@/lib/monitoring";
 import { usePageTracking } from "@/hooks/usePageTracking";
@@ -178,6 +179,7 @@ function RootComponent() {
             <SkipToContent />
             <ScrollManager />
             <CookieConsent />
+            <CrispChat />
             <SiteOnly>
               <SearchPalette />
               <FloatingContact />

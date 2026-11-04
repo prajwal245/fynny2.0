@@ -812,12 +812,12 @@ export async function followUps(ctx: AdminCtx, status: "open" | "closed") {
   const { TOUCH_TEMPLATES_UTILITY, pickTouchTemplate, marketingAllowed } = await import("../practice/touchpoints/whatsapp");
   const sender = touchSender();
   const metaList = sender?.wabaId ? await listTemplates({ wabaId: sender.wabaId, token: sender.token }) : null;
-  const names = { setup: process.env["WHATSAPP_TOUCH_SETUP_TEMPLATE"], trial: process.env["WHATSAPP_TOUCH_TRIAL_TEMPLATE"], plan: process.env["WHATSAPP_TOUCH_PLAN_TEMPLATE"] };
+  const names = { setup: process.env["WHATSAPP_TOUCH_SETUP_TEMPLATE"], trial: process.env["WHATSAPP_TOUCH_TRIAL_TEMPLATE"], plan: process.env["WHATSAPP_TOUCH_PLAN_TEMPLATE"], issue: process.env["WHATSAPP_TOUCH_ISSUE_TEMPLATE"], ready: process.env["WHATSAPP_TOUCH_READY_TEMPLATE"] };
   const whatsapp = {
     ready: Boolean(sender?.wabaId && metaList),
     problem: !sender ? "FynHelp's WhatsApp number or token is not set up." : !sender.wabaId ? "Add WHATSAPP_WABA_ID so FynHelp can check the templates." : !metaList ? "Could not read the templates from Meta." : null,
     marketingAllowed: marketingAllowed(process.env["WHATSAPP_TOUCH_ALLOW_MARKETING"]),
-    templates: (["setup", "trial", "plan"] as const).map((k) => {
+    templates: (["setup", "trial", "plan", "issue", "ready"] as const).map((k) => {
       const pick = metaList
         ? pickTouchTemplate(k, metaList, { envName: names[k], language: "en", allowMarketing: marketingAllowed(process.env["WHATSAPP_TOUCH_ALLOW_MARKETING"]) })
         : { name: names[k] || TOUCH_TEMPLATES_UTILITY[k].name, template: undefined, marketing: false, why: "not checked" };

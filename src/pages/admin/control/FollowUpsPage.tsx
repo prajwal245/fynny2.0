@@ -84,7 +84,7 @@ export default function FollowUpsPage() {
               ))}
             </div>
           )}
-          <p className="text-xs mt-3" style={{ color: muted }}>Sent only to people who agreed to WhatsApp, about their own set-up, trial or plan, 9 am to 8 pm IST, at most once in 3 days. Each message has Call me, Not now and Stop messages buttons.</p>
+          <p className="text-xs mt-3" style={{ color: muted }}>Sent only to people who agreed to WhatsApp, about their own set-up, trial, plan, documents or results, 9 am to 8 pm IST, at most once in 3 days. Each message has Call me, Not now and Stop messages buttons.</p>
         </Panel>
       )}
 

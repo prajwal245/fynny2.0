@@ -321,6 +321,22 @@ const MIN_OCR_CHARS = 40;
 /** Lines read from a scan never outrank a person's glance unless the balances verify. */
 const OCR_CONFIDENCE_CAP = 0.8;
 
+/** Says why a photo could not be read, from what the OCR and AI calls actually did. */
+function photoFailureMessage(calls: AiCallRecord[], ocrOn: boolean): string {
+  const ocr = calls.find((c) => c.purpose === "extract_ocr");
+  const tail = " Upload the document as a PDF, Excel or CSV instead, or send a clearer, closer photo.";
+  if (ocr?.status === "error") {
+    const why = ocr.error ?? "";
+    if (/size|limit|1024|1 ?MB|large/i.test(why))
+      return "This photo is too large for the reader (about 1 MB maximum). Send a smaller or compressed copy." + tail;
+    if (/timed out/i.test(why)) return "Reading this photo took too long. Please try again in a minute." + tail;
+    return "The photo reader could not read this image: " + why.slice(0, 160) + "." + tail;
+  }
+  if (ocr?.status === "success")
+    return "The photo was read, but not enough text could be made out, or turning it into entries needs the AI reader, which is not switched on." + tail;
+  return (ocrOn ? "The photo could not be read." : "Reading photos isn't switched on yet.") + tail;
+}
+
 /**
  * Scans and photos: OCR first, then the same grounded text route as a text
  * PDF (statement parser with running-balance checks, then the AI reading the
@@ -577,12 +593,7 @@ export async function runExtract(
       },
     });
     if (!parsed && !read)
-      return fail(
-        kind,
-        "needs_ai",
-        "Reading photos isn't switched on yet. Upload the document as a PDF, Excel or CSV instead, or try again later.",
-        calls,
-      );
+      return fail(kind, "needs_ai", photoFailureMessage(calls, Boolean(deps.ocr)), calls);
     if (read) {
       aiReadUsed = true;
       parsed = rowsFromAiRead(read.rows, "");

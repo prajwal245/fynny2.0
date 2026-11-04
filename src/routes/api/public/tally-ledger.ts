@@ -18,6 +18,9 @@ export const Route = createFileRoute("/api/public/tally-ledger")({
         const db = await adminDb();
         const connector = await t.authConnector(db, request.headers.get("authorization"));
         if (!connector) return json({ error: "Unknown or revoked connector token" }, 401);
+        const { limitRequest, POLICIES } = await import("@/lib/rateLimit.server");
+        const limited = await limitRequest(POLICIES.connector, connector.id, "This connector is sending too fast. It will retry shortly.");
+        if (limited) return limited;
         const url = new URL(request.url);
         const company = (url.searchParams.get("company") ?? "").trim();
         const month = url.searchParams.get("month") ?? "";

@@ -24,6 +24,10 @@ const esc = (s: string) =>
 export const notifyWaitlistLead = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => leadSchema.parse(data))
   .handler(async ({ data }) => {
+    const { enforceRateLimit, POLICIES, requestIp } = await import("@/lib/rateLimit.server");
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const req = getRequest();
+    if (req) await enforceRateLimit(POLICIES.anonForm, requestIp(req), "Too many requests from this network. Please try again later.");
     const apiKey = process.env["RESEND_API_KEY"];
     if (!apiKey) {
       console.error("[waitlist-notify] RESEND_API_KEY is not configured");

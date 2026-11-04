@@ -18,11 +18,17 @@ export const Route = createFileRoute("/api/public/upload-link")({
     handlers: {
       GET: async ({ request }) => {
         const token = new URL(request.url).searchParams.get("token") ?? "";
+        const { limitRequest, requestIp, POLICIES } = await import("@/lib/rateLimit.server");
+        const limited = (await limitRequest(POLICIES.uploadIp, requestIp(request))) ?? (await limitRequest(POLICIES.uploadToken, token.slice(0, 64)));
+        if (limited) return limited;
         const { adminDb } = await import("@/lib/practice/db.server");
         const { linkInfo } = await import("@/lib/practice/uploadLinks.server");
         return json(await linkInfo(await adminDb(), token));
       },
       POST: async ({ request }) => {
+        const { limitRequest, requestIp, POLICIES } = await import("@/lib/rateLimit.server");
+        const limitedIp = await limitRequest(POLICIES.uploadIp, requestIp(request), "Too many uploads from this network. Please wait a few minutes and try again.");
+        if (limitedIp) return limitedIp;
         const length = Number(request.headers.get("content-length") ?? 0);
         if (length > MAX_FILE_BYTES + 512 * 1024) return json({ ok: false, reason: "size", message: "That file is larger than 15 MB. Please send a smaller or compressed copy." }, 413);
         let form: FormData;
@@ -33,6 +39,8 @@ export const Route = createFileRoute("/api/public/upload-link")({
         }
         const token = String(form.get("token") ?? "");
         const file = form.get("file");
+        const limitedLink = await limitRequest(POLICIES.uploadToken, token.slice(0, 64), "This link has received too many files. Please wait a few minutes and try again.");
+        if (limitedLink) return limitedLink;
         if (!(file instanceof File)) return json({ ok: false, reason: "empty", message: "Choose a file first." }, 400);
         const { adminDb } = await import("@/lib/practice/db.server");
         const { acceptUpload } = await import("@/lib/practice/uploadLinks.server");

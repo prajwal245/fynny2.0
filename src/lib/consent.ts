@@ -15,6 +15,9 @@ export interface Consent {
 /** Google Analytics 4 property for www.fynhelp.com (public, appears in every page). */
 export const GA_MEASUREMENT_ID = "G-GEZMCK8JYS";
 
+/** Google Ads conversion-tracking tag (public, appears in every page). */
+export const GOOGLE_ADS_ID = "AW-18553300605";
+
 const KEY = "fynhelp.consent";
 export const OPEN_SETTINGS_EVENT = "fh-open-cookie-settings";
 const CHANGED_EVENT = "fh-consent-changed";

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { MessageCircle, X, Mail, Phone, CalendarClock } from "lucide-react";
+import { useCrispLive } from "./CrispChat";
 
 /**
  * The support phone/WhatsApp number, digits with country code (e.g. "91XXXXXXXXXX").
@@ -13,6 +14,8 @@ const CALL = "https://calendly.com/nidhi-fynhelp/nidhi-meetings";
 /** Persistent contact launcher for public marketing pages. */
 export default function FloatingContact() {
   const [open, setOpen] = useState(false);
+  // On the live site Crisp is the chat; this launcher would only sit on top of it.
+  const crispLive = useCrispLive();
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -48,6 +51,7 @@ export default function FloatingContact() {
     </a>
   );
 
+  if (crispLive) return null;
   return (
     <div ref={ref} className="fyn-no-print" style={{ position: "fixed", right: 20, bottom: 20, zIndex: 80 }}>
       {open && (

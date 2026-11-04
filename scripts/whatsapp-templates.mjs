@@ -44,13 +44,27 @@ export const TEMPLATES = [
   tpl("fh_setup_help", "Hello {{1}}, this is the FynHelp team. You started setting up {{2}}. {{3}} If you would like a hand, tap a button below and a person will help.", ["Asha", "Rao & Co", "The next step is to add your first client, which takes about 2 minutes."], followButtons),
   tpl("fh_trial_update", "Hello {{1}}, a note from FynHelp about the trial for {{2}}: it {{3}}. Nothing you have done is lost. Would you like help choosing a plan or finishing a client?", ["Asha", "Rao & Co", "ends in 2 days"], followButtons),
   tpl("fh_plan_help", "Hello {{1}}, this is FynHelp about the plan for {{2}}. The payment {{3}}. Nothing is lost, and we can help you finish. Tap a button below.", ["Asha", "Rao & Co", "was not completed"], followButtons),
+  // Utility notices about the person's own account (see docs/WHATSAPP_FOLLOWUP_TEMPLATES.md).
+  tpl("fh_account_update", "Hello {{1}}, this is FynHelp with an update on {{2}}. {{3}} The details are in your FynHelp account. The buttons below let you open it, ask us to call, pause these messages or stop them.", ["Asha", "Rao & Co", "1 document could not be read. Uploading it again as a PDF, Excel or CSV usually fixes this."], followButtons),
+  tpl("fh_results_ready", "Hello {{1}}, this is FynHelp with an update on {{2}}. {{3}} You can view the results in your FynHelp account. The buttons below let you open it, ask us to call, pause these messages or stop them.", ["Asha", "Rao & Co", "3 documents were read and 1 report is ready."], followButtons),
+  // Sign-up verification code. Authentication templates have Meta-fixed wording: only these flags are set.
+  {
+    name: "fh_signup_otp",
+    language: "en",
+    category: "AUTHENTICATION",
+    components: [
+      { type: "BODY", add_security_recommendation: true },
+      { type: "FOOTER", code_expiration_minutes: 10 },
+      { type: "BUTTONS", buttons: [{ type: "OTP", otp_type: "COPY_CODE", text: "Copy code" }] },
+    ],
+  },
 ];
 
 async function main() {
   console.log(`WhatsApp Business Account ${WABA}`);
   if (!TOKEN) {
     console.log("\nNo WHATSAPP_ACCESS_TOKEN set: showing what would be created. Nothing is sent.\n");
-    for (const t of TEMPLATES) console.log(`- ${t.name}: ${t.components[0].text}`);
+    for (const t of TEMPLATES) console.log(`- ${t.name}: ${t.components[0].text ?? "(Meta-fixed Authentication wording)"}`);
     return;
   }
   // 1. Is this the right account? The number FynHelp sends from must belong to it, or templates made here can never be sent.

@@ -213,6 +213,8 @@ export default function PricingPage() {
   const [helperClients, setHelperClients] = useState(30);
   const [roi, setRoi] = useState({ clients: 30, hours: 1.5, rate: 250, fee: 0 });
   const m = (n: number) => money(n, cur);
+  /** A price per page or per credit: kept to paise so ₹1.70 never reads as ₹2. */
+  const unit = (n: number) => (cur === "INR" ? `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `$${(n / INR_PER_USD).toFixed(3)}`);
 
   const helper = useMemo(() => {
     const n = Math.max(1, Math.min(2000, Math.round(helperClients || 1)));
@@ -363,7 +365,7 @@ export default function PricingPage() {
                 {k.name === "Pro" ? <span className="tag">Best value</span> : null}
                 <b>{k.pages.toLocaleString("en-IN")} pages</b>
                 <div className="pp">{m(k.price)}</div>
-                <small>{m(k.perPage)} per page · {gstNote(cur)}</small>
+                <small>{unit(k.perPage)} per page · {gstNote(cur)}</small>
               </div>
             ))}
           </div>
@@ -377,7 +379,7 @@ export default function PricingPage() {
                 {k.tag ? <span className="tag">{k.tag}</span> : null}
                 <b>{k.credits.toLocaleString("en-IN")} credits</b>
                 <div className="pp">{m(k.price)}</div>
-                <small>{m(Math.round((k.price / k.credits) * 100) / 100)} per credit · {gstNote(cur)}</small>
+                <small>{unit(k.price / k.credits)} per credit · {gstNote(cur)}</small>
               </div>
             ))}
           </div>

@@ -5,7 +5,7 @@ const line: ApprovedLine = {
   id: "ln_123",
   company: "Sundara Textiles & Co",
   date: "2026-09-12",
-  direction: "credit",
+  direction: "in",
   amount: 48200,
   bankLedger: "HDFC Bank",
   partyLedger: "Rao Steels",
@@ -17,7 +17,7 @@ const ledgers = ["HDFC Bank", "Rao Steels"];
 describe("writing an approved line to Tally", () => {
   it("a credit is a Receipt and a debit is a Payment", () => {
     expect(kindOf(line)).toBe("Receipt");
-    expect(kindOf({ direction: "debit" })).toBe("Payment");
+    expect(kindOf({ direction: "out" })).toBe("Payment");
   });
 
   it("Receipt debits the bank and credits the party; the two amounts balance", () => {
@@ -29,7 +29,7 @@ describe("writing an approved line to Tally", () => {
   });
 
   it("Payment debits the party and credits the bank", () => {
-    const x = importVoucherXml({ ...line, direction: "debit" });
+    const x = importVoucherXml({ ...line, direction: "out" });
     expect(x).toContain('VCHTYPE="Payment"');
     expect(x).toMatch(/<LEDGERNAME>Rao Steels<\/LEDGERNAME><ISDEEMEDPOSITIVE>Yes<\/ISDEEMEDPOSITIVE><AMOUNT>-48200.00</);
     expect(x).toMatch(/<LEDGERNAME>HDFC Bank<\/LEDGERNAME><ISDEEMEDPOSITIVE>No<\/ISDEEMEDPOSITIVE><AMOUNT>48200.00</);

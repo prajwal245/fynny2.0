@@ -188,3 +188,29 @@ describe("connector end to end", () => {
     expect(r.out).toMatch(/token/i);
   });
 });
+
+describe("connector: ledger list and write safety", () => {
+  it("asks for ledger names and groups of one company", () => {
+    const x = connector.ledgerListRequest("A & B Co");
+    expect(x).toContain("<TYPE>Ledger</TYPE>");
+    expect(x).toContain("A &amp; B Co");
+  });
+  it("reads ledger names and parents, and ignores empty ones", () => {
+    const xml = `<ENVELOPE><LEDGER NAME="Rao Steels"><PARENT>Sundry Creditors</PARENT></LEDGER><LEDGER><NAME>HDFC Bank</NAME><PARENT>Bank Accounts</PARENT></LEDGER><LEDGER NAME=""></LEDGER></ENVELOPE>`;
+    expect(connector.parseLedgers(xml)).toEqual([
+      { name: "Rao Steels", parent: "Sundry Creditors" },
+      { name: "HDFC Bank", parent: "Bank Accounts" },
+    ]);
+  });
+  it("writing is off unless the config turns it on", () => {
+    const dir = mkdtempSync(join(tmpdir(), "fyn-"));
+    const file = join(dir, "c.json");
+    const token = "fyn_tc_" + "a".repeat(43);
+    writeFileSync(file, JSON.stringify({ token }));
+    expect(connector.loadConfig(["--config", file]).allowWrite).toBe(false);
+    writeFileSync(file, JSON.stringify({ token, allowWrite: true }));
+    expect(connector.loadConfig(["--config", file]).allowWrite).toBe(true);
+    writeFileSync(file, JSON.stringify({ token, allowWrite: "yes" }));
+    expect(connector.loadConfig(["--config", file]).allowWrite).toBe(false);
+  });
+});

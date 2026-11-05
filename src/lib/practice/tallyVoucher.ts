@@ -15,7 +15,7 @@ export interface ApprovedLine {
   company: string;
   /** YYYY-MM-DD */
   date: string;
-  direction: "debit" | "credit";
+  direction: "in" | "out";
   amount: number;
   /** The bank ledger in Tally the statement belongs to. */
   bankLedger: string;
@@ -55,8 +55,8 @@ export function problemsWith(line: ApprovedLine, existingLedgers: Iterable<strin
   return out;
 }
 
-/** Money coming in is a Receipt, money going out is a Payment. */
-export const kindOf = (line: Pick<ApprovedLine, "direction">): VoucherKind => (line.direction === "credit" ? "Receipt" : "Payment");
+/** Money in (a credit on the bank statement) is a Receipt, money out is a Payment. */
+export const kindOf = (line: Pick<ApprovedLine, "direction">): VoucherKind => (line.direction === "in" ? "Receipt" : "Payment");
 
 /** The Import Data request for one approved line. Throws if the line has problems the caller did not clear. */
 export function importVoucherXml(line: ApprovedLine): string {

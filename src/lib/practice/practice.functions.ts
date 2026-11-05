@@ -1262,3 +1262,31 @@ export const referralApply = createServerFn({ method: "POST" })
       return (await import("./referrals.server")).applyReferral(db, ctx, data.code);
     }),
   );
+
+
+/* ── Tally posting: approve what goes into Tally ───────── */
+
+export const tallyWorkbench = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ business_id: uuid }).parse(d))
+  .handler(async ({ context, data }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      const { assertClient } = await import("./db.server");
+      await assertClient(db, ctx, data.business_id);
+      return (await import("./tallyPosting.server")).workbench(db, ctx, data.business_id);
+    }),
+  );
+
+export const tallyApprove = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ txn_id: uuid, party_ledger: z.string().min(1).max(200), bank_ledger: z.string().min(1).max(200) }).parse(d))
+  .handler(async ({ context, data }) =>
+    withFirm(context.userId, async (db, ctx) =>
+      (await import("./tallyPosting.server")).approvePosting(db, ctx, { txnId: data.txn_id, partyLedger: data.party_ledger, bankLedger: data.bank_ledger }),
+    ),
+  );
+
+export const tallyCancel = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ id: uuid }).parse(d))
+  .handler(async ({ context, data }) => withFirm(context.userId, async (db, ctx) => (await import("./tallyPosting.server")).cancelPosting(db, ctx, data.id)));

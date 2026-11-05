@@ -1,15 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import EnterprisePage from "@/pages/EnterprisePage";
-import { breadcrumbLd, seo } from "@/lib/seo";
+import { seo } from "@/lib/seo";
 
+// Shared by direct link only: not indexed, no structured data.
 export const Route = createFileRoute("/_main/enterprise")({
   component: EnterprisePage,
   head: () =>
     seo({
-      title: "Enterprise month-end automation for Indian finance teams",
-      description:
-        "Bank, GST and TDS reconciliation, intercompany matching and MIS commentary on your Tally, SAP or Zoho books. Coming soon. Get early access.",
+      title: "FynHelp for finance teams",
+      description: "End the manual month-end. Keep your existing books.",
       path: "/enterprise",
-      jsonLd: [breadcrumbLd([{ name: "Enterprise", path: "/enterprise" }])],
+      noindex: true,
     }),
 });

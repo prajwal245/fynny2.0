@@ -1,177 +1,167 @@
 import { useState, type FormEvent } from "react";
-import { motion } from "framer-motion";
 import {
   ArrowRight,
-  Banknote,
-  Building2,
+  BookOpenCheck,
   CheckCircle2,
-  FileSpreadsheet,
-  GitMerge,
+  ClipboardCheck,
+  FileSearch,
+  GitCompareArrows,
+  Inbox,
   Landmark,
+  LockKeyhole,
   Receipt,
   ShieldCheck,
-  Send,
-  Workflow,
+  Timer,
+  Users,
+  X,
 } from "lucide-react";
-import Layout from "@/components/Layout";
-import { notifyWaitlistLead } from "@/lib/waitlistNotify.functions";
+import { openDemo } from "@/components/site/BookDemo";
+import { Link } from "@/lib/router-compat";
 
 /**
- * /enterprise: "coming soon" page for Heads of Finance at larger Indian companies.
- * Honest by design: it states what is in design, not what is shipped, and collects
- * early-access interest. Leads reach the team through notifyWaitlistLead (email).
+ * /enterprise: landing page for in-house finance teams (not indexed).
+ * Visual language follows the cool, bordered-grid style of modern finance-software
+ * sites: light grey-teal ground, hairline grid cells, dark teal gradient close.
  */
 
-const CREAM = "#EFE8D8";
-const DARK = "#171208";
-const RED = "#A93838";
-const SOFT = "#F5EFE2";
-const serif = { fontFamily: '"Playfair Display", Georgia, serif' };
+const INK = "#0B1F1E";
+const TEAL = "#0F4F4C";
+const TEAL_DEEP = "#0A3836";
+const GROUND = "#EFF4F4";
+const LINE = "#D3DEDE";
+const MUTED = "#4C6361";
+const FONT = '"Inter", "DM Sans", system-ui, sans-serif';
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 24 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as const } },
-};
-
-const CASES = [
-  {
-    icon: Landmark,
-    title: "Bank reconciliation across every account",
-    body: "Statements from every bank and entity, matched to Tally, SAP or Zoho Books. Only the exceptions reach your team, each with the evidence beside it.",
-  },
-  {
-    icon: Receipt,
-    title: "GST and TDS reconciliation",
-    body: "GSTR-2B against purchase books, and TDS deducted against TDS deposited. Mismatches are listed with the vendor, the invoice and the likely reason.",
-  },
-  {
-    icon: GitMerge,
-    title: "Intercompany matching",
-    body: "Group entities agree on what they owe each other before close, not after. Differences go to the right owner with a due date.",
-  },
-  {
-    icon: Workflow,
-    title: "Month-end close checklist",
-    body: "A live close calendar per entity: who owes what, what is blocked and what is done. Reviewers sign off in order.",
-  },
-  {
-    icon: FileSpreadsheet,
-    title: "MIS and board-pack commentary",
-    body: "Draft commentary on why numbers moved, written from your own ledgers. Every figure opens to the lines behind it.",
-  },
-  {
-    icon: Send,
-    title: "Vendor and customer follow-ups",
-    body: "Missing invoices, confirmations and receivable reminders go out on WhatsApp or email, and stop the moment the document arrives.",
-  },
+const STEPS = [
+  { icon: Inbox, n: "1", t: "Collect", d: "Reads Indian bank statements (PDF, Excel, even a phone photo), the Tally day book and supporting documents. Clients can send them on WhatsApp or email." },
+  { icon: GitCompareArrows, n: "2", t: "Reconcile", d: "Matches bank lines to your Tally or Zoho books. Surfaces only real exceptions with clear reasons. GST and TDS matching is in design with finance heads." },
+  { icon: BookOpenCheck, n: "3", t: "Narrate", d: "Generates a source-traceable close pack. Every number links back to the original document." },
+  { icon: ClipboardCheck, n: "4", t: "Review and approve", d: "Your team reviews only what needs attention. Approved entries can be written to your ledger, never without human approval." },
 ];
 
-const PRINCIPLES = [
-  { icon: Building2, t: "Keep your ERP", d: "Works on top of Tally, SAP, Oracle, Dynamics or Zoho Books. Nothing to rip out." },
-  { icon: Banknote, t: "Built for India", d: "GST, TDS, e-invoicing, Indian bank formats, WhatsApp and rupees from day one." },
-  { icon: ShieldCheck, t: "Humans decide", d: "Agents prepare. Your team approves. Every change is logged with who and when." },
+const REASONS = [
+  { icon: Landmark, t: "No migration required" },
+  { icon: Users, t: "Works with Tally and Zoho Books you already use" },
+  { icon: LockKeyhole, t: "Zero silent posting, full human control" },
+  { icon: FileSearch, t: "Exception-only workflow" },
+  { icon: ShieldCheck, t: "Clean audit trail on every figure" },
+  { icon: Timer, t: "Faster close without adding headcount" },
 ];
 
-const NEEDS = [
-  "Multiple entities and approval hierarchies",
-  "SSO and role-based access",
-  "Audit trail on every decision",
-  "India-hosted data",
-  "Integrations with your ERP and banks",
+const PAIN = [
+  "Chasing statements and invoices",
+  "Matching bank feeds to the ledger line by line",
+  "Reconciling GST and TDS data",
+  "Preparing packs that leadership can actually trust",
+  "Working late to hit the close deadline",
 ];
 
-const ENTITIES = ["1–5", "6–25", "26–100", "100+"];
-const TOOLS = ["Tally", "SAP", "Oracle", "Microsoft Dynamics", "Zoho Books", "NetSuite", "Excel", "Other"];
+const BEFORE_AFTER = [
+  ["Hours of manual matching", "Only exceptions need review"],
+  ["Late-night pack prep", "Source-linked pack ready faster"],
+  ["Heavy review load", "Leadership reviews with confidence"],
+  ["Close slips easily", "Tighter, more predictable close"],
+];
+
+const btnDark = {
+  background: INK,
+  color: "#fff",
+} as const;
+
+function TopBar() {
+  return (
+    <div className="text-center text-[13px] py-3 px-4" style={{ background: `linear-gradient(90deg, ${INK}, ${TEAL})`, color: "#fff" }}>
+      <span className="inline-block w-1.5 h-1.5 rounded-full mr-2 align-middle" style={{ background: "#B7F0C8" }} />
+      Enterprise finance teams: early access is open.{" "}
+      <button onClick={() => openDemo("enterprise-bar")} className="underline underline-offset-2 font-medium">
+        Book a walkthrough
+      </button>
+    </div>
+  );
+}
+
+function Nav() {
+  return (
+    <header style={{ background: "#fff", borderBottom: `1px solid ${LINE}` }}>
+      <div className="mx-auto max-w-[1180px] px-6 h-[72px] flex items-center justify-between">
+        <Link to="/" className="text-[26px] font-semibold tracking-tight" style={{ color: INK, fontFamily: FONT }}>
+          FynHelp
+        </Link>
+        <nav className="hidden md:flex items-center gap-9 text-[15px]" style={{ color: INK }}>
+          <a href="#how">How it works</a>
+          <a href="#why">Why FynHelp</a>
+          <a href="#change">What changes</a>
+          <Link to="/pricing">Pricing</Link>
+        </nav>
+        <div className="flex items-center gap-4 text-[15px]">
+          <Link to="/login" className="hidden sm:inline" style={{ color: INK }}>
+            Login
+          </Link>
+          <button onClick={() => openDemo("enterprise-nav")} className="rounded-md px-5 py-2.5 text-[15px] font-medium" style={btnDark}>
+            Book a walkthrough
+          </button>
+        </div>
+      </div>
+    </header>
+  );
+}
 
 function Hero() {
+  const [email, setEmail] = useState("");
+  const go = (e: FormEvent) => {
+    e.preventDefault();
+    openDemo("enterprise-hero");
+  };
   return (
-    <section style={{ background: CREAM }}>
-      <div className="mx-auto max-w-6xl px-6 pt-20 pb-16 lg:pt-28 lg:pb-20 text-center">
-        <motion.div initial="hidden" animate="visible" variants={fadeUp}>
-          <span
-            className="inline-block text-[12px] font-semibold tracking-wider uppercase px-3 py-1.5 rounded-full"
-            style={{ background: `${RED}14`, color: RED }}
-          >
-            Enterprise · Coming soon
-          </span>
-          <h1 className="mt-6 text-4xl md:text-6xl leading-[1.08]" style={{ ...serif, color: DARK }}>
-            Month-end for finance teams,
-            <br />
-            <span style={{ color: RED }}>run by agents.</span>
-          </h1>
-          <p className="mt-6 mx-auto max-w-2xl text-lg leading-relaxed" style={{ color: "rgba(23,18,8,0.72)" }}>
-            Reconciliations, GST and TDS checks, intercompany matching and MIS commentary, on the Tally, SAP or
-            Zoho books you already run. Your team reviews. Your finance head signs off.
-          </p>
-          <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-            <a
-              href="#early-access"
-              className="inline-flex items-center gap-2 rounded-full px-7 py-3.5 text-[15px] font-semibold text-white"
-              style={{ background: RED }}
-            >
-              Get early access <ArrowRight size={16} />
-            </a>
-            <a
-              href="/ca-firms"
-              className="inline-flex items-center rounded-full px-7 py-3.5 text-[15px] font-semibold"
-              style={{ background: "#fff", color: DARK, border: "1px solid rgba(23,18,8,0.12)" }}
-            >
-              See it live for CA firms
-            </a>
-          </div>
-          <p className="mt-4 text-[13px]" style={{ color: "rgba(23,18,8,0.55)" }}>
-            Already running month-end for CA firms in production. Enterprise is opening to a small first group.
-          </p>
-        </motion.div>
-      </div>
-    </section>
-  );
-}
-
-function Principles() {
-  return (
-    <section style={{ background: SOFT }}>
-      <div className="mx-auto max-w-6xl px-6 py-14 grid md:grid-cols-3 gap-6">
-        {PRINCIPLES.map((p) => (
-          <div key={p.t} className="rounded-2xl p-6" style={{ background: "#fff" }}>
-            <p.icon size={22} color={RED} />
-            <h3 className="mt-4 text-lg font-semibold" style={{ color: DARK }}>
-              {p.t}
-            </h3>
-            <p className="mt-2 text-[15px] leading-relaxed" style={{ color: "rgba(23,18,8,0.7)" }}>
-              {p.d}
-            </p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function UseCases() {
-  return (
-    <section style={{ background: CREAM }}>
-      <div className="mx-auto max-w-6xl px-6 py-20">
-        <h2 className="text-3xl md:text-4xl max-w-2xl" style={{ ...serif, color: DARK }}>
-          The work that fills your close calendar, taken off your team.
-        </h2>
-        <p className="mt-4 max-w-2xl text-[16px]" style={{ color: "rgba(23,18,8,0.7)" }}>
-          These are the automations we are designing with finance heads. Tell us which ones matter most and they move
-          up the list.
+    <section style={{ background: `linear-gradient(180deg, ${GROUND} 0%, #fff 100%)` }}>
+      <div className="mx-auto max-w-[1180px] px-6 pt-20 pb-16 md:pt-28 md:pb-24 text-center">
+        <h1 className="text-[40px] md:text-[68px] leading-[1.04] font-medium tracking-[-0.03em]" style={{ color: INK, fontFamily: FONT }}>
+          End the manual month-end.
+          <br />
+          Keep your existing books.
+        </h1>
+        <p className="mt-7 mx-auto max-w-[720px] text-[18px] md:text-[20px] leading-relaxed" style={{ color: MUTED }}>
+          FynHelp is the intelligence layer that sits on top of your current accounting system. It extracts, reconciles
+          and prepares a clean, source-traceable close pack, so your team only reviews exceptions.
         </p>
-        <div className="mt-10 grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {CASES.map((c) => (
-            <div key={c.title} className="rounded-2xl p-6" style={{ background: "#fff" }}>
-              <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: `${RED}14` }}>
-                <c.icon size={20} color={RED} />
-              </div>
-              <h3 className="mt-4 text-[17px] font-semibold leading-snug" style={{ color: DARK }}>
-                {c.title}
-              </h3>
-              <p className="mt-2 text-[14.5px] leading-relaxed" style={{ color: "rgba(23,18,8,0.7)" }}>
-                {c.body}
-              </p>
-            </div>
+        <form onSubmit={go} className="mt-10 mx-auto flex flex-col sm:flex-row gap-3 max-w-[560px]">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Enter your work email"
+            aria-label="Work email"
+            className="flex-1 rounded-md px-4 py-3.5 text-[15px] outline-none"
+            style={{ background: "#fff", border: `1px solid ${LINE}`, color: INK }}
+          />
+          <button type="submit" className="rounded-md px-6 py-3.5 text-[15px] font-medium inline-flex items-center justify-center gap-2" style={{ background: TEAL, color: "#fff" }}>
+            Book a walkthrough <ArrowRight size={16} />
+          </button>
+        </form>
+        <div className="mt-5 flex items-center justify-center gap-6 text-[15px]">
+          <a href="#how" className="font-medium underline underline-offset-4" style={{ color: INK }}>
+            See how it works
+          </a>
+          <Link to="/samples" className="underline underline-offset-4" style={{ color: MUTED }}>
+            See a sample close pack
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function IndiaStrip() {
+  const items = ["Tally day book", "Zoho Books", "HDFC, ICICI, SBI and other bank statements", "WhatsApp follow-ups", "Amounts in ₹ and lakh format", "SAP and Oracle connectors in design"];
+  return (
+    <section style={{ background: "#fff", borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}` }}>
+      <div className="mx-auto max-w-[1180px] px-6 py-8">
+        <div className="text-center text-[12px] tracking-[0.14em] uppercase font-medium" style={{ color: MUTED }}>
+          Built for how Indian finance teams work
+        </div>
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-[15px] font-medium" style={{ color: INK }}>
+          {items.map((x) => (
+            <span key={x}>{x}</span>
           ))}
         </div>
       </div>
@@ -179,24 +169,27 @@ function UseCases() {
   );
 }
 
-function Controls() {
+function Problem() {
   return (
-    <section style={{ background: DARK }}>
-      <div className="mx-auto max-w-6xl px-6 py-20 grid lg:grid-cols-2 gap-12 items-center">
+    <section style={{ background: "#fff" }}>
+      <div className="mx-auto max-w-[1180px] px-6 py-20 grid lg:grid-cols-2 gap-12">
         <div>
-          <h2 className="text-3xl md:text-4xl" style={{ ...serif, color: "#fff" }}>
-            Built to pass your IT and audit review.
+          <div className="text-[12px] tracking-[0.14em] uppercase font-medium" style={{ color: MUTED }}>
+            The problem
+          </div>
+          <h2 className="mt-4 text-[32px] md:text-[44px] leading-[1.1] font-medium tracking-[-0.025em]" style={{ color: INK, fontFamily: FONT }}>
+            Month-end still looks the same in most finance teams.
           </h2>
-          <p className="mt-4 text-[16px] leading-relaxed" style={{ color: "rgba(255,255,255,0.7)" }}>
-            Enterprise finance has controls that a small-firm tool never needed. This is what we are building for the
-            first group.
+          <p className="mt-5 text-[17px] leading-relaxed" style={{ color: MUTED }}>
+            Adding more people only increases the review burden. You need a better layer, not another full system
+            replacement.
           </p>
         </div>
-        <ul className="space-y-3">
-          {NEEDS.map((n) => (
-            <li key={n} className="flex items-start gap-3 text-[16px]" style={{ color: "rgba(255,255,255,0.9)" }}>
-              <CheckCircle2 size={20} color="#E0A39A" className="mt-0.5 shrink-0" />
-              {n}
+        <ul style={{ border: `1px solid ${LINE}` }}>
+          {PAIN.map((p, i) => (
+            <li key={p} className="flex items-center gap-4 px-6 py-5 text-[17px]" style={{ color: INK, borderTop: i ? `1px solid ${LINE}` : "none" }}>
+              <X size={18} color="#B5483B" className="shrink-0" />
+              {p}
             </li>
           ))}
         </ul>
@@ -205,186 +198,160 @@ function Controls() {
   );
 }
 
-function EarlyAccess() {
-  const [state, setState] = useState<"idle" | "sending" | "done" | "error">("idle");
-  const [tools, setTools] = useState<string[]>([]);
-  const [cases, setCases] = useState<string[]>([]);
-
-  const toggle = (list: string[], set: (v: string[]) => void, v: string) =>
-    set(list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
-
-  async function onSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    const str = (k: string) => String(f.get(k) ?? "").trim();
-    setState("sending");
-    try {
-      const params = new URLSearchParams(window.location.search);
-      await notifyWaitlistLead({
-        data: {
-          full_name: str("name"),
-          email: str("email"),
-          firm_name: str("company"),
-          role: str("role").slice(0, 50) || "Head of Finance",
-          client_entities: str("entities"),
-          hear_about: "Enterprise page",
-          month_end_pain: [
-            `Systems: ${tools.join(", ") || "n/a"}`,
-            `Automations wanted: ${cases.join("; ") || "n/a"}`,
-            `Biggest problem: ${str("pain") || "n/a"}`,
-          ]
-            .join(" | ")
-            .slice(0, 500),
-          utm_source: params.get("utm_source") ?? "",
-          utm_medium: params.get("utm_medium") ?? "",
-          utm_campaign: params.get("utm_campaign") ?? "",
-          referrer: document.referrer.slice(0, 500),
-          landing_page: window.location.href.slice(0, 500),
-        },
-      });
-      setState("done");
-    } catch {
-      setState("error");
-    }
-  }
-
-  const input = "w-full rounded-xl px-4 py-3 text-[15px] outline-none";
-  const inputStyle = { background: "#fff", border: "1px solid rgba(23,18,8,0.14)", color: DARK };
-  const chip = (on: boolean) => ({
-    background: on ? RED : "#fff",
-    color: on ? "#fff" : DARK,
-    border: `1px solid ${on ? RED : "rgba(23,18,8,0.14)"}`,
-  });
-
+function How() {
   return (
-    <section id="early-access" style={{ background: SOFT }}>
-      <div className="mx-auto max-w-3xl px-6 py-20">
-        <h2 className="text-3xl md:text-4xl text-center" style={{ ...serif, color: DARK }}>
-          Get early access
+    <section id="how" style={{ background: GROUND }}>
+      <div className="mx-auto max-w-[1180px] px-6 py-20">
+        <div className="text-[12px] tracking-[0.14em] uppercase font-medium" style={{ color: MUTED }}>
+          How FynHelp works
+        </div>
+        <h2 className="mt-4 text-[32px] md:text-[44px] leading-[1.1] font-medium tracking-[-0.025em] max-w-[760px]" style={{ color: INK, fontFamily: FONT }}>
+          Four steps. Your team only touches the last one.
         </h2>
-        <p className="mt-3 text-center text-[16px]" style={{ color: "rgba(23,18,8,0.7)" }}>
-          Two minutes. We will use your answers to decide what to build first, and call you when it is ready.
-        </p>
-
-        {state === "done" ? (
-          <div className="mt-10 rounded-2xl p-8 text-center" style={{ background: "#fff" }}>
-            <CheckCircle2 size={32} color="#2F855A" className="mx-auto" />
-            <h3 className="mt-3 text-xl font-semibold" style={{ color: DARK }}>
-              Thank you. You are on the list.
-            </h3>
-            <p className="mt-2 text-[15px]" style={{ color: "rgba(23,18,8,0.7)" }}>
-              We will reach out personally. Meanwhile, you can see the product working for CA firms.
-            </p>
-            <a href="/ca-firms" className="mt-5 inline-flex items-center gap-2 font-semibold" style={{ color: RED }}>
-              See FynHelp live <ArrowRight size={16} />
-            </a>
-          </div>
-        ) : (
-          <form onSubmit={onSubmit} className="mt-10 space-y-5 rounded-2xl p-6 md:p-8" style={{ background: "#fff" }}>
-            <div className="grid md:grid-cols-2 gap-4">
-              <input name="name" required maxLength={100} placeholder="Your name" className={input} style={inputStyle} />
-              <input name="email" type="email" required maxLength={255} placeholder="Work email" className={input} style={inputStyle} />
-              <input name="company" required maxLength={150} placeholder="Company" className={input} style={inputStyle} />
-              <input name="role" maxLength={50} placeholder="Your role (e.g. Head of Finance)" className={input} style={inputStyle} />
-            </div>
-
-            <div>
-              <label className="block text-[14px] font-semibold mb-2" style={{ color: DARK }}>
-                How many entities do you close each month?
-              </label>
-              <select name="entities" required defaultValue="" className={input} style={inputStyle}>
-                <option value="" disabled>
-                  Select
-                </option>
-                {ENTITIES.map((x) => (
-                  <option key={x} value={x}>
-                    {x}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <div className="text-[14px] font-semibold mb-2" style={{ color: DARK }}>
-                Which systems hold your books?
+        <div className="mt-12 grid md:grid-cols-2" style={{ border: `1px solid ${LINE}`, background: "#fff" }}>
+          {STEPS.map((s, i) => (
+            <div key={s.t} className="flex" style={{ borderTop: i > 1 ? `1px solid ${LINE}` : "none", borderLeft: i % 2 ? `1px solid ${LINE}` : "none" }}>
+              <div className="w-[76px] shrink-0 flex items-start justify-center pt-7" style={{ borderRight: `1px solid ${LINE}`, background: GROUND }}>
+                <s.icon size={22} color={TEAL} />
               </div>
-              <div className="flex flex-wrap gap-2">
-                {TOOLS.map((t) => (
-                  <button
-                    type="button"
-                    key={t}
-                    aria-pressed={tools.includes(t)}
-                    onClick={() => toggle(tools, setTools, t)}
-                    className="rounded-full px-4 py-2 text-[14px]"
-                    style={chip(tools.includes(t))}
-                  >
-                    {t}
-                  </button>
-                ))}
+              <div className="p-7">
+                <div className="text-[12px] font-medium" style={{ color: MUTED }}>
+                  Step {s.n}
+                </div>
+                <h3 className="mt-1 text-[22px] font-medium tracking-tight" style={{ color: INK }}>
+                  {s.t}
+                </h3>
+                <p className="mt-2 text-[15.5px] leading-relaxed" style={{ color: MUTED }}>
+                  {s.d}
+                </p>
               </div>
             </div>
-
-            <div>
-              <div className="text-[14px] font-semibold mb-2" style={{ color: DARK }}>
-                Which would you automate first? (pick up to 3)
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {CASES.map((c) => {
-                  const on = cases.includes(c.title);
-                  return (
-                    <button
-                      type="button"
-                      key={c.title}
-                      aria-pressed={on}
-                      disabled={!on && cases.length >= 3}
-                      onClick={() => toggle(cases, setCases, c.title)}
-                      className="rounded-full px-4 py-2 text-[14px] disabled:opacity-40"
-                      style={chip(on)}
-                    >
-                      {c.title}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <textarea
-              name="pain"
-              maxLength={300}
-              rows={3}
-              placeholder="What would be worth the most to fix in your next close?"
-              className={input}
-              style={inputStyle}
-            />
-
-            {state === "error" && (
-              <p className="text-[14px]" style={{ color: RED }}>
-                Something went wrong. Please try again, or write to nidhi@fynhelp.com.
-              </p>
-            )}
-            <button
-              type="submit"
-              disabled={state === "sending"}
-              className="w-full rounded-full py-3.5 text-[15px] font-semibold text-white disabled:opacity-60"
-              style={{ background: RED }}
-            >
-              {state === "sending" ? "Sending…" : "Request early access"}
-            </button>
-          </form>
-        )}
+          ))}
+        </div>
       </div>
     </section>
   );
 }
 
+function Why() {
+  return (
+    <section id="why" style={{ background: "#fff" }}>
+      <div className="mx-auto max-w-[1180px] px-6 py-20">
+        <div className="text-[12px] tracking-[0.14em] uppercase font-medium" style={{ color: MUTED }}>
+          Why finance teams choose this approach
+        </div>
+        <h2 className="mt-4 text-[32px] md:text-[44px] leading-[1.1] font-medium tracking-[-0.025em] max-w-[760px]" style={{ color: INK, fontFamily: FONT }}>
+          You keep your current stack. You remove the most painful part of the close.
+        </h2>
+        <div className="mt-12 grid sm:grid-cols-2 lg:grid-cols-3" style={{ border: `1px solid ${LINE}` }}>
+          {REASONS.map((r, i) => (
+            <div
+              key={r.t}
+              className="flex items-center gap-4 p-6"
+              style={{
+                borderTop: i >= 3 ? `1px solid ${LINE}` : "none",
+                borderLeft: i % 3 ? `1px solid ${LINE}` : "none",
+              }}
+            >
+              <div className="w-11 h-11 flex items-center justify-center shrink-0" style={{ background: GROUND }}>
+                <r.icon size={20} color={TEAL} />
+              </div>
+              <div className="text-[16px] font-medium leading-snug" style={{ color: INK }}>
+                {r.t}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Change() {
+  return (
+    <section id="change" style={{ background: GROUND }}>
+      <div className="mx-auto max-w-[1000px] px-6 py-20">
+        <h2 className="text-[32px] md:text-[44px] leading-[1.1] font-medium tracking-[-0.025em] text-center" style={{ color: INK, fontFamily: FONT }}>
+          What changes
+        </h2>
+        <div className="mt-10" style={{ border: `1px solid ${LINE}`, background: "#fff" }}>
+          <div className="grid grid-cols-2 text-[12px] tracking-[0.14em] uppercase font-medium" style={{ background: GROUND, color: MUTED }}>
+            <div className="px-6 py-4">Before</div>
+            <div className="px-6 py-4" style={{ borderLeft: `1px solid ${LINE}` }}>
+              After FynHelp
+            </div>
+          </div>
+          {BEFORE_AFTER.map(([b, a]) => (
+            <div key={b} className="grid grid-cols-2 text-[16px]" style={{ borderTop: `1px solid ${LINE}` }}>
+              <div className="px-6 py-5" style={{ color: MUTED }}>
+                {b}
+              </div>
+              <div className="px-6 py-5 flex items-center gap-3 font-medium" style={{ borderLeft: `1px solid ${LINE}`, color: INK }}>
+                <CheckCircle2 size={18} color={TEAL} className="shrink-0" />
+                {a}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Close() {
+  return (
+    <section style={{ background: `linear-gradient(120deg, ${TEAL_DEEP} 0%, ${TEAL} 55%, #2A7A74 100%)` }}>
+      <div className="mx-auto max-w-[900px] px-6 py-24 text-center">
+        <h2 className="text-[34px] md:text-[52px] leading-[1.1] font-medium tracking-[-0.03em]" style={{ color: "#fff", fontFamily: FONT }}>
+          Stop spending your best people on matching.
+        </h2>
+        <p className="mt-5 text-[19px]" style={{ color: "rgba(255,255,255,0.8)" }}>
+          Give them time to analyse and advise.
+        </p>
+        <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+          <button onClick={() => openDemo("enterprise-close")} className="rounded-md px-7 py-3.5 text-[15px] font-medium" style={{ background: "#fff", color: INK }}>
+            Book a walkthrough
+          </button>
+          <Link to="/samples" className="rounded-md px-7 py-3.5 text-[15px] font-medium" style={{ border: "1px solid rgba(255,255,255,0.45)", color: "#fff" }}>
+            See a sample close pack
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Footer() {
+  return (
+    <footer style={{ background: INK }}>
+      <div className="mx-auto max-w-[1180px] px-6 py-10 flex flex-col sm:flex-row items-center justify-between gap-4 text-[14px]" style={{ color: "rgba(255,255,255,0.6)" }}>
+        <div className="text-[18px] font-semibold" style={{ color: "#fff" }}>
+          FynHelp
+        </div>
+        <div className="flex gap-6">
+          <Link to="/security">Security</Link>
+          <Link to="/privacy">Privacy</Link>
+          <Link to="/terms">Terms</Link>
+          <Link to="/contact">Contact</Link>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
 export default function EnterprisePage() {
   return (
-    <Layout>
+    <div style={{ background: "#fff", fontFamily: FONT }}>
+      <TopBar />
+      <Nav />
       <Hero />
-      <Principles />
-      <UseCases />
-      <Controls />
-      <EarlyAccess />
-    </Layout>
+      <IndiaStrip />
+      <Problem />
+      <How />
+      <Why />
+      <Change />
+      <Close />
+      <Footer />
+    </div>
   );
 }

@@ -27,6 +27,7 @@ import {
 import Navbar from "@/components/Navbar";
 import FynLogo from "@/components/FynLogo";
 import FeaturedIn from "@/components/home/FeaturedIn";
+import AgentsBento from "@/components/home/AgentsBento";
 import type { PressEntry } from "@/lib/press";
 
 import { SiteFooter } from "@/components/site/SiteShell";
@@ -143,6 +144,13 @@ ${LIQUID_BUTTON_CSS}
 @media (max-width:660px){ .fh-g2,.fh-g3{ grid-template-columns:1fr; } }
 .fh-card { background:${C.card}; border:1px solid ${C.line}; border-radius:20px; padding:24px; height:100%; transition:transform .5s cubic-bezier(.16,1,.3,1), box-shadow .5s, border-color .3s; }
 .fh-card:hover { transform:translateY(-5px); box-shadow:0 30px 55px -42px rgba(23,18,8,.6); border-color:rgba(226,103,63,.35); }
+.fh-fix { margin-top:16px; padding:14px 15px; border-radius:14px; background:${C.page}; border:1px solid ${C.lineSoft}; display:grid; gap:7px; }
+.fh-fix-tag { display:inline-flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; color:${C.ink}; }
+.fh-fix-tag i { width:9px; height:9px; border-radius:50%; display:block; }
+.fh-fix-txt { font-size:14.5px; line-height:1.55; color:${C.body}; }
+.fh-fixline { text-align:center; margin:30px 0 0; font-size:17px; letter-spacing:-0.02em; color:${C.ink}; }
+.fh-fixline a { color:${C.maroon}; font-weight:600; text-decoration:none; white-space:nowrap; display:inline-flex; align-items:center; gap:6px; }
+.fh-fixline a:hover { text-decoration:underline; text-underline-offset:4px; }
 .fh-card h3 { font-size:18px; letter-spacing:-0.03em; }
 .fh-card p { font-size:15.5px; line-height:1.62; color:${C.body}; margin:9px 0 0; }
 .fh-ico { width:36px; height:36px; border-radius:11px; background:rgba(226,103,63,.12); color:${C.coral}; display:flex; align-items:center; justify-content:center; margin-bottom:14px; }
@@ -435,11 +443,11 @@ function ProblemViz({ kind }: { kind: string }) {
   );
 }
 
-const PROBLEMS = [
-  ["Document chasing", "\u201cWhere\u2019s the August statement?\u201d on WhatsApp, then email, then WhatsApp again. Across 30 clients, that\u2019s a junior\u2019s week."],
-  ["Manual reconciliation", "Bank in one tab, books in another, GSTR-2B in a third. Hundreds of lines matched by hand to find the few that don\u2019t tie."],
-  ["Rework after review", "Junior → manager → partner → back again, with nothing recording why something was flagged the first time."],
-  ["Sign-off on faith", "A finished P&L with no visible trail back to source is a signature you can\u2019t defend later."],
+const PROBLEMS: [string, string, string, string, string][] = [
+  ["Document chasing", "\u201cWhere\u2019s the August statement?\u201d on WhatsApp, then email, then WhatsApp again. Across 30 clients, that\u2019s a junior\u2019s week.", "Chaser", "#C9A227", "Sends the reminders on its own schedule, takes the files with no client login, and stops the moment a file arrives."],
+  ["Manual reconciliation", "Bank in one tab, books in another, GSTR-2B in a third. Hundreds of lines matched by hand to find the few that don\u2019t tie.", "Recon", "#2F855A", "Starts by itself once the books are in. Five matching passes, and only the lines that truly don\u2019t tie come to you."],
+  ["Rework after review", "Junior → manager → partner → back again, with nothing recording why something was flagged the first time.", "Recon", "#2F855A", "Every exception arrives with its reason code, and your decision and note are kept, so no line is sent back twice."],
+  ["Sign-off on faith", "A finished P&L with no visible trail back to source is a signature you can\u2019t defend later.", "Narrate", "#A93838", "Writes the monthly report with every figure linked to its source lines, so the partner signs off with the trail in front of them."],
 ];
 
 const PIPELINE = [
@@ -638,6 +646,13 @@ export default function HomePage({ press = [] }: { press?: PressEntry[] }) {
         </div>
       </section>
 
+      {/* ── THE FOUR AGENTS (bento of live product components) ── */}
+      <section className="fh-sec" style={{ paddingTop: 24 }} id="agents">
+        <div className="fh-wrap">
+          <AgentsBento />
+        </div>
+      </section>
+
       {/* ── FEATURE SPLIT ── */}
       <section className="fh-sec">
         <div className="fh-wrap fh-split2">
@@ -727,18 +742,32 @@ export default function HomePage({ press = [] }: { press?: PressEntry[] }) {
             <h2 className="fh-h2">
               Four things quietly eat <span className="ital">your firm&rsquo;s week</span>
             </h2>
+            <p className="fh-lead">
+              Month-end is four jobs your team does by hand. FynHelp gives each one to an AI agent that starts on its
+              own, shows its work, and comes to you only when a decision is yours.
+            </p>
           </Reveal>
           <div className="fh-grid fh-g2">
-            {PROBLEMS.map(([t, d], i) => (
+            {PROBLEMS.map(([t, d, agent, agentColor, fix], i) => (
               <Reveal key={t} delay={i * 70}>
                 <div className="fh-card">
                   <ProblemViz kind={["chase", "recon", "rework", "signoff"][i]} />
                   <h3>{t}</h3>
                   <p>{d}</p>
+                  <div className="fh-fix">
+                    <span className="fh-fix-tag"><i style={{ background: agentColor }} />{agent} agent takes it on</span>
+                    <span className="fh-fix-txt">{fix}</span>
+                  </div>
                 </div>
               </Reveal>
             ))}
           </div>
+          <Reveal delay={120}>
+            <p className="fh-fixline">
+              Four jobs, four agents. You still make the calls, and the partner still signs off.{" "}
+              <a href="#agents">See the agents at work <ArrowRight size={14} /></a>
+            </p>
+          </Reveal>
         </div>
       </section>
 

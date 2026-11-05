@@ -28,6 +28,7 @@ import { Route as MainDashboardRouteImport } from './routes/_main/dashboard'
 import { Route as MainLoginRouteImport } from './routes/_main/login'
 import { Route as MainOnboardingRouteImport } from './routes/_main/onboarding'
 import { Route as MainPipelineRouteImport } from './routes/_main/pipeline'
+import { Route as MainPressRouteImport } from './routes/_main/press'
 import { Route as MainPricingRouteImport } from './routes/_main/pricing'
 import { Route as MainPrivacyRouteImport } from './routes/_main/privacy'
 import { Route as MainRefundPolicyRouteImport } from './routes/_main/refund-policy'
@@ -116,6 +117,7 @@ import { Route as ApiPublicCaInvoicePaymentWebhookRouteImport } from './routes/a
 import { Route as ApiPublicCaPollGmailRouteImport } from './routes/api/public/ca-poll-gmail'
 import { Route as ApiPublicEmailPreferencesRouteImport } from './routes/api/public/email-preferences'
 import { Route as ApiPublicPracticeTickRouteImport } from './routes/api/public/practice-tick'
+import { Route as ApiPublicPressIngestRouteImport } from './routes/api/public/press-ingest'
 import { Route as ApiPublicRazorpayWebhookRouteImport } from './routes/api/public/razorpay-webhook'
 import { Route as ApiPublicTallyHelloRouteImport } from './routes/api/public/tally-hello'
 import { Route as ApiPublicTallyLedgerRouteImport } from './routes/api/public/tally-ledger'
@@ -130,6 +132,7 @@ import { Route as AdminAuthAdminProtectedIndexRouteImport } from './routes/_admi
 import { Route as AdminAuthAdminProtectedAiCreditsRouteImport } from './routes/_adminAuth/admin/_protected/ai-credits'
 import { Route as AdminAuthAdminProtectedAiMonitoringRouteImport } from './routes/_adminAuth/admin/_protected/ai-monitoring'
 import { Route as AdminAuthAdminProtectedAnalyticsRouteImport } from './routes/_adminAuth/admin/_protected/analytics'
+import { Route as AdminAuthAdminProtectedApiUsageRouteImport } from './routes/_adminAuth/admin/_protected/api-usage'
 import { Route as AdminAuthAdminProtectedAuditLogsRouteImport } from './routes/_adminAuth/admin/_protected/audit-logs'
 import { Route as AdminAuthAdminProtectedBillingRouteImport } from './routes/_adminAuth/admin/_protected/billing'
 import { Route as AdminAuthAdminProtectedCaInvitesRouteImport } from './routes/_adminAuth/admin/_protected/ca-invites'
@@ -146,6 +149,7 @@ import { Route as AdminAuthAdminProtectedFollowUpsRouteImport } from './routes/_
 import { Route as AdminAuthAdminProtectedInternalAccessRouteImport } from './routes/_adminAuth/admin/_protected/internal-access'
 import { Route as AdminAuthAdminProtectedMediaRouteImport } from './routes/_adminAuth/admin/_protected/media'
 import { Route as AdminAuthAdminProtectedOperationsRouteImport } from './routes/_adminAuth/admin/_protected/operations'
+import { Route as AdminAuthAdminProtectedPressRouteImport } from './routes/_adminAuth/admin/_protected/press'
 import { Route as AdminAuthAdminProtectedRolesRouteImport } from './routes/_adminAuth/admin/_protected/roles'
 import { Route as AdminAuthAdminProtectedSecurityLogRouteImport } from './routes/_adminAuth/admin/_protected/security-log'
 import { Route as AdminAuthAdminProtectedSettingsRouteImport } from './routes/_adminAuth/admin/_protected/settings'
@@ -312,6 +316,11 @@ const MainOnboardingRoute = MainOnboardingRouteImport.update({
 const MainPipelineRoute = MainPipelineRouteImport.update({
   id: '/pipeline',
   path: '/pipeline',
+  getParentRoute: () => MainRoute,
+} as any)
+const MainPressRoute = MainPressRouteImport.update({
+  id: '/press',
+  path: '/press',
   getParentRoute: () => MainRoute,
 } as any)
 const MainPricingRoute = MainPricingRouteImport.update({
@@ -775,6 +784,11 @@ const ApiPublicPracticeTickRoute = ApiPublicPracticeTickRouteImport.update({
   path: '/api/public/practice-tick',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicPressIngestRoute = ApiPublicPressIngestRouteImport.update({
+  id: '/api/public/press-ingest',
+  path: '/api/public/press-ingest',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicRazorpayWebhookRoute =
   ApiPublicRazorpayWebhookRouteImport.update({
     id: '/api/public/razorpay-webhook',
@@ -849,6 +863,12 @@ const AdminAuthAdminProtectedAnalyticsRoute =
   AdminAuthAdminProtectedAnalyticsRouteImport.update({
     id: '/analytics',
     path: '/analytics',
+    getParentRoute: () => AdminAuthAdminProtectedRoute,
+  } as any)
+const AdminAuthAdminProtectedApiUsageRoute =
+  AdminAuthAdminProtectedApiUsageRouteImport.update({
+    id: '/api-usage',
+    path: '/api-usage',
     getParentRoute: () => AdminAuthAdminProtectedRoute,
   } as any)
 const AdminAuthAdminProtectedAuditLogsRoute =
@@ -945,6 +965,12 @@ const AdminAuthAdminProtectedOperationsRoute =
   AdminAuthAdminProtectedOperationsRouteImport.update({
     id: '/operations',
     path: '/operations',
+    getParentRoute: () => AdminAuthAdminProtectedRoute,
+  } as any)
+const AdminAuthAdminProtectedPressRoute =
+  AdminAuthAdminProtectedPressRouteImport.update({
+    id: '/press',
+    path: '/press',
     getParentRoute: () => AdminAuthAdminProtectedRoute,
   } as any)
 const AdminAuthAdminProtectedRolesRoute =
@@ -1408,6 +1434,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof MainLoginRoute
   '/onboarding': typeof MainOnboardingRoute
   '/pipeline': typeof MainPipelineRoute
+  '/press': typeof MainPressRoute
   '/pricing': typeof MainPricingRoute
   '/privacy': typeof MainPrivacyRoute
   '/refund-policy': typeof MainRefundPolicyRoute
@@ -1492,6 +1519,7 @@ export interface FileRoutesByFullPath {
   '/api/public/ca-poll-gmail': typeof ApiPublicCaPollGmailRoute
   '/api/public/email-preferences': typeof ApiPublicEmailPreferencesRoute
   '/api/public/practice-tick': typeof ApiPublicPracticeTickRoute
+  '/api/public/press-ingest': typeof ApiPublicPressIngestRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/tally-hello': typeof ApiPublicTallyHelloRoute
   '/api/public/tally-ledger': typeof ApiPublicTallyLedgerRoute
@@ -1509,6 +1537,7 @@ export interface FileRoutesByFullPath {
   '/admin/ai-credits': typeof AdminAuthAdminProtectedAiCreditsRoute
   '/admin/ai-monitoring': typeof AdminAuthAdminProtectedAiMonitoringRoute
   '/admin/analytics': typeof AdminAuthAdminProtectedAnalyticsRoute
+  '/admin/api-usage': typeof AdminAuthAdminProtectedApiUsageRoute
   '/admin/audit-logs': typeof AdminAuthAdminProtectedAuditLogsRoute
   '/admin/billing': typeof AdminAuthAdminProtectedBillingRoute
   '/admin/ca-invites': typeof AdminAuthAdminProtectedCaInvitesRoute
@@ -1525,6 +1554,7 @@ export interface FileRoutesByFullPath {
   '/admin/internal-access': typeof AdminAuthAdminProtectedInternalAccessRoute
   '/admin/media': typeof AdminAuthAdminProtectedMediaRoute
   '/admin/operations': typeof AdminAuthAdminProtectedOperationsRoute
+  '/admin/press': typeof AdminAuthAdminProtectedPressRoute
   '/admin/roles': typeof AdminAuthAdminProtectedRolesRoute
   '/admin/security-log': typeof AdminAuthAdminProtectedSecurityLogRoute
   '/admin/settings': typeof AdminAuthAdminProtectedSettingsRoute
@@ -1617,6 +1647,7 @@ export interface FileRoutesByTo {
   '/login': typeof MainLoginRoute
   '/onboarding': typeof MainOnboardingRoute
   '/pipeline': typeof MainPipelineRoute
+  '/press': typeof MainPressRoute
   '/pricing': typeof MainPricingRoute
   '/privacy': typeof MainPrivacyRoute
   '/refund-policy': typeof MainRefundPolicyRoute
@@ -1698,6 +1729,7 @@ export interface FileRoutesByTo {
   '/api/public/ca-poll-gmail': typeof ApiPublicCaPollGmailRoute
   '/api/public/email-preferences': typeof ApiPublicEmailPreferencesRoute
   '/api/public/practice-tick': typeof ApiPublicPracticeTickRoute
+  '/api/public/press-ingest': typeof ApiPublicPressIngestRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/tally-hello': typeof ApiPublicTallyHelloRoute
   '/api/public/tally-ledger': typeof ApiPublicTallyLedgerRoute
@@ -1715,6 +1747,7 @@ export interface FileRoutesByTo {
   '/admin/ai-credits': typeof AdminAuthAdminProtectedAiCreditsRoute
   '/admin/ai-monitoring': typeof AdminAuthAdminProtectedAiMonitoringRoute
   '/admin/analytics': typeof AdminAuthAdminProtectedAnalyticsRoute
+  '/admin/api-usage': typeof AdminAuthAdminProtectedApiUsageRoute
   '/admin/audit-logs': typeof AdminAuthAdminProtectedAuditLogsRoute
   '/admin/billing': typeof AdminAuthAdminProtectedBillingRoute
   '/admin/ca-invites': typeof AdminAuthAdminProtectedCaInvitesRoute
@@ -1731,6 +1764,7 @@ export interface FileRoutesByTo {
   '/admin/internal-access': typeof AdminAuthAdminProtectedInternalAccessRoute
   '/admin/media': typeof AdminAuthAdminProtectedMediaRoute
   '/admin/operations': typeof AdminAuthAdminProtectedOperationsRoute
+  '/admin/press': typeof AdminAuthAdminProtectedPressRoute
   '/admin/roles': typeof AdminAuthAdminProtectedRolesRoute
   '/admin/security-log': typeof AdminAuthAdminProtectedSecurityLogRoute
   '/admin/settings': typeof AdminAuthAdminProtectedSettingsRoute
@@ -1830,6 +1864,7 @@ export interface FileRoutesById {
   '/_main/login': typeof MainLoginRoute
   '/_main/onboarding': typeof MainOnboardingRoute
   '/_main/pipeline': typeof MainPipelineRoute
+  '/_main/press': typeof MainPressRoute
   '/_main/pricing': typeof MainPricingRoute
   '/_main/privacy': typeof MainPrivacyRoute
   '/_main/refund-policy': typeof MainRefundPolicyRoute
@@ -1915,6 +1950,7 @@ export interface FileRoutesById {
   '/api/public/ca-poll-gmail': typeof ApiPublicCaPollGmailRoute
   '/api/public/email-preferences': typeof ApiPublicEmailPreferencesRoute
   '/api/public/practice-tick': typeof ApiPublicPracticeTickRoute
+  '/api/public/press-ingest': typeof ApiPublicPressIngestRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/tally-hello': typeof ApiPublicTallyHelloRoute
   '/api/public/tally-ledger': typeof ApiPublicTallyLedgerRoute
@@ -1932,6 +1968,7 @@ export interface FileRoutesById {
   '/_adminAuth/admin/_protected/ai-credits': typeof AdminAuthAdminProtectedAiCreditsRoute
   '/_adminAuth/admin/_protected/ai-monitoring': typeof AdminAuthAdminProtectedAiMonitoringRoute
   '/_adminAuth/admin/_protected/analytics': typeof AdminAuthAdminProtectedAnalyticsRoute
+  '/_adminAuth/admin/_protected/api-usage': typeof AdminAuthAdminProtectedApiUsageRoute
   '/_adminAuth/admin/_protected/audit-logs': typeof AdminAuthAdminProtectedAuditLogsRoute
   '/_adminAuth/admin/_protected/billing': typeof AdminAuthAdminProtectedBillingRoute
   '/_adminAuth/admin/_protected/ca-invites': typeof AdminAuthAdminProtectedCaInvitesRoute
@@ -1948,6 +1985,7 @@ export interface FileRoutesById {
   '/_adminAuth/admin/_protected/internal-access': typeof AdminAuthAdminProtectedInternalAccessRoute
   '/_adminAuth/admin/_protected/media': typeof AdminAuthAdminProtectedMediaRoute
   '/_adminAuth/admin/_protected/operations': typeof AdminAuthAdminProtectedOperationsRoute
+  '/_adminAuth/admin/_protected/press': typeof AdminAuthAdminProtectedPressRoute
   '/_adminAuth/admin/_protected/roles': typeof AdminAuthAdminProtectedRolesRoute
   '/_adminAuth/admin/_protected/security-log': typeof AdminAuthAdminProtectedSecurityLogRoute
   '/_adminAuth/admin/_protected/settings': typeof AdminAuthAdminProtectedSettingsRoute
@@ -2044,6 +2082,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/onboarding'
     | '/pipeline'
+    | '/press'
     | '/pricing'
     | '/privacy'
     | '/refund-policy'
@@ -2128,6 +2167,7 @@ export interface FileRouteTypes {
     | '/api/public/ca-poll-gmail'
     | '/api/public/email-preferences'
     | '/api/public/practice-tick'
+    | '/api/public/press-ingest'
     | '/api/public/razorpay-webhook'
     | '/api/public/tally-hello'
     | '/api/public/tally-ledger'
@@ -2145,6 +2185,7 @@ export interface FileRouteTypes {
     | '/admin/ai-credits'
     | '/admin/ai-monitoring'
     | '/admin/analytics'
+    | '/admin/api-usage'
     | '/admin/audit-logs'
     | '/admin/billing'
     | '/admin/ca-invites'
@@ -2161,6 +2202,7 @@ export interface FileRouteTypes {
     | '/admin/internal-access'
     | '/admin/media'
     | '/admin/operations'
+    | '/admin/press'
     | '/admin/roles'
     | '/admin/security-log'
     | '/admin/settings'
@@ -2253,6 +2295,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/onboarding'
     | '/pipeline'
+    | '/press'
     | '/pricing'
     | '/privacy'
     | '/refund-policy'
@@ -2334,6 +2377,7 @@ export interface FileRouteTypes {
     | '/api/public/ca-poll-gmail'
     | '/api/public/email-preferences'
     | '/api/public/practice-tick'
+    | '/api/public/press-ingest'
     | '/api/public/razorpay-webhook'
     | '/api/public/tally-hello'
     | '/api/public/tally-ledger'
@@ -2351,6 +2395,7 @@ export interface FileRouteTypes {
     | '/admin/ai-credits'
     | '/admin/ai-monitoring'
     | '/admin/analytics'
+    | '/admin/api-usage'
     | '/admin/audit-logs'
     | '/admin/billing'
     | '/admin/ca-invites'
@@ -2367,6 +2412,7 @@ export interface FileRouteTypes {
     | '/admin/internal-access'
     | '/admin/media'
     | '/admin/operations'
+    | '/admin/press'
     | '/admin/roles'
     | '/admin/security-log'
     | '/admin/settings'
@@ -2465,6 +2511,7 @@ export interface FileRouteTypes {
     | '/_main/login'
     | '/_main/onboarding'
     | '/_main/pipeline'
+    | '/_main/press'
     | '/_main/pricing'
     | '/_main/privacy'
     | '/_main/refund-policy'
@@ -2550,6 +2597,7 @@ export interface FileRouteTypes {
     | '/api/public/ca-poll-gmail'
     | '/api/public/email-preferences'
     | '/api/public/practice-tick'
+    | '/api/public/press-ingest'
     | '/api/public/razorpay-webhook'
     | '/api/public/tally-hello'
     | '/api/public/tally-ledger'
@@ -2567,6 +2615,7 @@ export interface FileRouteTypes {
     | '/_adminAuth/admin/_protected/ai-credits'
     | '/_adminAuth/admin/_protected/ai-monitoring'
     | '/_adminAuth/admin/_protected/analytics'
+    | '/_adminAuth/admin/_protected/api-usage'
     | '/_adminAuth/admin/_protected/audit-logs'
     | '/_adminAuth/admin/_protected/billing'
     | '/_adminAuth/admin/_protected/ca-invites'
@@ -2583,6 +2632,7 @@ export interface FileRouteTypes {
     | '/_adminAuth/admin/_protected/internal-access'
     | '/_adminAuth/admin/_protected/media'
     | '/_adminAuth/admin/_protected/operations'
+    | '/_adminAuth/admin/_protected/press'
     | '/_adminAuth/admin/_protected/roles'
     | '/_adminAuth/admin/_protected/security-log'
     | '/_adminAuth/admin/_protected/settings'
@@ -2691,6 +2741,7 @@ export interface RootRouteChildren {
   ApiPublicCaPollGmailRoute: typeof ApiPublicCaPollGmailRoute
   ApiPublicEmailPreferencesRoute: typeof ApiPublicEmailPreferencesRoute
   ApiPublicPracticeTickRoute: typeof ApiPublicPracticeTickRoute
+  ApiPublicPressIngestRoute: typeof ApiPublicPressIngestRoute
   ApiPublicRazorpayWebhookRoute: typeof ApiPublicRazorpayWebhookRoute
   ApiPublicTallyHelloRoute: typeof ApiPublicTallyHelloRoute
   ApiPublicTallyLedgerRoute: typeof ApiPublicTallyLedgerRoute
@@ -2834,6 +2885,13 @@ declare module '@tanstack/react-router' {
       path: '/pipeline'
       fullPath: '/pipeline'
       preLoaderRoute: typeof MainPipelineRouteImport
+      parentRoute: typeof MainRoute
+    }
+    '/_main/press': {
+      id: '/_main/press'
+      path: '/press'
+      fullPath: '/press'
+      preLoaderRoute: typeof MainPressRouteImport
       parentRoute: typeof MainRoute
     }
     '/_main/pricing': {
@@ -3452,6 +3510,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicPracticeTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/press-ingest': {
+      id: '/api/public/press-ingest'
+      path: '/api/public/press-ingest'
+      fullPath: '/api/public/press-ingest'
+      preLoaderRoute: typeof ApiPublicPressIngestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/razorpay-webhook': {
       id: '/api/public/razorpay-webhook'
       path: '/api/public/razorpay-webhook'
@@ -3548,6 +3613,13 @@ declare module '@tanstack/react-router' {
       path: '/analytics'
       fullPath: '/admin/analytics'
       preLoaderRoute: typeof AdminAuthAdminProtectedAnalyticsRouteImport
+      parentRoute: typeof AdminAuthAdminProtectedRoute
+    }
+    '/_adminAuth/admin/_protected/api-usage': {
+      id: '/_adminAuth/admin/_protected/api-usage'
+      path: '/api-usage'
+      fullPath: '/admin/api-usage'
+      preLoaderRoute: typeof AdminAuthAdminProtectedApiUsageRouteImport
       parentRoute: typeof AdminAuthAdminProtectedRoute
     }
     '/_adminAuth/admin/_protected/audit-logs': {
@@ -3660,6 +3732,13 @@ declare module '@tanstack/react-router' {
       path: '/operations'
       fullPath: '/admin/operations'
       preLoaderRoute: typeof AdminAuthAdminProtectedOperationsRouteImport
+      parentRoute: typeof AdminAuthAdminProtectedRoute
+    }
+    '/_adminAuth/admin/_protected/press': {
+      id: '/_adminAuth/admin/_protected/press'
+      path: '/press'
+      fullPath: '/admin/press'
+      preLoaderRoute: typeof AdminAuthAdminProtectedPressRouteImport
       parentRoute: typeof AdminAuthAdminProtectedRoute
     }
     '/_adminAuth/admin/_protected/roles': {
@@ -4208,6 +4287,7 @@ interface AdminAuthAdminProtectedRouteChildren {
   AdminAuthAdminProtectedAiCreditsRoute: typeof AdminAuthAdminProtectedAiCreditsRoute
   AdminAuthAdminProtectedAiMonitoringRoute: typeof AdminAuthAdminProtectedAiMonitoringRoute
   AdminAuthAdminProtectedAnalyticsRoute: typeof AdminAuthAdminProtectedAnalyticsRoute
+  AdminAuthAdminProtectedApiUsageRoute: typeof AdminAuthAdminProtectedApiUsageRoute
   AdminAuthAdminProtectedAuditLogsRoute: typeof AdminAuthAdminProtectedAuditLogsRoute
   AdminAuthAdminProtectedBillingRoute: typeof AdminAuthAdminProtectedBillingRoute
   AdminAuthAdminProtectedCaInvitesRoute: typeof AdminAuthAdminProtectedCaInvitesRoute
@@ -4224,6 +4304,7 @@ interface AdminAuthAdminProtectedRouteChildren {
   AdminAuthAdminProtectedInternalAccessRoute: typeof AdminAuthAdminProtectedInternalAccessRoute
   AdminAuthAdminProtectedMediaRoute: typeof AdminAuthAdminProtectedMediaRoute
   AdminAuthAdminProtectedOperationsRoute: typeof AdminAuthAdminProtectedOperationsRoute
+  AdminAuthAdminProtectedPressRoute: typeof AdminAuthAdminProtectedPressRoute
   AdminAuthAdminProtectedRolesRoute: typeof AdminAuthAdminProtectedRolesRoute
   AdminAuthAdminProtectedSecurityLogRoute: typeof AdminAuthAdminProtectedSecurityLogRoute
   AdminAuthAdminProtectedSettingsRoute: typeof AdminAuthAdminProtectedSettingsRoute
@@ -4249,6 +4330,7 @@ const AdminAuthAdminProtectedRouteChildren: AdminAuthAdminProtectedRouteChildren
       AdminAuthAdminProtectedAiMonitoringRoute,
     AdminAuthAdminProtectedAnalyticsRoute:
       AdminAuthAdminProtectedAnalyticsRoute,
+    AdminAuthAdminProtectedApiUsageRoute: AdminAuthAdminProtectedApiUsageRoute,
     AdminAuthAdminProtectedAuditLogsRoute:
       AdminAuthAdminProtectedAuditLogsRoute,
     AdminAuthAdminProtectedBillingRoute: AdminAuthAdminProtectedBillingRoute,
@@ -4274,6 +4356,7 @@ const AdminAuthAdminProtectedRouteChildren: AdminAuthAdminProtectedRouteChildren
     AdminAuthAdminProtectedMediaRoute: AdminAuthAdminProtectedMediaRoute,
     AdminAuthAdminProtectedOperationsRoute:
       AdminAuthAdminProtectedOperationsRoute,
+    AdminAuthAdminProtectedPressRoute: AdminAuthAdminProtectedPressRoute,
     AdminAuthAdminProtectedRolesRoute: AdminAuthAdminProtectedRolesRoute,
     AdminAuthAdminProtectedSecurityLogRoute:
       AdminAuthAdminProtectedSecurityLogRoute,
@@ -4609,6 +4692,7 @@ interface MainRouteChildren {
   MainLoginRoute: typeof MainLoginRoute
   MainOnboardingRoute: typeof MainOnboardingRoute
   MainPipelineRoute: typeof MainPipelineRoute
+  MainPressRoute: typeof MainPressRoute
   MainPricingRoute: typeof MainPricingRoute
   MainPrivacyRoute: typeof MainPrivacyRoute
   MainRefundPolicyRoute: typeof MainRefundPolicyRoute
@@ -4634,6 +4718,7 @@ const MainRouteChildren: MainRouteChildren = {
   MainLoginRoute: MainLoginRoute,
   MainOnboardingRoute: MainOnboardingRoute,
   MainPipelineRoute: MainPipelineRoute,
+  MainPressRoute: MainPressRoute,
   MainPricingRoute: MainPricingRoute,
   MainPrivacyRoute: MainPrivacyRoute,
   MainRefundPolicyRoute: MainRefundPolicyRoute,
@@ -4713,6 +4798,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicCaPollGmailRoute: ApiPublicCaPollGmailRoute,
   ApiPublicEmailPreferencesRoute: ApiPublicEmailPreferencesRoute,
   ApiPublicPracticeTickRoute: ApiPublicPracticeTickRoute,
+  ApiPublicPressIngestRoute: ApiPublicPressIngestRoute,
   ApiPublicRazorpayWebhookRoute: ApiPublicRazorpayWebhookRoute,
   ApiPublicTallyHelloRoute: ApiPublicTallyHelloRoute,
   ApiPublicTallyLedgerRoute: ApiPublicTallyLedgerRoute,

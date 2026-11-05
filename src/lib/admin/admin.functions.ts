@@ -287,6 +287,11 @@ export const adminSystemHealth = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => (await import("./admin.server")).systemHealth(await gate(context, "ops.view")));
 
+export const adminApiUsage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ days: z.number().int().min(1).max(365) }).parse(d))
+  .handler(async ({ data, context }) => (await import("./apiUsage.server")).apiUsage(await gate(context, "ops.view"), data.days));
+
 /* ── follow-ups ──────────────────────────────────────────── */
 
 export const adminFollowUps = createServerFn({ method: "POST" })

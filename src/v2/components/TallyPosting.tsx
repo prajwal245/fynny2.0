@@ -6,8 +6,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
-import { CheckCircle2, Clock, Link2Off, Loader2, RefreshCw, Send, ShieldCheck, TriangleAlert, Undo2 } from "lucide-react";
-import { tallyApprove, tallyCancel, tallyWorkbench } from "@/lib/practice/practice.functions";
+import { CheckCircle2, ChevronDown, Clock, Link2Off, Loader2, RefreshCw, Send, ShieldCheck, TriangleAlert, Undo2 } from "lucide-react";
+import { tallyApprove, tallyCancel, tallyMarkPosted, tallyWorkbench } from "@/lib/practice/practice.functions";
+import { splitGstInclusive, type Split } from "@/lib/practice/tallyVoucher";
+import { PagesChip, PagesTopUpModal } from "./PagesPanel";
+import { refreshPages } from "../lib/pages";
 import { Badge, V, formatDate, formatINR } from "../ui";
 
 type Bench = Awaited<ReturnType<typeof tallyWorkbench>>;
@@ -20,6 +23,17 @@ const ago = (iso: string | null) => {
   const m = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60_000));
   return m < 1 ? "just now" : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`;
 };
+
+/** Extra choices for one line: a transfer between own accounts (Contra), or a charge with its GST. */
+interface Opts {
+  open?: boolean;
+  contra?: boolean;
+  gst?: boolean;
+  rate?: number;
+  igst?: boolean;
+  tax1?: string;
+  tax2?: string;
+}
 
 const STATUS: Record<string, { label: string; tone: "info" | "good" | "warn" | "bad" | "neutral" }> = {
   queued: { label: "Approved, waiting for Tally", tone: "info" },
@@ -34,6 +48,9 @@ export function TallyPosting({ clientId }: { clientId: string }) {
   const [choice, setChoice] = useState<Record<string, string>>({});
   const [bank, setBank] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const [opts, setOpts] = useState<Record<string, Opts>>({});
+  const [addPages, setAddPages] = useState(false);
+  const setOpt = (id: string, o: Opts) => setOpts((cur) => ({ ...cur, [id]: { ...cur[id], ...o } }));
 
   const load = useCallback(async () => {
     try {
@@ -61,11 +78,20 @@ export function TallyPosting({ clientId }: { clientId: string }) {
   const approve = async (l: Line, ledger: string) => {
     setBusy(l.txn_id);
     try {
-      await tallyApprove({ data: { txn_id: l.txn_id, party_ledger: ledger, bank_ledger: bank } });
+      const o = opts[l.txn_id] ?? {};
+      let splits: Split[] | undefined;
+      if (o.gst && !o.contra) {
+        const g = splitGstInclusive(l.amount, o.rate ?? 18, !o.igst);
+        splits = [{ ledger, amount: g.base }, ...(o.igst ? [{ ledger: o.tax1 ?? "", amount: g.igst }] : [{ ledger: o.tax1 ?? "", amount: g.cgst }, { ledger: o.tax2 ?? "", amount: g.sgst }])];
+      }
+      await tallyApprove({ data: { txn_id: l.txn_id, party_ledger: ledger, bank_ledger: bank, kind: o.contra ? "Contra" : undefined, splits } });
       toast.success("Approved. It will be written to Tally the next time the connector checks in.");
+      void refreshPages();
       await load();
     } catch (e) {
-      toast.error(errMsg(e));
+      const m = errMsg(e);
+      if (/Add pages/i.test(m)) setAddPages(true);
+      toast.error(m);
     } finally {
       setBusy(null);
     }
@@ -75,6 +101,21 @@ export function TallyPosting({ clientId }: { clientId: string }) {
     try {
       await tallyCancel({ data: { id } });
       toast.success("Cancelled. Nothing was written to Tally.");
+      await load();
+    } catch (e) {
+      toast.error(errMsg(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const markPosted = async (id: string) => {
+    const note = window.prompt("You have checked Tally and this entry is there. Add a short note (for example, voucher number):", "Checked in Tally");
+    if (!note || note.trim().length < 3) return;
+    setBusy(id);
+    try {
+      await tallyMarkPosted({ data: { id, note: note.trim() } });
+      toast.success("Marked as in Tally. The note is kept in the history.");
       await load();
     } catch (e) {
       toast.error(errMsg(e));
@@ -107,8 +148,10 @@ export function TallyPosting({ clientId }: { clientId: string }) {
         <b style={{ fontSize: 15 }}>Post to Tally: {linked.company}</b>
         <Badge tone={online ? "good" : "warn"}>{online ? "Connector online" : "Connector offline"}</Badge>
         <span style={{ fontSize: 12.5, color: V.muted }}>Tally last read {ago(linked.lastSyncedAt)}</span>
-        <button className="v2-btn v2-btn-ghost" style={{ marginLeft: "auto" }} onClick={() => void load()} aria-label="Refresh"><RefreshCw size={14} /> Refresh</button>
+        <span style={{ marginLeft: "auto" }}><PagesChip onAdd={() => setAddPages(true)} /></span>
+        <button className="v2-btn v2-btn-ghost" onClick={() => void load()} aria-label="Refresh"><RefreshCw size={14} /> Refresh</button>
       </div>
+      <PagesTopUpModal open={addPages} onClose={() => setAddPages(false)} />
 
       {!online && (
         <div role="status" style={{ background: "rgba(217,160,43,.12)", borderRadius: 12, padding: "10px 14px", fontSize: 13, color: V.body, display: "flex", gap: 8 }}>
@@ -180,6 +223,9 @@ export function TallyPosting({ clientId }: { clientId: string }) {
                   {l.posting?.status === "failed" && (
                     <div role="alert" style={{ background: "rgba(169,56,56,.07)", borderRadius: 10, padding: "8px 12px", fontSize: 12.5, color: V.maroon }}>
                       {l.posting.last_error || "This entry did not reach Tally."} Check Tally for this entry before approving again.
+                      <div style={{ marginTop: 6 }}>
+                        <button className="v2-btn v2-btn-ghost" disabled={busy === l.posting.id} onClick={() => void markPosted(l.posting!.id)}><CheckCircle2 size={14} /> It is in Tally: mark as posted</button>
+                      </div>
                     </div>
                   )}
                   <div style={{ fontSize: 12.5, color: V.body }}>
@@ -206,6 +252,46 @@ export function TallyPosting({ clientId }: { clientId: string }) {
                       {busy === l.txn_id ? <Loader2 size={15} className="fh-spin" /> : <Send size={15} />} Approve for Tally
                     </button>
                   </div>
+                  <button type="button" className="v2-btn v2-btn-ghost" style={{ justifySelf: "start", padding: "4px 10px", fontSize: 12.5 }} aria-expanded={!!opts[l.txn_id]?.open} onClick={() => setOpt(l.txn_id, { open: !opts[l.txn_id]?.open })}>
+                    <ChevronDown size={14} style={{ transform: opts[l.txn_id]?.open ? "rotate(180deg)" : "none", transition: "transform .2s" }} /> More options
+                  </button>
+                  <AnimatePresence initial={false}>
+                    {opts[l.txn_id]?.open && (
+                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} style={{ overflow: "hidden" }}>
+                        <div style={{ display: "grid", gap: 10, background: V.gray, borderRadius: 12, padding: 12, fontSize: 13 }}>
+                          <label style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                            <input type="checkbox" checked={!!opts[l.txn_id]?.contra} onChange={(e) => setOpt(l.txn_id, { contra: e.target.checked, gst: false })} style={{ marginTop: 3 }} />
+                            <span><b>Transfer between my own bank or cash accounts</b> (posts as a Contra). Choose the other bank or cash ledger above.</span>
+                          </label>
+                          {!opts[l.txn_id]?.contra && (
+                            <label style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                              <input type="checkbox" checked={!!opts[l.txn_id]?.gst} onChange={(e) => setOpt(l.txn_id, { gst: e.target.checked })} style={{ marginTop: 3 }} />
+                              <span><b>This amount includes GST</b> (for example a bank charge). FynHelp splits it into the charge and its GST ledgers.</span>
+                            </label>
+                          )}
+                          {opts[l.txn_id]?.gst && !opts[l.txn_id]?.contra && (
+                            <div style={{ display: "grid", gap: 8 }}>
+                              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                                <select className="v2-input" aria-label="GST rate" value={opts[l.txn_id]?.rate ?? 18} onChange={(e) => setOpt(l.txn_id, { rate: Number(e.target.value) })}>
+                                  {[5, 12, 18, 28].map((r) => <option key={r} value={r}>{r}% GST</option>)}
+                                </select>
+                                <select className="v2-input" aria-label="GST type" value={opts[l.txn_id]?.igst ? "igst" : "cs"} onChange={(e) => setOpt(l.txn_id, { igst: e.target.value === "igst" })}>
+                                  <option value="cs">CGST + SGST (same state)</option>
+                                  <option value="igst">IGST (other state)</option>
+                                </select>
+                              </div>
+                              <input className="v2-input" list="fh-tally-ledgers" placeholder={opts[l.txn_id]?.igst ? "Input IGST ledger" : "Input CGST ledger"} aria-label="First GST ledger" value={opts[l.txn_id]?.tax1 ?? ""} onChange={(e) => setOpt(l.txn_id, { tax1: e.target.value })} />
+                              {!opts[l.txn_id]?.igst && <input className="v2-input" list="fh-tally-ledgers" placeholder="Input SGST ledger" aria-label="Second GST ledger" value={opts[l.txn_id]?.tax2 ?? ""} onChange={(e) => setOpt(l.txn_id, { tax2: e.target.value })} />}
+                              {(() => {
+                                const g = splitGstInclusive(l.amount, opts[l.txn_id]?.rate ?? 18, !opts[l.txn_id]?.igst);
+                                return <div style={{ fontSize: 12.5, color: V.body }}>Charge {formatINR(g.base)} + {opts[l.txn_id]?.igst ? `IGST ${formatINR(g.igst)}` : `CGST ${formatINR(g.cgst)} + SGST ${formatINR(g.sgst)}`} = {formatINR(l.amount)}</div>;
+                              })()}
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                   {typed && !exists && <div style={{ fontSize: 12, color: V.maroon }}>"{typed}" is not a ledger in Tally. FynHelp never creates ledgers: create it in Tally, then sync.</div>}
                 </>
               )}
@@ -214,7 +300,7 @@ export function TallyPosting({ clientId }: { clientId: string }) {
         })}
       </AnimatePresence>
       <p style={{ fontSize: 12, color: V.muted, margin: 0 }}>
-        Every entry needs your approval. Nothing is written until the connector on the Tally PC has writing turned on, and each line is written once.
+        Every entry needs your approval. Nothing is written until the connector on the Tally PC has writing turned on, and each line is written once. Only typed or printed documents are read reliably: handwritten documents are not supported, and unclear lines go to the Review Queue instead of being guessed.
       </p>
     </section>
   );

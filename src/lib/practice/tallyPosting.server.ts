@@ -11,13 +11,17 @@
 import { PracticeError } from "./core";
 import { logActivity, type Db, type FirmContext } from "./db.server";
 import type { ConnectorRow } from "./tallyConnector.server";
-import { importVoucherXml, parseImportReply, problemsWith, type ApprovedLine } from "./tallyVoucher";
+import { importVoucherXml, parseImportReply, problemsWith, type ApprovedLine, type Split } from "./tallyVoucher";
+import { pagesForDocument } from "./billing/pageCredits";
 import { suggestLedger } from "./tallyLedgerSuggest";
 
 /** A claimed line not reported back within this time is treated as interrupted. */
 export const LEASE_MINUTES = 10;
 export const MAX_CLAIM = 10;
 const MAX_LEDGERS = 20_000;
+
+/** Bank and cash ledgers of a company, by their Tally group. Used to tell a Contra from a Receipt or Payment. */
+const isBankGroup = (parent: string | null | undefined) => /bank|cash/i.test(parent ?? "");
 
 const canApprove = (ctx: FirmContext) => ["owner", "admin", "partner", "manager"].includes(ctx.role);
 
@@ -114,13 +118,13 @@ export async function workbench(db: Db, ctx: FirmContext, businessId: string) {
 
 /* ── approve, cancel, retry ───────────────────────────────── */
 
-export async function approvePosting(db: Db, ctx: FirmContext, input: { txnId: string; partyLedger: string; bankLedger: string }) {
+export async function approvePosting(db: Db, ctx: FirmContext, input: { txnId: string; partyLedger: string; bankLedger: string; kind?: "Contra"; splits?: Split[] | null }) {
   if (!canApprove(ctx)) throw new PracticeError("forbidden", "Only a partner or manager can approve entries for Tally.");
   const billing = await import("./billing.server");
   if (!(await billing.firmCanWork(db, ctx.firmId))) throw new PracticeError("paused", "The trial or plan has ended. New work is paused.");
   const { data: t } = await db
     .from("ca_txns")
-    .select("id, business_id, side, direction, amount, txn_date, counterparty, description, reference, match_status")
+    .select("id, business_id, extraction_id, side, direction, amount, txn_date, counterparty, description, reference, match_status")
     .eq("id", input.txnId)
     .eq("ca_firm_id", ctx.firmId)
     .maybeSingle();
@@ -128,8 +132,9 @@ export async function approvePosting(db: Db, ctx: FirmContext, input: { txnId: s
   if (!["unmatched", "exception"].includes(t.match_status as string)) throw new PracticeError("already_matched", "This line is already matched to an entry in Tally. Nothing to post.");
   const co = await companyFor(db, ctx, t.business_id as string);
   if (!co) throw new PracticeError("no_company", "Link this client to a Tally company first.");
-  const { data: lg } = await db.from("ca_tally_ledgers").select("name").eq("company_id", co.id);
+  const { data: lg } = await db.from("ca_tally_ledgers").select("name, parent").eq("company_id", co.id);
   const existing = (lg ?? []).map((l) => l.name as string);
+  const bankLike = (lg ?? []).filter((l) => isBankGroup(l.parent as string | null)).map((l) => l.name as string);
   const line: ApprovedLine = {
     id: `fh-${t.id}`,
     company: co.company_name,
@@ -140,9 +145,20 @@ export async function approvePosting(db: Db, ctx: FirmContext, input: { txnId: s
     partyLedger: input.partyLedger,
     narration: String(t.description ?? t.counterparty ?? "").slice(0, 240),
     reference: (t.reference as string | null) ?? null,
+    kind: input.kind === "Contra" ? "Contra" : undefined,
+    splits: input.splits?.length ? input.splits : null,
   };
-  const problems = problemsWith(line, existing);
+  const problems = problemsWith(line, existing, bankLike);
   if (problems.length) throw new PracticeError("not_allowed", problems[0]);
+  // Pages for this document, taken once however many of its lines are approved. Short of pages: nothing is queued.
+  let charged = false;
+  if (t.extraction_id) {
+    const { count } = await db.from("ca_txns").select("id", { count: "exact", head: true }).eq("extraction_id", t.extraction_id as string);
+    const pages = pagesForDocument({ rows: count ?? 0 });
+    const spend = await (await import("./billing/pageCredits.server")).spendForDocument(db, ctx.firmId, t.extraction_id as string, pages);
+    if (!spend.ok) throw new PracticeError("no_pages", `This document needs ${spend.needed} page${spend.needed === 1 ? "" : "s"} and you have ${spend.balance}. Add pages in Settings, Billing, then approve again.`);
+    charged = spend.charged;
+  }
   // Use the ledger's exact spelling from Tally, not what was typed.
   const exact = (n: string) => existing.find((e) => e.trim().toLowerCase() === n.trim().toLowerCase()) ?? n;
   const { data, error } = await db
@@ -157,7 +173,9 @@ export async function approvePosting(db: Db, ctx: FirmContext, input: { txnId: s
       amount: line.amount,
       txn_date: line.date,
       bank_ledger: exact(line.bankLedger),
-      party_ledger: exact(line.partyLedger),
+      party_ledger: exact(line.splits?.[0]?.ledger ?? line.partyLedger),
+      voucher_kind: line.kind ?? null,
+      splits: line.splits ? line.splits.map((x) => ({ ledger: exact(x.ledger), amount: x.amount })) : null,
       narration: line.narration,
       reference: line.reference,
       approved_by: ctx.userId,
@@ -165,6 +183,8 @@ export async function approvePosting(db: Db, ctx: FirmContext, input: { txnId: s
     .select("id")
     .single();
   if (error) {
+    // Not queued, so the pages taken for this document just now go back.
+    if (charged && t.extraction_id) await (await import("./billing/pageCredits.server")).refundDocument(db, ctx.firmId, t.extraction_id as string);
     if (/duplicate key/i.test(error.message)) throw new PracticeError("conflict", "This line has already been approved for Tally.");
     throw new PracticeError("db_error", error.message);
   }
@@ -204,7 +224,7 @@ export async function claimPostings(db: Db, c: ConnectorRow) {
     .in("company_id", [...byId.keys()]);
   const { data: rows } = await db
     .from("ca_tally_postings")
-    .select("id, company_id, line_key, direction, amount, txn_date, bank_ledger, party_ledger, narration, reference")
+    .select("id, company_id, line_key, direction, amount, txn_date, bank_ledger, party_ledger, narration, reference, voucher_kind, splits")
     .eq("ca_firm_id", c.ca_firm_id)
     .eq("status", "queued")
     .in("company_id", [...byId.keys()])
@@ -212,8 +232,9 @@ export async function claimPostings(db: Db, c: ConnectorRow) {
     .limit(MAX_CLAIM);
   const out: { id: string; company: string; xml: string }[] = [];
   for (const r of rows ?? []) {
-    const { data: lg } = await db.from("ca_tally_ledgers").select("name").eq("company_id", r.company_id as string);
+    const { data: lg } = await db.from("ca_tally_ledgers").select("name, parent").eq("company_id", r.company_id as string);
     const existing = (lg ?? []).map((l) => l.name as string);
+    const bankLike = (lg ?? []).filter((l) => isBankGroup(l.parent as string | null)).map((l) => l.name as string);
     const line: ApprovedLine = {
       id: r.line_key as string,
       company: byId.get(r.company_id as string)!,
@@ -224,8 +245,10 @@ export async function claimPostings(db: Db, c: ConnectorRow) {
       partyLedger: r.party_ledger as string,
       narration: (r.narration as string) ?? "",
       reference: (r.reference as string | null) ?? null,
+      kind: r.voucher_kind === "Contra" ? "Contra" : undefined,
+      splits: Array.isArray(r.splits) ? (r.splits as Split[]) : null,
     };
-    const problems = problemsWith(line, existing);
+    const problems = problemsWith(line, existing, bankLike);
     if (problems.length) {
       // The ledger was removed or renamed in Tally since approval: stop, do not write.
       await db.from("ca_tally_postings").update({ status: "failed", last_error: problems[0], updated_at: new Date().toISOString() }).eq("id", r.id).eq("status", "queued");
@@ -263,4 +286,26 @@ export async function reportResult(db: Db, c: ConnectorRow, id: string, input: {
   const why = err || res?.message || (reply ? "Tally did not confirm that the entry was created." : "No answer from Tally.");
   await db.from("ca_tally_postings").update({ status: "failed", last_error: why.slice(0, 300), tally_reply: reply.slice(0, 2000) || null, updated_at: now }).eq("id", id).eq("status", "sent");
   return { status: "failed" };
+}
+
+/**
+ * A person has checked Tally and the entry is there (for example after an interrupted write), so FynHelp should
+ * stop treating it as unsent. Only a held (failed) line can be confirmed, and the note is kept in the history.
+ */
+export async function markPostedByHand(db: Db, ctx: FirmContext, id: string, note: string) {
+  if (!canApprove(ctx)) throw new PracticeError("forbidden", "Only a partner or manager can confirm an entry.");
+  const clean = note.replace(/\s+/g, " ").trim().slice(0, 200);
+  if (clean.length < 3) throw new PracticeError("note_needed", "Write a short note, for example 'Checked in Tally, voucher 245 is there'.");
+  const now = new Date().toISOString();
+  const { data, error } = await db
+    .from("ca_tally_postings")
+    .update({ status: "posted", posted_at: now, last_error: null, resolved_note: clean, updated_at: now })
+    .eq("id", id)
+    .eq("ca_firm_id", ctx.firmId)
+    .eq("status", "failed")
+    .select("business_id");
+  if (error) throw new PracticeError("db_error", error.message);
+  if (!data?.length) throw new PracticeError("not_held", "Only an entry that is waiting for a check can be confirmed.");
+  await logActivity(db, ctx.firmId, data[0].business_id as string, "recon", `An entry was confirmed as already in Tally by hand: ${clean}`);
+  return { ok: true };
 }

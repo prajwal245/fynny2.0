@@ -32,7 +32,7 @@ describe("ledger suggestion", () => {
 describe("page pack pricing: 15% below the reference", () => {
   it("prices match 85% of ₹2 and ₹1 per page", () => {
     const by = Object.fromEntries(PAGE_PACKS.map((p) => [p.key, p]));
-    expect(by["regular-200"]).toMatchObject({ referencePrice: 400, price: 340, gst: 61, total: 401 });
+    expect(by["regular-200"]).toMatchObject({ referencePrice: 400, price: 340, gst: 61.2, total: 401.2 });
     expect(by["regular-400"].price).toBe(680);
     expect(by["regular-600"].price).toBe(1020);
     expect(by["pro-3000"]).toMatchObject({ referencePrice: 3000, price: 2550, gst: 459, total: 3009 });

@@ -18,6 +18,7 @@ export interface PagePack {
   referencePrice: number;
   /** FynHelp price, ex GST, whole rupees. */
   price: number;
+  /** GST in rupees and paise, so the total is exactly what Razorpay charges. */
   gst: number;
   total: number;
   perPage: number;
@@ -26,8 +27,8 @@ export interface PagePack {
 const make = (name: PagePack["name"], pages: number): PagePack => {
   const referencePrice = pages * (name === "Pro" ? REFERENCE_PER_PAGE.pro : REFERENCE_PER_PAGE.regular);
   const price = Math.round(referencePrice * (1 - DISCOUNT));
-  const gst = Math.round(price * GST_RATE);
-  return { key: `${name.toLowerCase()}-${pages}`, name, pages, referencePrice, price, gst, total: price + gst, perPage: Math.round((price / pages) * 100) / 100 };
+  const gst = Math.round(price * GST_RATE * 100) / 100;
+  return { key: `${name.toLowerCase()}-${pages}`, name, pages, referencePrice, price, gst, total: Math.round((price + gst) * 100) / 100, perPage: Math.round((price / pages) * 100) / 100 };
 };
 
 export const PAGE_PACKS: PagePack[] = [make("Regular", 200), make("Regular", 400), make("Regular", 600), make("Pro", 3000)];

@@ -73,3 +73,65 @@ describe("writing an approved line to Tally", () => {
     expect(parseImportReply("").ok).toBe(false);
   });
 });
+
+import { splitGstInclusive } from "@/lib/practice/tallyVoucher";
+
+describe("contra, bank charges and GST splits", () => {
+  const all = ["HDFC Bank", "ICICI Bank", "Cash", "Bank Charges", "Input CGST", "Input SGST", "Input IGST", "Rao Steels"];
+  const bankLike = ["HDFC Bank", "ICICI Bank", "Cash"];
+
+  it("a transfer between own accounts is a Contra and balances", () => {
+    const l: ApprovedLine = { ...line, direction: "out", kind: "Contra", partyLedger: "ICICI Bank" };
+    expect(problemsWith(l, all, bankLike)).toEqual([]);
+    const x = importVoucherXml(l);
+    expect(x).toContain('VCHTYPE="Contra"');
+    expect(x).toMatch(/<LEDGERNAME>ICICI Bank<\/LEDGERNAME><ISDEEMEDPOSITIVE>Yes<\/ISDEEMEDPOSITIVE><AMOUNT>-48200.00</);
+    expect(x).toMatch(/<LEDGERNAME>HDFC Bank<\/LEDGERNAME><ISDEEMEDPOSITIVE>No<\/ISDEEMEDPOSITIVE><AMOUNT>48200.00</);
+  });
+  it("a Contra to a non-bank ledger, and a Receipt from a bank ledger, are refused", () => {
+    expect(problemsWith({ ...line, kind: "Contra", partyLedger: "Rao Steels" }, all, bankLike)[0]).toMatch(/not a bank or cash ledger/);
+    expect(problemsWith({ ...line, partyLedger: "ICICI Bank" }, all, bankLike)[0]).toMatch(/must be posted as a Contra/);
+  });
+
+  it("GST inside a total is split into whole paise that add up exactly", () => {
+    const r = splitGstInclusive(118, 18, true);
+    expect(r).toEqual({ base: 100, cgst: 9, sgst: 9, igst: 0 });
+    for (const total of [1, 99.99, 590, 1234.57, 0.5]) {
+      const s = splitGstInclusive(total, 18, true);
+      expect(Math.round((s.base + s.cgst + s.sgst) * 100)).toBe(Math.round(total * 100));
+      expect(s.cgst).toBe(s.sgst);
+      const i = splitGstInclusive(total, 18, false);
+      expect(Math.round((i.base + i.igst) * 100)).toBe(Math.round(total * 100));
+    }
+    expect(() => splitGstInclusive(0, 18, true)).toThrow();
+  });
+
+  it("a bank charge with GST posts as one Payment with a split other side", () => {
+    const g = splitGstInclusive(590, 18, true);
+    const l: ApprovedLine = {
+      ...line,
+      direction: "out",
+      partyLedger: "Bank Charges",
+      splits: [
+        { ledger: "Bank Charges", amount: g.base },
+        { ledger: "Input CGST", amount: g.cgst },
+        { ledger: "Input SGST", amount: g.sgst },
+      ],
+      amount: 590,
+    };
+    expect(problemsWith(l, all, bankLike)).toEqual([]);
+    const x = importVoucherXml(l);
+    expect(x).toContain('VCHTYPE="Payment"');
+    expect((x.match(/<ALLLEDGERENTRIES.LIST>/g) ?? []).length).toBe(4);
+    expect(x).toMatch(/<LEDGERNAME>Input CGST<\/LEDGERNAME><ISDEEMEDPOSITIVE>Yes<\/ISDEEMEDPOSITIVE><AMOUNT>-45.00</);
+    expect(x).toMatch(/<LEDGERNAME>HDFC Bank<\/LEDGERNAME><ISDEEMEDPOSITIVE>No<\/ISDEEMEDPOSITIVE><AMOUNT>590.00</);
+  });
+
+  it("a split that does not add up, uses a missing ledger or is a Contra is refused", () => {
+    const base = { ...line, direction: "out" as const, amount: 590, partyLedger: "Bank Charges" };
+    expect(problemsWith({ ...base, splits: [{ ledger: "Bank Charges", amount: 500 }, { ledger: "Input CGST", amount: 80 }] }, all, bankLike).join()).toMatch(/add up/);
+    expect(problemsWith({ ...base, splits: [{ ledger: "Bank Charges", amount: 500 }, { ledger: "Nope GST", amount: 90 }] }, all, bankLike).join()).toMatch(/does not exist/);
+    expect(problemsWith({ ...base, splits: [{ ledger: "Bank Charges", amount: 590 }] }, all, bankLike).join()).toMatch(/between 2 and 10/);
+    expect(problemsWith({ ...base, kind: "Contra", splits: [{ ledger: "Cash", amount: 300 }, { ledger: "ICICI Bank", amount: 290 }] }, all, bankLike).join()).toMatch(/cannot be split/);
+  });
+});

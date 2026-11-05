@@ -1279,10 +1279,10 @@ export const tallyWorkbench = createServerFn({ method: "POST" })
 
 export const tallyApprove = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ txn_id: uuid, party_ledger: z.string().min(1).max(200), bank_ledger: z.string().min(1).max(200) }).parse(d))
+  .inputValidator((d: unknown) => z.object({ txn_id: uuid, party_ledger: z.string().min(1).max(200), bank_ledger: z.string().min(1).max(200), kind: z.literal("Contra").optional(), splits: z.array(z.object({ ledger: z.string().min(1).max(200), amount: z.number().positive().max(1e10) })).min(2).max(10).optional() }).parse(d))
   .handler(async ({ context, data }) =>
     withFirm(context.userId, async (db, ctx) =>
-      (await import("./tallyPosting.server")).approvePosting(db, ctx, { txnId: data.txn_id, partyLedger: data.party_ledger, bankLedger: data.bank_ledger }),
+      (await import("./tallyPosting.server")).approvePosting(db, ctx, { txnId: data.txn_id, partyLedger: data.party_ledger, bankLedger: data.bank_ledger, kind: data.kind, splits: data.splits }),
     ),
   );
 
@@ -1290,3 +1290,24 @@ export const tallyCancel = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ id: uuid }).parse(d))
   .handler(async ({ context, data }) => withFirm(context.userId, async (db, ctx) => (await import("./tallyPosting.server")).cancelPosting(db, ctx, data.id)));
+
+export const tallyMarkPosted = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ id: uuid, note: z.string().min(3).max(200) }).parse(d))
+  .handler(async ({ context, data }) => withFirm(context.userId, async (db, ctx) => (await import("./tallyPosting.server")).markPostedByHand(db, ctx, data.id, data.note)));
+
+/* ── Tally posting pages (a second credit type, next to WhatsApp credits) ── */
+
+export const getPracticePages = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => withFirm(context.userId, async (db, ctx) => (await import("./billing/pageCredits.server")).pagesView(db, ctx)));
+
+export const startPracticePageTopUp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ pack: z.enum(["regular-200", "regular-400", "regular-600", "pro-3000"]) }).parse(d))
+  .handler(async ({ context, data }) => withFirm(context.userId, async (db, ctx) => (await import("./billing/pageCredits.server")).createPageOrder(db, ctx, data.pack)));
+
+export const confirmPracticePageTopUp = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ razorpay_order_id: z.string().min(5).max(80), razorpay_payment_id: z.string().min(5).max(80), razorpay_signature: z.string().min(10).max(200) }).parse(d))
+  .handler(async ({ context, data }) => withFirm(context.userId, async (db, ctx) => (await import("./billing/pageCredits.server")).confirmPageTopUp(db, ctx, data)));

@@ -50,15 +50,18 @@ export function TallyPosting({ clientId }: { clientId: string }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [opts, setOpts] = useState<Record<string, Opts>>({});
   const [addPages, setAddPages] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
   const setOpt = (id: string, o: Opts) => setOpts((cur) => ({ ...cur, [id]: { ...cur[id], ...o } }));
 
   const load = useCallback(async () => {
     try {
       const b = await tallyWorkbench({ data: { business_id: clientId } });
+      setUnavailable(false);
       setBench(b);
       if (b.linked) setBank((cur) => cur || b.bankLedgers[0] || "");
-    } catch (e) {
-      toast.error(errMsg(e));
+    } catch {
+      // Quiet on purpose: if posting is not available yet the panel explains it instead of a red error on every visit.
+      setUnavailable(true);
     } finally {
       setLoading(false);
     }
@@ -125,6 +128,9 @@ export function TallyPosting({ clientId }: { clientId: string }) {
   };
 
   if (loading) return <div style={{ display: "flex", alignItems: "center", gap: 8, color: V.muted, fontSize: 13 }}><Loader2 size={15} className="fh-spin" /> Checking Tally…</div>;
+  if (unavailable && !bench) {
+    return <div style={{ background: V.gray, borderRadius: 14, padding: 14, fontSize: 13, color: V.body }}>Posting to Tally is not available right now. Your extracted rows above are safe. Try again in a few minutes.</div>;
+  }
   if (!bench || !linked) {
     return (
       <div style={{ background: V.gray, borderRadius: 14, padding: 16, fontSize: 13.5, color: V.body, display: "flex", gap: 10 }}>

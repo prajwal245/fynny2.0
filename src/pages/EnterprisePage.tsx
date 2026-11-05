@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { notifyWaitlistLead } from "@/lib/waitlistNotify.functions";
 import {
   ArrowRight,
   BookOpenCheck,
@@ -24,12 +25,12 @@ import { Link } from "@/lib/router-compat";
  * sites: light grey-teal ground, hairline grid cells, dark teal gradient close.
  */
 
-const INK = "#0B1F1E";
-const TEAL = "#0F4F4C";
-const TEAL_DEEP = "#0A3836";
-const GROUND = "#EFF4F4";
-const LINE = "#D3DEDE";
-const MUTED = "#4C6361";
+const INK = "#171208";
+const TEAL = "#A93838";
+const TEAL_DEEP = "#5E1E1E";
+const GROUND = "#F3ECDD";
+const LINE = "#DDD2BD";
+const MUTED = "#6B5F4E";
 const FONT = '"Inter", "DM Sans", system-ui, sans-serif';
 
 const STEPS = [
@@ -71,7 +72,7 @@ const btnDark = {
 function TopBar() {
   return (
     <div className="text-center text-[13px] py-3 px-4" style={{ background: `linear-gradient(90deg, ${INK}, ${TEAL})`, color: "#fff" }}>
-      <span className="inline-block w-1.5 h-1.5 rounded-full mr-2 align-middle" style={{ background: "#B7F0C8" }} />
+      <span className="inline-block w-1.5 h-1.5 rounded-full mr-2 align-middle" style={{ background: "#E8C25A" }} />
       Enterprise finance teams: early access is open.{" "}
       <button onClick={() => openDemo("enterprise-bar")} className="underline underline-offset-2 font-medium">
         Book a walkthrough
@@ -91,6 +92,7 @@ function Nav() {
           <a href="#how">How it works</a>
           <a href="#why">Why FynHelp</a>
           <a href="#change">What changes</a>
+          <a href="#waitlist">Waitlist</a>
           <Link to="/pricing">Pricing</Link>
         </nav>
         <div className="flex items-center gap-4 text-[15px]">
@@ -145,6 +147,9 @@ function Hero() {
           <Link to="/samples" className="underline underline-offset-4" style={{ color: MUTED }}>
             See a sample close pack
           </Link>
+          <a href="#waitlist" className="underline underline-offset-4" style={{ color: MUTED }}>
+            Join the waitlist
+          </a>
         </div>
       </div>
     </section>
@@ -188,7 +193,7 @@ function Problem() {
         <ul style={{ border: `1px solid ${LINE}` }}>
           {PAIN.map((p, i) => (
             <li key={p} className="flex items-center gap-4 px-6 py-5 text-[17px]" style={{ color: INK, borderTop: i ? `1px solid ${LINE}` : "none" }}>
-              <X size={18} color="#B5483B" className="shrink-0" />
+              <X size={18} color="#8B6914" className="shrink-0" />
               {p}
             </li>
           ))}
@@ -298,9 +303,126 @@ function Change() {
   );
 }
 
+const ENTITIES = ["1-5", "6-25", "26-100", "100+"];
+const TOOLS = ["Tally", "Zoho Books", "SAP", "Oracle", "Microsoft Dynamics", "Excel", "Other"];
+
+function Waitlist() {
+  const [state, setState] = useState<"idle" | "sending" | "done" | "error">("idle");
+  const [tools, setTools] = useState<string[]>([]);
+  const toggle = (v: string) => setTools((l) => (l.includes(v) ? l.filter((x) => x !== v) : [...l, v]));
+
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    const str = (k: string) => String(f.get(k) ?? "").trim();
+    setState("sending");
+    try {
+      const q = new URLSearchParams(window.location.search);
+      await notifyWaitlistLead({
+        data: {
+          full_name: str("name"),
+          email: str("email"),
+          firm_name: str("company"),
+          role: str("role").slice(0, 50) || "Finance team",
+          client_entities: str("entities"),
+          hear_about: "Finance teams page",
+          month_end_pain: `Systems: ${tools.join(", ") || "n/a"} | Biggest problem: ${str("pain") || "n/a"}`.slice(0, 500),
+          utm_source: q.get("utm_source") ?? "",
+          utm_medium: q.get("utm_medium") ?? "",
+          utm_campaign: q.get("utm_campaign") ?? "",
+          referrer: document.referrer.slice(0, 500),
+          landing_page: window.location.href.slice(0, 500),
+        },
+      });
+      setState("done");
+    } catch {
+      setState("error");
+    }
+  }
+
+  const field = "w-full rounded-md px-4 py-3.5 text-[15px] outline-none";
+  const fieldStyle = { background: "#fff", border: `1px solid ${LINE}`, color: INK };
+  return (
+    <section id="waitlist" style={{ background: "#fff" }}>
+      <div className="mx-auto max-w-[760px] px-6 py-20">
+        <div className="text-center text-[12px] tracking-[0.14em] uppercase font-medium" style={{ color: MUTED }}>
+          Waitlist
+        </div>
+        <h2 className="mt-4 text-center text-[32px] md:text-[44px] leading-[1.1] font-medium tracking-[-0.025em]" style={{ color: INK, fontFamily: FONT }}>
+          Be first in line for your finance team.
+        </h2>
+        <p className="mt-4 text-center text-[16px]" style={{ color: MUTED }}>
+          Two minutes. We use your answers to decide what to build first, and we contact you personally.
+        </p>
+        {state === "done" ? (
+          <div className="mt-10 p-10 text-center" style={{ border: `1px solid ${LINE}`, background: GROUND }}>
+            <CheckCircle2 size={30} color={TEAL} className="mx-auto" />
+            <div className="mt-3 text-[20px] font-medium" style={{ color: INK }}>
+              You are on the list. Thank you.
+            </div>
+            <p className="mt-2 text-[15px]" style={{ color: MUTED }}>
+              We will be in touch soon.
+            </p>
+          </div>
+        ) : (
+          <form onSubmit={onSubmit} className="mt-10 p-6 md:p-8 space-y-4" style={{ border: `1px solid ${LINE}`, background: GROUND }}>
+            <div className="grid md:grid-cols-2 gap-4">
+              <input name="name" required maxLength={100} placeholder="Your name" className={field} style={fieldStyle} />
+              <input name="email" type="email" required maxLength={255} placeholder="Work email" className={field} style={fieldStyle} />
+              <input name="company" required maxLength={150} placeholder="Company" className={field} style={fieldStyle} />
+              <input name="role" maxLength={50} placeholder="Your role (e.g. Head of Finance)" className={field} style={fieldStyle} />
+            </div>
+            <select name="entities" required defaultValue="" className={field} style={fieldStyle}>
+              <option value="" disabled>
+                Entities you close each month
+              </option>
+              {ENTITIES.map((x) => (
+                <option key={x} value={x}>
+                  {x}
+                </option>
+              ))}
+            </select>
+            <div>
+              <div className="text-[14px] font-medium mb-2" style={{ color: INK }}>
+                Where do your books live?
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {TOOLS.map((t) => {
+                  const on = tools.includes(t);
+                  return (
+                    <button
+                      type="button"
+                      key={t}
+                      aria-pressed={on}
+                      onClick={() => toggle(t)}
+                      className="rounded-md px-4 py-2 text-[14px]"
+                      style={{ background: on ? TEAL : "#fff", color: on ? "#fff" : INK, border: `1px solid ${on ? TEAL : LINE}` }}
+                    >
+                      {t}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <textarea name="pain" maxLength={300} rows={3} placeholder="What would be worth the most to fix in your next close?" className={field} style={fieldStyle} />
+            {state === "error" && (
+              <p className="text-[14px]" style={{ color: TEAL }}>
+                Something went wrong. Please try again, or write to nidhi@fynhelp.com.
+              </p>
+            )}
+            <button type="submit" disabled={state === "sending"} className="w-full rounded-md py-3.5 text-[15px] font-medium disabled:opacity-60" style={{ background: INK, color: "#fff" }}>
+              {state === "sending" ? "Sending..." : "Join the waitlist"}
+            </button>
+          </form>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function Close() {
   return (
-    <section style={{ background: `linear-gradient(120deg, ${TEAL_DEEP} 0%, ${TEAL} 55%, #2A7A74 100%)` }}>
+    <section style={{ background: `linear-gradient(120deg, ${TEAL_DEEP} 0%, ${TEAL} 55%, #C25A4A 100%)` }}>
       <div className="mx-auto max-w-[900px] px-6 py-24 text-center">
         <h2 className="text-[34px] md:text-[52px] leading-[1.1] font-medium tracking-[-0.03em]" style={{ color: "#fff", fontFamily: FONT }}>
           Stop spending your best people on matching.
@@ -350,6 +472,7 @@ export default function EnterprisePage() {
       <How />
       <Why />
       <Change />
+      <Waitlist />
       <Close />
       <Footer />
     </div>

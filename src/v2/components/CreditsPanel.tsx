@@ -112,7 +112,7 @@ export function TopUpModal({ open, onClose }: { open: boolean; onClose: () => vo
 }
 
 /** Switch automatic top-up on or off, choose the pack and the monthly limit. */
-function AutoTopUp({ c, compact = false }: { c: Credits; compact?: boolean }) {
+export function AutoTopUp({ c, compact = false }: { c: Credits; compact?: boolean }) {
   const [busy, setBusy] = useState(false);
   const s = c.settings;
   const save = async (next: Partial<typeof s>) => {

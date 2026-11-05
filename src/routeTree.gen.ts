@@ -25,6 +25,7 @@ import { Route as MainCaFirmsRouteImport } from './routes/_main/ca-firms'
 import { Route as MainCommunityRouteImport } from './routes/_main/community'
 import { Route as MainContactRouteImport } from './routes/_main/contact'
 import { Route as MainDashboardRouteImport } from './routes/_main/dashboard'
+import { Route as MainEnterpriseRouteImport } from './routes/_main/enterprise'
 import { Route as MainLoginRouteImport } from './routes/_main/login'
 import { Route as MainOnboardingRouteImport } from './routes/_main/onboarding'
 import { Route as MainPipelineRouteImport } from './routes/_main/pipeline'
@@ -301,6 +302,11 @@ const MainContactRoute = MainContactRouteImport.update({
 const MainDashboardRoute = MainDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => MainRoute,
+} as any)
+const MainEnterpriseRoute = MainEnterpriseRouteImport.update({
+  id: '/enterprise',
+  path: '/enterprise',
   getParentRoute: () => MainRoute,
 } as any)
 const MainLoginRoute = MainLoginRouteImport.update({
@@ -1431,6 +1437,7 @@ export interface FileRoutesByFullPath {
   '/community': typeof MainCommunityRoute
   '/contact': typeof MainContactRoute
   '/dashboard': typeof MainDashboardRouteWithChildren
+  '/enterprise': typeof MainEnterpriseRoute
   '/login': typeof MainLoginRoute
   '/onboarding': typeof MainOnboardingRoute
   '/pipeline': typeof MainPipelineRoute
@@ -1644,6 +1651,7 @@ export interface FileRoutesByTo {
   '/ca-firms': typeof MainCaFirmsRoute
   '/community': typeof MainCommunityRoute
   '/contact': typeof MainContactRoute
+  '/enterprise': typeof MainEnterpriseRoute
   '/login': typeof MainLoginRoute
   '/onboarding': typeof MainOnboardingRoute
   '/pipeline': typeof MainPipelineRoute
@@ -1861,6 +1869,7 @@ export interface FileRoutesById {
   '/_main/community': typeof MainCommunityRoute
   '/_main/contact': typeof MainContactRoute
   '/_main/dashboard': typeof MainDashboardRouteWithChildren
+  '/_main/enterprise': typeof MainEnterpriseRoute
   '/_main/login': typeof MainLoginRoute
   '/_main/onboarding': typeof MainOnboardingRoute
   '/_main/pipeline': typeof MainPipelineRoute
@@ -2079,6 +2088,7 @@ export interface FileRouteTypes {
     | '/community'
     | '/contact'
     | '/dashboard'
+    | '/enterprise'
     | '/login'
     | '/onboarding'
     | '/pipeline'
@@ -2292,6 +2302,7 @@ export interface FileRouteTypes {
     | '/ca-firms'
     | '/community'
     | '/contact'
+    | '/enterprise'
     | '/login'
     | '/onboarding'
     | '/pipeline'
@@ -2508,6 +2519,7 @@ export interface FileRouteTypes {
     | '/_main/community'
     | '/_main/contact'
     | '/_main/dashboard'
+    | '/_main/enterprise'
     | '/_main/login'
     | '/_main/onboarding'
     | '/_main/pipeline'
@@ -2864,6 +2876,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof MainDashboardRouteImport
+      parentRoute: typeof MainRoute
+    }
+    '/_main/enterprise': {
+      id: '/_main/enterprise'
+      path: '/enterprise'
+      fullPath: '/enterprise'
+      preLoaderRoute: typeof MainEnterpriseRouteImport
       parentRoute: typeof MainRoute
     }
     '/_main/login': {
@@ -4689,6 +4708,7 @@ interface MainRouteChildren {
   MainCommunityRoute: typeof MainCommunityRoute
   MainContactRoute: typeof MainContactRoute
   MainDashboardRoute: typeof MainDashboardRouteWithChildren
+  MainEnterpriseRoute: typeof MainEnterpriseRoute
   MainLoginRoute: typeof MainLoginRoute
   MainOnboardingRoute: typeof MainOnboardingRoute
   MainPipelineRoute: typeof MainPipelineRoute
@@ -4715,6 +4735,7 @@ const MainRouteChildren: MainRouteChildren = {
   MainCommunityRoute: MainCommunityRoute,
   MainContactRoute: MainContactRoute,
   MainDashboardRoute: MainDashboardRouteWithChildren,
+  MainEnterpriseRoute: MainEnterpriseRoute,
   MainLoginRoute: MainLoginRoute,
   MainOnboardingRoute: MainOnboardingRoute,
   MainPipelineRoute: MainPipelineRoute,

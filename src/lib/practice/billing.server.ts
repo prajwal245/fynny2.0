@@ -558,6 +558,13 @@ export async function handleRazorpayWebhook(
     const done = await (await import("./billing/credits.server")).grantPaidOrder(db, order.id, payment.id);
     return { duplicate: false, firmId: done?.firmId ?? null };
   }
+  // A paid Tally posting pages order: same safety as credits, a separate ledger.
+  if (payload.event === "order.paid" && order?.id && order.notes?.kind === "pages" && payment?.id) {
+    const { error: seen } = await db.from("ca_billing_events").insert({ id: eventId, event: payload.event, ca_firm_id: order.notes.firm_id ?? null, payload });
+    if (seen) return { duplicate: true };
+    const done = await (await import("./billing/pageCredits.server")).grantPaidPageOrder(db, order.id, payment.id);
+    return { duplicate: false, firmId: done?.firmId ?? null };
+  }
   let firmId: string | null = sub?.notes?.firm_id ?? (invoice?.notes?.kind === "usage" ? (invoice.notes.firm_id ?? null) : null);
   if (!firmId && sub?.id) {
     const { data } = await db.from("ca_billing").select("ca_firm_id").eq("razorpay_subscription_id", sub.id).maybeSingle();

@@ -30,7 +30,7 @@ import { dirname, join, resolve } from "node:path";
 import { hostname } from "node:os";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-export const VERSION = "1.0.0";
+export const VERSION = "1.1.0";
 
 /* ── Tally XML helpers (pure; tested) ───────────────────────── */
 
@@ -69,6 +69,23 @@ export function monthRange(month) {
 export function dayBookRequest(company, month) {
   const { from, to } = monthRange(month);
   return `<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>Day Book</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>${esc(company)}</SVCURRENTCOMPANY><SVFROMDATE>${from}</SVFROMDATE><SVTODATE>${to}</SVTODATE><EXPLODEFLAG>Yes</EXPLODEFLAG></STATICVARIABLES></DESC></BODY></ENVELOPE>`;
+}
+
+export function ledgerListRequest(company) {
+  return `<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>FynHelpLedgers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>${esc(company)}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="FynHelpLedgers" ISMODIFY="No"><TYPE>Ledger</TYPE><NATIVEMETHOD>Name</NATIVEMETHOD><NATIVEMETHOD>Parent</NATIVEMETHOD></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`;
+}
+
+/** Ledger names and groups from Tally's Ledger collection reply. */
+export function parseLedgers(xml) {
+  const out = new Map();
+  for (const m of xml.matchAll(/<LEDGER\b([^>]*)>([\s\S]*?)<\/LEDGER>/gi)) {
+    const attr = /\bNAME="([^"]+)"/i.exec(m[1]);
+    const tag = /<NAME[^>]*>([^<]+)<\/NAME>/i.exec(m[2]);
+    const name = unesc((attr?.[1] ?? tag?.[1] ?? "")).trim();
+    const parent = /<PARENT[^>]*>([^<]+)<\/PARENT>/i.exec(m[2]);
+    if (name) out.set(name, parent ? unesc(parent[1]).trim() : null);
+  }
+  return [...out].map(([name, parent]) => ({ name, parent }));
 }
 
 /** Company names from Tally's Company collection reply. */
@@ -137,6 +154,8 @@ export function loadConfig(argv, cwd = process.cwd(), here = dirname(fileURLToPa
     server: String(raw.server ?? "https://www.fynhelp.com").replace(/\/+$/, ""),
     tallyUrl: String(raw.tallyUrl ?? "http://localhost:9000"),
     checkMinutes: Math.max(1, Number(raw.checkMinutes) || 2),
+    // Writing into Tally is OFF unless the person at this PC turns it on with "allowWrite": true.
+    allowWrite: raw.allowWrite === true,
   };
 }
 
@@ -145,6 +164,39 @@ async function readCompanies(cfg) {
   const err = tallyError(xml);
   if (err) throw new Error(`Tally said: ${err}`);
   return parseCompanies(xml);
+}
+
+/** Sends each company's ledger names so FynHelp can only ever point at a ledger that exists. */
+async function sendLedgers(cfg, name) {
+  const xml = await askTally(cfg.tallyUrl, ledgerListRequest(name), 60_000);
+  const err = tallyError(xml);
+  if (err) throw new Error(`Tally said: ${err}`);
+  const ledgers = parseLedgers(xml);
+  if (!ledgers.length) return;
+  await fynhelp(cfg, "/api/public/tally-ledgers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ company: name, ledgers }) });
+  log(`✓ ${name}: ${ledgers.length} ledgers sent`);
+}
+
+/** Writes lines a person approved in FynHelp. One at a time; every answer is reported back. Off unless allowWrite is true. */
+async function writeApproved(cfg, companies) {
+  if (!cfg.allowWrite) return;
+  const { postings } = await fynhelp(cfg, "/api/public/tally-outbox", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+  for (const p of postings ?? []) {
+    if (!companies.includes(p.company)) {
+      await fynhelp(cfg, "/api/public/tally-result", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: p.id, error: `Company "${p.company}" is not open in Tally.` }) });
+      continue;
+    }
+    let body;
+    try {
+      const reply = await askTally(cfg.tallyUrl, p.xml, 60_000);
+      body = { id: p.id, reply };
+      log(`→ wrote approved entry ${p.id.slice(0, 8)} to ${p.company}`);
+    } catch (e) {
+      body = { id: p.id, error: e.message };
+      log(`✗ could not write ${p.id.slice(0, 8)}: ${e.message}`);
+    }
+    await fynhelp(cfg, "/api/public/tally-result", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  }
 }
 
 /** One check-in, and a full sync when it is due or a person asked for one. */
@@ -166,6 +218,11 @@ async function round(cfg, state, forceSync) {
     log("!", tallyProblem);
     return;
   }
+  try {
+    await writeApproved(cfg, companies);
+  } catch (e) {
+    log(`✗ writing approved entries: ${e.message}`);
+  }
   const due = !state.lastFull || Date.now() - state.lastFull >= (reply.intervalMinutes ?? 60) * 60_000;
   if (!(forceSync || reply.syncNow || due)) return;
 
@@ -176,6 +233,11 @@ async function round(cfg, state, forceSync) {
       continue;
     }
     if (!companies.includes(co.name)) continue;
+    try {
+      await sendLedgers(cfg, co.name);
+    } catch (e) {
+      log(`✗ ${co.name} ledgers: ${e.message}`);
+    }
     for (const month of co.months) {
       try {
         const xml = await askTally(cfg.tallyUrl, dayBookRequest(co.name, month), 10 * 60_000);

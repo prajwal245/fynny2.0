@@ -122,6 +122,9 @@ import { Route as ApiPublicPressIngestRouteImport } from './routes/api/public/pr
 import { Route as ApiPublicRazorpayWebhookRouteImport } from './routes/api/public/razorpay-webhook'
 import { Route as ApiPublicTallyHelloRouteImport } from './routes/api/public/tally-hello'
 import { Route as ApiPublicTallyLedgerRouteImport } from './routes/api/public/tally-ledger'
+import { Route as ApiPublicTallyLedgersRouteImport } from './routes/api/public/tally-ledgers'
+import { Route as ApiPublicTallyOutboxRouteImport } from './routes/api/public/tally-outbox'
+import { Route as ApiPublicTallyResultRouteImport } from './routes/api/public/tally-result'
 import { Route as ApiPublicUploadLinkRouteImport } from './routes/api/public/upload-link'
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp-webhook'
 import { Route as AppClientsIndexRouteImport } from './routes/app/clients.index'
@@ -809,6 +812,21 @@ const ApiPublicTallyHelloRoute = ApiPublicTallyHelloRouteImport.update({
 const ApiPublicTallyLedgerRoute = ApiPublicTallyLedgerRouteImport.update({
   id: '/api/public/tally-ledger',
   path: '/api/public/tally-ledger',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicTallyLedgersRoute = ApiPublicTallyLedgersRouteImport.update({
+  id: '/api/public/tally-ledgers',
+  path: '/api/public/tally-ledgers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicTallyOutboxRoute = ApiPublicTallyOutboxRouteImport.update({
+  id: '/api/public/tally-outbox',
+  path: '/api/public/tally-outbox',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicTallyResultRoute = ApiPublicTallyResultRouteImport.update({
+  id: '/api/public/tally-result',
+  path: '/api/public/tally-result',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicUploadLinkRoute = ApiPublicUploadLinkRouteImport.update({
@@ -1530,6 +1548,9 @@ export interface FileRoutesByFullPath {
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/tally-hello': typeof ApiPublicTallyHelloRoute
   '/api/public/tally-ledger': typeof ApiPublicTallyLedgerRoute
+  '/api/public/tally-ledgers': typeof ApiPublicTallyLedgersRoute
+  '/api/public/tally-outbox': typeof ApiPublicTallyOutboxRoute
+  '/api/public/tally-result': typeof ApiPublicTallyResultRoute
   '/api/public/upload-link': typeof ApiPublicUploadLinkRoute
   '/api/public/whatsapp-webhook': typeof ApiPublicWhatsappWebhookRoute
   '/app/clients/$clientId': typeof AppClientsClientIdRoute
@@ -1741,6 +1762,9 @@ export interface FileRoutesByTo {
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/tally-hello': typeof ApiPublicTallyHelloRoute
   '/api/public/tally-ledger': typeof ApiPublicTallyLedgerRoute
+  '/api/public/tally-ledgers': typeof ApiPublicTallyLedgersRoute
+  '/api/public/tally-outbox': typeof ApiPublicTallyOutboxRoute
+  '/api/public/tally-result': typeof ApiPublicTallyResultRoute
   '/api/public/upload-link': typeof ApiPublicUploadLinkRoute
   '/api/public/whatsapp-webhook': typeof ApiPublicWhatsappWebhookRoute
   '/app/clients/$clientId': typeof AppClientsClientIdRoute
@@ -1963,6 +1987,9 @@ export interface FileRoutesById {
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/tally-hello': typeof ApiPublicTallyHelloRoute
   '/api/public/tally-ledger': typeof ApiPublicTallyLedgerRoute
+  '/api/public/tally-ledgers': typeof ApiPublicTallyLedgersRoute
+  '/api/public/tally-outbox': typeof ApiPublicTallyOutboxRoute
+  '/api/public/tally-result': typeof ApiPublicTallyResultRoute
   '/api/public/upload-link': typeof ApiPublicUploadLinkRoute
   '/api/public/whatsapp-webhook': typeof ApiPublicWhatsappWebhookRoute
   '/app/clients/$clientId': typeof AppClientsClientIdRoute
@@ -2181,6 +2208,9 @@ export interface FileRouteTypes {
     | '/api/public/razorpay-webhook'
     | '/api/public/tally-hello'
     | '/api/public/tally-ledger'
+    | '/api/public/tally-ledgers'
+    | '/api/public/tally-outbox'
+    | '/api/public/tally-result'
     | '/api/public/upload-link'
     | '/api/public/whatsapp-webhook'
     | '/app/clients/$clientId'
@@ -2392,6 +2422,9 @@ export interface FileRouteTypes {
     | '/api/public/razorpay-webhook'
     | '/api/public/tally-hello'
     | '/api/public/tally-ledger'
+    | '/api/public/tally-ledgers'
+    | '/api/public/tally-outbox'
+    | '/api/public/tally-result'
     | '/api/public/upload-link'
     | '/api/public/whatsapp-webhook'
     | '/app/clients/$clientId'
@@ -2613,6 +2646,9 @@ export interface FileRouteTypes {
     | '/api/public/razorpay-webhook'
     | '/api/public/tally-hello'
     | '/api/public/tally-ledger'
+    | '/api/public/tally-ledgers'
+    | '/api/public/tally-outbox'
+    | '/api/public/tally-result'
     | '/api/public/upload-link'
     | '/api/public/whatsapp-webhook'
     | '/app/clients/$clientId'
@@ -2757,6 +2793,9 @@ export interface RootRouteChildren {
   ApiPublicRazorpayWebhookRoute: typeof ApiPublicRazorpayWebhookRoute
   ApiPublicTallyHelloRoute: typeof ApiPublicTallyHelloRoute
   ApiPublicTallyLedgerRoute: typeof ApiPublicTallyLedgerRoute
+  ApiPublicTallyLedgersRoute: typeof ApiPublicTallyLedgersRoute
+  ApiPublicTallyOutboxRoute: typeof ApiPublicTallyOutboxRoute
+  ApiPublicTallyResultRoute: typeof ApiPublicTallyResultRoute
   ApiPublicUploadLinkRoute: typeof ApiPublicUploadLinkRoute
   ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
   SharedMisTokenRoute: typeof SharedMisTokenRoute
@@ -3555,6 +3594,27 @@ declare module '@tanstack/react-router' {
       path: '/api/public/tally-ledger'
       fullPath: '/api/public/tally-ledger'
       preLoaderRoute: typeof ApiPublicTallyLedgerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/tally-ledgers': {
+      id: '/api/public/tally-ledgers'
+      path: '/api/public/tally-ledgers'
+      fullPath: '/api/public/tally-ledgers'
+      preLoaderRoute: typeof ApiPublicTallyLedgersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/tally-outbox': {
+      id: '/api/public/tally-outbox'
+      path: '/api/public/tally-outbox'
+      fullPath: '/api/public/tally-outbox'
+      preLoaderRoute: typeof ApiPublicTallyOutboxRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/tally-result': {
+      id: '/api/public/tally-result'
+      path: '/api/public/tally-result'
+      fullPath: '/api/public/tally-result'
+      preLoaderRoute: typeof ApiPublicTallyResultRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/upload-link': {
@@ -4823,6 +4883,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicRazorpayWebhookRoute: ApiPublicRazorpayWebhookRoute,
   ApiPublicTallyHelloRoute: ApiPublicTallyHelloRoute,
   ApiPublicTallyLedgerRoute: ApiPublicTallyLedgerRoute,
+  ApiPublicTallyLedgersRoute: ApiPublicTallyLedgersRoute,
+  ApiPublicTallyOutboxRoute: ApiPublicTallyOutboxRoute,
+  ApiPublicTallyResultRoute: ApiPublicTallyResultRoute,
   ApiPublicUploadLinkRoute: ApiPublicUploadLinkRoute,
   ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,
   SharedMisTokenRoute: SharedMisTokenRoute,

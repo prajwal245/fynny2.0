@@ -21,6 +21,8 @@ import {
   type PlanKey,
 } from "@/lib/practice/billing/plans";
 import { CREDIT_PACKS, PLAN_CREDITS, TRIAL_CREDITS } from "@/lib/practice/billing/credits";
+import { PLAN_PAGES, PAGE_ROWS, TRIAL_PAGES } from "@/lib/practice/billing/pageCredits";
+import { PAGE_PACKS } from "@/lib/practice/tallyPricing";
 
 /* ================================================================
    FynHelp pricing (16 Oct 2026): per active client, unlimited users.
@@ -65,6 +67,17 @@ const STYLES = `
 .fh-chips { display:flex; flex-wrap:wrap; justify-content:center; gap:10px; margin-top:30px; }
 .fh-chip { background:${C.card}; border:1px solid ${C.line}; border-radius:999px; padding:8px 16px; font-size:13px; font-weight:500; color:${C.ink}; }
 
+.fh-packs { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:14px; margin-top:22px; }
+.fh-pack { background:${C.card}; border:1px solid ${C.line}; border-radius:18px; padding:20px 22px; transition:transform .25s cubic-bezier(.22,1,.36,1), box-shadow .25s; }
+.fh-pack:hover { transform:translateY(-3px); box-shadow:0 18px 36px -26px rgba(20,18,16,.35); }
+.fh-pack.best { border-color:${C.coral}; }
+.fh-pack b { display:block; font-size:19px; }
+.fh-pack .pp { font-size:26px; font-weight:600; margin:8px 0 2px; letter-spacing:-.02em; }
+.fh-pack small { color:${C.muted}; font-size:12.5px; display:block; }
+.fh-pack .tag { display:inline-block; font-size:11.5px; font-weight:600; color:${C.coral}; margin-bottom:6px; }
+.fh-topgroup { margin-top:34px; }
+.fh-topgroup h3 { font-size:19px; margin-bottom:4px !important; }
+@media (prefers-reduced-motion:reduce){ .fh-pack{ transition:none; } .fh-pack:hover{ transform:none; } }
 .fh-defs { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:34px; }
 @media (max-width:760px){ .fh-defs{ grid-template-columns:1fr; } }
 .fh-def { background:${C.card}; border:1px solid ${C.line}; border-radius:18px; padding:22px 24px; }
@@ -155,9 +168,9 @@ const gstNote = (cur: Currency) => (cur === "INR" ? `+ ${GST_PERCENT}% GST` : "+
 
 /** Features that differ between plans, shown on the cards. Only what works today. */
 const CARD_FEATURES: Record<PlanKey, string[]> = {
-  starter: ["Extraction, reconciliation and source-linked MIS", "Gmail intake and Chaser by email, no limit", `${PLAN_CREDITS.starter} WhatsApp reminder credits a month`, "MIS exports with a “Prepared with FynHelp” footer"],
-  professional: ["Everything in Essential", `${PLAN_CREDITS.professional} WhatsApp reminder credits a month`, "MIS exports in your firm’s name", "Help importing your clients"],
-  scale: ["Everything in Firm", `${PLAN_CREDITS.scale.toLocaleString("en-IN")} WhatsApp reminder credits a month`, "Priority WhatsApp support and a named contact", "Assisted import of up to 100 clients"],
+  starter: ["Extraction, reconciliation and source-linked MIS", "Gmail intake and Chaser by email, no limit", `${PLAN_CREDITS.starter} WhatsApp reminder credits a month`, `${PLAN_PAGES.starter} Tally posting pages a month`, "MIS exports with a “Prepared with FynHelp” footer"],
+  professional: ["Everything in Essential", `${PLAN_CREDITS.professional} WhatsApp reminder credits a month`, `${PLAN_PAGES.professional} Tally posting pages a month`, "MIS exports in your firm’s name", "Help importing your clients"],
+  scale: ["Everything in Firm", `${PLAN_CREDITS.scale.toLocaleString("en-IN")} WhatsApp reminder credits a month`, `${PLAN_PAGES.scale.toLocaleString("en-IN")} Tally posting pages a month`, "Priority WhatsApp support and a named contact", "Assisted import of up to 100 clients"],
 };
 
 type Cell = boolean | string | { soon: true };
@@ -169,6 +182,8 @@ const FEATURE_ROWS: [string, Cell, Cell, Cell][] = [
   ["Chaser by email", true, true, true],
   ["Chaser by WhatsApp (1 credit per reminder)", `${PLAN_CREDITS.starter} credits a month`, `${PLAN_CREDITS.professional} credits a month`, `${PLAN_CREDITS.scale.toLocaleString("en-IN")} credits a month`],
   ["Extra WhatsApp credits", "From ₹1 each", "From ₹1 each", "Down to ₹0.80 each"],
+  ["Post approved entries to Tally (1 page credit per page)", `${PLAN_PAGES.starter} pages a month`, `${PLAN_PAGES.professional} pages a month`, `${PLAN_PAGES.scale.toLocaleString("en-IN")} pages a month`],
+  ["Extra Tally posting pages", "From ₹1.70 each", "From ₹1.70 each", "As low as ₹0.85 each"],
   ["MIS exports (PDF and Excel)", "“Prepared with FynHelp” footer", "Firm branding", "Firm branding"],
   ["Shareable MIS links", { soon: true }, { soon: true }, { soon: true }],
   ["Team and branch permissions", false, false, { soon: true }],
@@ -198,6 +213,8 @@ export default function PricingPage() {
   const [helperClients, setHelperClients] = useState(30);
   const [roi, setRoi] = useState({ clients: 30, hours: 1.5, rate: 250, fee: 0 });
   const m = (n: number) => money(n, cur);
+  /** A price per page or per credit: kept to paise so ₹1.70 never reads as ₹2. */
+  const unit = (n: number) => (cur === "INR" ? `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `$${(n / INR_PER_USD).toFixed(3)}`);
 
   const helper = useMemo(() => {
     const n = Math.max(1, Math.min(2000, Math.round(helperClients || 1)));
@@ -329,6 +346,43 @@ export default function PricingPage() {
               <p>One uploaded file. A bank statement counts as one document however many lines it has; one invoice is one document. Past your pooled allowance, {m(OVERAGE_BLOCK_PRICE)} per {OVERAGE_BLOCK_DOCS} documents on the next invoice. Work is never blocked.</p>
             </div>
           </Reveal>
+        </div>
+      </Section>
+
+      {/* TOP-UPS */}
+      <Section kicker="Top-ups" title="Need more?" italic="Add credits any time." center>
+        <p className="fh-note" style={{ textAlign: "center", maxWidth: 640, margin: "0 auto" }}>
+          Every plan includes credits each month. If you use more, top up in two taps from Settings, Billing. Credits last 12 months, so a quiet month never wastes them.
+        </p>
+        <div className="fh-topgroup">
+          <h3>Tally posting pages</h3>
+          <p className="fh-note">
+            One page credit is one page of a document posted to Tally. A PDF counts its pages; an Excel or CSV file counts 1 page for every {PAGE_ROWS} lines. You approve every entry, and approving more lines from the same document costs nothing more. Every plan includes {PLAN_PAGES.starter.toLocaleString("en-IN")}, {PLAN_PAGES.professional.toLocaleString("en-IN")} or {PLAN_PAGES.scale.toLocaleString("en-IN")} pages a month; your free trial includes {TRIAL_PAGES}.
+          </p>
+          <div className="fh-packs">
+            {PAGE_PACKS.map((k) => (
+              <div key={k.key} className={`fh-pack${k.name === "Pro" ? " best" : ""}`}>
+                {k.name === "Pro" ? <span className="tag">Best value</span> : null}
+                <b>{k.pages.toLocaleString("en-IN")} pages</b>
+                <div className="pp">{m(k.price)}</div>
+                <small>{unit(k.perPage)} per page · {gstNote(cur)}</small>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="fh-topgroup">
+          <h3>WhatsApp reminder credits</h3>
+          <p className="fh-note">One credit sends one WhatsApp reminder from FynHelp's number. Email reminders are free.</p>
+          <div className="fh-packs">
+            {CREDIT_PACKS.map((k) => (
+              <div key={k.key} className={`fh-pack${k.tag === "Best value" ? " best" : ""}`}>
+                {k.tag ? <span className="tag">{k.tag}</span> : null}
+                <b>{k.credits.toLocaleString("en-IN")} credits</b>
+                <div className="pp">{m(k.price)}</div>
+                <small>{unit(k.price / k.credits)} per credit · {gstNote(cur)}</small>
+              </div>
+            ))}
+          </div>
         </div>
       </Section>
 

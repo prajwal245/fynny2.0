@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
  */
 import { ReactNode, CSSProperties, useEffect, useId, useRef, useState } from "react";
 import { motion, AnimatePresence, useIsPresent } from "framer-motion";
-import { X } from "lucide-react";
+import { Maximize2, Minimize2, X } from "lucide-react";
 import { LIQUID_BUTTON_CSS } from "@/lib/liquidButton";
 
 /** Palette: red #D92B2B and #8E1B1F, cream #EADBC8, ink #141210, mist #FAF7F2. Green and amber are for status only. */
@@ -313,8 +313,31 @@ function useOverlay(open: boolean, onClose: () => void) {
   return `overlay-${count.current}`;
 }
 
-export function Drawer({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
+const DRAWER_WIDE_KEY = "fh-drawer-wide";
+const readWide = () => {
+  try {
+    return window.localStorage.getItem(DRAWER_WIDE_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
+
+/** A side panel. With `expandable` it gets an Expand button that widens it for dense review work; the choice is remembered. */
+export function Drawer({ open, onClose, title, children, expandable }: { open: boolean; onClose: () => void; title: string; children: ReactNode; expandable?: boolean }) {
   const key = useOverlay(open, onClose);
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    if (open && expandable) setWide(readWide());
+  }, [open, expandable]);
+  const toggle = () =>
+    setWide((w) => {
+      try {
+        window.localStorage.setItem(DRAWER_WIDE_KEY, w ? "0" : "1");
+      } catch {
+        /* the choice just is not remembered */
+      }
+      return !w;
+    });
   return portal(
     <AnimatePresence>
       {open && (
@@ -333,11 +356,18 @@ export function Drawer({ open, onClose, title, children }: { open: boolean; onCl
             initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
             // No overshoot: a spring pushed the panel past the edge and clipped it for a moment.
             transition={{ type: "tween", duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
-            style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "min(560px, 100%)", background: V.card, boxShadow: "-24px 0 60px -40px rgba(0,0,0,.6)", display: "flex", flexDirection: "column", overflowX: "hidden", willChange: "transform" }}
+            style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: wide ? "min(1180px, 100%)" : "min(560px, 100%)", transition: "width .28s cubic-bezier(.22,1,.36,1)", background: V.card, boxShadow: "-24px 0 60px -40px rgba(0,0,0,.6)", display: "flex", flexDirection: "column", overflowX: "hidden", willChange: "transform" }}
           >
             <div style={{ padding: "18px 22px", borderBottom: `1px solid ${V.line}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-              <h3 style={{ fontSize: 16 }}>{title}</h3>
-              <IconButton label="Close" onClick={onClose}><X size={18} /></IconButton>
+              <h3 style={{ fontSize: 16, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</h3>
+              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                {expandable ? (
+                  <IconButton label={wide ? "Make the panel narrower" : "Expand the panel"} onClick={toggle}>
+                    {wide ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                  </IconButton>
+                ) : null}
+                <IconButton label="Close" onClick={onClose}><X size={18} /></IconButton>
+              </div>
             </div>
             <div style={{ padding: 22, overflowY: "auto", flex: 1 }}>{children}</div>
           </motion.aside>

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertTriangle,
   CheckCircle2,
+  Download,
   ExternalLink,
   FileText,
   Inbox,
@@ -25,6 +26,7 @@ import {
 } from "../ui";
 import { AgentStatusBadge, RowSkeleton } from "../agents";
 import { IntakePanel } from "../components/IntakePanel";
+import { TallyPosting } from "../components/TallyPosting";
 import { SourceIcon } from "../components/BrandIcons";
 import { Doc, useV2 } from "../store";
 import { BulkBar, SEL_STYLES, SelectAllHeader, SelectCell, useSelection } from "../components/Selection";
@@ -45,6 +47,60 @@ const clock = (iso: string) =>
   new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
 
 /** The status cell: what the Extract agent is doing with this file, honestly. */
+type DocRow = Doc["rows"][number];
+
+const rowMatches = (r: DocRow, q: string) => {
+  const t = q.trim().toLowerCase();
+  if (!t) return true;
+  return `${r.particulars} ${r.date} ${Math.abs(r.amount)} ${r.matchStatus ?? ""}`.toLowerCase().includes(t);
+};
+
+/** A spreadsheet reads a leading = + - @ as a formula: prefix those so file content can never run. */
+const csvCell = (v: string | number) => {
+  let t = String(v);
+  if (/^[=+\-@\t\r]/.test(t)) t = `'${t}`;
+  return /[",\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+};
+
+/** Totals, search and a CSV download for the rows read from a file. The totals are what an accountant checks against the statement. */
+function RowTools({ rows, name, query, setQuery }: { rows: DocRow[]; name: string; query: string; setQuery: (q: string) => void }) {
+  const money = (pred: (n: number) => boolean) => rows.filter((r) => pred(r.amount)).reduce((a, r) => a + r.amount, 0);
+  const inn = money((n) => n > 0);
+  const out = money((n) => n < 0);
+  const shown = rows.filter((r) => rowMatches(r, query)).length;
+  const download = () => {
+    const head = ["Date", "Particulars", "Amount (+ in, - out)", "Recon"];
+    const body = rows.map((r) => [r.date, r.particulars, r.amount.toFixed(2), r.matchStatus ?? ""].map(csvCell).join(","));
+    const blob = new Blob([[head.join(","), ...body].join("\r\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${name.replace(/\.[^.]+$/, "").replace(/[^\w.-]+/g, "_").slice(0, 60) || "rows"}-extracted.csv`;
+    a.click();
+    window.setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  };
+  const cell = (label: string, value: string, color?: string) => (
+    <div style={{ background: V.gray, borderRadius: 12, padding: "10px 12px", minWidth: 0 }}>
+      <div style={{ fontSize: 11.5, color: V.muted }}>{label}</div>
+      <div className="num" style={{ fontWeight: 600, fontSize: 15, color: color ?? V.ink, overflowWrap: "anywhere" }}>{value}</div>
+    </div>
+  );
+  return (
+    <div style={{ display: "grid", gap: 10 }} data-testid="row-tools">
+      <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))" }}>
+        {cell("Rows read", String(rows.length))}
+        {cell("Money in", formatINR(inn), V.green)}
+        {cell("Money out", formatINR(Math.abs(out)), V.maroon)}
+        {cell("Net", formatINR(inn + out))}
+      </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <input className="v2-input" style={{ flex: "1 1 200px", minWidth: 0 }} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search particulars, date or amount" aria-label="Search the extracted rows" />
+        <button className="v2-btn v2-btn-ghost" onClick={download}><Download size={15} /> Download CSV</button>
+      </div>
+      {query.trim() ? <div style={{ fontSize: 12.5, color: V.muted }}>Showing {shown} of {rows.length} rows</div> : null}
+    </div>
+  );
+}
+
 function DocStatus({ d }: { d: Doc }) {
   if (d.status === "Uploading")
     return <AgentStatusBadge agent="extract" active label="Uploading" />;
@@ -107,6 +163,7 @@ export default function DocumentsPage({
   } = useV2();
   const [tab, setTab] = useState("All");
   const [open, setOpen] = useState<string | null>(null);
+  const [rowQuery, setRowQuery] = useState("");
   const [uploadClient, setUploadClient] = useState(
     scopedClient ?? clients[0]?.id ?? "",
   );
@@ -175,6 +232,7 @@ export default function DocumentsPage({
 
   const openDoc = (d: Doc) => {
     setOpen(d.id);
+    setRowQuery("");
     // An unassigned arrival may carry a suggestion; it is only pre-selected, never filed.
     setAssign({ clientId: d.clientId || d.suggestedClientId || "", side: d.register ? "register" : (d.side ?? "") });
   };
@@ -485,6 +543,7 @@ export default function DocumentsPage({
         open={!!active}
         onClose={() => setOpen(null)}
         title={active?.name ?? ""}
+        expandable
       >
         {active && (
           <div style={{ display: "grid", gap: 18 }}>
@@ -696,6 +755,8 @@ export default function DocumentsPage({
                     : "No transactions were extracted from this file."}
               </p>
             ) : (
+              <>
+              <RowTools rows={active.rows} name={active.name} query={rowQuery} setQuery={setRowQuery} />
               <motion.table
                 className="v2-table"
                 initial={{ opacity: 0 }}
@@ -712,7 +773,7 @@ export default function DocumentsPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {active.rows.map((r, i) => (
+                  {active.rows.map((r, i) => ({ r, i })).filter(({ r }) => rowMatches(r, rowQuery)).map(({ r, i }) => (
                     <tr key={r.id ?? i} className={sel.has(rowKey(r, i)) ? "is-selected" : undefined}>
                       <SelectCell sel={sel} id={rowKey(r, i)} label={`${r.particulars.slice(0, 40)}, ${formatINR(r.amount)}`} />
                       <td className="num">{formatDate(r.date)}</td>
@@ -745,7 +806,9 @@ export default function DocumentsPage({
                   ))}
                 </tbody>
               </motion.table>
+              </>
             )}
+            {active.side === "bank" && active.clientId && active.status === "Parsed" && <TallyPosting clientId={active.clientId} />}
             <style>{BX_STYLES + SEL_STYLES}</style>
             <BulkBar sel={sel} total={active.rows.length} noun={pickedRows.length === 1 ? "transaction" : "transactions"} inDrawer>
               {active.side === "bank" && active.clientId

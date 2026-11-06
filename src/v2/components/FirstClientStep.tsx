@@ -35,44 +35,63 @@ function Field({ label, optional, hint, children, error }: { label: string; opti
 }
 
 
-/** Three cards: what kind of practice this is. Drives the wording everywhere and decides whether an ICAI number is asked. */
+const KIND_NOTE: Record<PracticeKind, string> = {
+  ca: "Close the month for the clients you serve. Needs your ICAI membership number.",
+  accounting: "Bookkeeping and accounting practices. No ICAI number needed.",
+  inhouse: "Close the books for your own company's entities. No ICAI number needed.",
+};
+
+/**
+ * Pick what kind of practice this is: three calm rows, one highlight that glides to the choice.
+ * Drives the wording everywhere and decides whether an ICAI number is asked.
+ * Arrow keys move between the rows (they are real radio buttons).
+ */
 export function KindPicker({ kind, setKind, legend }: { kind: PracticeKind; setKind: (k: PracticeKind) => void; legend: string }) {
   const reduce = useReducedMotion();
   const radioName = useId();
+  const group = useId();
   return (
-      <fieldset style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
-        <legend className="v2-label" style={{ marginBottom: 8 }}>{legend}</legend>
-        <div role="radiogroup" aria-label="Kind of practice" style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit,minmax(min(170px,100%),1fr))" }}>
-          {KINDS.map((o) => {
-            const on = o.value === kind;
-            return (
-              <label key={o.value} style={{ position: "relative", cursor: "pointer" }}>
-                <input type="radio" name={radioName} value={o.value} checked={on} onChange={() => setKind(o.value)} style={{ position: "absolute", opacity: 0, inset: 0 }} />
-                <motion.div
-                  animate={{ scale: on ? 1 : 0.985 }}
-                  whileHover={reduce ? undefined : { y: -2 }}
-                  transition={{ type: "spring", stiffness: 420, damping: 30 }}
-                  style={{ display: "grid", gridTemplateColumns: "auto minmax(0,1fr) auto", gap: 10, alignItems: "center", padding: "12px 14px", borderRadius: 14, border: `1.5px solid ${on ? V.coral : V.line}`, background: on ? V.blue : V.card, boxShadow: on ? "0 10px 24px -18px rgba(217,43,43,.6)" : "none" }}
-                >
-                  <o.icon size={19} color={on ? V.brandDeep : V.body} aria-hidden="true" />
-                  <span style={{ display: "grid", gap: 1, minWidth: 0 }}>
-                    <b style={{ fontSize: 13.5, color: V.ink }}>{o.label}</b>
-                    <span style={{ fontSize: 11.5, color: V.muted }}>{o.hint}</span>
-                  </span>
-                  <AnimatePresence>
-                    {on && (
-                      <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} style={{ width: 20, height: 20, borderRadius: 10, background: V.coral, color: "#fff", display: "grid", placeItems: "center" }}>
-                        <Check size={13} strokeWidth={3} />
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
-              </label>
-            );
-          })}
-        </div>
-      </fieldset>
-
+    <fieldset style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+      <legend className="v2-label" style={{ marginBottom: 10 }}>{legend}</legend>
+      <div role="radiogroup" aria-label={legend} style={{ display: "grid", gap: 8 }}>
+        {KINDS.map((o) => {
+          const on = o.value === kind;
+          return (
+            <label key={o.value} className="kp-row" data-on={on} style={{ position: "relative", display: "block", cursor: "pointer", borderRadius: 14 }}>
+              <input className="kp-input" type="radio" name={radioName} value={o.value} checked={on} onChange={() => setKind(o.value)} />
+              {on && (
+                <motion.span
+                  layoutId={`kp-hl-${group}`}
+                  aria-hidden="true"
+                  transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 40 }}
+                  style={{ position: "absolute", inset: 0, borderRadius: 14, border: `1.5px solid ${V.ink}`, background: V.card, boxShadow: "0 10px 28px -20px rgba(20,18,16,.55)" }}
+                />
+              )}
+              <span style={{ position: "relative", display: "grid", gridTemplateColumns: "40px minmax(0,1fr) auto", gap: 14, alignItems: "center", padding: "13px 16px" }}>
+                <span aria-hidden="true" style={{ width: 40, height: 40, borderRadius: 12, background: on ? V.ink : V.gray, color: on ? "#fff" : V.body, display: "grid", placeItems: "center", transition: "background .25s ease, color .25s ease" }}>
+                  <o.icon size={19} />
+                </span>
+                <span style={{ display: "grid", gap: 2, minWidth: 0 }}>
+                  <b style={{ fontSize: 14.5, color: V.ink, fontWeight: 600 }}>{o.label}</b>
+                  <span style={{ fontSize: 12.5, color: V.muted, lineHeight: 1.45 }}>{KIND_NOTE[o.value]}</span>
+                </span>
+                <span aria-hidden="true" style={{ width: 20, height: 20, borderRadius: 10, border: `1.5px solid ${on ? V.ink : "var(--v2-dash)"}`, display: "grid", placeItems: "center", transition: "border-color .2s ease" }}>
+                  <motion.span initial={false} animate={{ scale: on ? 1 : 0 }} transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 600, damping: 28 }} style={{ width: 10, height: 10, borderRadius: 5, background: V.ink }} />
+                </span>
+              </span>
+            </label>
+          );
+        })}
+      </div>
+      <style>{`
+        .kp-input { position:absolute; opacity:0; inset:0; width:100%; height:100%; margin:0; cursor:pointer; }
+        .kp-row { border:1px solid var(--v2-line); background:var(--v2-card); transition:border-color .2s ease, transform .2s ease; }
+        .kp-row:hover { border-color:var(--v2-dash); }
+        .kp-row[data-on="true"] { border-color:transparent; }
+        .kp-row:has(.kp-input:focus-visible) { outline:2px solid ${V.ink}; outline-offset:2px; }
+        @media (prefers-reduced-motion: no-preference) { .kp-row:active { transform:scale(.995); } }
+      `}</style>
+    </fieldset>
   );
 }
 

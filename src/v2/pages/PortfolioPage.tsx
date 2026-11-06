@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { PanelRight, PanelRightClose, Plus } from "lucide-react";
 import { Badge, Card, EmptyState, PageHeader, Stat, V, formatDate, Tone } from "../ui";
 import { AnimatedCounter } from "../agents";
-import { PinwheelCard } from "../components/MotionKit";
+import { GetStarted } from "../components/GetStarted";
 import { monthOf, useV2 } from "../store";
 import { CloseProgress } from "../components/CloseProgress";
 import { AgentActivity, AgentStrip, NeedsYou, SetupChecklist, TODAY_STYLES, agentSummary, greeting, useNeedsYou } from "../components/Today";
@@ -79,12 +79,7 @@ export default function PortfolioPage() {
       <AgentStrip live={live} last={lastRun} />
 
       {clients.length === 0 ? (
-        <PinwheelCard
-          title="Add your first client to get started"
-          action={<button className="v2-btn v2-btn-primary" onClick={() => setAdding(true)}><Plus size={15} /> Add client</button>}
-        >
-          Once a client is added, their documents, reconciliation exceptions and MIS reports appear here, and the agents take it from there.
-        </PinwheelCard>
+        <GetStarted onAdd={() => setAdding(true)} />
       ) : (
         <>
           <Card style={{ padding: 0, marginBottom: 18 }}>

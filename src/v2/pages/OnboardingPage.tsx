@@ -166,20 +166,15 @@ export default function OnboardingPage() {
     if (signupPage === 0) {
       if (!account.name.trim()) { toast.error("Tell us your name."); return; }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(account.email.trim())) { toast.error("Enter your work email, like you@firm.com."); return; }
+      if (account.password.length < PASSWORD_MIN) { toast.error(`Use a password of at least ${PASSWORD_MIN} characters.`); return; }
       setSignupPage(1);
-      return;
-    }
-    if (signupPage === 1) {
-      if (!parseMobile(account.phone)) { toast.error("Enter a valid mobile number, for example 98200 11223."); return; }
-      if (kind === "ca" && !cleanIcai(account.icai)) { toast.error("Enter your ICAI membership number: 5 or 6 digits, as on your membership card."); return; }
-      setSignupPage(2);
     }
   };
 
   const submitAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     // Enter on an early page moves on to the next page; only the last page creates the account.
-    if (mode === "signup" && signupPage < 2) { advanceSignup(); return; }
+    if (mode === "signup" && signupPage < 1) { advanceSignup(); return; }
     setBusy(true);
     const email = account.email.trim();
     try {
@@ -307,10 +302,10 @@ export default function OnboardingPage() {
     const created = addClient({ ...client, gstin: client.gstin.trim().toUpperCase() });
     setClientId(created.id);
     track("onboarding_step_completed", { step: "client", result: "added", kind });
-    next();
+    setStep(4);
   };
 
-  // Skipping is a normal path: no client means no document step, so go straight to the finish.
+  // Skipping is a normal path. Either way the next screen is the finish.
   const skipClient = () => {
     track("onboarding_step_completed", { step: "client", result: "skipped", kind });
     setStep(4);
@@ -339,9 +334,10 @@ export default function OnboardingPage() {
   };
 
   const clientName = client.name.trim() || "your client";
-  // One bar for the whole set-up: three short sign-up pages, then firm, client and first document.
-  const PROGRESS = ["Your details", "About you", "Password", "Your firm", "First client", "First document"];
-  const progress = step === 0 ? (mode === "signup" ? signupPage : -1) : step >= 4 ? PROGRESS.length : 2 + step;
+  // One bar for the whole set-up: two short sign-up pages, then firm and client. Uploading a first document happens in the client workspace.
+  const PROGRESS = ["Your details", "About you", "Your firm"];
+  // The client screen is an optional extra after the three steps, so the bar is already full there.
+  const progress = step === 0 ? (mode === "signup" ? signupPage : -1) : step === 1 ? 2 : PROGRESS.length;
 
   return (
     <div className="onb" data-step={step}>
@@ -370,17 +366,18 @@ export default function OnboardingPage() {
             transition={{ duration: 0.26, ease: "easeOut" }}
             className="onb-card"
           >
-            {progress >= 0 && step < 4 && (
+            {progress >= 0 && progress < PROGRESS.length && (
               <div className="onb-eyebrow">
                 Step {progress + 1} of {PROGRESS.length} · {PROGRESS[progress]}
               </div>
             )}
+            {step === 2 && <div className="onb-eyebrow">All set · One optional extra</div>}
 
             {step === 0 && (
               <form onSubmit={submitAccount} style={{ display: "grid", gap: 16 }} data-auth-mode={mode}>
                 <div>
                   <h1 className="onb-title">
-                    {mode === "signin" ? "Welcome back" : mode === "forgot" ? "Reset your password" : signupPage === 0 ? "Let's set up your practice" : signupPage === 1 ? "A little about you" : "Secure your account"}
+                    {mode === "signin" ? "Welcome back" : mode === "forgot" ? "Reset your password" : signupPage === 0 ? "Let's set up your practice" : "A little about you"}
                   </h1>
                   <p className="onb-sub">
                     {mode === "signin"
@@ -388,10 +385,8 @@ export default function OnboardingPage() {
                       : mode === "forgot"
                         ? "Enter your work email and we will send a link to set a new password."
                         : signupPage === 0
-                          ? "Four agents do the month-end work. You review and sign off. It takes about two minutes, with no card needed."
-                          : signupPage === 1
-                            ? (kind === "ca" ? "We check every CA's ICAI membership number. Your mobile is used only for alerts you ask for." : "Tell us how you work so FynHelp speaks your language. Your mobile is used only for alerts you ask for.")
-                            : "Choose a password. Next, you will name your firm."}
+                          ? "Four agents do the month-end work. You review and sign off. About a minute, no card needed."
+                          : kind === "ca" ? "We check every CA's ICAI membership number. Your mobile is used only for alerts you ask for." : "Tell us how you work so FynHelp speaks your language. Your mobile is used only for alerts you ask for."}
                   </p>
                 </div>
                 {expired && mode === "signin" && (
@@ -424,7 +419,7 @@ export default function OnboardingPage() {
                   </>
                 )}
                 {(mode !== "signup" || signupPage === 0) && <Field label="Work email"><input className="v2-input" type="email" required autoFocus={mode !== "signup"} autoComplete="email" value={account.email} onChange={(e) => setAccount({ ...account, email: e.target.value })} placeholder="you@firm.com" /></Field>}
-                {mode !== "forgot" && (mode !== "signup" || signupPage === 2) && (
+                {mode !== "forgot" && (mode !== "signup" || signupPage === 0) && (
                   <Field
                     label="Password"
                     aside={mode === "signin" ? <button type="button" className="v2-link" style={{ fontSize: 12 }} onClick={() => setMode("forgot")}>Forgot password?</button> : undefined}
@@ -445,8 +440,8 @@ export default function OnboardingPage() {
                   {mode === "signup" && signupPage > 0 && (
                     <button className="v2-btn v2-btn-ghost v2-btn-lg" type="button" onClick={() => setSignupPage((p) => Math.max(0, p - 1))} disabled={busy}>Back</button>
                   )}
-                  <button className="v2-btn v2-btn-primary v2-btn-lg v2-btn-block" style={{ flex: 1 }} type="submit" data-busy={busy} disabled={busy || (mode === "signup" && signupPage === 2 && otp.sent && otp.code.length !== 6)} data-testid="account-continue">
-                    {mode === "signin" ? "Sign in" : mode === "forgot" ? "Send reset link" : signupPage < 2 ? "Continue" : otp.sent ? "Verify and create account" : "Create account"}
+                  <button className="v2-btn v2-btn-primary v2-btn-lg v2-btn-block" style={{ flex: 1 }} type="submit" data-busy={busy} disabled={busy || (mode === "signup" && signupPage === 1 && otp.sent && otp.code.length !== 6)} data-testid="account-continue">
+                    {mode === "signin" ? "Sign in" : mode === "forgot" ? "Send reset link" : signupPage < 1 ? "Continue" : otp.sent ? "Verify and create account" : "Create account"}
                   </button>
                 </div>
                 <p className="onb-foot" style={{ textAlign: "center" }}>
@@ -458,7 +453,7 @@ export default function OnboardingPage() {
                     <>New to FynHelp? <button type="button" className="v2-link" onClick={() => setMode("signup")}>Create an account</button></>
                   )}
                 </p>
-                {mode === "signup" && signupPage === 2 && (
+                {mode === "signup" && signupPage === 1 && (
                   <p className="onb-foot" style={{ textAlign: "center", marginTop: -6 }}>
                     Free trial: 14 days from your first upload. No card needed. By creating an account you agree to the{" "}
                     <a className="v2-link" href="/terms" target="_blank" rel="noreferrer">Terms</a> and{" "}
@@ -470,20 +465,25 @@ export default function OnboardingPage() {
 
             {step === 1 && (
               <form onSubmit={submitFirm} style={{ display: "grid", gap: 16 }}>
-                <Intro icon={<Building2 size={20} />} title="Set up your firm" text="Your firm's name goes on every MIS and every message the Chaser sends." />
-                <Field label="Firm name"><input className="v2-input" required autoFocus value={firmForm.name} onChange={(e) => setFirmForm({ ...firmForm, name: e.target.value })} placeholder="Mehta and Associates" /></Field>
+                <Intro icon={<Building2 size={20} />} title={kind === "inhouse" ? "Name your company" : "Name your firm"} text={kind === "inhouse" ? "This name goes on every report FynHelp prepares for your team." : "Your firm's name goes on every MIS and every message the Chaser sends. Everything else can wait."} />
+                <Field label={kind === "inhouse" ? "Company name" : "Firm name"}><input className="v2-input" required autoFocus value={firmForm.name} onChange={(e) => setFirmForm({ ...firmForm, name: e.target.value })} placeholder={kind === "inhouse" ? "Acme India Pvt Ltd" : "Mehta and Associates"} /></Field>
                 {!parseMobile(account.phone) && (
                   <Field label="Your mobile number" hint={MOBILE_HINT}>
                     <input className="v2-input" type="tel" inputMode="tel" required autoComplete="tel" value={firmForm.phone} onChange={(e) => setFirmForm({ ...firmForm, phone: e.target.value })} placeholder="98200 11223" />
                   </Field>
                 )}
+                <details className="onb-more">
+                  <summary>More details <span>(optional: city, registration number, referral code)</span></summary>
+                  <div style={{ marginTop: 14 }}>
                 <div className="onb-2col">
-                  <Field label="City" optional><input className="v2-input" value={firmForm.city} onChange={(e) => setFirmForm({ ...firmForm, city: e.target.value })} placeholder="Bengaluru" /></Field>
-                  <Field label="Firm registration number" optional><input className="v2-input" value={firmForm.frn} onChange={(e) => setFirmForm({ ...firmForm, frn: e.target.value })} placeholder="012345S" /></Field>
-                  <Field label="Referral code" optional><input className="v2-input" value={firmForm.ref} onChange={(e) => setFirmForm({ ...firmForm, ref: e.target.value.toUpperCase() })} placeholder="FHXXXXXX" autoComplete="off" /></Field>
-                </div>
+                      <Field label="City" optional><input className="v2-input" value={firmForm.city} onChange={(e) => setFirmForm({ ...firmForm, city: e.target.value })} placeholder="Bengaluru" /></Field>
+                      <Field label="Firm registration number" optional><input className="v2-input" value={firmForm.frn} onChange={(e) => setFirmForm({ ...firmForm, frn: e.target.value })} placeholder="012345S" /></Field>
+                      <Field label="Referral code" optional><input className="v2-input" value={firmForm.ref} onChange={(e) => setFirmForm({ ...firmForm, ref: e.target.value.toUpperCase() })} placeholder="FHXXXXXX" autoComplete="off" /></Field>
+                    </div>
+                  </div>
+                </details>
                 <Actions>
-                  <button className="v2-btn v2-btn-primary" type="submit" data-busy={busy} disabled={busy}>Create firm <ArrowRight size={15} /></button>
+                  <button className="v2-btn v2-btn-primary v2-btn-lg" type="submit" data-busy={busy} disabled={busy}>Continue <ArrowRight size={15} /></button>
                 </Actions>
               </form>
             )}

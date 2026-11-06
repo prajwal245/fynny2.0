@@ -28,7 +28,9 @@ import {
   rowsFromTable,
   isTallyLedger,
 } from "./table";
-import { isTallyXml, rowsFromTally } from "./tally";
+import { isTallyXml, readTally } from "./tally";
+import { TALLY_XML_NO_VOUCHERS, unsupportedReport } from "./unsupported";
+import { passwordNeededMessage, passwordWrongMessage, type ProtectedKind } from "../passwordFile";
 import { detectRegister, summariseRegister, type RegisterSummary } from "./registers";
 import { rowsFromStatementText } from "./textStatement";
 
@@ -114,12 +116,18 @@ export interface ExtractOutcome {
   register?: RegisterSummary | null;
   /** The side the content shows, when it overrides the one asked for (a Tally ledger named "bank…"). */
   side?: Side;
+  /** What was left out of the rows and why (non-bank vouchers, cancelled vouchers), for the activity log. */
+  note?: string;
   error: { code: string; message: string } | null;
 }
 
 export class PdfPasswordError extends Error {
-  constructor() {
-    super("PDF is password protected");
+  constructor(
+    /** "needed": no password was given. "wrong": one was given and did not open the file. */
+    public readonly reason: "needed" | "wrong" = "needed",
+    public readonly what: ProtectedKind = "PDF",
+  ) {
+    super(`${what} is password protected`);
     this.name = "PdfPasswordError";
   }
 }
@@ -420,6 +428,7 @@ export async function runExtract(
   let parsed: ExtractedRow[] | null = null;
   let sourceText = "";
   let documentKind: string | null = null;
+  let note = "";
   let aiReadUsed = false;
 
   if (kind === "unsupported") {
@@ -446,6 +455,8 @@ export async function runExtract(
   if (kind === "csv") {
     sourceText = decodeText(input.bytes);
     const table = parseDelimited(sourceText);
+    const unsupported = unsupportedReport(table);
+    if (unsupported) return fail(kind, "unsupported_report", unsupported);
     const reg = asRegister(table);
     if (reg) return reg;
     if (input.side !== "books" && isTallyLedger(table)) input = { ...input, side: "books" };
@@ -461,17 +472,22 @@ export async function runExtract(
     let rows: string[][];
     try {
       rows = deps.sheetRows(input.bytes);
-    } catch {
+    } catch (e) {
+      // A locked workbook is opened before this point (see unlockWorkbook); this catches a damaged or unsupported file.
+      if (e instanceof PdfPasswordError)
+        return fail(kind, e.reason === "wrong" ? "password_wrong" : "password_protected", e.reason === "wrong" ? passwordWrongMessage("Excel file") : passwordNeededMessage("Excel file"));
       return fail(
         kind,
         "unreadable",
-        "The Excel file could not be opened. It may be password protected or damaged.",
+        "The Excel file could not be opened. It may be damaged. Save it again from Excel, or export it as CSV.",
       );
     }
     sourceText = rows
       .slice(0, 2000)
       .map((r) => r.join(", "))
       .join("\n");
+    const unsupported = unsupportedReport(rows);
+    if (unsupported) return fail(kind, "unsupported_report", unsupported);
     const reg = asRegister(rows);
     if (reg) return reg;
     if (input.side !== "books" && isTallyLedger(rows)) input = { ...input, side: "books" };
@@ -480,7 +496,14 @@ export async function runExtract(
   } else if (kind === "tally_xml") {
     sourceText = decodeText(input.bytes);
     try {
-      parsed = rowsFromTally(sourceText);
+      const read = readTally(sourceText);
+      if (read.vouchers === 0) return fail(kind, "no_vouchers", TALLY_XML_NO_VOUCHERS);
+      parsed = read.rows;
+      const left = [
+        read.skippedNonBank ? `${read.skippedNonBank} sales, purchase or journal voucher${read.skippedNonBank === 1 ? "" : "s"} with no bank or cash entry were left out of bank reconciliation` : "",
+        read.skippedCancelled ? `${read.skippedCancelled} cancelled or optional voucher${read.skippedCancelled === 1 ? "" : "s"} were skipped` : "",
+      ].filter(Boolean);
+      if (left.length) note = left.join("; ") + ".";
     } catch (e) {
       return fail(
         kind,
@@ -498,8 +521,8 @@ export async function runExtract(
         if (e instanceof PdfPasswordError)
           return fail(
             kind,
-            "password_protected",
-            "This PDF is password protected. Ask the client for an unlocked copy or the password.",
+            e.reason === "wrong" ? "password_wrong" : "password_protected",
+            e.reason === "wrong" ? passwordWrongMessage("PDF") : passwordNeededMessage("PDF"),
           );
         // A real PDF opens even when it is a scan; one that cannot be opened is damaged.
         return fail(
@@ -689,6 +712,7 @@ export async function runExtract(
     aiCalls: calls,
     documentKind,
     side: input.side,
+    ...(note ? { note } : {}),
     error: null,
   };
 }

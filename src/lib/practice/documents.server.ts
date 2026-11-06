@@ -26,7 +26,9 @@ import {
   runExtract,
   type AiCallRecord,
 } from "./extract/pipeline";
-import { loadSheetReader, pdfText } from "./files.server";
+import { loadSheetReader, pdfText, unlockWorkbook } from "./files.server";
+import { PdfPasswordError } from "./extract/pipeline";
+import { passwordNeededMessage, passwordWrongMessage } from "./passwordFile";
 import { practiceLlm, withinAiCap } from "./llm.server";
 import { practiceOcr } from "./ocr.server";
 import { applyMemory } from "./memory";
@@ -203,7 +205,7 @@ async function logAiCalls(
 export async function processExtraction(
   db: Db,
   extractionId: string,
-  opts: { trigger?: RunTrigger; userId?: string | null } = {},
+  opts: { trigger?: RunTrigger; userId?: string | null; /** Opens a locked PDF or Excel file for this one read. Never stored or logged. */ password?: string } = {},
 ): Promise<{
   status: string;
   txns: number;
@@ -345,9 +347,20 @@ export async function processExtraction(
         .limit(1)
         .maybeSingle()
     : { data: null };
+  // A locked workbook is opened here (the spreadsheet reader cannot decrypt); a locked PDF is opened by pdfText below.
+  let readBytes = bytes;
+  if (kind === "xlsx") {
+    try {
+      readBytes = await unlockWorkbook(bytes, opts.password);
+    } catch (e) {
+      if (e instanceof PdfPasswordError)
+        return failWith(e.reason === "wrong" ? passwordWrongMessage(e.what) : passwordNeededMessage(e.what), e.reason === "wrong" ? "password_wrong" : "password_protected");
+      throw e;
+    }
+  }
   const outcome = await runExtract(
     {
-      bytes,
+      bytes: readBytes,
       filename,
       mime: null,
       side,
@@ -358,7 +371,7 @@ export async function processExtraction(
     {
       llm: (await withinAiCap(db, doc.ca_firm_id)) ? practiceLlm() : null,
       ocr: practiceOcr(),
-      pdfText,
+      pdfText: (b) => pdfText(b, opts.password),
       sheetRows: kind === "xlsx" ? await loadSheetReader() : undefined,
     },
   );
@@ -572,7 +585,7 @@ export async function processExtraction(
     doc.ca_firm_id,
     doc.business_id,
     "extract",
-    `${parts.join(", ")}.`,
+    `${parts.join(", ")}.${outcome.note ? ` ${outcome.note}` : ""}`,
   );
 
   if (doc.business_id) await autoResolveChases(db, { ...doc, side }, filename);

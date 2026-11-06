@@ -19,7 +19,10 @@ import { useV2 } from "../store";
 type Connector = Awaited<ReturnType<typeof tallyConnectors>>[number];
 const errMsg = (e: unknown) => (e instanceof Error && e.message ? e.message : "Something went wrong. Please try again.");
 
-export function TallyConnector({ onChange }: { onChange?: (anyOnline: boolean) => void }) {
+/** none: no connector online. connected: online but no books have arrived. active: books have arrived. */
+export type TallyLink = "none" | "connected" | "active";
+
+export function TallyConnector({ onChange }: { onChange?: (state: TallyLink) => void }) {
   const { clients, canSignOff } = useV2();
   const [list, setList] = useState<Connector[] | null>(null);
   const [name, setName] = useState("");
@@ -30,7 +33,8 @@ export function TallyConnector({ onChange }: { onChange?: (anyOnline: boolean) =
     try {
       const l = await tallyConnectors();
       setList(l);
-      onChange?.(l.some((c) => c.online));
+      const online = l.filter((c) => c.online);
+      onChange?.(!online.length ? "none" : online.some((c) => c.companies.some((co) => co.last_synced_at)) ? "active" : "connected");
     } catch (e) {
       toast.error(errMsg(e));
     }
@@ -63,7 +67,7 @@ export function TallyConnector({ onChange }: { onChange?: (anyOnline: boolean) =
       <div style={{ fontWeight: 600, fontSize: 13.5 }}>Live connection</div>
       <div style={{ fontSize: 12.5, color: V.body, lineHeight: 1.6 }}>
         Install the FynHelp Connector on the PC where TallyPrime is open. It reads Tally on that PC and sends each month's Day Book to FynHelp over the internet.
-        Nothing is installed in Tally, no port is opened to the internet, and FynHelp never writes to Tally.
+        Nothing is installed in Tally and no port is opened to the internet. Reading is automatic. Writing approved entries into Tally is off until the person at that PC turns it on in the connector's settings, and FynHelp only writes lines your team has approved.
       </div>
 
       {fresh && (
@@ -75,9 +79,14 @@ export function TallyConnector({ onChange }: { onChange?: (anyOnline: boolean) =
           </div>
           <ol style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
             <li>In TallyPrime press <span className="num">F1 (Help) → Settings → Connectivity → Client/Server configuration</span> and set <b>TallyPrime acts as: Both</b> on port <span className="num">9000</span>.</li>
-            <li>On the same PC, <a href="/downloads/fynhelp-tally-connector.mjs" download style={{ color: V.maroon, fontWeight: 600 }}>download the connector</a> and install Node.js 18 or later from nodejs.org.</li>
-            <li>Create a file <span className="num">fynhelp-connector.json</span> next to it with the token above, then run <span className="num">node fynhelp-tally-connector.mjs</span>. The steps are at the top of the file.</li>
+            <li>On that PC, <a href="/downloads/fynhelp-connector-setup.cmd" download style={{ color: V.maroon, fontWeight: 600 }}>download the setup</a> and double-click it. It installs what is needed, asks for the token above, tests the connection and starts the connector by itself.</li>
           </ol>
+          <details style={{ fontSize: 12.5, color: V.body }}>
+            <summary style={{ cursor: "pointer" }}>Set it up by hand instead</summary>
+            <div style={{ marginTop: 6, lineHeight: 1.7 }}>
+              <a href="/downloads/fynhelp-tally-connector.mjs" download style={{ color: V.maroon, fontWeight: 600 }}>Download the connector</a>, install Node.js 18 or later from nodejs.org, create <span className="num">fynhelp-connector.json</span> next to it with the token, then run <span className="num">node fynhelp-tally-connector.mjs</span>. The steps are at the top of the file.
+            </div>
+          </details>
           <div><button className="v2-btn v2-btn-ghost" onClick={() => setFresh(null)}>I have saved the token</button></div>
         </div>
       )}
@@ -111,7 +120,11 @@ export function TallyConnector({ onChange }: { onChange?: (anyOnline: boolean) =
             </div>
             {c.last_error && <div style={{ fontSize: 12.5, color: V.maroon }}>Connector says: {c.last_error}</div>}
             {c.companies.length === 0 ? (
-              <div style={{ fontSize: 12.5, color: V.muted }}>No Tally companies reported yet. Open a company in TallyPrime on that PC.</div>
+              <div style={{ fontSize: 12.5, color: V.muted, lineHeight: 1.6 }}>
+                {c.online
+                  ? `Connected${c.last_seen_at ? ` (last check-in ${formatDate(c.last_seen_at)})` : ""}, but no Tally companies have been reported yet. In TallyPrime, check that Client/Server is set to Both on port 9000 and that a company is loaded. If it already is, update the connector to the latest version and read the message in its window.`
+                  : "No Tally companies reported yet. Start the connector on the PC where TallyPrime is open."}
+              </div>
             ) : (
               <div style={{ display: "grid", gap: 6 }}>
                 {c.companies.map((co) => (

@@ -4,7 +4,7 @@
  * from the agents' stored output.
  */
 import { parsePeriod, signedAmount } from "./core";
-import { clientMeta, type Db, type FirmContext } from "./db.server";
+import { clientMeta, fetchAll, type Db, type FirmContext } from "./db.server";
 import { decisionPattern } from "./memory";
 import { REASON_LABELS, type ReasonCode } from "./recon/engine";
 
@@ -13,7 +13,9 @@ const DOC_LIMIT = 300;
 const STUCK_MS = 90 * 1000;
 export const STUCK_READ_MESSAGE =
   "Reading this file took too long and was stopped. Press Retry to read it again; if it stops again, send the file as CSV or Excel.";
-const ROWS_PER_DOC = 200;
+/** Lines kept per document on screen. Reconciliation always uses every line; a file longer than this says so (rowsTruncated). */
+const ROWS_PER_DOC = 2000;
+const DOCS_PER_BATCH = 10;
 
 type Source = "Manual" | "Gmail" | "WhatsApp" | "Zoho Books" | "Tally";
 
@@ -186,22 +188,37 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       reference: string | null;
     }[]
   >();
-  // All batches at once: one round trip instead of one per 50 documents.
+  // Batches of a few documents, each read in pages (a response is capped at 1,000 rows), so a full-year ledger is not cut at the first page.
   const batches = await Promise.all(
-    Array.from({ length: Math.ceil(docIds.length / 50) }, (_, k) => k * 50).map((i) =>
-      db
-      .from("ca_txns")
-      .select(
-        "id, extraction_id, txn_date, description, counterparty, reference, amount, direction, side, match_status, row_index",
-      )
-      .in("extraction_id", docIds.slice(i, i + 50))
-      .order("txn_date")
-      .order("row_index")
-      .limit(ROWS_PER_DOC * 50),
+    Array.from({ length: Math.ceil(docIds.length / DOCS_PER_BATCH) }, (_, k) => k * DOCS_PER_BATCH).map((i) =>
+      fetchAll<{
+        id: string;
+        extraction_id: string;
+        txn_date: string;
+        description: string | null;
+        counterparty: string | null;
+        reference: string | null;
+        amount: number | string;
+        direction: "in" | "out";
+        side: string;
+        match_status: string;
+        row_index: number | null;
+      }>(
+        (from, to) =>
+          db
+            .from("ca_txns")
+            .select("id, extraction_id, txn_date, description, counterparty, reference, amount, direction, side, match_status, row_index")
+            .in("extraction_id", docIds.slice(i, i + DOCS_PER_BATCH))
+            .order("extraction_id")
+            .order("txn_date")
+            .order("row_index")
+            .range(from, to),
+        ROWS_PER_DOC * DOCS_PER_BATCH,
+      ),
     ),
   );
-  for (const { data } of batches) {
-    for (const t of data ?? []) {
+  for (const data of batches) {
+    for (const t of data) {
       const list =
         txnsByDoc.get(t.extraction_id) ??
         txnsByDoc.set(t.extraction_id, []).get(t.extraction_id)!;
@@ -287,6 +304,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
         (r.source_metadata as { suggested_by?: string | null } | null)
           ?.suggested_by ?? undefined,
       txnCount: r.txn_count ?? rows.length,
+      rowsTruncated: (r.txn_count ?? 0) > rows.length,
       reviewCount: r.review_count ?? 0,
       duplicateCount: r.duplicate_count ?? 0,
       sender:

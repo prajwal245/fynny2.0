@@ -77,10 +77,30 @@ export function isTallyXml(text: string): boolean {
   );
 }
 
+/** Voucher types that move no money through the bank or cash: they are not bank-reconciliation lines. */
+const NON_BANK_TYPES = new Set(["sales", "purchase", "journal", "credit note", "debit note", "memorandum", "rejections out", "rejections in"]);
+
+export interface TallyRead {
+  rows: ExtractedRow[];
+  /** Vouchers read but left out of bank reconciliation because no bank or cash ledger is in them (sales, purchase, journal...). */
+  skippedNonBank: number;
+  /** Cancelled and optional vouchers. */
+  skippedCancelled: number;
+  /** Every voucher found in the file, kept or not. */
+  vouchers: number;
+}
+
 export function rowsFromTally(xml: string): ExtractedRow[] {
+  return readTally(xml).rows;
+}
+
+/** Like rowsFromTally, and also says what was left out and why, so the screen can tell the person. */
+export function readTally(xml: string): TallyRead {
   const doc = parseXml(xml);
   const vouchers = findAll(doc, "VOUCHER");
   const out: ExtractedRow[] = [];
+  let skippedNonBank = 0;
+  let skippedCancelled = 0;
   vouchers.forEach((v, idx) => {
     const vtype = (
       childText(v, "VOUCHERTYPENAME") ||
@@ -99,7 +119,10 @@ export function rowsFromTally(xml: string): ExtractedRow[] {
     const cancelled =
       /^yes$/i.test(childText(v, "ISCANCELLED")) ||
       /^yes$/i.test(childText(v, "ISOPTIONAL"));
-    if (cancelled) return;
+    if (cancelled) {
+      skippedCancelled++;
+      return;
+    }
 
     const issues: string[] = [];
     let confidence = 0.95;
@@ -110,6 +133,12 @@ export function rowsFromTally(xml: string): ExtractedRow[] {
     const partyEntry = party
       ? entries.find((e) => e.ledger === party)
       : undefined;
+    // A Day Book also holds sales, purchases and journals. With no bank or cash leg they are not bank
+    // movements, so they stay out of bank reconciliation instead of showing up as unmatched items.
+    if (!bankEntry && NON_BANK_TYPES.has(vtype.toLowerCase())) {
+      skippedNonBank++;
+      return;
+    }
     const pick =
       bankEntry ??
       partyEntry ??
@@ -169,5 +198,5 @@ export function rowsFromTally(xml: string): ExtractedRow[] {
       parse_issues: issues,
     });
   });
-  return out;
+  return { rows: out, skippedNonBank, skippedCancelled, vouchers: vouchers.length };
 }

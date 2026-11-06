@@ -50,24 +50,32 @@ export async function hello(
 ) {
   const names = cleanCompanyNames(body.companies);
   const now = new Date();
+  let problem = typeof body.error === "string" && body.error ? body.error.slice(0, 300) : null;
+  if (names.length) {
+    const { error } = await db
+      .from("ca_tally_companies")
+      .upsert(names.map((company_name) => ({ ca_firm_id: c.ca_firm_id, connector_id: c.id, company_name })), {
+        onConflict: "connector_id,company_name",
+        ignoreDuplicates: true,
+      });
+    // Never swallow this: a failed save here is why "No Tally companies reported yet" can show while Tally has three open.
+    if (error) {
+      console.error(`[tally] could not save companies for connector ${c.id}: ${error.message}`);
+      problem = `FynHelp could not save the ${names.length} compan${names.length === 1 ? "y" : "ies"} Tally reported. Tell FynHelp support. (${error.message.slice(0, 120)})`;
+    }
+  } else if (!problem) {
+    problem = "The connector checked in, but TallyPrime listed no companies.";
+  }
   await db
     .from("ca_tally_connectors")
     .update({
       last_seen_at: now.toISOString(),
       agent_version: typeof body.version === "string" ? body.version.slice(0, 40) : null,
       host_name: typeof body.host === "string" ? body.host.slice(0, 80) : null,
-      last_error: typeof body.error === "string" && body.error ? body.error.slice(0, 300) : null,
+      last_error: problem,
       sync_requested_at: null,
     })
     .eq("id", c.id);
-  if (names.length) {
-    await db
-      .from("ca_tally_companies")
-      .upsert(names.map((company_name) => ({ ca_firm_id: c.ca_firm_id, connector_id: c.id, company_name })), {
-        onConflict: "connector_id,company_name",
-        ignoreDuplicates: true,
-      });
-  }
   const { data: rows } = await db
     .from("ca_tally_companies")
     .select("company_name, business_id, last_synced_at")

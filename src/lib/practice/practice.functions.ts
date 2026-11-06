@@ -210,6 +210,32 @@ export const reprocessPracticeDocument = createServerFn({ method: "POST" })
     }),
   );
 
+/**
+ * Opens a password-protected PDF or Excel file with the password the person typed, and reads it. The password is used for this
+ * one read in memory: it is not saved, not logged, and not sent to the AI. Tries are limited per document.
+ */
+export const unlockPracticeDocument = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: uuid, password: z.string().min(1).max(128) }).parse(d))
+  .handler(async ({ data, context }) =>
+    withWork(context.userId, async (db, ctx) => {
+      const { data: doc } = await db
+        .from("ca_document_extractions")
+        .select("id")
+        .eq("id", data.id)
+        .eq("ca_firm_id", ctx.firmId)
+        .maybeSingle();
+      if (!doc) throw new Error("Document not found.");
+      const { enforceRateLimit, POLICIES } = await import("@/lib/rateLimit.server");
+      await enforceRateLimit(POLICIES.passwordTry, `${ctx.firmId}:${data.id}`, "Too many password tries for this file. Wait a while, or ask the sender for an unlocked copy.");
+      await db
+        .from("ca_document_extractions")
+        .update({ extract_status: "queued", extract_attempts: 0, extract_next_attempt_at: null })
+        .eq("id", data.id);
+      return (await import("./documents.server")).processExtraction(db, data.id, { trigger: "user", userId: ctx.userId, password: data.password });
+    }),
+  );
+
 export const assignPracticeDocument = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) =>

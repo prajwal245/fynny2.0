@@ -41,6 +41,8 @@ export const POLICIES = {
   otpVerify: { name: "otp_verify", limit: 8, windowSec: 600 },
   /** Anonymous forms (waitlist, callbacks), per address. */
   anonForm: { name: "anon_form", limit: 20, windowSec: 3600 },
+  /** Tries at a locked file's password: per firm and document, so a password cannot be guessed. */
+  passwordTry: { name: "password_try", limit: 12, windowSec: 3600 },
   /** No-login upload links: per address and per link. */
   uploadIp: { name: "upload_ip", limit: 60, windowSec: 600 },
   uploadToken: { name: "upload_token", limit: 40, windowSec: 600 },

@@ -31,6 +31,7 @@ import {
   getPracticeDocumentUrl,
   getPracticeWorkspace,
   reprocessPracticeDocument,
+  unlockPracticeDocument,
   registerPracticeUpload,
   requestPracticeReportCorrection,
   markPracticeReportCorrected,
@@ -93,6 +94,8 @@ export type Doc = {
   kind?: string;
   error?: string;
   txnCount?: number;
+  /** The file has more lines than are shown here. Reconciliation still uses all of them. */
+  rowsTruncated?: boolean;
   reviewCount?: number;
   duplicateCount?: number;
   sender?: string;
@@ -392,6 +395,8 @@ type Store = {
   firmIdReady: () => Promise<string | null>;
   /** Re-run the Extract agent on a document (retry after a failure). */
   reprocessDoc: (id: string) => Promise<void>;
+  /** Opens a password-protected PDF or Excel file with the password typed, and reads it. Resolves ok, or why not. */
+  unlockDoc: (id: string, password: string) => Promise<{ ok: true } | { ok: false; message: string }>;
   /** File an unassigned document under a client (and bank/books side); it is re-extracted. */
   assignDoc: (
     id: string,
@@ -1219,6 +1224,23 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
     [refresh, track, isRunning, docs],
   );
 
+  const unlockDoc = useCallback(
+    async (id: string, password: string): Promise<{ ok: true } | { ok: false; message: string }> => {
+      setDocs((p) => p.map((d) => (d.id === id ? { ...d, status: "Processing", error: undefined, retryAt: undefined } : d)));
+      try {
+        const r = await unlockPracticeDocument({ data: { id, password } });
+        if (r.status === "failed") return { ok: false, message: r.error ?? "The file could not be opened." };
+        toast.success(`Opened and read: ${r.txns} transaction${r.txns === 1 ? "" : "s"}${r.review ? `, ${r.review} sent to the Review Queue` : ""}.`);
+        return { ok: true };
+      } catch (e) {
+        return { ok: false, message: errMsg(e) };
+      } finally {
+        void refresh();
+      }
+    },
+    [refresh],
+  );
+
   const assignDoc = useCallback(
     async (id: string, clientId: string, side?: "bank" | "books") => {
       setDocs((p) =>
@@ -1260,6 +1282,14 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
 
   const resolveReview = useCallback(
     (id: string, status: "confirmed" | "discarded", patch?: Txn) => {
+      // A line with no readable date is never a transaction (often a detail or total line from Tally): do not let it into the books.
+      if (status === "confirmed") {
+        const item = review.find((r) => r.id === id);
+        if (!(patch ?? item?.suggestion)?.date) {
+          toast.error("This line has no readable date, so it cannot be confirmed. Add the date, or discard the line.");
+          return;
+        }
+      }
       setReview((p) =>
         p.map((r) =>
           r.id === id ? { ...r, status, suggestion: patch ?? r.suggestion } : r,
@@ -1291,7 +1321,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
           void refresh();
         });
     },
-    [refresh],
+    [refresh, review],
   );
 
   /** Resolves true when the server accepted the decision. */
@@ -1862,6 +1892,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       firmId: firmId.current,
       firmIdReady,
       reprocessDoc,
+      unlockDoc,
       assignDoc,
       openDocument,
       clients,
@@ -1939,6 +1970,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       refresh,
       firmIdReady,
       reprocessDoc,
+      unlockDoc,
       assignDoc,
       openDocument,
       clients,

@@ -8,6 +8,7 @@ import {
   ExternalLink,
   FileText,
   Inbox,
+  LockKeyhole,
   RotateCw,
   Search,
   UploadCloud,
@@ -27,6 +28,8 @@ import {
 import { AgentStatusBadge, RowSkeleton } from "../agents";
 import { IntakePanel } from "../components/IntakePanel";
 import { TallyPosting } from "../components/TallyPosting";
+import { UnlockFile } from "../components/UnlockFile";
+import { isPasswordMessage } from "@/lib/practice/passwordFile";
 import { SourceIcon } from "../components/BrandIcons";
 import { Doc, useV2 } from "../store";
 import { BulkBar, SEL_STYLES, SelectAllHeader, SelectCell, useSelection } from "../components/Selection";
@@ -111,6 +114,13 @@ function DocStatus({ d }: { d: Doc }) {
       <span title="Arrived by email or WhatsApp. The Extract agent reads it on the next sync.">
         <Badge tone="neutral">Queued</Badge>
         <div style={{ fontSize: 11.5, color: V.muted, marginTop: 3 }}>Reads on next sync</div>
+      </span>
+    );
+  if (d.status === "Failed" && isPasswordMessage(d.error))
+    return (
+      <span>
+        <Badge tone="warn">Password needed</Badge>
+        <div style={{ fontSize: 11.5, color: V.muted, marginTop: 3 }}>Open it to enter the password</div>
       </span>
     );
   if (d.status === "Failed")
@@ -230,6 +240,8 @@ export default function DocumentsPage({
   const count = (s: Doc["status"]) =>
     scoped.filter((d) => (d.clientId || scopedClient) && d.status === s).length;
 
+  // Files that arrived locked (by email, WhatsApp or upload): one tap opens the password box.
+  const lockedDocs = scoped.filter((d) => d.status === "Failed" && isPasswordMessage(d.error));
   const openDoc = (d: Doc) => {
     setOpen(d.id);
     setRowQuery("");
@@ -349,7 +361,15 @@ export default function DocumentsPage({
         }
       />
 
-      
+      {lockedDocs.length > 0 && (
+        <div role="status" data-testid="locked-files" style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", background: V.warnBg, color: V.warnFg, borderRadius: 14, padding: "12px 16px", marginBottom: 14, fontSize: 13.5 }}>
+          <LockKeyhole size={18} aria-hidden="true" />
+          <span style={{ flex: "1 1 240px" }}>
+            {lockedDocs.length === 1 ? `${lockedDocs[0].name} needs a password to open.` : `${lockedDocs.length} files need a password to open.`}
+          </span>
+          <button className="v2-btn v2-btn-primary" onClick={() => openDoc(lockedDocs[0])}>Enter password</button>
+        </div>
+      )}
 
       <Tabs
         value={tab}
@@ -589,7 +609,11 @@ export default function DocumentsPage({
               </div>
             )}
 
-            {active.status === "Failed" && (
+            {active.status === "Failed" && isPasswordMessage(active.error) && (
+              <UnlockFile docId={active.id} fileName={active.name} lastError={active.error} />
+            )}
+
+            {active.status === "Failed" && !isPasswordMessage(active.error) && (
               <div
                 style={{
                   background: "rgba(169,56,56,.07)",
@@ -757,6 +781,11 @@ export default function DocumentsPage({
             ) : (
               <>
               <RowTools rows={active.rows} name={active.name} query={rowQuery} setQuery={setRowQuery} />
+              {active.rowsTruncated && (
+                <div role="status" style={{ fontSize: 12.5, color: V.warnFg, background: V.warnBg, borderRadius: 12, padding: "9px 12px" }}>
+                  Showing the first {active.rows.length.toLocaleString("en-IN")} of {(active.txnCount ?? 0).toLocaleString("en-IN")} lines. All of them are used for reconciliation.
+                </div>
+              )}
               <motion.table
                 className="v2-table"
                 initial={{ opacity: 0 }}

@@ -34,35 +34,14 @@ function Field({ label, optional, hint, children, error }: { label: string; opti
   );
 }
 
-export function FirstClientStep({
-  kind, setKind, client, setClient, gstinErr, clearGstinErr, onSubmit, onSkip,
-}: {
-  kind: PracticeKind;
-  setKind: (k: PracticeKind) => void;
-  client: ClientForm;
-  setClient: (c: ClientForm) => void;
-  gstinErr: string | null;
-  clearGstinErr: () => void;
-  onSubmit: (e: React.FormEvent) => void;
-  onSkip: () => void;
-}) {
+
+/** Three cards: what kind of practice this is. Drives the wording everywhere and decides whether an ICAI number is asked. */
+export function KindPicker({ kind, setKind, legend }: { kind: PracticeKind; setKind: (k: PracticeKind) => void; legend: string }) {
   const reduce = useReducedMotion();
-  const k = KINDS.find((x) => x.value === kind) ?? KINDS[0];
   const radioName = useId();
   return (
-    <form onSubmit={onSubmit} style={{ display: "grid", gap: 20 }} data-testid="first-client-step">
-      <div style={{ display: "grid", gridTemplateColumns: "auto minmax(0,1fr)", gap: 14, alignItems: "start" }}>
-        <span style={{ width: 40, height: 40, borderRadius: 13, background: V.blue, color: V.brandDeep, display: "grid", placeItems: "center" }}><UserPlus size={20} /></span>
-        <div>
-          <h2 style={{ fontSize: 19, letterSpacing: "-0.01em" }}>Add your first {k.one}</h2>
-          <p style={{ margin: "5px 0 0", fontSize: 13.5, color: V.body, lineHeight: 1.6 }}>
-            The agents work one {k.one} at a time. A name is enough to start, and you can skip this and add {k.many} later.
-          </p>
-        </div>
-      </div>
-
       <fieldset style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
-        <legend className="v2-label" style={{ marginBottom: 8 }}>I work in a</legend>
+        <legend className="v2-label" style={{ marginBottom: 8 }}>{legend}</legend>
         <div role="radiogroup" aria-label="Kind of practice" style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit,minmax(min(170px,100%),1fr))" }}>
           {KINDS.map((o) => {
             const on = o.value === kind;
@@ -93,6 +72,37 @@ export function FirstClientStep({
           })}
         </div>
       </fieldset>
+
+  );
+}
+
+export function FirstClientStep({
+  kind, setKind, client, setClient, gstinErr, clearGstinErr, onSubmit, onSkip, showKind = true,
+}: {
+  showKind?: boolean;
+  kind: PracticeKind;
+  setKind: (k: PracticeKind) => void;
+  client: ClientForm;
+  setClient: (c: ClientForm) => void;
+  gstinErr: string | null;
+  clearGstinErr: () => void;
+  onSubmit: (e: React.FormEvent) => void;
+  onSkip: () => void;
+}) {
+  const k = KINDS.find((x) => x.value === kind) ?? KINDS[0];
+  return (
+    <form onSubmit={onSubmit} style={{ display: "grid", gap: 20 }} data-testid="first-client-step">
+      <div style={{ display: "grid", gridTemplateColumns: "auto minmax(0,1fr)", gap: 14, alignItems: "start" }}>
+        <span style={{ width: 40, height: 40, borderRadius: 13, background: V.blue, color: V.brandDeep, display: "grid", placeItems: "center" }}><UserPlus size={20} /></span>
+        <div>
+          <h2 style={{ fontSize: 19, letterSpacing: "-0.01em" }}>Add your first {k.one}</h2>
+          <p style={{ margin: "5px 0 0", fontSize: 13.5, color: V.body, lineHeight: 1.6 }}>
+            The agents work one {k.one} at a time. A name is enough to start, and you can skip this and add {k.many} later.
+          </p>
+        </div>
+      </div>
+
+      {showKind && <KindPicker kind={kind} setKind={setKind} legend="I work in a" />}
 
       <div className="onb-2col" style={{ alignItems: "start" }}>
         <Field label={`${k.one[0].toUpperCase()}${k.one.slice(1)} name`}>

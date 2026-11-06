@@ -21,3 +21,6 @@ export function cleanFirmName(raw: string | null | undefined): string | null {
   if (!/[a-z]/i.test(s)) return null;
   return s;
 }
+
+/** A CA gives an ICAI number. Accounting firms and company finance teams are welcome without one. */
+export const needsIcai = (practiceKind: string | null | undefined): boolean => practiceKind !== "accounting" && practiceKind !== "inhouse";

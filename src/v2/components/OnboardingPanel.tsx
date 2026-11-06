@@ -139,6 +139,11 @@ export function OnboardingPanel(props: {
           {body}
         </motion.div>
       </AnimatePresence>
+      <ul aria-label="Built for India" style={{ listStyle: "none", margin: 0, padding: 0, position: "absolute", left: "clamp(28px,4vw,56px)", right: "clamp(28px,4vw,56px)", bottom: 28, display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {["Tally", "Zoho Books", "GST and TDS", "WhatsApp", "Made in India"].map((t) => (
+          <li key={t} style={{ fontSize: 11.5, color: SOFT, border: `1px solid ${LINE}`, borderRadius: 999, padding: "5px 11px", background: "rgba(255,255,255,.05)" }}>{t}</li>
+        ))}
+      </ul>
     </aside>
   );
 }

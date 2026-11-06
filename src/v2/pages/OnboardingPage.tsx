@@ -29,7 +29,7 @@ import { confirmPendingAccount, createAccount, sendSignupCode, verifySignupCode 
 import { MOBILE_HINT, parseMobile } from "@/lib/practice/mobile";
 import { ENTITY_TYPES, useV2 } from "../store";
 import { OnboardingPanel } from "../components/OnboardingPanel";
-import { FirstClientStep, type PracticeKind } from "../components/FirstClientStep";
+import { FirstClientStep, KindPicker, type PracticeKind } from "../components/FirstClientStep";
 import { GmailIcon } from "../components/BrandIcons";
 import { gstinProblem } from "@/lib/practice/india";
 
@@ -130,6 +130,8 @@ export default function OnboardingPage() {
   const [client, setClient] = useState({ name: "", entityType: ENTITY_TYPES[0], gstin: "", contactName: "", email: "", phone: "" });
   const [clientId, setClientId] = useState<string | null>(null);
   const [kind, setKind] = useState<PracticeKind>("ca");
+  // Sign-up is three short pages (you, your details, password); the account is created once, on the last.
+  const [signupPage, setSignupPage] = useState(0);
   const [uploaded, setUploaded] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -160,8 +162,24 @@ export default function OnboardingPage() {
     return true;
   };
 
+  const advanceSignup = () => {
+    if (signupPage === 0) {
+      if (!account.name.trim()) { toast.error("Tell us your name."); return; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(account.email.trim())) { toast.error("Enter your work email, like you@firm.com."); return; }
+      setSignupPage(1);
+      return;
+    }
+    if (signupPage === 1) {
+      if (!parseMobile(account.phone)) { toast.error("Enter a valid mobile number, for example 98200 11223."); return; }
+      if (kind === "ca" && !cleanIcai(account.icai)) { toast.error("Enter your ICAI membership number: 5 or 6 digits, as on your membership card."); return; }
+      setSignupPage(2);
+    }
+  };
+
   const submitAccount = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Enter on an early page moves on to the next page; only the last page creates the account.
+    if (mode === "signup" && signupPage < 2) { advanceSignup(); return; }
     setBusy(true);
     const email = account.email.trim();
     try {
@@ -181,8 +199,7 @@ export default function OnboardingPage() {
       }
       const mobile = parseMobile(account.phone);
       if (!mobile) { toast.error("Enter a valid mobile number, for example 98200 11223."); return; }
-      if (!account.isCa) { toast.error("Please confirm that you are a Chartered Accountant."); return; }
-      if (!cleanIcai(account.icai)) { toast.error("Enter your ICAI membership number: 5 or 6 digits, as on your membership card."); return; }
+      if (kind === "ca" && !cleanIcai(account.icai)) { toast.error("Enter your ICAI membership number: 5 or 6 digits, as on your membership card."); return; }
       // Verify the number on WhatsApp first (when switched on), so every account has a real, reachable number.
       let proof = otp.for === mobile.digits ? otp.proof : "";
       if (!proof) {
@@ -201,7 +218,7 @@ export default function OnboardingPage() {
           setOtp((o) => ({ ...o, proof }));
         }
       }
-      const created = await createAccountFn({ data: { name: account.name.trim(), isCa: account.isCa, icai: account.icai.trim(), phoneProof: proof || undefined, email, password: account.password, phone: account.phone, whatsappOk: account.whatsappOk, attribution: signupAttribution(), lead: getLeadAttribution() } }).catch(
+      const created = await createAccountFn({ data: { name: account.name.trim(), isCa: kind === "ca", practiceKind: kind, icai: kind === "ca" ? account.icai.trim() : "", phoneProof: proof || undefined, email, password: account.password, phone: account.phone, whatsappOk: account.whatsappOk, attribution: signupAttribution(), lead: getLeadAttribution() } }).catch(
         () => ({ ok: false as const, message: "We couldn't create your account just now. Check your connection and try again." }),
       );
       if (!created.ok) { toast.error(created.message); return; }
@@ -227,7 +244,9 @@ export default function OnboardingPage() {
     settingUp.current = true;
     setBusy(true);
     const { ref: referralCode, ...firmDetails } = firmForm;
-    if (!parseMobile(firmForm.phone)) {
+    // The mobile was given at sign-up; ask again only if it was not.
+    const phone = parseMobile(account.phone) ? account.phone : firmForm.phone;
+    if (!parseMobile(phone)) {
       toast.error("Enter a valid mobile number, for example 98200 11223.");
       settingUp.current = false;
       setBusy(false);
@@ -235,6 +254,7 @@ export default function OnboardingPage() {
     }
     const ok = await saveFirm({
       ...firmDetails,
+      phone,
       whatsappOk: account.whatsappOk || session?.whatsappOk,
       partnerName: account.name || session?.name || "",
       email: account.email || session?.email || "",
@@ -319,7 +339,9 @@ export default function OnboardingPage() {
   };
 
   const clientName = client.name.trim() || "your client";
-  const done = (i: number) => i < step;
+  // One bar for the whole set-up: three short sign-up pages, then firm, client and first document.
+  const PROGRESS = ["Your details", "About you", "Password", "Your firm", "First client", "First document"];
+  const progress = step === 0 ? (mode === "signup" ? signupPage : -1) : step >= 4 ? PROGRESS.length : 2 + step;
 
   return (
     <div className="onb" data-step={step}>
@@ -331,24 +353,12 @@ export default function OnboardingPage() {
           <span style={{ color: V.muted, fontSize: 12.5 }}>Practice OS for CA and accounting firms</span>
         </a>
 
-        {step > 0 && (
-          <ol className="onb-rail" aria-label="Setup progress">
-            {STEPS.slice(1).map((label, k) => {
-              const i = k + 1;
-              // Steps skipped (no client, so no first document either) are shown as still to do, not as done.
-              const skipped = step === 4 && !clientId && (i === 2 || i === 3);
-              const state = done(i) && !skipped ? "done" : i === step ? "current" : "todo";
-              return (
-                <li key={label} data-state={state} aria-current={state === "current" ? "step" : undefined}>
-                  <span className="onb-dot">{state === "done" ? <Check size={12} strokeWidth={3} /> : i}</span>
-                  <span className="onb-rail-text">
-                    <span className="onb-rail-label">{label}</span>
-                    <span className="onb-rail-hint">{STEP_HINT[i]}</span>
-                  </span>
-                </li>
-              );
-            })}
-          </ol>
+        {progress >= 0 && (
+          <div className="onb-seg" role="progressbar" aria-label="Setup progress" aria-valuemin={1} aria-valuemax={PROGRESS.length} aria-valuenow={Math.min(progress + 1, PROGRESS.length)} aria-valuetext={`Step ${Math.min(progress + 1, PROGRESS.length)} of ${PROGRESS.length}: ${PROGRESS[Math.min(progress, PROGRESS.length - 1)]}`}>
+            {PROGRESS.map((label, i) => (
+              <span key={label} data-on={i <= progress} data-current={i === progress} />
+            ))}
+          </div>
         )}
 
         <AnimatePresence mode="wait">
@@ -360,9 +370,9 @@ export default function OnboardingPage() {
             transition={{ duration: 0.26, ease: "easeOut" }}
             className="onb-card"
           >
-            {step > 0 && (
+            {progress >= 0 && step < 4 && (
               <div className="onb-eyebrow">
-                Step {step} of {STEPS.length - 1} · {STEPS[step]}
+                Step {progress + 1} of {PROGRESS.length} · {PROGRESS[progress]}
               </div>
             )}
 
@@ -370,14 +380,18 @@ export default function OnboardingPage() {
               <form onSubmit={submitAccount} style={{ display: "grid", gap: 16 }} data-auth-mode={mode}>
                 <div>
                   <h1 className="onb-title">
-                    {mode === "signin" ? "Welcome back" : mode === "forgot" ? "Reset your password" : "Close the month with four agents"}
+                    {mode === "signin" ? "Welcome back" : mode === "forgot" ? "Reset your password" : signupPage === 0 ? "Let's set up your practice" : signupPage === 1 ? "A little about you" : "Secure your account"}
                   </h1>
                   <p className="onb-sub">
                     {mode === "signin"
                       ? "Sign in to your practice. Everything is where your team left it."
                       : mode === "forgot"
                         ? "Enter your work email and we will send a link to set a new password."
-                        : "Extract, Recon, Narrate and Chaser do the month-end work. You review and sign off."}
+                        : signupPage === 0
+                          ? "Four agents do the month-end work. You review and sign off. It takes about two minutes, with no card needed."
+                          : signupPage === 1
+                            ? (kind === "ca" ? "We check every CA's ICAI membership number. Your mobile is used only for alerts you ask for." : "Tell us how you work so FynHelp speaks your language. Your mobile is used only for alerts you ask for.")
+                            : "Choose a password. Next, you will name your firm."}
                   </p>
                 </div>
                 {expired && mode === "signin" && (
@@ -385,23 +399,20 @@ export default function OnboardingPage() {
                     Your session ended. Sign in again to pick up where you left off.
                   </div>
                 )}
-                {mode !== "forgot" && <div><GoogleSignIn label={mode === "signup" ? "Sign up with Google" : "Continue with Google"} /></div>}
-                {mode === "signup" && launch && (
+                {mode !== "forgot" && (mode !== "signup" || signupPage === 0) && <div><GoogleSignIn label={mode === "signup" ? "Sign up with Google" : "Continue with Google"} /></div>}
+                {mode === "signup" && signupPage === 0 && launch && (
                   <div role="status" data-testid="launch-chip" style={{ fontSize: 13, padding: "10px 12px", borderRadius: 12, background: V.blue, color: V.ink, display: "flex", gap: 8, alignItems: "center" }}>
                     <b>Launch offer applied.</b> {LAUNCH_DAYS} days free, no card needed.
                   </div>
                 )}
-                {mode === "signup" && (
+                {mode === "signup" && signupPage === 0 && (
                   <Field label="Full name"><input className="v2-input" required autoFocus autoComplete="name" value={account.name} onChange={(e) => setAccount({ ...account, name: e.target.value })} placeholder="Priya Rao" /></Field>
                 )}
-                {mode === "signup" && (
+                {mode === "signup" && signupPage === 1 && (
                   <>
-                    <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 13.5, color: V.ink, lineHeight: 1.5, fontWeight: 600 }}>
-                      <input type="checkbox" required checked={account.isCa} onChange={(e) => setAccount({ ...account, isCa: e.target.checked, icai: e.target.checked ? account.icai : "" })} style={{ marginTop: 3 }} data-testid="is-ca" />
-                      <span>I am a Chartered Accountant (or I run a CA firm)</span>
-                    </label>
-                    {account.isCa && (
-                      <Field label="ICAI membership number" hint={ICAI_HINT}><input className="v2-input" required autoFocus inputMode="numeric" maxLength={8} value={account.icai} onChange={(e) => setAccount({ ...account, icai: e.target.value })} placeholder="245981" data-testid="icai-number" /></Field>
+                    <KindPicker kind={kind} setKind={(k) => { setKind(k); setAccount({ ...account, isCa: k === "ca", icai: k === "ca" ? account.icai : "" }); }} legend="I work in a" />
+                    {kind === "ca" && (
+                      <Field label="ICAI membership number" hint={ICAI_HINT}><input className="v2-input" required inputMode="numeric" maxLength={8} value={account.icai} onChange={(e) => setAccount({ ...account, icai: e.target.value })} placeholder="245981" data-testid="icai-number" /></Field>
                     )}
                     <Field label="Mobile number" hint={MOBILE_HINT}>
                       <input className="v2-input" type="tel" inputMode="tel" required autoComplete="tel" value={account.phone} onChange={(e) => setAccount({ ...account, phone: e.target.value })} placeholder="98200 11223" aria-describedby="mobile-why" />
@@ -412,8 +423,8 @@ export default function OnboardingPage() {
                     </label>
                   </>
                 )}
-                <Field label="Work email"><input className="v2-input" type="email" required autoFocus={mode !== "signup"} autoComplete="email" value={account.email} onChange={(e) => setAccount({ ...account, email: e.target.value })} placeholder="you@firm.com" /></Field>
-                {mode !== "forgot" && (
+                {(mode !== "signup" || signupPage === 0) && <Field label="Work email"><input className="v2-input" type="email" required autoFocus={mode !== "signup"} autoComplete="email" value={account.email} onChange={(e) => setAccount({ ...account, email: e.target.value })} placeholder="you@firm.com" /></Field>}
+                {mode !== "forgot" && (mode !== "signup" || signupPage === 2) && (
                   <Field
                     label="Password"
                     aside={mode === "signin" ? <button type="button" className="v2-link" style={{ fontSize: 12 }} onClick={() => setMode("forgot")}>Forgot password?</button> : undefined}
@@ -426,23 +437,28 @@ export default function OnboardingPage() {
                     <input className="v2-input" inputMode="numeric" autoComplete="one-time-code" maxLength={6} required autoFocus value={otp.code} onChange={(e) => setOtp({ ...otp, code: e.target.value.replace(/\D/g, "") })} placeholder="123456" data-testid="otp-code" />
                     <span style={{ fontSize: 12.5 }}>
                       Wrong number or no message?{" "}
-                      <button type="button" className="v2-link" onClick={() => setOtp({ sent: false, code: "", proof: "", for: "" })}>Change number or resend</button>
+                      <button type="button" className="v2-link" onClick={() => { setOtp({ sent: false, code: "", proof: "", for: "" }); setSignupPage(1); }}>Change number or resend</button>
                     </span>
                   </Field>
                 )}
-                <button className="v2-btn v2-btn-primary v2-btn-lg v2-btn-block" type="submit" data-busy={busy} disabled={busy || (mode === "signup" && otp.sent && otp.code.length !== 6)}>
-                  {mode === "signin" ? "Sign in" : mode === "forgot" ? "Send reset link" : mode === "signup" && otp.sent ? "Verify and create account" : "Create account"}
-                </button>
+                <div style={{ display: "flex", gap: 10 }}>
+                  {mode === "signup" && signupPage > 0 && (
+                    <button className="v2-btn v2-btn-ghost v2-btn-lg" type="button" onClick={() => setSignupPage((p) => Math.max(0, p - 1))} disabled={busy}>Back</button>
+                  )}
+                  <button className="v2-btn v2-btn-primary v2-btn-lg v2-btn-block" style={{ flex: 1 }} type="submit" data-busy={busy} disabled={busy || (mode === "signup" && signupPage === 2 && otp.sent && otp.code.length !== 6)} data-testid="account-continue">
+                    {mode === "signin" ? "Sign in" : mode === "forgot" ? "Send reset link" : signupPage < 2 ? "Continue" : otp.sent ? "Verify and create account" : "Create account"}
+                  </button>
+                </div>
                 <p className="onb-foot" style={{ textAlign: "center" }}>
                   {mode === "signup" ? (
-                    <>Already have an account, or invited by your firm? <button type="button" className="v2-link" onClick={() => setMode("signin")}>Sign in</button></>
+                    signupPage > 0 ? null : <>Already have an account, or invited by your firm? <button type="button" className="v2-link" onClick={() => setMode("signin")}>Sign in</button></>
                   ) : mode === "forgot" ? (
                     <>Remembered it? <button type="button" className="v2-link" onClick={() => setMode("signin")}>Back to sign in</button></>
                   ) : (
                     <>New to FynHelp? <button type="button" className="v2-link" onClick={() => setMode("signup")}>Create an account</button></>
                   )}
                 </p>
-                {mode === "signup" && (
+                {mode === "signup" && signupPage === 2 && (
                   <p className="onb-foot" style={{ textAlign: "center", marginTop: -6 }}>
                     Free trial: 14 days from your first upload. No card needed. By creating an account you agree to the{" "}
                     <a className="v2-link" href="/terms" target="_blank" rel="noreferrer">Terms</a> and{" "}
@@ -456,9 +472,11 @@ export default function OnboardingPage() {
               <form onSubmit={submitFirm} style={{ display: "grid", gap: 16 }}>
                 <Intro icon={<Building2 size={20} />} title="Set up your firm" text="Your firm's name goes on every MIS and every message the Chaser sends." />
                 <Field label="Firm name"><input className="v2-input" required autoFocus value={firmForm.name} onChange={(e) => setFirmForm({ ...firmForm, name: e.target.value })} placeholder="Mehta and Associates" /></Field>
-                <Field label="Your mobile number" hint={MOBILE_HINT}>
-                  <input className="v2-input" type="tel" inputMode="tel" required autoComplete="tel" value={firmForm.phone} onChange={(e) => setFirmForm({ ...firmForm, phone: e.target.value })} placeholder="98200 11223" />
-                </Field>
+                {!parseMobile(account.phone) && (
+                  <Field label="Your mobile number" hint={MOBILE_HINT}>
+                    <input className="v2-input" type="tel" inputMode="tel" required autoComplete="tel" value={firmForm.phone} onChange={(e) => setFirmForm({ ...firmForm, phone: e.target.value })} placeholder="98200 11223" />
+                  </Field>
+                )}
                 <div className="onb-2col">
                   <Field label="City" optional><input className="v2-input" value={firmForm.city} onChange={(e) => setFirmForm({ ...firmForm, city: e.target.value })} placeholder="Bengaluru" /></Field>
                   <Field label="Firm registration number" optional><input className="v2-input" value={firmForm.frn} onChange={(e) => setFirmForm({ ...firmForm, frn: e.target.value })} placeholder="012345S" /></Field>
@@ -471,7 +489,7 @@ export default function OnboardingPage() {
             )}
 
             {step === 2 && (
-              <FirstClientStep kind={kind} setKind={setKind} client={client} setClient={setClient} gstinErr={gstinErr} clearGstinErr={() => setGstinErr(null)} onSubmit={submitClient} onSkip={skipClient} />
+              <FirstClientStep showKind={false} kind={kind} setKind={setKind} client={client} setClient={setClient} gstinErr={gstinErr} clearGstinErr={() => setGstinErr(null)} onSubmit={submitClient} onSkip={skipClient} />
             )}
 
             {step === 3 && (
@@ -632,19 +650,17 @@ function Field({ label, children, optional, aside, hint }: { label: string; chil
 }
 
 const ONB_STYLES = `
-.onb { min-height:100vh; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,520px); background:${V.bg}; }
-.onb-main { padding:28px clamp(18px,5vw,64px) 48px; display:flex; flex-direction:column; align-items:center; gap:22px; }
+.onb { min-height:100vh; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,520px); background:${V.card}; }
+.onb-main { padding:28px clamp(18px,5vw,64px) 48px; display:flex; flex-direction:column; align-items:center; gap:22px; min-height:100vh; }
+.onb-main > .onb-card { margin-top:clamp(16px,7vh,72px); }
 .onb-main > * { width:100%; max-width:560px; }
 .onb-brand { display:flex; align-items:center; gap:10px; font-size:15px; }
 .onb-logo { width:28px; height:28px; border-radius:9px; background:${V.ink}; color:#fff; display:grid; place-items:center; font-weight:700; font-size:14px; }
-.onb-rail { list-style:none; margin:6px 0 0; padding:0; display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:6px; }
-.onb-rail li { display:flex; flex-direction:column; gap:6px; font-size:12px; color:${V.muted}; }
-.onb-rail li::before { content:""; height:3px; border-radius:999px; background:var(--v2-line); transition:background .3s ease; }
-.onb-rail li[data-state="done"]::before, .onb-rail li[data-state="current"]::before { background:${V.ink}; }
-.onb-rail li[data-state="current"] { color:${V.ink}; font-weight:600; }
-.onb-rail .onb-dot { display:none; }
-.onb-rail-hint { display:none; }
-.onb-card { background:${V.card}; backdrop-filter:blur(14px); border:1px solid ${V.line}; border-radius:22px; padding:clamp(20px,3vw,32px); box-shadow:0 1px 2px rgba(20,18,16,.04), 0 24px 48px -36px rgba(20,18,16,.35); }
+.onb-seg { display:grid; grid-auto-flow:column; grid-auto-columns:1fr; gap:6px; margin-top:2px; }
+.onb-seg span { height:4px; border-radius:999px; background:var(--v2-line); transition:background .35s ease, transform .35s ease; transform-origin:left; }
+.onb-seg span[data-on="true"] { background:${V.ink}; }
+.onb-seg span[data-current="true"] { background:${V.coral}; }
+.onb-card { background:transparent; padding:clamp(4px,1vw,12px) 0 0; }
 .onb-eyebrow { font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:${V.muted}; font-weight:700; margin-bottom:16px; }
 .onb-title { font-size:clamp(24px,3vw,30px); letter-spacing:-0.03em; line-height:1.15; margin:0; }
 .onb-sub { margin:8px 0 4px; font-size:14px; color:${V.body}; line-height:1.6; }
@@ -679,5 +695,5 @@ const ONB_STYLES = `
 .onb-checklist .onb-dot { width:22px; height:22px; border-radius:999px; display:grid; place-items:center; background:${V.gray}; color:${V.muted}; font-size:12px; }
 .onb-checklist li[data-ok="true"] .onb-dot { background:rgba(31,90,70,.14); color:${V.green}; }
 @media (max-width:980px) { .onb { grid-template-columns:minmax(0,1fr); } .onb-panel { display:none !important; } }
-@media (max-width:560px) { .onb-rail-label { display:none; } .onb-stats { grid-template-columns:minmax(0,1fr); } }
+@media (max-width:560px) { .onb-stats { grid-template-columns:minmax(0,1fr); } }
 `;

@@ -14,6 +14,8 @@ const accountSchema = z.object({
   /** The person confirmed they are a Chartered Accountant, and gave an ICAI membership number: asked up front so only real CAs get an account. */
   isCa: z.boolean().optional(),
   icai: z.string().trim().max(24).optional(),
+  /** What kind of practice. A CA gives an ICAI number; an accounting firm or a company finance team does not need one. */
+  practiceKind: z.enum(["ca", "accounting", "inhouse"]).optional(),
   /** Mobile number, collected so a person can help if setup stalls. */
   phone: z.string().trim().min(1).max(24),
   /** Proof from the WhatsApp code step; required once WhatsApp verification is on. */
@@ -50,8 +52,11 @@ export const createAccount = createServerFn({ method: "POST" })
     const { cleanIcai } = await import("@/lib/practice/icai");
     const requireCa = process.env["SIGNUP_REQUIRE_ICAI"] !== "0";
     const icai = cleanIcai(data.icai);
-    if (requireCa && data.isCa !== true) return { ok: false, message: "Please confirm that you are a Chartered Accountant." };
-    if (requireCa && !icai) return { ok: false, message: "Enter your ICAI membership number: 5 or 6 digits, as on your membership card." };
+    // Accounting firms and company finance teams are welcome without an ICAI number; a CA still gives one.
+    const { needsIcai } = await import("@/lib/practice/icai");
+    const nonCa = !needsIcai(data.practiceKind);
+    if (requireCa && !nonCa && data.isCa !== true) return { ok: false, message: "Please confirm that you are a Chartered Accountant." };
+    if (requireCa && !nonCa && !icai) return { ok: false, message: "Enter your ICAI membership number: 5 or 6 digits, as on your membership card." };
     const { looksFake } = await import("@/lib/practice/signupOtp");
     if (mobile.digits.startsWith("91") && looksFake(mobile.digits.slice(2))) return { ok: false, message: "That does not look like a real mobile number. Please check it." };
     const { phoneProofOk } = await import("@/lib/practice/signupOtp.server");
@@ -72,7 +77,7 @@ export const createAccount = createServerFn({ method: "POST" })
       email: data.email,
       password: data.password,
       email_confirm: true,
-      user_metadata: { full_name: data.name, phone: mobile.digits, ...(icai ? { icai_membership_number: icai } : {}), whatsapp_ok: data.whatsappOk === true, ...(data.lead ? { lead: data.lead } : {}) },
+      user_metadata: { full_name: data.name, phone: mobile.digits, ...(icai ? { icai_membership_number: icai } : {}), ...(data.practiceKind ? { practice_kind: data.practiceKind } : {}), whatsapp_ok: data.whatsappOk === true, ...(data.lead ? { lead: data.lead } : {}) },
     });
     if (!error) {
       // Tell the FynHelp team. Never blocks or fails the sign-up.
@@ -80,7 +85,7 @@ export const createAccount = createServerFn({ method: "POST" })
       const { pushLeadToSheet } = await import("@/lib/practice/leadSheet.server");
       await Promise.all([
         notifyNewSignup({ name: data.name, email: data.email, phone: mobile.digits, icai: icai ?? undefined, whatsappOk: data.whatsappOk === true, lead: data.lead, ...(data.attribution ?? {}) }),
-        pushLeadToSheet({ type: "signup", name: data.name, email: data.email, phone: mobile.digits, is_ca: data.isCa === true, icai_membership_number: icai ?? "", whatsapp_ok: data.whatsappOk === true, ...flatLead(data.lead) }),
+        pushLeadToSheet({ type: "signup", name: data.name, email: data.email, phone: mobile.digits, is_ca: data.isCa === true, practice_kind: data.practiceKind ?? "", icai_membership_number: icai ?? "", whatsapp_ok: data.whatsappOk === true, ...flatLead(data.lead) }),
       ]);
       return { ok: true, existed: false };
     }

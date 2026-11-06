@@ -25,7 +25,9 @@ const GONE = new Set(["/blog/budgetvsforecast", "/blog/ca-vs-cfo-for-indian-sme"
 const hostMiddleware = createMiddleware().server(async ({ next, request }) => {
   const url = new URL(request.url);
   const host = (request.headers.get("x-forwarded-host") ?? url.host).toLowerCase();
-  if (host === "fynhelp.com") {
+  // Never redirect API calls: a redirect turns a POST into a GET and drops the Authorization header, so the Tally
+  // connector, the payment webhook and the WhatsApp webhook would fail for anyone using the address without "www".
+  if (host === "fynhelp.com" && !url.pathname.startsWith("/api/")) {
     return new Response(null, { status: 301, headers: { location: `https://www.fynhelp.com${url.pathname}${url.search}`, "cache-control": "public, max-age=86400" } });
   }
   if (GONE.has(url.pathname.replace(/\/$/, ""))) {

@@ -1,0 +1,71 @@
+name: Connector for Windows
+
+# Builds the FynHelp Connector as a single Windows program (no Node.js needed on the customer's PC) and tests it on a real
+# Windows machine: it starts, reports its version, reports a clear error with a bad token, and the setup script parses.
+# The program is an artifact of the run (Actions, this run, "fynhelp-connector-windows"). Nothing is published from here.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - "public/downloads/fynhelp-tally-connector.mjs"
+      - "public/downloads/fynhelp-connector-setup.ps1"
+      - "scripts/connector-exe-entry.mjs"
+      - ".github/workflows/connector-exe.yml"
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Build the program
+        shell: pwsh
+        run: |
+          mkdir build | Out-Null
+          npx --yes esbuild scripts/connector-exe-entry.mjs --bundle --platform=node --format=cjs --target=node22 --outfile=build/entry.cjs
+          npx --yes @yao-pkg/pkg build/entry.cjs --targets node22-win-x64 --output build/fynhelp-connector.exe
+          Get-Item build/fynhelp-connector.exe | Select-Object Name, Length
+
+      - name: It starts and says its version
+        shell: pwsh
+        run: |
+          $v = & ./build/fynhelp-connector.exe --version
+          Write-Host "version: $v"
+          if ($v -notmatch '^\d+\.\d+\.\d+$') { throw "Unexpected version output: $v" }
+
+      - name: A bad token and an unreachable server give a clear message, not a crash
+        shell: pwsh
+        run: |
+          '{"token":"fyn_tc_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","server":"http://127.0.0.1:9"}' | Set-Content build/cfg.json
+          $out = & ./build/fynhelp-connector.exe --check --config build/cfg.json 2>&1 | Out-String
+          Write-Host $out
+          if ($out -notmatch 'FynHelp') { throw "No readable message from the check." }
+
+      - name: A missing config file is explained
+        shell: pwsh
+        run: |
+          $out = & ./build/fynhelp-connector.exe --check --config build/missing.json 2>&1 | Out-String
+          Write-Host $out
+          if ($out -notmatch 'fynhelp-connector.json') { throw "The missing-config message did not name the file." }
+
+      - name: The setup script is valid PowerShell
+        shell: pwsh
+        run: |
+          foreach ($f in 'public/downloads/fynhelp-connector-setup.ps1') {
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f), [ref]$null, [ref]$errors) | Out-Null
+            if ($errors.Count) { $errors | ForEach-Object { Write-Host $_.Message }; throw "Syntax errors in $f" }
+            Write-Host "$f parses cleanly"
+          }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fynhelp-connector-windows
+          path: build/fynhelp-connector.exe
+          retention-days: 30

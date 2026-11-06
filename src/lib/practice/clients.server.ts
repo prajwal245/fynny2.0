@@ -4,6 +4,7 @@
  */
 import { PracticeError } from "./core";
 import { gstinProblem } from "./india";
+import { chaseContactPatch, type ChaseContact, type ClientContactChange } from "./chaseContact";
 import {
   assertClient,
   clientMeta,
@@ -117,6 +118,19 @@ export async function createPracticeClient(
   return { id: biz.id, row_id: client.id };
 }
 
+async function syncOpenChases(db: Db, firmId: string, businessId: string, change: ClientContactChange) {
+  const { data: chases } = await db
+    .from("ca_document_requests")
+    .select("id, status, contact_name, contact_email, contact_phone, notes")
+    .eq("ca_firm_id", firmId)
+    .eq("business_id", businessId)
+    .not("status", "in", "(fulfilled,resolved,cancelled)");
+  for (const c of chases ?? []) {
+    const patch = chaseContactPatch(c as ChaseContact, change);
+    if (patch) await db.from("ca_document_requests").update(patch).eq("id", c.id as string);
+  }
+}
+
 export async function updatePracticeClient(
   db: Db,
   ctx: FirmContext,
@@ -151,6 +165,12 @@ export async function updatePracticeClient(
     .update(update)
     .eq("id", current.id);
   if (error) throw new PracticeError("db_error", error.message);
+  // Open chases copied the client's contact details when they were made: bring them up to date.
+  const change: ClientContactChange = {};
+  if (patch.phone !== undefined) change.phone = { old: current.client_phone ?? null, next: phone };
+  if (patch.email !== undefined) change.email = { old: current.client_email ?? null, next: email };
+  if (patch.contactName !== undefined) change.contactName = { old: meta.contactName ?? null, next: patch.contactName.trim() || null };
+  if (Object.keys(change).length) await syncOpenChases(db, ctx.firmId, businessId, change);
   if (patch.name)
     await db
       .from("businesses")

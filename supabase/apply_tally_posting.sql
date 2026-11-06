@@ -1,3 +1,62 @@
+-- FynHelp: Tally posting and page credits. Safe to run more than once, and self-contained.
+-- Needs the practice backend tables (ca_firms, ca_txns, user_in_ca_firm), which every live project already has.
+DO $$
+BEGIN
+  IF to_regclass('public.ca_firms') IS NULL OR to_regclass('public.ca_txns') IS NULL THEN
+    RAISE EXCEPTION 'The practice backend tables (ca_firms, ca_txns) are missing. Apply the earlier migrations first, then run this file again.';
+  END IF;
+  IF to_regprocedure('public.user_in_ca_firm(uuid)') IS NULL THEN
+    RAISE EXCEPTION 'The function user_in_ca_firm(uuid) is missing. Apply the earlier migrations first, then run this file again.';
+  END IF;
+END $$;
+
+-- ===== Part 0: the Tally connector tables (already there if the connector was set up; skipped if so) =====
+-- Live TallyPrime connection. A small FynHelp Connector runs on the PC that has Tally open, reads
+-- Tally's local XML server and sends each month's Day Book to FynHelp over HTTPS (outbound only).
+-- The connector proves who it is with a secret token; only its SHA-256 hash is stored.
+CREATE TABLE IF NOT EXISTS public.ca_tally_connectors (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  ca_firm_id uuid NOT NULL REFERENCES public.ca_firms(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  token_hash text NOT NULL UNIQUE,
+  is_active boolean NOT NULL DEFAULT true,
+  created_by uuid,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  last_seen_at timestamptz,
+  agent_version text,
+  host_name text,
+  last_error text,
+  -- A person pressed "Sync now": the connector picks this up on its next check and clears it.
+  sync_requested_at timestamptz
+);
+CREATE INDEX IF NOT EXISTS ca_tally_connectors_firm_idx ON public.ca_tally_connectors (ca_firm_id);
+
+-- The companies open in Tally, as reported by the connector, and the FynHelp client each one belongs to.
+CREATE TABLE IF NOT EXISTS public.ca_tally_companies (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  ca_firm_id uuid NOT NULL REFERENCES public.ca_firms(id) ON DELETE CASCADE,
+  connector_id uuid NOT NULL REFERENCES public.ca_tally_connectors(id) ON DELETE CASCADE,
+  company_name text NOT NULL,
+  business_id uuid,
+  last_synced_at timestamptz,
+  last_sync_note text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (connector_id, company_name)
+);
+CREATE INDEX IF NOT EXISTS ca_tally_companies_firm_idx ON public.ca_tally_companies (ca_firm_id);
+
+GRANT SELECT ON public.ca_tally_connectors, public.ca_tally_companies TO authenticated;
+GRANT ALL ON public.ca_tally_connectors, public.ca_tally_companies TO service_role;
+ALTER TABLE public.ca_tally_connectors ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ca_tally_companies ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "firm reads tally connectors" ON public.ca_tally_connectors;
+CREATE POLICY "firm reads tally connectors" ON public.ca_tally_connectors
+  FOR SELECT TO authenticated USING (public.user_in_ca_firm(ca_firm_id));
+DROP POLICY IF EXISTS "firm reads tally companies" ON public.ca_tally_companies;
+CREATE POLICY "firm reads tally companies" ON public.ca_tally_companies
+  FOR SELECT TO authenticated USING (public.user_in_ca_firm(ca_firm_id));
+
+-- ===== Part 1: Tally posting =====
 -- Writing approved bank lines into Tally. Nothing here posts by itself: a row is created only
 -- when a partner or manager approves one line and one existing ledger. All access is through
 -- the service role (server functions check the firm and role); clients can only read their firm's rows.
@@ -53,6 +112,8 @@ DROP POLICY IF EXISTS "firm reads tally ledgers" ON public.ca_tally_ledgers;
 CREATE POLICY "firm reads tally ledgers" ON public.ca_tally_ledgers FOR SELECT TO authenticated USING (public.user_in_ca_firm(ca_firm_id));
 DROP POLICY IF EXISTS "firm reads tally postings" ON public.ca_tally_postings;
 CREATE POLICY "firm reads tally postings" ON public.ca_tally_postings FOR SELECT TO authenticated USING (public.user_in_ca_firm(ca_firm_id));
+
+-- ===== Part 2: Tally posting pages (credits) =====
 -- FynHelp Tally posting pages (separate from WhatsApp credits, same design): one credit is one page of a document posted to Tally.
 -- Credits come in lots (plan allowance each month, trial gift, top-ups). A lot lasts 12 months. Spending takes from
 -- the lot that expires first. Every change is written to a ledger, and a refund puts credits back into the lots they

@@ -23,7 +23,7 @@ Reads were already live (the connector sends the Day Book). This adds the write 
 - No automatic top-up for pages yet.
 
 ## Setup
-1. Apply `supabase/apply_tally_posting.sql` in the Supabase SQL Editor (or the two migrations `20261109090000_tally_posting.sql` and `20261109100000_page_credits.sql`). Until then the new panels return errors.
+1. Apply `supabase/apply_tally_posting.sql` in the Supabase SQL Editor. It is self-contained (it also creates the Tally connector tables if they are missing) and safe to run twice. Until then the new panels return errors.
 2. Razorpay: nothing new if `order.paid` is already on the webhook.
 3. On the Tally PC: download connector 1.1, set `"allowWrite": true` in `fynhelp-connector.json` only when ready, restart it.
 

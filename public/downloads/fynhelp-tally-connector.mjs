@@ -184,7 +184,11 @@ async function fynhelp(cfg, path, init) {
     ...init,
     headers: { Authorization: `Bearer ${cfg.token}`, ...(init.headers ?? {}) },
     signal: AbortSignal.timeout(10 * 60_000),
+    // A redirect would drop the token and turn the request into a GET: say so instead of failing mysteriously.
+    redirect: "manual",
   });
+  if (res.status >= 300 && res.status < 400)
+    throw new Error(`FynHelp redirected this request to ${res.headers.get("location") ?? "another address"}. Set "server" in fynhelp-connector.json to https://www.fynhelp.com`);
   const text = await res.text();
   let json = null;
   try {
@@ -198,7 +202,16 @@ async function fynhelp(cfg, path, init) {
 
 const log = (...a) => console.log(new Date().toISOString().replace("T", " ").slice(0, 19), ...a);
 
-export function loadConfig(argv, cwd = process.cwd(), here = dirname(fileURLToPath(import.meta.url))) {
+/** The folder this file is in. When packaged as a program there is no such address, so fall back to the program's folder. */
+function thisFolder() {
+  try {
+    return dirname(fileURLToPath(import.meta.url));
+  } catch {
+    return dirname(process.execPath);
+  }
+}
+
+export function loadConfig(argv, cwd = process.cwd(), here = thisFolder()) {
   const i = argv.indexOf("--config");
   const candidates = i >= 0 && argv[i + 1] ? [resolve(argv[i + 1])] : [join(cwd, "fynhelp-connector.json"), join(here, "fynhelp-connector.json")];
   const file = candidates.find((f) => existsSync(f));
@@ -315,8 +328,12 @@ async function round(cfg, state, forceSync) {
   log(`Sync finished: ${sent} month${sent === 1 ? "" : "s"} sent.`);
 }
 
-async function main() {
+export async function main() {
   const argv = process.argv.slice(2);
+  if (argv.includes("--version")) {
+    console.log(VERSION);
+    return;
+  }
   let cfg;
   try {
     cfg = loadConfig(argv);
@@ -359,4 +376,11 @@ async function main() {
   setInterval(tick, cfg.checkMinutes * 60_000);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) void main();
+// Run when started directly (node fynhelp-tally-connector.mjs). The packaged program calls main() from its own entry file.
+let startedDirectly = false;
+try {
+  startedDirectly = Boolean(process.argv[1]) && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+} catch {
+  startedDirectly = false;
+}
+if (startedDirectly) void main();

@@ -281,6 +281,8 @@ export async function reportResult(db: Db, c: ConnectorRow, id: string, input: {
   if (res?.ok) {
     await db.from("ca_tally_postings").update({ status: "posted", posted_at: now, tally_reply: reply.slice(0, 2000), last_error: null, updated_at: now }).eq("id", id).eq("status", "sent");
     await logActivity(db, c.ca_firm_id, p.business_id as string, "recon", "An approved entry was written to Tally.");
+    // Read it back: ask the connector for a fresh Day Book at its next check-in, so Recon sees the new voucher and matches it.
+    await db.from("ca_tally_connectors").update({ sync_requested_at: now }).eq("id", c.id);
     return { status: "posted" };
   }
   const why = err || res?.message || (reply ? "Tally did not confirm that the entry was created." : "No answer from Tally.");

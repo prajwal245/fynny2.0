@@ -54,6 +54,9 @@ export function ReviewGuide({ items }: { items: ReviewItem[] }) {
         const looksLikeRegister = regs.has(g.docId);
         const unassigned = !g.clientId;
         const n = g.items.length;
+        // Only lines with a readable date and an amount can become transactions; the rest need a person.
+        const dated = g.items.filter((r) => r.suggestion.date && r.suggestion.amount);
+        const undated = g.items.filter((r) => !(r.suggestion.date && r.suggestion.amount));
         const title = looksLikeRegister
           ? `${g.docName} looks like a list of invoices or a tax register, not a bank statement`
           : unassigned
@@ -74,6 +77,11 @@ export function ReviewGuide({ items }: { items: ReviewItem[] }) {
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 600, overflowWrap: "anywhere" }}>{title}</div>
                   <div style={{ fontSize: 13.5, color: V.body, marginTop: 4, lineHeight: 1.55 }}>{body}</div>
+                  {undated.length > 0 && !looksLikeRegister && (
+                    <div role="note" style={{ fontSize: 13, color: V.warnFg, background: V.warnBg, borderRadius: 10, padding: "8px 11px", marginTop: 8, lineHeight: 1.5 }}>
+                      {undated.length} row{undated.length === 1 ? " has" : "s have"} no readable date. These are usually Tally's detail or total lines, so they cannot be confirmed. Discard them.
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                   {unassigned && (
@@ -113,15 +121,15 @@ export function ReviewGuide({ items }: { items: ReviewItem[] }) {
                       <RotateCcw size={15} /> Read again as a register
                     </button>
                   )}
-                  {!unassigned && !looksLikeRegister && (
+                  {!unassigned && !looksLikeRegister && dated.length > 0 && (
                     <button
                       className="v2-btn v2-btn-ghost"
                       onClick={() => {
-                        g.items.forEach((r) => resolveReview(r.id, "confirmed"));
-                        toast.success(`${n} row${n === 1 ? "" : "s"} from ${g.docName} confirmed as transactions`);
+                        dated.forEach((r) => resolveReview(r.id, "confirmed"));
+                        toast.success(`${dated.length} row${dated.length === 1 ? "" : "s"} from ${g.docName} confirmed as transactions`);
                       }}
                     >
-                      <Check size={15} /> Confirm all {n}
+                      <Check size={15} /> Confirm {undated.length ? `${dated.length} dated` : `all ${n}`}
                     </button>
                   )}
                   <button

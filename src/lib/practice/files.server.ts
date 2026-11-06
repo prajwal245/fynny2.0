@@ -6,20 +6,24 @@
 import { PdfPasswordError } from "./extract/pipeline";
 import { columnMarks, findColumns, type PdfTextItem, type StatementColumns } from "./extract/pdfColumns";
 
+/**
+ * The text of a PDF. A locked PDF needs `password`; the reader tells "no password" (code 1) from "wrong password" (code 2).
+ * The password is used once to open the file in memory and is not kept anywhere.
+ */
 export async function pdfText(
   bytes: Uint8Array,
+  password?: string,
 ): Promise<{ text: string; pages: number }> {
   const { getDocumentProxy, extractText } = await import("unpdf");
   let doc;
   try {
-    doc = await getDocumentProxy(new Uint8Array(bytes));
+    doc = await getDocumentProxy(new Uint8Array(bytes), password ? { password } : {});
   } catch (e) {
-    const name = (e as { name?: string })?.name ?? "";
-    if (
-      name === "PasswordException" ||
-      /password/i.test(String((e as Error)?.message))
-    )
-      throw new PdfPasswordError();
+    const err = e as { name?: string; code?: number; message?: string };
+    if (err.name === "PasswordException" || /password/i.test(String(err.message))) {
+      const wrong = err.code === 2 || /incorrect/i.test(String(err.message));
+      throw new PdfPasswordError(wrong ? "wrong" : "needed", "PDF");
+    }
     throw e;
   }
   const pages = Math.min(doc.numPages, 40);
@@ -95,4 +99,34 @@ export async function loadSheetReader(): Promise<
     }
     return [];
   };
+}
+
+/**
+ * A locked Excel workbook (a modern .xlsx saved with "Encrypt with password"), opened with the password and returned as an
+ * ordinary workbook. The spreadsheet reader cannot decrypt, so this runs first. Anything not locked is returned as it is.
+ * Throws PdfPasswordError("needed" | "wrong", "Excel file").
+ */
+export async function unlockWorkbook(bytes: Uint8Array, password?: string): Promise<Uint8Array> {
+  const mod = (await import("officecrypto-tool")) as unknown as { default?: OfficeCrypto } & OfficeCrypto;
+  const oc: OfficeCrypto = mod.default ?? mod;
+  let locked = false;
+  try {
+    locked = Boolean(oc.isEncrypted(Buffer.from(bytes)));
+  } catch {
+    return bytes;
+  }
+  if (!locked) return bytes;
+  if (!password) throw new PdfPasswordError("needed", "Excel file");
+  try {
+    const out = await oc.decrypt(Buffer.from(bytes), { password });
+    return new Uint8Array(out);
+  } catch (e) {
+    if (/password/i.test(String((e as Error)?.message))) throw new PdfPasswordError("wrong", "Excel file");
+    throw e;
+  }
+}
+
+interface OfficeCrypto {
+  isEncrypted(input: Buffer): boolean;
+  decrypt(input: Buffer, options: { password: string }): Promise<Buffer>;
 }

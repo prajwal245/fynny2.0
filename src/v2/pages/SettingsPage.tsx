@@ -109,7 +109,7 @@ export default function SettingsPage() {
     email: "",
     role: "junior" as Team["roles"][number],
   });
-  const [tallyOnline, setTallyOnline] = useState(false);
+  const [tallyState, setTallyState] = useState<"none" | "connected" | "active">("none");
   const [busy, setBusy] = useState<string | null>(null);
   const [gmailResult, setGmailResult] = useState<string | null>(null);
   // Back from Google: check the inbox straight away and show the health check.
@@ -493,8 +493,8 @@ export default function SettingsPage() {
                   name="TallyPrime"
                   tag={<span style={{ fontSize: 11, color: V.muted, fontWeight: 600 }}>OR VIA EXPORT</span>}
                   description="Connect TallyPrime live with the FynHelp Connector, or export the bank ledger and drop it on Documents. Works with Tally on office PCs and Tally on Cloud."
-                  status={tallyOnline ? { tone: "good", label: "Active", live: true } : { tone: "neutral", label: "Not connected" }}
-                  nextStep={tallyOnline ? undefined : { text: "Install the Connector on the PC that runs Tally, or upload an export.", cta: "Set up Tally" }}
+                  status={tallyState === "active" ? { tone: "good", label: "Active", live: true } : tallyState === "connected" ? { tone: "warn", label: "Connected, no data yet" } : { tone: "neutral", label: "Not connected" }}
+                  nextStep={tallyState === "active" ? undefined : tallyState === "connected" ? { text: "The connector is running but no books have arrived yet. Link a Tally company to a client below, then press Sync now.", cta: "Link a company" } : { text: "Install the Connector on the PC that runs Tally, or upload an export.", cta: "Set up Tally" }}
                   actions={
                     <Link to="/app/documents" className="v2-btn v2-btn-ghost" style={{ padding: "8px 14px", fontSize: 13 }}>
                       <UploadCloud size={14} /> Upload export
@@ -502,7 +502,7 @@ export default function SettingsPage() {
                   }
                 >
                   <div style={{ display: "grid", gap: 14 }}>
-                    <TallyConnector onChange={setTallyOnline} />
+                    <TallyConnector onChange={setTallyState} />
                     <Disclosure label="Or upload an export by hand">
                       <div style={{ display: "grid", gap: 8, fontSize: 13, color: V.body }}>
                         <div>

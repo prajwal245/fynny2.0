@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
- * FynHelp Connector for TallyPrime (version 1.0.0)
+ * FynHelp Connector for TallyPrime (version 1.2.0)
  *
  * Runs on the PC where TallyPrime is open. It asks Tally (on this PC) for each linked company's
  * Day Book and sends it to FynHelp over HTTPS. It only makes outbound connections, never opens a
- * port to the internet, and only reads from Tally: it never changes anything in Tally.
+ * port to the internet. It reads from Tally. It writes into Tally ONLY lines your team approved in FynHelp,
+ * and only if you set "allowWrite": true in fynhelp-connector.json (off by default).
  *
  * SET UP (about 5 minutes)
  *  1. TallyPrime: F1 (Help) -> Settings -> Connectivity -> Client/Server configuration.
@@ -15,7 +16,8 @@
  *  4. In the same folder create fynhelp-connector.json:
  *       { "token": "fyn_tc_..." }
  *     Optional keys: "server" (default https://www.fynhelp.com), "tallyUrl" (default
- *     http://localhost:9000), "checkMinutes" (default 2).
+ *     http://localhost:9000), "checkMinutes" (default 2), "allowWrite" (default false).
+ *     Easier on Windows: run fynhelp-connector-setup.cmd, paste the token, and it does steps 2 to 5 for you.
  *  5. Test:   node fynhelp-tally-connector.mjs --check
  *     Run it: node fynhelp-tally-connector.mjs
  *  6. In FynHelp, link each Tally company to a client (Settings -> TallyPrime). Months of books
@@ -30,7 +32,7 @@ import { dirname, join, resolve } from "node:path";
 import { hostname } from "node:os";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-export const VERSION = "1.1.0";
+export const VERSION = "1.2.0";
 
 /* ── Tally XML helpers (pure; tested) ───────────────────────── */
 
@@ -66,9 +68,63 @@ export function monthRange(month) {
   return { from: `${m[1]}${m[2]}01`, to: `${m[1]}${m[2]}${String(last).padStart(2, "0")}` };
 }
 
-export function dayBookRequest(company, month) {
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** "20261101" as Tally prints a date ("1-Nov-2026"), or unchanged ("ymd"). */
+export function tallyDate(ymd, style = "dmy") {
+  if (style === "ymd") return ymd;
+  return `${Number(ymd.slice(6, 8))}-${MON[Number(ymd.slice(4, 6)) - 1]}-${ymd.slice(0, 4)}`;
+}
+
+/** Every day of a month as YYYYMMDD. */
+export function daysOfMonth(month) {
   const { from, to } = monthRange(month);
-  return `<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>Day Book</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>${esc(company)}</SVCURRENTCOMPANY><SVFROMDATE>${from}</SVFROMDATE><SVTODATE>${to}</SVTODATE><EXPLODEFLAG>Yes</EXPLODEFLAG></STATICVARIABLES></DESC></BODY></ENVELOPE>`;
+  const out = [];
+  for (let d = Number(from.slice(6)); d <= Number(to.slice(6)); d++) out.push(`${from.slice(0, 6)}${String(d).padStart(2, "0")}`);
+  return out;
+}
+
+/** The distinct voucher dates (YYYYMMDD) in a Day Book reply. */
+export function voucherDates(xml) {
+  const out = new Set();
+  for (const m of xml.matchAll(/<VOUCHER\b[\s\S]*?<DATE>\s*(\d{8})\s*<\/DATE>/gi)) out.add(m[1]);
+  return [...out].sort();
+}
+
+/** The <VOUCHER> blocks of a reply, as written. */
+export function voucherBlocks(xml) {
+  return xml.match(/<VOUCHER\b[\s\S]*?<\/VOUCHER>/gi) ?? [];
+}
+
+/** One Day Book envelope from several replies, without the same voucher twice. */
+export function mergeDayBooks(replies) {
+  const seen = new Set();
+  const blocks = [];
+  for (const r of replies) for (const b of voucherBlocks(r)) if (!seen.has(b)) { seen.add(b); blocks.push(b); }
+  return `<ENVELOPE><BODY><DATA><TALLYMESSAGE>${blocks.join("")}</TALLYMESSAGE></DATA></BODY></ENVELOPE>`;
+}
+
+/**
+ * Tally can answer a Day Book request for only the first day when it does not like the date format.
+ * So: ask with Tally's own format; if the answer covers a single day of a longer period, ask again with the other format;
+ * if it still does, ask one day at a time and join the answers. The caller always gets the whole period.
+ */
+export async function fetchDayBook(ask, company, month) {
+  const days = daysOfMonth(month);
+  const first = await ask(dayBookRequest(company, month, "dmy"));
+  if (voucherDates(first).length !== 1 || days.length < 2) return first;
+  const second = await ask(dayBookRequest(company, month, "ymd"));
+  if (voucherDates(second).length > 1) return second;
+  const replies = [];
+  for (const d of days) replies.push(await ask(dayBookRequest(company, month, "ymd", d)));
+  const merged = mergeDayBooks(replies);
+  return voucherBlocks(merged).length ? merged : first;
+}
+
+export function dayBookRequest(company, month, style = "dmy", onlyDay) {
+  const range = monthRange(month);
+  const from = onlyDay ?? range.from;
+  const to = onlyDay ?? range.to;
+  return `<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>Day Book</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>${esc(company)}</SVCURRENTCOMPANY><SVFROMDATE>${tallyDate(from, style)}</SVFROMDATE><SVTODATE>${tallyDate(to, style)}</SVTODATE><EXPLODEFLAG>Yes</EXPLODEFLAG></STATICVARIABLES></DESC></BODY></ENVELOPE>`;
 }
 
 export function ledgerListRequest(company) {
@@ -205,7 +261,7 @@ async function round(cfg, state, forceSync) {
   let tallyProblem = null;
   try {
     companies = await readCompanies(cfg);
-    if (!companies.length) tallyProblem = "TallyPrime is reachable but no company is open. Open the company in Tally.";
+    if (!companies.length) tallyProblem = "TallyPrime answered but listed no companies. In Tally, check that Client/Server is set to Both on port 9000, and that a company is loaded (Alt+F3 to select one). Then run the connector again.";
   } catch (e) {
     tallyProblem = `Cannot reach TallyPrime at ${cfg.tallyUrl}. Is it open, with Client/Server set to Both on port 9000? (${e.message})`;
   }
@@ -240,7 +296,7 @@ async function round(cfg, state, forceSync) {
     }
     for (const month of co.months) {
       try {
-        const xml = await askTally(cfg.tallyUrl, dayBookRequest(co.name, month), 10 * 60_000);
+        const xml = await fetchDayBook((body) => askTally(cfg.tallyUrl, body, 10 * 60_000), co.name, month);
         const err = tallyError(xml);
         if (err) throw new Error(`Tally said: ${err}`);
         const r = await fynhelp(cfg, `/api/public/tally-ledger?company=${encodeURIComponent(co.name)}&month=${month}`, {

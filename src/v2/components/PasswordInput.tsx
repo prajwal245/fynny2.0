@@ -1,8 +1,8 @@
 /** Password field with a show/hide button. */
-import { useState, type InputHTMLAttributes } from "react";
+import { useState, type InputHTMLAttributes, type Ref } from "react";
 import { Eye, EyeOff } from "lucide-react";
 
-export default function PasswordInput(props: Omit<InputHTMLAttributes<HTMLInputElement>, "type">) {
+export default function PasswordInput(props: Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & { ref?: Ref<HTMLInputElement> }) {
   const [show, setShow] = useState(false);
   return (
     <div style={{ position: "relative" }}>

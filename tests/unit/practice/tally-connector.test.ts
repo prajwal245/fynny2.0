@@ -64,8 +64,9 @@ describe("Tally XML helpers", () => {
     expect(connector.monthRange("2026-02")).toEqual({ from: "20260201", to: "20260228" });
     const req = connector.dayBookRequest("Acme & Sons", "2026-04");
     expect(req).toContain("<SVCURRENTCOMPANY>Acme &amp; Sons</SVCURRENTCOMPANY>");
-    expect(req).toContain("<SVFROMDATE>20260401</SVFROMDATE>");
-    expect(req).toContain("<SVTODATE>20260430</SVTODATE>");
+    expect(req).toContain("<SVFROMDATE>1-Apr-2026</SVFROMDATE>");
+    expect(req).toContain("<SVTODATE>30-Apr-2026</SVTODATE>");
+    expect(connector.dayBookRequest("A", "2026-04", "ymd")).toContain("<SVFROMDATE>20260401</SVFROMDATE>");
     expect(() => connector.monthRange("April")).toThrow();
   });
   it("reads company names from either reply shape", () => {
@@ -212,5 +213,46 @@ describe("connector: ledger list and write safety", () => {
     expect(connector.loadConfig(["--config", file]).allowWrite).toBe(true);
     writeFileSync(file, JSON.stringify({ token, allowWrite: "yes" }));
     expect(connector.loadConfig(["--config", file]).allowWrite).toBe(false);
+  });
+});
+
+describe("connector: a Day Book that arrives complete", () => {
+  const vch = (d, n) => `<VOUCHER VCHTYPE="Receipt"><DATE>${d}</DATE><VOUCHERNUMBER>${n}</VOUCHERNUMBER></VOUCHER>`;
+  const env = (...v) => `<ENVELOPE><BODY><DATA><TALLYMESSAGE>${v.join("")}</TALLYMESSAGE></DATA></BODY></ENVELOPE>`;
+  it("formats dates the way Tally prints them, or as plain digits", () => {
+    expect(connector.tallyDate("20261101")).toBe("1-Nov-2026");
+    expect(connector.tallyDate("20261130", "dmy")).toBe("30-Nov-2026");
+    expect(connector.tallyDate("20261101", "ymd")).toBe("20261101");
+  });
+  it("lists the days of a month and the dates in a reply", () => {
+    expect(connector.daysOfMonth("2026-02")).toHaveLength(28);
+    expect(connector.voucherDates(env(vch("20261103", 1), vch("20261101", 2), vch("20261103", 3)))).toEqual(["20261101", "20261103"]);
+  });
+  it("joins replies without repeating a voucher", () => {
+    const merged = connector.mergeDayBooks([env(vch("20261101", 1)), env(vch("20261101", 1), vch("20261102", 2))]);
+    expect(connector.voucherBlocks(merged)).toHaveLength(2);
+  });
+  it("a reply that covers the period is used as it is", async () => {
+    const asked = [];
+    const xml = await connector.fetchDayBook(async (b) => { asked.push(b); return env(vch("20261101", 1), vch("20261110", 2)); }, "Acme", "2026-11");
+    expect(asked).toHaveLength(1);
+    expect(connector.voucherDates(xml)).toHaveLength(2);
+  });
+  it("a reply with only one day triggers the other date format, then day by day, and joins the days", async () => {
+    const asked = [];
+    const ask = async (b) => {
+      asked.push(b);
+      const day = /<SVFROMDATE>(\d{8})<\/SVFROMDATE><SVTODATE>(\d{8})<\/SVTODATE>/.exec(b);
+      if (day && day[1] === day[2]) return day[1] === "20261105" || day[1] === "20261120" ? env(vch(day[1], day[1])) : env();
+      return env(vch("20261101", 1)); // Tally answered only the first day, whatever the period
+    };
+    const xml = await connector.fetchDayBook(ask, "Acme", "2026-11");
+    expect(connector.voucherDates(xml)).toEqual(["20261105", "20261120"]);
+    expect(asked.length).toBe(2 + 30);
+  });
+  it("a month that really has one busy day still returns it", async () => {
+    const ask = async () => env(vch("20261101", 1));
+    const xml = await connector.fetchDayBook(ask, "Acme", "2026-11");
+    expect(connector.voucherBlocks(xml).length).toBeGreaterThan(0);
   });
 });

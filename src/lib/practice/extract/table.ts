@@ -211,7 +211,7 @@ export function mapColumns(rows: string[][]): ColumnMap | null {
 
 const FOREIGN_CCY = /\b(USD|EUR|GBP|AED|SGD|JPY|AUD|CAD)\b|[$€£¥]/i;
 const SUMMARY_LINE =
-  /\b(total|opening balance|closing balance|balance b\/?f|balance c\/?f|carried forward|brought forward|statement summary|grand total)\b/i;
+  /\b(total|totals|opening balance|closing balance|opening bal|closing bal|balance b\/?f|balance c\/?f|carried forward|brought forward|statement summary|grand total|sub ?total)\b/i;
 
 /**
  * Turns a table into extracted rows. `rows` includes the preamble and header.
@@ -254,6 +254,7 @@ export function rowsFromTable(rows: string[][], side?: "bank" | "books"): Extrac
   const unsignedSingleColumn =
     map.debit === -1 && map.credit === -1 && map.type === -1;
 
+  const tallyLayout = isTallyLedger(rows);
   const out: ExtractedRow[] = [];
   for (let r = map.headerRow + 1; r < rows.length; r++) {
     const row = rows[r];
@@ -276,6 +277,11 @@ export function rowsFromTable(rows: string[][], side?: "bank" | "books"): Extrac
     if (booksDebitIn) signed = -signed;
     const vchDir = side === "books" ? directionFromVoucherType(cell(row, map.vchType)) : null;
     if (vchDir && signed !== 0) signed = vchDir === "in" ? Math.abs(signed) : -Math.abs(signed);
+
+    // In a Tally ledger every real entry carries a date. An undated line WITH an amount is a breakdown of the
+    // entry above it (GST, bill-wise detail) or a column total, never a transaction of its own: keep it out of the
+    // review queue, where "Confirm all" could add wrong entries (or a crore-rupee total) to the books.
+    if (tallyLayout && !date && signed !== 0) continue;
 
     if (!date && signed === 0) {
       // Continuation of a multi-line narration: keep the text, attach it upward.

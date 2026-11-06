@@ -1,6 +1,6 @@
 {
   "_comment": "Allowlist of Supabase database linter findings that are reviewed and accepted. CI fails on any finding NOT in this list. Each entry is matched on (name, level, metadata.schema, metadata.name) so adding a new policy/function with the same name as an allowlisted one will still be detected.",
-  "_updated": "2026-10-12",
+  "_updated": "2026-11-06",
   "allowed": [
     {
       "name": "function_search_path_mutable",
@@ -246,6 +246,13 @@
       "schema": "public",
       "object": "lookup_client_by_reference",
       "reason": "Raises unless the caller belongs to the firm (20261012130000)."
+    },
+    {
+      "name": "authenticated_security_definer_function_executable",
+      "level": "WARN",
+      "schema": "public",
+      "object": "admin_practice_ai_overview",
+      "reason": "Admin-only: the function body raises unless is_admin_user() is true (same pattern as admin_ai_usage_overview). Called from the admin screen with the admin's own session; anon and PUBLIC are revoked."
     }
   ]
 }

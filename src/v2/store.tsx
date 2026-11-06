@@ -1016,6 +1016,8 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
               },
             },
           });
+          // Open chases take the client's new phone, email or contact name on the server: show them.
+          if (patch.phone !== undefined || patch.email !== undefined || patch.contactName !== undefined) void refresh();
         } catch (e) {
           toast.error(`Could not save the client: ${errMsg(e)}`);
           void refresh();

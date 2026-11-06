@@ -29,6 +29,7 @@ import { confirmPendingAccount, createAccount, sendSignupCode, verifySignupCode 
 import { MOBILE_HINT, parseMobile } from "@/lib/practice/mobile";
 import { ENTITY_TYPES, useV2 } from "../store";
 import { OnboardingPanel } from "../components/OnboardingPanel";
+import { FirstClientStep, type PracticeKind } from "../components/FirstClientStep";
 import { GmailIcon } from "../components/BrandIcons";
 import { gstinProblem } from "@/lib/practice/india";
 
@@ -128,6 +129,7 @@ export default function OnboardingPage() {
   const [gstinErr, setGstinErr] = useState<string | null>(null);
   const [client, setClient] = useState({ name: "", entityType: ENTITY_TYPES[0], gstin: "", contactName: "", email: "", phone: "" });
   const [clientId, setClientId] = useState<string | null>(null);
+  const [kind, setKind] = useState<PracticeKind>("ca");
   const [uploaded, setUploaded] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -284,7 +286,14 @@ export default function OnboardingPage() {
     if (gp) return;
     const created = addClient({ ...client, gstin: client.gstin.trim().toUpperCase() });
     setClientId(created.id);
+    track("onboarding_step_completed", { step: "client", result: "added", kind });
     next();
+  };
+
+  // Skipping is a normal path: no client means no document step, so go straight to the finish.
+  const skipClient = () => {
+    track("onboarding_step_completed", { step: "client", result: "skipped", kind });
+    setStep(4);
   };
 
   const upload = (files: FileList | null) => {
@@ -319,14 +328,16 @@ export default function OnboardingPage() {
         <a className="onb-brand" href="/" aria-label="FynHelp home" style={{ color: "inherit", textDecoration: "none" }}>
           <span className="onb-logo">F</span>
           <span style={{ fontWeight: 700, letterSpacing: "-0.02em" }}>FynHelp</span>
-          <span style={{ color: V.muted, fontSize: 12.5 }}>Practice OS for CA firms</span>
+          <span style={{ color: V.muted, fontSize: 12.5 }}>Practice OS for CA and accounting firms</span>
         </a>
 
         {step > 0 && (
           <ol className="onb-rail" aria-label="Setup progress">
             {STEPS.slice(1).map((label, k) => {
               const i = k + 1;
-              const state = done(i) ? "done" : i === step ? "current" : "todo";
+              // Steps skipped (no client, so no first document either) are shown as still to do, not as done.
+              const skipped = step === 4 && !clientId && (i === 2 || i === 3);
+              const state = done(i) && !skipped ? "done" : i === step ? "current" : "todo";
               return (
                 <li key={label} data-state={state} aria-current={state === "current" ? "step" : undefined}>
                   <span className="onb-dot">{state === "done" ? <Check size={12} strokeWidth={3} /> : i}</span>
@@ -460,36 +471,7 @@ export default function OnboardingPage() {
             )}
 
             {step === 2 && (
-              <form onSubmit={submitClient} style={{ display: "grid", gap: 16 }}>
-                <Intro icon={<UserPlus size={20} />} title="Add your first client" text="The agents work client by client. Statements from this email file themselves, and the Chaser writes here when one is missing." />
-                <div className="onb-2col">
-                  <Field label="Client name"><input className="v2-input" required autoFocus value={client.name} onChange={(e) => setClient({ ...client, name: e.target.value })} placeholder="Sundar Textiles Pvt Ltd" /></Field>
-                  <Field label="Client's email"><input className="v2-input" type="email" required value={client.email} onChange={(e) => setClient({ ...client, email: e.target.value })} placeholder="ramesh@client.in" /></Field>
-                </div>
-                <details className="onb-more">
-                  <summary>More details <span>(optional)</span></summary>
-                  <div style={{ display: "grid", gap: 14, marginTop: 14 }}>
-                    <div className="onb-2col">
-                      <Field label="Contact person" optional><input className="v2-input" value={client.contactName} onChange={(e) => setClient({ ...client, contactName: e.target.value })} placeholder="Ramesh Sundar" /></Field>
-                      <Field label="Entity type">
-                        <select className="v2-input" value={client.entityType} onChange={(e) => setClient({ ...client, entityType: e.target.value })}>
-                          {ENTITY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                      </Field>
-                    </div>
-                    <div className="onb-2col">
-                      <Field label="GSTIN" optional>
-                        <input className="v2-input v2-mono" value={client.gstin} aria-invalid={Boolean(gstinErr)} style={gstinErr ? { borderColor: V.maroon } : undefined} onChange={(e) => { setClient({ ...client, gstin: e.target.value }); setGstinErr(null); }} placeholder="27AABCS1429B1ZU" />
-                        {gstinErr && <div role="alert" style={{ fontSize: 12, color: V.maroon, marginTop: 4 }}>{gstinErr}</div>}
-                      </Field>
-                      <Field label="WhatsApp number" optional><input className="v2-input" value={client.phone} onChange={(e) => setClient({ ...client, phone: e.target.value })} placeholder="919820011223" /></Field>
-                    </div>
-                  </div>
-                </details>
-                <Actions>
-                  <button className="v2-btn v2-btn-primary" type="submit">Add client <ArrowRight size={15} /></button>
-                </Actions>
-              </form>
+              <FirstClientStep kind={kind} setKind={setKind} client={client} setClient={setClient} gstinErr={gstinErr} clearGstinErr={() => setGstinErr(null)} onSubmit={submitClient} onSkip={skipClient} />
             )}
 
             {step === 3 && (
@@ -542,7 +524,7 @@ export default function OnboardingPage() {
                 <Intro icon={<Check size={20} />} title={`${firm?.name || firmForm.name || "Your practice"} is ready`} text="Here is where things stand, and the one thing to do next." />
                 <ul className="onb-checklist">
                   <Checked ok label="Firm set up" detail={firmForm.city ? `${firm?.name || firmForm.name}, ${firmForm.city}` : undefined} />
-                  <Checked ok={Boolean(clientId)} label={clientId ? `${clientName} added` : "First client"} />
+                  <Checked ok={Boolean(clientId)} label={clientId ? `${clientName} added` : "First client"} detail={clientId ? undefined : "Add one from Clients whenever you are ready"} />
                   <Checked
                     ok={Boolean(firstDoc && firstDoc.status !== "Failed")}
                     label={firstDoc ? `${firstDoc.name} read` : "First document"}
@@ -556,10 +538,12 @@ export default function OnboardingPage() {
                     ? firstDoc.reviewCount
                       ? `confirm the ${firstDoc.reviewCount} line${firstDoc.reviewCount === 1 ? "" : "s"} in review, then upload the books (Tally or ledger) so Recon can match the month.`
                       : "upload the books (Tally or ledger) so Recon can match the month."
-                    : "upload a bank statement and the books for the month."}
+                    : clientId
+                      ? "upload a bank statement and the books for the month."
+                      : "add your first client from Clients, then upload a bank statement and the books for the month."}
                 </div>
                 <Actions>
-                  <button className="v2-btn v2-btn-primary v2-btn-lg" onClick={finish}>Open the client workspace <ArrowRight size={15} /></button>
+                  <button className="v2-btn v2-btn-primary v2-btn-lg" onClick={finish}>{clientId ? "Open the client workspace" : "Open your workspace"} <ArrowRight size={15} /></button>
                   <button className="v2-btn v2-btn-ghost" onClick={connectGmail}>
                     <GmailIcon size={16} /> Connect Gmail
                   </button>

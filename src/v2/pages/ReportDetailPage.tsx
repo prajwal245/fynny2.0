@@ -89,7 +89,7 @@ export default function ReportDetailPage() {
   const features = billing?.access.features;
   const meta = { clientName: clientName(report.clientId), firmName: firm?.name ?? "FynHelp", branded: features ? PLANS[features].firmBranding : false };
 
-  // The gateway gross-up is part of the Revenue and Expenses figures, so it is listed with their sources.
+  // The gateway gross-up is part of the Receipts and Expenses figures, so it is listed with their sources.
   const g = report.gateway;
   const grossUpIn: Txn[] = g ? [{ date: "", particulars: "Fees and GST on fees kept by the payment gateway (added back from the settlement report)", amount: g.fees + g.gst_on_fees }] : [];
   const grossUpOut: Txn[] = g
@@ -102,7 +102,7 @@ export default function ReportDetailPage() {
   const everyRow = [...allRows, ...(report.otherFlows ?? []).flatMap((f) => f.rows)];
   const citedRows = (ids?: string[]) => (ids?.length ? everyRow.filter((r) => r.id && ids.includes(r.id)) : everyRow);
   const metrics = [
-    { label: "Revenue", value: report.revenue, tone: V.green, rows: [...report.sources.revenue, ...grossUpIn] },
+    { label: "Receipts", value: report.revenue, tone: V.green, rows: [...report.sources.revenue, ...grossUpIn] },
     { label: "Expenses", value: report.expenses, tone: V.maroon, rows: [...report.sources.expenses, ...grossUpOut] },
     { label: "Net", value: net, tone: net >= 0 ? V.green : V.maroon, rows: [...allRows, ...grossUpIn, ...grossUpOut] },
   ];
@@ -281,7 +281,7 @@ export default function ReportDetailPage() {
         <Card style={{ marginBottom: 20, background: V.cream }} data-testid="gateway-grossup">
           <div style={{ fontSize: 14.5, fontWeight: 600 }}>Payment gateway payouts grossed up</div>
           <div style={{ fontSize: 13.5, color: V.body, marginTop: 4, lineHeight: 1.55 }}>
-            {report.gateway.payouts} payout{report.gateway.payouts === 1 ? "" : "s"} matched the uploaded settlement report. Revenue includes the {formatINR(report.gateway.fees + report.gateway.gst_on_fees)} customers paid that the gateway kept, and the same amount is in expenses as gateway fees ({formatINR(report.gateway.fees)}) and GST on fees ({formatINR(report.gateway.gst_on_fees)}).
+            {report.gateway.payouts} payout{report.gateway.payouts === 1 ? "" : "s"} matched the uploaded settlement report. Receipts include the {formatINR(report.gateway.fees + report.gateway.gst_on_fees)} customers paid that the gateway kept, and the same amount is in expenses as gateway fees ({formatINR(report.gateway.fees)}) and GST on fees ({formatINR(report.gateway.gst_on_fees)}).
           </div>
         </Card>
       )}

@@ -41,7 +41,7 @@ export const POSTS_C: StaticPost[] = [
         ["Where was the FynHelp launch covered?", `The launch has been covered by ${PRESS.length} outlets: ${PRESS.map((p) => p.outlet).join(", ")}. Links to each article are on this page.`],
         ["What were the coverage headlines?", `${headlines.map((h) => `&ldquo;${h}&rdquo;`).join("; ")}.`],
         ["What is FynHelp?", "FynHelp is month-end close software for CA firms in India. It collects client documents, reconciles bank statements to Tally or Zoho books and drafts a source-traceable MIS that a partner signs off."],
-        ["Does FynHelp replace Tally or Zoho Books?", "No. FynHelp works on top of the ledger a firm already uses. It never writes to Tally."],
+        ["Does FynHelp replace Tally or Zoho Books?", "No. FynHelp works on top of the ledger a firm already uses. It reads by default, and writes into Tally only entries your partner has approved, and only if writing is switched on at the connector."],
         ["How is FynHelp priced?", "Per active client, with unlimited users. Plans start at ₹1,999 a month for 10 clients, excluding GST, and there is a free trial with no card."],
       ]),
       cta("See what the coverage describes on one of your own clients."),

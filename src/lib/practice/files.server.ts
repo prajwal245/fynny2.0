@@ -130,3 +130,18 @@ interface OfficeCrypto {
   isEncrypted(input: Buffer): boolean;
   decrypt(input: Buffer, options: { password: string }): Promise<Buffer>;
 }
+
+/** Every sheet that holds data (two or more filled rows), in file order. Date cells become YYYY-MM-DD. */
+export async function loadSheetsReader(): Promise<(bytes: Uint8Array) => { name: string; rows: string[][] }[]> {
+  const XLSX = await import("xlsx");
+  return (bytes: Uint8Array) => {
+    const wb = XLSX.read(bytes, { type: "array", cellDates: true });
+    const out: { name: string; rows: string[][] }[] = [];
+    for (const name of wb.SheetNames) {
+      const rows = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[name], { header: 1, raw: true, defval: "" });
+      const clean = rows.map((r) => (r as unknown[]).map((c) => (c instanceof Date ? iso(c) : c === null || c === undefined ? "" : String(c))));
+      if (clean.filter((r) => r.some((c) => c !== "")).length >= 2) out.push({ name, rows: clean });
+    }
+    return out;
+  };
+}

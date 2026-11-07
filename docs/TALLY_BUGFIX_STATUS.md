@@ -32,3 +32,29 @@ never half-read because of the date format. **Unverified against real Tally 7.2.
 Locked PDFs and locked Excel (.xlsx) files now show a password box in the document panel (and a "Password needed" badge and a
 prompt on the Documents page). The password is used once, in memory, and not stored or logged; tries are limited to 12 an hour per file.
 Checked with real locked files (no password, wrong password, right password). Old locked .xls files and locked CSV/zip are not covered.
+
+---
+
+# Retest of 6 Nov 2026 (combined status): what was fixed, what is not
+
+Every fix below is covered by unit tests built from the retest's own symptoms. **None has been run against a real TallyPrime or the live site**: please retest with the same files.
+
+| Retest bug | Result | What changed |
+|---|---|---|
+| 8 Opening balance read as a transaction | Fixed | Cause: Tally's Excel ledger puts "By"/"To" under Particulars and the party name in the next, unheaded column, so the opening row's text was never checked. The party column is now read, and a row with no voucher type that says Opening/Closing/Total is skipped. |
+| 10 "By"/"To" instead of the party | Fixed (same cause) | The party name is shown; a line with no name shows its voucher type and number. |
+| 9 Guide recommends XML it can't read | Fixed | Settings, the first-close guide and the FAQ now say Excel (Spreadsheet) for a ledger and warn about the multi-sheet file. Reading Ledger XML is still not built (no sample). |
+| N1 Multi-sheet Excel read only the first sheet | Fixed | The sheet that names the client (the latest one) is read; if none does, the last sheet is read; the activity log says which sheets were read and which were not. |
+| 11 Day Book mixed into bank reconciliation | Fixed for Excel and XML | A Day Book file keeps only receipts and payments; sales, purchase and journal vouchers are left out. A bank **ledger** keeps every line it lists. |
+| N5 Invoices and bills raise exceptions | Fixed | Invoice and bill lines are kept in the document but marked "ignored" for reconciliation. A re-read replaces them. |
+| 12 Kotak CSV misread | **Safety net only** | If nearly every "amount" equals the day of its own date the file is refused instead of offering 500 wrong lines. The real cause needs the Kotak file. |
+| 13 MIS calls receipts "Revenue" | Fixed | Labelled "Receipts" on the report, the list, exports and the guide. |
+| 14 Trial balance and ageing | Fixed earlier | Recognised at upload and refused with a plain message. |
+| N4 Statement footer added to a transaction | Fixed | Footer lines ("computer-generated statement...", page numbers, registered office, customer care) are never part of a narration. |
+| 15 / N2 "Discard all" stalls and says done | Fixed | One server action for the whole file; the message reports the real count; a failure puts the rows back and says nothing was changed. |
+| N3 Existing firm sent to "Name your firm" | Fixed | Only the server's own "Create your practice first" means no firm. Any other failure is retried and then shows "We could not open your practice just now" with a Try again button. |
+| 17 Older months can't be selected | Fixed | The Period list now covers every month from the firm's first to last transaction. |
+| 16 "Never writes to Tally" doesn't match the product | **Partly** | Position taken: read-only by default; writes only approved entries, only if switched on at the connector. FAQ, Security page and blog updated. **The Terms of Service (legal text) still say it never posts to Tally: your decision and a lawyer's review, not changed.** |
+| N6 "Move it here" did nothing | **Not reproduced** | Now says so if the file could not be read after the move, and the exception card wording is corrected. |
+| 7 Same lines added twice (overlap between a full-year and a monthly file) | Not retested, not changed | |
+| Live connector, Windows setup, GST/TDS checks | Not part of this change | Still need the retests in the first table. |

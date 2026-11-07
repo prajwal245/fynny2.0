@@ -14,6 +14,10 @@ const DATE_AT_START =
 const MONEY = /(?:\(?-?[\d,]+\.\d{2}\)?(?:\s?(?:Cr|Dr|CR|DR))?)/g;
 /** Marks of a pen note beside a printed line ("paid? check w/ Ramesh !!", "personal ->") rather than a wrapped narration. */
 const ANNOTATION = /[?!]|->|=>|<-|~|\bw\/|\bpls\b|\bcheck\b/i;
+/** Printed at the foot of a statement (or a page): never part of a transaction's narration. */
+const FOOTER =
+  /computer[- ]generated|system[- ]generated|(does|do) not (require|need)(?: a)? signature|needs? no signature|no signature (is )?(required|needed)|end of statement|statement ends|registered office|\bpage \d+ of \d+\b|toll[- ]free|customer care|www\.[a-z0-9-]+\.[a-z]{2,}|if you notice any discrepanc|kindly (inform|notify)|unless the constituent|this is an? [a-z ]{0,30}statement/i;
+const FOOTER_TAIL = /\s*[\/|-]?\s*(this is an? [a-z ]{0,30}statement|computer[- ]generated|system[- ]generated)[^]*$/i;
 const SKIP =
   /\b(opening balance|closing balance|balance b\/?f|brought forward|carried forward|total)\b/i;
 
@@ -42,9 +46,14 @@ export function rowsFromStatementText(text: string): TextStatementResult {
     }
   }
 
+  // Once a footer line is met, nothing after it (until the next dated line) belongs to a transaction.
+  let inFooter = false;
   lines.forEach((line, idx) => {
     const dm = line.match(DATE_AT_START);
+    if (dm) inFooter = false;
     if (!dm) {
+      if (FOOTER.test(line)) inFooter = true;
+      if (inFooter) return;
       // Narration spilling onto the next line.
       const prev = rows[rows.length - 1];
       if (prev && !SKIP.test(line) && !line.match(MONEY)?.length) {
@@ -54,7 +63,7 @@ export function rowsFromStatementText(text: string): TextStatementResult {
           prev.raw_text = `${prev.raw_text} ${line}`;
           return;
         }
-        prev.description = `${prev.description} ${line}`.trim().slice(0, 500);
+        prev.description = `${prev.description} ${line}`.replace(FOOTER_TAIL, "").trim().slice(0, 500);
         prev.raw_text = `${prev.raw_text} ${line}`;
       }
       return;

@@ -39,7 +39,7 @@ export function guideGroups(items: ReviewItem[], keep: Set<string> = new Set()):
 }
 
 export function ReviewGuide({ items }: { items: ReviewItem[] }) {
-  const { clients, reprocessDoc, assignDoc, resolveReview } = useV2();
+  const { clients, reprocessDoc, assignDoc, resolveReview, discardReviewDoc } = useV2();
   const [pick, setPick] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
   // Every register-like file gets its card (a 4th legacy register was hidden before); others up to 3.
@@ -134,9 +134,14 @@ export function ReviewGuide({ items }: { items: ReviewItem[] }) {
                   )}
                   <button
                     className="v2-btn v2-btn-ghost"
-                    onClick={() => {
-                      g.items.forEach((r) => resolveReview(r.id, "discarded"));
-                      toast.success(`${n} row${n === 1 ? "" : "s"} from ${g.docName} discarded`);
+                    disabled={busy === `d-${g.docId}`}
+                    onClick={async () => {
+                      // One server action for the whole file; the message says what really happened, never "done" for a partial result.
+                      setBusy(`d-${g.docId}`);
+                      const r = await discardReviewDoc(g.docId);
+                      setBusy(null);
+                      if (r.ok) toast.success(`${r.discarded} row${r.discarded === 1 ? "" : "s"} from ${g.docName} discarded`);
+                      else toast.error(`Could not discard these rows: ${r.message}. Nothing was changed; try again.`);
                     }}
                   >
                     <Trash2 size={15} /> Discard all {n}

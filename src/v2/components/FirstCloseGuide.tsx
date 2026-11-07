@@ -84,7 +84,7 @@ export function useFirstCloseSteps() {
         key: "books",
         title: "Upload the books for the same month",
         why: "Recon matches the bank to the books, so it needs both sides of the same account.",
-        how: "Export the Tally day book or the bank ledger (CSV, Excel or Tally XML) for the same month and bank account.",
+        how: "Export the bank ledger from Tally as Excel (Spreadsheet) for the same month and bank account, one file per month. A Day Book can be sent as XML.",
         done: books.length > 0,
         action: { label: "Upload books", to: `${base}?tab=recon` },
       },
@@ -117,7 +117,7 @@ export function useFirstCloseSteps() {
         title: "Check a figure, then sign off",
         why: "Open any number to see the transactions behind it. A partner's sign-off makes it the version for the client.",
         how: partnerView
-          ? "Click Revenue to check its lines, then Sign off. Download the PDF or Excel to send to the client."
+          ? "Click Receipts to check its lines, then Sign off. Download the PDF or Excel to send to the client."
           : "Ask a partner to sign it off. Until then it stays a draft.",
         done: Boolean(report?.signedOff),
         action: { label: report ? "Open the MIS" : "MIS and Reports", to: report ? `/app/reports/${report.id}` : "/app/reports" },

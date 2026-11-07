@@ -20,7 +20,7 @@ describe("what the site says about Zoho Books matches what the product does", ()
       expect(t, f).toMatch(/read-only/i);
       expect(t, f).toMatch(/approv/i);
     }
-    expect(read("src/pages/SecurityPage.tsx")).toMatch(/never writes to Tally/);
+    expect(read("src/pages/SecurityPage.tsx")).toMatch(/writes into Tally only an entry a partner or manager has approved/);
   });
 
   it("still never claims to write to Tally", () => {

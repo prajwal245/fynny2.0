@@ -25,7 +25,7 @@ export const PRICING_FAQS: [string, string][] = [
   ],
   [
     "Do we have to leave Tally or Zoho?",
-    "No migration. Upload Tally exports (XML or Excel) as you do today, or connect Zoho Books and pull each client’s bank ledger and open invoices. Both are read-only by default, and FynHelp never writes to Tally.",
+    "No migration. Upload your Tally bank ledger as an Excel export, or the Day Book as XML, as you do today. You can also connect Zoho Books and pull each client’s bank ledger and open invoices. Everything is read-only by default. FynHelp writes into Tally only entries your partner has approved, and only if writing is switched on at the connector.",
   ],
   [
     "Does FynHelp change anything in Zoho Books?",

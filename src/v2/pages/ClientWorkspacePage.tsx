@@ -192,7 +192,7 @@ export default function ClientWorkspacePage() {
           <div className="v2-grid-cards" style={{ marginBottom: 18 }}>
             <Stat label="Documents" value={<AnimatedCounter value={cDocs.length} />} hint="Collected so far" />
             <Stat label="Awaiting review" value={<AnimatedCounter value={cReview.length} />} hint="Low confidence rows" />
-            <Stat label="Open exceptions" value={<AnimatedCounter value={cEx.length} />} tone={cEx.length ? "bad" : "neutral"} hint="Unmatched bank lines" />
+            <Stat label="Open exceptions" value={<AnimatedCounter value={cEx.length} />} tone={cEx.length ? "bad" : "neutral"} hint="Lines that did not match" />
             <Stat label="Open chases" value={<AnimatedCounter value={cChases.length} />} hint="Documents still pending" />
           </div>
           <Card>

@@ -73,7 +73,7 @@ export function buildReportHtml(report: Report, meta: ExportMeta) {
     </tbody>
   </table>`;
   const gatewayNote = !report.gateway ? "" : `
-  <div class="insight">Payment gateway payouts grossed up: ${report.gateway.payouts} payout${report.gateway.payouts === 1 ? "" : "s"} matched the settlement report. Revenue includes ${inr(report.gateway.fees + report.gateway.gst_on_fees)} kept by the gateway, booked in expenses as fees ${inr(report.gateway.fees)} and GST on fees ${inr(report.gateway.gst_on_fees)}.</div>`;
+  <div class="insight">Payment gateway payouts grossed up: ${report.gateway.payouts} payout${report.gateway.payouts === 1 ? "" : "s"} matched the settlement report. Receipts include ${inr(report.gateway.fees + report.gateway.gst_on_fees)} kept by the gateway, booked in expenses as fees ${inr(report.gateway.fees)} and GST on fees ${inr(report.gateway.gst_on_fees)}.</div>`;
   const decisions = report.decisions ?? [];
   const exceptionBody = `
   <h3>Open exceptions and review items</h3>
@@ -92,8 +92,8 @@ export function buildReportHtml(report: Report, meta: ExportMeta) {
     : report.template === "Key Variances" ? varianceTable
       : report.template === "Bank Reconciliation Summary" ? bankTable + rowsTable("All bank lines considered", all)
         : report.template === "Working Paper"
-          ? varianceTable + bankTable + rowsTable("Revenue transactions", report.sources.revenue) + rowsTable("Expense transactions", report.sources.expenses)
-          : varianceTable + rowsTable("Revenue transactions", report.sources.revenue) + rowsTable("Expense transactions", report.sources.expenses);
+          ? varianceTable + bankTable + rowsTable("Receipts transactions", report.sources.revenue) + rowsTable("Expense transactions", report.sources.expenses)
+          : varianceTable + rowsTable("Receipts transactions", report.sources.revenue) + rowsTable("Expense transactions", report.sources.expenses);
   const isException = report.template === "Exception and Review Summary";
   const flowCount = flows.reduce((n, f) => n + f.count, 0);
   const notes = [
@@ -127,7 +127,7 @@ export function buildReportHtml(report: Report, meta: ExportMeta) {
     <div class="meta"><strong>${esc(statusOf(report))}</strong></div>
   </header>
   ${isException ? "" : `<div class="cards">
-    <div class="card"><span>Revenue</span><strong>${inr(report.revenue)}</strong></div>
+    <div class="card"><span>Receipts</span><strong>${inr(report.revenue)}</strong></div>
     <div class="card"><span>Expenses</span><strong>${inr(report.expenses)}</strong></div>
     <div class="card"><span>Net</span><strong>${inr(net)}</strong></div>
   </div>`}
@@ -169,7 +169,7 @@ export async function downloadExcel(report: Report, meta: ExportMeta) {
     ["Status", status],
     [],
     ["Line", "Amount (₹)"],
-    ["Revenue", report.revenue],
+    ["Receipts", report.revenue],
     ["Expenses", report.expenses],
     ["Net", report.revenue - report.expenses],
     ...(report.otherFlows ?? []).map((f) => [`${f.label} (not revenue/expense, net)`, flowMoney(f).net]),
@@ -196,7 +196,7 @@ export async function downloadExcel(report: Report, meta: ExportMeta) {
     "Transactions",
     [
       ["Figure", "Date", "Particulars", "Amount (₹)"],
-      ...tx("Revenue", report.sources.revenue),
+      ...tx("Receipts", report.sources.revenue),
       ...tx("Expenses", report.sources.expenses),
       ...(report.otherFlows ?? []).flatMap((f) => tx(f.label, f.rows)),
     ],

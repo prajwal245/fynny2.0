@@ -8,6 +8,7 @@
  * and reloads the workspace after each action. Figures are always derived
  * from transactions read out of files the practice actually uploaded.
  */
+import { WorkspaceUnavailable, loadWorkspaceWithRetry, messageOf } from "./lib/workspaceLoad";
 import { signupAttribution } from "@/lib/attribution";
 import { getLeadAttribution } from "@/lib/leadAttribution";
 import {
@@ -32,6 +33,7 @@ import {
   getPracticeWorkspace,
   reprocessPracticeDocument,
   unlockPracticeDocument,
+  discardPracticeReviewForDocument,
   registerPracticeUpload,
   requestPracticeReportCorrection,
   markPracticeReportCorrected,
@@ -338,18 +340,6 @@ const safeName = (s: string) =>
 /** Set by the provider: called when the server rejects an expired session. */
 let onSessionEnded: (() => void) | null = null;
 /** Any thrown value as words: Error, a server error object, or a plain string. Never "[object Object]". */
-function messageOf(e: unknown): string {
-  if (e instanceof Error && typeof e.message === "string" && e.message && e.message !== "[object Object]") return e.message;
-  if (typeof e === "string") return e;
-  if (e && typeof e === "object") {
-    const o = e as { message?: unknown; error?: unknown; statusText?: unknown };
-    for (const v of [o.message, o.error, o.statusText]) {
-      if (typeof v === "string" && v) return v;
-      if (v && typeof v === "object" && typeof (v as { message?: unknown }).message === "string") return (v as { message: string }).message;
-    }
-  }
-  return "Something went wrong. Please try again.";
-}
 /** The server cut the call off: the read is closed as Failed (with Retry) on the next load after 90 s. */
 const isTimeout = (e: unknown) => /error occurred with your deployment|FUNCTION_INVOCATION_TIMEOUT|gateway time-?out|\b504\b/i.test(messageOf(e));
 const errMsg = (e: unknown) => {
@@ -380,6 +370,9 @@ type Workspace = Awaited<ReturnType<typeof getPracticeWorkspace>>;
 
 type Store = {
   hydrated: boolean;
+  /** The workspace could not be loaded (not "no firm yet"): show a retry screen, never the sign-up steps. */
+  bootError: string | null;
+  retryBoot: () => void;
   session: { name: string; email: string; phone?: string; whatsappOk?: boolean } | null;
   firm: Firm | null;
   onboarded: boolean;
@@ -395,6 +388,8 @@ type Store = {
   firmIdReady: () => Promise<string | null>;
   /** Re-run the Extract agent on a document (retry after a failure). */
   reprocessDoc: (id: string) => Promise<void>;
+  /** Discards every open review line of a document in one server action. Resolves what really happened. */
+  discardReviewDoc: (docId: string) => Promise<{ ok: true; discarded: number } | { ok: false; message: string; remaining?: number }>;
   /** Opens a password-protected PDF or Excel file with the password typed, and reads it. Resolves ok, or why not. */
   unlockDoc: (id: string, password: string) => Promise<{ ok: true } | { ok: false; message: string }>;
   /** File an unassigned document under a client (and bank/books side); it is re-extracted. */
@@ -500,6 +495,9 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
   const [runs, setRuns] = useState<AgentRun[]>([]);
   const [recon, setRecon] = useState<Record<string, ReconResult>>({});
   const [hydrated, setHydrated] = useState(false);
+  const [bootError, setBootError] = useState<string | null>(null);
+  /** Every month between the firm's first and last transaction ("2025-03"), so older months can be picked. */
+  const [dataMonths, setDataMonths] = useState<string[]>([]);
   const [session, setSession] = useState<Store["session"]>(null);
   const [firm, setFirm] = useState<Firm | null>(null);
   const [period, setPeriod] = useState(DEFAULT_PERIOD);
@@ -575,6 +573,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
     // Teammates who cannot sign off work in the junior view.
     if (r && !["owner", "admin", "partner"].includes(r)) setRole("Junior");
     setReadyForMis(w.readyForMis ?? []);
+    setDataMonths(((w as { dataMonths?: string[] }).dataMonths) ?? []);
   }, []);
 
   /** Reloads everything from the server; the server is the source of truth. */
@@ -629,7 +628,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       () => true, // offline: let the workspace call decide
     );
     try {
-      const [ok, w] = await Promise.all([live, getPracticeWorkspace()]);
+      const [ok, w] = await Promise.all([live, loadWorkspaceWithRetry(getPracticeWorkspace)]);
       if (!ok) throw new Error("Unauthorized: session ended");
       workspace = w;
     } catch (e) {
@@ -648,8 +647,15 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
         setHydrated(true);
         return;
       }
+      if (e instanceof WorkspaceUnavailable) {
+        // Do not guess "no firm": say it failed and offer a retry.
+        setBootError(e.message || "The workspace could not be loaded.");
+        setHydrated(true);
+        return;
+      }
       workspace = null;
     }
+    setBootError(null);
     if (workspace) {
       firmId.current = workspace.firm.id;
       firmReady.current = Promise.resolve(workspace.firm.id);
@@ -671,6 +677,12 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    void boot();
+  }, [boot]);
+
+  const retryBoot = useCallback(() => {
+    setBootError(null);
+    setHydrated(false);
     void boot();
   }, [boot]);
 
@@ -1224,6 +1236,24 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
     [refresh, track, isRunning, docs],
   );
 
+  const discardReviewDoc = useCallback(
+    async (docId: string): Promise<{ ok: true; discarded: number } | { ok: false; message: string }> => {
+      const before = review;
+      // Show it gone at once; put it back if the server says otherwise.
+      setReview((p) => p.map((r) => (r.docId === docId && r.status === "open" ? { ...r, status: "discarded" } : r)));
+      try {
+        const r = await discardPracticeReviewForDocument({ data: { id: docId } });
+        void refresh();
+        return { ok: true, discarded: r.discarded };
+      } catch (e) {
+        setReview(before);
+        void refresh();
+        return { ok: false, message: errMsg(e) };
+      }
+    },
+    [refresh, review],
+  );
+
   const unlockDoc = useCallback(
     async (id: string, password: string): Promise<{ ok: true } | { ok: false; message: string }> => {
       setDocs((p) => p.map((d) => (d.id === id ? { ...d, status: "Processing", error: undefined, retryAt: undefined } : d)));
@@ -1253,9 +1283,10 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
         const r = await assignPracticeDocument({
           data: { id, business_id: clientId, ...(side ? { side } : {}) },
         });
-        toast.success(
-          `Filed and read: ${r.txns} transactions${r.review ? `, ${r.review} to review` : ""}.`,
-        );
+        // The server answers "failed" without throwing when the file could not be read under the new client: say so,
+        // never "Filed and read: 0 transactions".
+        if (r.status === "failed") toast.error(`Moved, but the file could not be read: ${r.error ?? "unknown reason"}`);
+        else toast.success(`Filed and read: ${r.txns} transaction${r.txns === 1 ? "" : "s"}${r.review ? `, ${r.review} to review` : ""}.`);
       } catch (e) {
         toast.error(errMsg(e));
       } finally {
@@ -1868,6 +1899,11 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       const d = new Date();
       keyed.set(p, monthKey(new Date(d.getFullYear(), d.getMonth() - i, 1)));
     });
+    // Months known from the whole of the firm's data, even when a file's lines are not all loaded here.
+    for (const m of dataMonths) {
+      const label = monthOf(`${m}-01`);
+      if (label && !keyed.has(label)) keyed.set(label, monthKey(new Date(`${m}-01T00:00:00`)));
+    }
     for (const doc of docs)
       for (const r of doc.rows) {
         if (!r.date) continue;
@@ -1876,11 +1912,13 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       }
     if (!keyed.has(period)) keyed.set(period, -1);
     return [...keyed.entries()].sort((a, b) => b[1] - a[1]).map(([p]) => p);
-  }, [docs, period]);
+  }, [docs, period, dataMonths]);
 
   const value = useMemo<Store>(
     () => ({
       hydrated,
+      bootError,
+      retryBoot,
       session,
       firm,
       onboarded: Boolean(firm),
@@ -1893,6 +1931,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       firmIdReady,
       reprocessDoc,
       unlockDoc,
+      discardReviewDoc,
       assignDoc,
       openDocument,
       clients,
@@ -1961,6 +2000,8 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       activityFor,
       closeStateFor,
       hydrated,
+      bootError,
+      retryBoot,
       session,
       firm,
       signIn,
@@ -1971,6 +2012,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       firmIdReady,
       reprocessDoc,
       unlockDoc,
+      discardReviewDoc,
       assignDoc,
       openDocument,
       clients,

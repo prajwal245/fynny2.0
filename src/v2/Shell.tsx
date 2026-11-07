@@ -47,7 +47,7 @@ export default function V2Shell() {
 function ShellBody() {
   const [open, setOpen] = useState(false);
   const [theme, toggleTheme] = useV2Theme();
-  const { hydrated, session, onboarded, firm, signOut, period, setPeriod, periods, role, setRole, review, exceptions, chases, firmRole, canSignOff, runs, dismissRun, reports } = useV2();
+  const { hydrated, bootError, retryBoot, session, onboarded, firm, signOut, period, setPeriod, periods, role, setRole, review, exceptions, chases, firmRole, canSignOff, runs, dismissRun, reports } = useV2();
   const navigate = useNavigate();
   // The page actually on screen (not one still loading), without a trailing slash.
   const pathname = useRouterState({ select: (s) => (s.resolvedLocation ?? s.location).pathname.replace(/(.)\/+$/, "$1") });
@@ -100,11 +100,11 @@ function ShellBody() {
   };
 
   useEffect(() => {
-    if (!hydrated || resetting) return;
+    if (!hydrated || resetting || bootError) return;
     if ((!session || !onboarded) && !onboarding) navigate({ to: "/app/onboarding" });
     // Leaving onboarding for the portfolio is decided by the onboarding page, so a
     // new partner is not pulled out halfway (the firm exists after step two).
-  }, [hydrated, session, onboarded, onboarding, resetting, navigate]);
+  }, [hydrated, bootError, session, onboarded, onboarding, resetting, navigate]);
 
   if (!hydrated && !resetting) {
     return (
@@ -121,6 +121,23 @@ function ShellBody() {
           />
           <ShimmerText text="Opening your practice…" agent="extract" style={{ fontSize: 15, fontWeight: 600 }} />
           <div className="v2-bar" style={{ width: 160 }}><i style={{ background: V.brand }} /></div>
+        </div>
+      </div>
+    );
+  }
+
+  // The workspace failed to load. Say so: never fall through to the sign-up steps for a firm that already exists.
+  if (bootError && !resetting) {
+    return (
+      <div className="v2" role="alert" style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: V.bg, padding: 20 }}>
+        <div style={{ display: "grid", justifyItems: "center", gap: 14, textAlign: "center", maxWidth: 420 }}>
+          <img src={brandMark} alt="" width={48} height={48} style={{ width: 48, height: 48, objectFit: "contain" }} />
+          <h1 style={{ fontSize: 20, margin: 0 }}>We could not open your practice just now</h1>
+          <p style={{ margin: 0, fontSize: 14, color: V.body, lineHeight: 1.6 }}>
+            Your firm and your data are safe. This is usually a short interruption: wait a few seconds and try again.
+          </p>
+          <button className="v2-btn v2-btn-primary v2-btn-lg" onClick={retryBoot}>Try again</button>
+          <details style={{ fontSize: 12, color: V.muted }}><summary style={{ cursor: "pointer" }}>Details</summary>{bootError}</details>
         </div>
       </div>
     );

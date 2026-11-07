@@ -631,7 +631,34 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
     activity,
     agentRuns,
     readyForMis,
+    dataMonths: await dataMonthsOf(db, ctx.firmId),
   };
+}
+
+/**
+ * Every month from the firm's first transaction to its last ("2025-03" ... "2026-11"), so any month that has data can be
+ * picked in the Period list, however old and however the lines were loaded. At most 120 months.
+ */
+export async function dataMonthsOf(db: Db, firmId: string): Promise<string[]> {
+  const [first, last] = await Promise.all([
+    db.from("ca_txns").select("txn_date").eq("ca_firm_id", firmId).order("txn_date", { ascending: true }).limit(1).maybeSingle(),
+    db.from("ca_txns").select("txn_date").eq("ca_firm_id", firmId).order("txn_date", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  return monthsBetween(first.data?.txn_date as string | undefined, last.data?.txn_date as string | undefined);
+}
+
+/** "2025-11-03", "2026-02-10" -> ["2025-11", "2025-12", "2026-01", "2026-02"]. Empty for a missing or reversed range. */
+export function monthsBetween(from: string | null | undefined, to: string | null | undefined, max = 120): string[] {
+  if (!from || !to || !/^\d{4}-\d{2}/.test(from) || !/^\d{4}-\d{2}/.test(to)) return [];
+  let y = Number(from.slice(0, 4)), m = Number(from.slice(5, 7));
+  const ey = Number(to.slice(0, 4)), em = Number(to.slice(5, 7));
+  const out: string[] = [];
+  while ((y < ey || (y === ey && m <= em)) && out.length < max) {
+    out.push(`${y}-${String(m).padStart(2, "0")}`);
+    m++;
+    if (m > 12) { m = 1; y++; }
+  }
+  return out;
 }
 
 interface ReportRow {

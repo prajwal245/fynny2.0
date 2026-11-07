@@ -236,6 +236,14 @@ export const unlockPracticeDocument = createServerFn({ method: "POST" })
     }),
   );
 
+/** Discards all open review lines of a document in one server action. */
+export const discardPracticeReviewForDocument = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: uuid }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./documents.server")).discardOpenReviewForDocument(db, ctx, data.id)),
+  );
+
 export const assignPracticeDocument = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) =>

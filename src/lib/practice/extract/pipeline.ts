@@ -30,6 +30,7 @@ import {
 } from "./table";
 import { isTallyXml, readTally } from "./tally";
 import { TALLY_XML_NO_VOUCHERS, unsupportedReport } from "./unsupported";
+import { selectSheet } from "./sheets";
 import { passwordNeededMessage, passwordWrongMessage, type ProtectedKind } from "../passwordFile";
 import { detectRegister, summariseRegister, type RegisterSummary } from "./registers";
 import { rowsFromStatementText } from "./textStatement";
@@ -85,6 +86,8 @@ export interface ExtractDeps {
   pdfText?: (bytes: Uint8Array) => Promise<{ text: string; pages: number }>;
   /** Rows of the first sheet with data in an Excel workbook. */
   sheetRows?: (bytes: Uint8Array) => string[][];
+  /** Every sheet with data. When given, the right sheet for this client is chosen instead of always the first. */
+  sheetsAll?: (bytes: Uint8Array) => { name: string; rows: string[][] }[];
   /** Text of a scanned PDF or photo (OCR.space). Null when OCR is not configured. */
   ocr?: ((bytes: Uint8Array, mime: string) => Promise<string>) | null;
   threshold?: number;
@@ -471,7 +474,11 @@ export async function runExtract(
       );
     let rows: string[][];
     try {
-      rows = deps.sheetRows(input.bytes);
+      const chosen = deps.sheetsAll ? selectSheet(deps.sheetsAll(input.bytes), input.clientName) : null;
+      if (chosen) {
+        rows = chosen.sheet.rows;
+        if (chosen.note) note = chosen.note;
+      } else rows = deps.sheetRows(input.bytes);
     } catch (e) {
       // A locked workbook is opened before this point (see unlockWorkbook); this catches a damaged or unsupported file.
       if (e instanceof PdfPasswordError)

@@ -18,7 +18,7 @@ export type MisBucket =
   | "unidentified";
 
 export const BUCKET_LABELS: Record<MisBucket, string> = {
-  revenue: "Revenue",
+  revenue: "Receipts (money in)",
   other_income: "Other income (interest)",
   expense: "Expenses",
   tax_payment: "Taxes paid (GST, TDS, advance tax)",

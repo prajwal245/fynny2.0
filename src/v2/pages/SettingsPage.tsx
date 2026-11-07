@@ -507,7 +507,10 @@ export default function SettingsPage() {
                       <div style={{ display: "grid", gap: 8, fontSize: 13, color: V.body }}>
                         <div>
                           In TallyPrime: Display More Reports → Account Books → Ledger → the bank ledger, <span className="num">Alt+F2</span> for the month, then{" "}
-                          <span className="num">Alt+E</span> → Current → XML (Data Interchange).
+                          <span className="num">Alt+E</span> → Current → <span className="num">F8</span> → <b>Excel (Spreadsheet)</b>. Excel is the format FynHelp reads for a ledger.
+                        </div>
+                        <div style={{ fontSize: 12.5 }}>
+                          Tally reuses the same file name and adds each export as a new sheet. Rename the file with the month (for example "HDFC Nov 2026") before the next export, so every month is its own file.
                         </div>
                         <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
                           <a href="/blog/tally-export-to-fynhelp" target="_blank" rel="noreferrer" style={{ color: V.maroon, fontWeight: 600 }}>

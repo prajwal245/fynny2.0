@@ -255,6 +255,21 @@ export function rowsFromTable(rows: string[][], side?: "bank" | "books"): Extrac
     map.debit === -1 && map.credit === -1 && map.type === -1;
 
   const tallyLayout = isTallyLedger(rows);
+  // Tally's Excel ledger writes "By" or "To" under "Particulars" and the party's name in the NEXT column, which has no heading.
+  // Reading only the headed column gave every line the description "By" or "To" (and the opening balance a normal-looking line).
+  let nameCol = -1;
+  if (tallyLayout && map.description >= 0 && !String(header[map.description + 1] ?? "").trim()) {
+    const first = rows
+      .slice(map.headerRow + 1, map.headerRow + 60)
+      .map((r) => String(r[map.description] ?? "").trim())
+      .filter(Boolean);
+    const sideWords = first.filter((v) => /^(by|to|dr|cr)\.?$/i.test(v)).length;
+    if (first.length && sideWords / first.length >= 0.6) nameCol = map.description + 1;
+  }
+  // A Day Book lists every voucher. Sales, purchases and journals move no money through the bank, so they are not bank
+  // reconciliation lines. (A bank LEDGER, by contrast, only ever lists bank movements, so nothing is dropped from it.)
+  const dayBook = tallyLayout && rows.slice(0, map.headerRow).some((r) => /\bday ?book\b/i.test(r.join(" ")));
+  const NON_BANK_VCH = /^(sales|sale|purchase|journal|credit note|debit note|memorandum|stock journal|rejections? (in|out))\b/i;
   const out: ExtractedRow[] = [];
   for (let r = map.headerRow + 1; r < rows.length; r++) {
     const row = rows[r];
@@ -264,7 +279,17 @@ export function rowsFromTable(rows: string[][], side?: "bank" | "books"): Extrac
       .join(" | ");
     const dateCell = cell(row, map.date) || cell(row, map.valueDate);
     const date = parseDate(dateCell);
-    const description = cell(row, map.description);
+    const vchTypeCell = cell(row, map.vchType);
+    const vchNoCell = header.findIndex((h) => /^(vch|voucher) ?no\b|^(vch|voucher) ?number/.test(norm(String(h ?? ""))));
+    const rawDescription = nameCol >= 0 ? cell(row, nameCol) : cell(row, map.description);
+    // A line with no party name still says what it is: its voucher type and number.
+    const description =
+      /^(by|to|dr|cr)\.?$/i.test(rawDescription) || !rawDescription
+        ? [vchTypeCell, vchNoCell >= 0 ? cell(row, vchNoCell) : ""].filter(Boolean).join(" ") || rawDescription
+        : rawDescription;
+    // Opening and closing balances and totals have no voucher type: they are checks, never transactions.
+    if (tallyLayout && !vchTypeCell && SUMMARY_LINE.test(row.join(" "))) continue;
+    if (dayBook && NON_BANK_VCH.test(vchTypeCell)) continue;
     let signed = round2(
       normaliseAmount(
         cell(row, map.amount),
@@ -344,7 +369,7 @@ export function rowsFromTable(rows: string[][], side?: "bank" | "books"): Extrac
       amount: Math.abs(signed),
       direction: signed < 0 ? "out" : "in",
       description,
-      counterparty: cell(row, map.counterparty) || null,
+      counterparty: cell(row, map.counterparty) || (nameCol >= 0 && rawDescription && !/^(by|to|dr|cr)\.?$/i.test(rawDescription) ? rawDescription : null),
       reference: cell(row, map.reference) || null,
       category: null,
       currency,
@@ -353,7 +378,18 @@ export function rowsFromTable(rows: string[][], side?: "bank" | "books"): Extrac
       parse_issues: issues,
     });
   }
+  // Safety net: if almost every amount is just the day of the month in that row's own date, the amount column was
+  // misread (a Kotak CSV once gave Rs 25 and Rs 9 for 25 and 9 December). Do not hand a person 500 wrong lines to confirm.
+  if (amountsAreDayNumbers(out)) return null;
   return out;
+}
+
+/** True when nearly every row's amount equals the day of its own date: a sign the amount column is really a date part. */
+export function amountsAreDayNumbers(rows: ExtractedRow[]): boolean {
+  const dated = rows.filter((r) => r.date && r.amount);
+  if (dated.length < 8) return false;
+  const same = dated.filter((r) => Number.isInteger(r.amount!) && r.amount === Number(String(r.date).slice(8, 10))).length;
+  return same / dated.length >= 0.8;
 }
 
 /** Excel files that were renamed to .csv start with the zip or OLE signature. */

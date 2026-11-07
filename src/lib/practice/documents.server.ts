@@ -26,8 +26,9 @@ import {
   runExtract,
   type AiCallRecord,
 } from "./extract/pipeline";
-import { loadSheetReader, pdfText, unlockWorkbook } from "./files.server";
+import { loadSheetReader, loadSheetsReader, pdfText, unlockWorkbook } from "./files.server";
 import { PdfPasswordError } from "./extract/pipeline";
+import { reconStatusFor } from "./reconScope";
 import { passwordNeededMessage, passwordWrongMessage } from "./passwordFile";
 import { practiceLlm, withinAiCap } from "./llm.server";
 import { practiceOcr } from "./ocr.server";
@@ -373,6 +374,7 @@ export async function processExtraction(
       ocr: practiceOcr(),
       pdfText: (b) => pdfText(b, opts.password),
       sheetRows: kind === "xlsx" ? await loadSheetReader() : undefined,
+      sheetsAll: kind === "xlsx" ? await loadSheetsReader() : undefined,
     },
   );
   await logAiCalls(db, doc.ca_firm_id, doc.id, outcome.aiCalls);
@@ -439,7 +441,8 @@ export async function processExtraction(
     .from("ca_txns")
     .delete()
     .eq("extraction_id", doc.id)
-    .eq("match_status", "unmatched")
+    // Unmatched lines, and the invoice lines kept out of reconciliation (a re-read replaces them; a line a person ignored stays).
+    .or("match_status.eq.unmatched,recon_tag.eq.invoice")
     .eq("created_via", "extract");
   await db
     .from("ca_review_items")
@@ -479,6 +482,7 @@ export async function processExtraction(
       }),
       created_via: "extract",
       created_by: doc.uploaded_by,
+      ...reconStatusFor(outcome.documentKind),
     }));
 
   let inserted = 0;
@@ -1054,4 +1058,35 @@ export async function correctionLog(db: Db, ctx: FirmContext) {
         .range(from, to),
     5000,
   );
+}
+
+/**
+ * Discards every open review line of one document in a single step. One call and one update, so discarding 500 lines
+ * is as quick as discarding one, and the count returned is what was really discarded (never "done" for a partial result).
+ */
+export async function discardOpenReviewForDocument(db: Db, ctx: FirmContext, extractionId: string) {
+  const { data: doc } = await db
+    .from("ca_document_extractions")
+    .select("id, business_id, original_filename")
+    .eq("id", extractionId)
+    .eq("ca_firm_id", ctx.firmId)
+    .maybeSingle();
+  if (!doc) throw new PracticeError("not_found", "Document not found.");
+  const now = new Date().toISOString();
+  const { data: done, error } = await db
+    .from("ca_review_items")
+    .update({ status: "discarded", resolved_by: ctx.userId, resolved_at: now })
+    .eq("extraction_id", extractionId)
+    .eq("ca_firm_id", ctx.firmId)
+    .eq("status", "open")
+    .select("id");
+  if (error) throw new PracticeError("db_error", error.message);
+  const { count } = await db.from("ca_review_items").select("id", { count: "exact", head: true }).eq("extraction_id", extractionId).eq("status", "open");
+  const left = count ?? 0;
+  await db
+    .from("ca_document_extractions")
+    .update({ review_count: left, ...(left === 0 ? { extract_status: "parsed", review_state: "posted", reviewed_at: now, reviewed_by: ctx.userId } : {}) })
+    .eq("id", extractionId);
+  await logActivity(db, ctx.firmId, doc.business_id as string | null, "extract", `${done?.length ?? 0} review line${done?.length === 1 ? "" : "s"} from ${doc.original_filename ?? "a document"} discarded.`);
+  return { discarded: done?.length ?? 0, remaining: left };
 }

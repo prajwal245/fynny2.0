@@ -10,7 +10,7 @@ import { REPORT_TEMPLATES, ReportTemplate, useV2 } from "../store";
 import { latestIds, reportState } from "../lib/reportStatus";
 
 const TEMPLATE_HINT: Record<ReportTemplate, string> = {
-  "Monthly MIS": "Revenue, expenses, variances and the transactions behind them.",
+  "Monthly MIS": "Receipts, expenses, variances and the transactions behind them.",
   "Bank Reconciliation Summary": "Credits, debits and high value lines with every bank row listed.",
   "Key Variances": "Only the movement against the prior period.",
   "Working Paper": "Everything above in one file, laid out for the audit file.",
@@ -91,7 +91,7 @@ export default function ReportsPage({ clientId: scopedClient }: { clientId?: str
         </div>
         <Card style={{ padding: 0 }} className="v2-scroll">
           <table className="v2-table v2-table-stack">
-            <thead><tr>{!scopedClient && <th>Client</th>}<th>Period</th><th>Template</th><th>Status</th><th>Revenue</th><th>Expenses</th><th>Generated</th></tr></thead>
+            <thead><tr>{!scopedClient && <th>Client</th>}<th>Period</th><th>Template</th><th>Status</th><th>Receipts</th><th>Expenses</th><th>Generated</th></tr></thead>
             <tbody>
               <AnimatePresence initial={false}>
                 {reports.map((r) => (

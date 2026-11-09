@@ -159,7 +159,7 @@ export const TERMS: LegalDoc = {
   {
    "t": "c",
    "n": "4.2",
-   "text": "The Service operates alongside the Customer’s existing accounting software and accesses ledger exports and connected sources on a read-only basis. It does not post or alter entries in Tally or any other accounting system. Where the Customer has connected Zoho Books and a partner of the Customer has expressly enabled approved entries for a client, the Service may create, and may remove, individual entries in that client’s Zoho Books organisation only after a partner of the Customer has reviewed and approved each entry. The Service does not otherwise alter or delete entries in Zoho Books."
+   "text": "The Service operates alongside the Customer’s existing accounting software and accesses ledger exports and connected sources on a read-only basis. It does not post or alter entries in any accounting system except as follows. Where the Customer has installed the FynHelp Connector for Tally and has switched on writing at the connector, the Service may create a single new Receipt, Payment or Contra voucher in a linked Tally company, one at a time, only after a partner or manager of the Customer has reviewed and approved that entry. The Service does not create or change ledgers or other masters in Tally, and does not alter or delete existing Tally entries. Where the Customer has connected Zoho Books and a partner of the Customer has expressly enabled approved entries for a client, the Service may create, and may remove, individual entries in that client’s Zoho Books organisation only after a partner of the Customer has reviewed and approved each entry. The Service does not otherwise alter or delete entries in Zoho Books."
   },
   {
    "t": "c",

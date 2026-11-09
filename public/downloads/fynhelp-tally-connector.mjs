@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * FynHelp Connector for TallyPrime (version 1.2.0)
+ * FynHelp Connector for TallyPrime (version 1.3.0)
  *
  * Runs on the PC where TallyPrime is open. It asks Tally (on this PC) for each linked company's
  * Day Book and sends it to FynHelp over HTTPS. It only makes outbound connections, never opens a
@@ -32,7 +32,7 @@ import { dirname, join, resolve } from "node:path";
 import { hostname } from "node:os";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-export const VERSION = "1.2.0";
+export const VERSION = "1.3.0";
 
 /* ── Tally XML helpers (pure; tested) ───────────────────────── */
 
@@ -104,27 +104,86 @@ export function mergeDayBooks(replies) {
 }
 
 /**
- * Tally can answer a Day Book request for only the first day when it does not like the date format.
- * So: ask with Tally's own format; if the answer covers a single day of a longer period, ask again with the other format;
- * if it still does, ask one day at a time and join the answers. The caller always gets the whole period.
+ * The ways of asking Tally for a month of vouchers, in the order tried. TallyPrime 7.2 was seen to IGNORE the period in a
+ * Day Book request (it answered with the same few vouchers, all dated Tally's current date), while its Voucher Register honours it.
  */
-export async function fetchDayBook(ask, company, month) {
-  const days = daysOfMonth(month);
-  const first = await ask(dayBookRequest(company, month, "dmy"));
-  if (voucherDates(first).length !== 1 || days.length < 2) return first;
-  const second = await ask(dayBookRequest(company, month, "ymd"));
-  if (voucherDates(second).length > 1) return second;
-  const replies = [];
-  for (const d of days) replies.push(await ask(dayBookRequest(company, month, "ymd", d)));
-  const merged = mergeDayBooks(replies);
-  return voucherBlocks(merged).length ? merged : first;
+export const PERIOD_ATTEMPTS = [
+  { id: "Voucher Register", style: "dmy", typed: true },
+  { id: "Voucher Register", style: "ymd", typed: false },
+  { id: "Day Book", style: "dmy", typed: true },
+  { id: "Day Book", style: "ymd", typed: false },
+];
+
+/** The voucher dates in a reply that fall outside the month (YYYYMMDD), or an empty list. */
+export function datesOutsideMonth(xml, month) {
+  const { from, to } = monthRange(month);
+  return voucherDates(xml).filter((d) => d < from || d > to);
 }
 
-export function dayBookRequest(company, month, style = "dmy", onlyDay) {
+/**
+ * A month of vouchers that is checked: every voucher date must fall inside the month, or the reply is refused and the next
+ * way of asking is tried. If nothing works, this throws and NOTHING is sent for the month (a wrong month must never be filed).
+ * A month in which every way of asking returns no vouchers at all is genuinely empty and is returned as such.
+ */
+export async function fetchDayBook(ask, company, month, onAttempt = () => {}) {
+  const { from, to } = monthRange(month);
+  const problems = [];
+  let empty = null;
+  let undated = null;
+  let sawWrongDates = false;
+  for (const a of PERIOD_ATTEMPTS) {
+    const reply = await ask(dayBookRequest(company, month, a.style, undefined, a));
+    const err = tallyError(reply);
+    if (err) {
+      problems.push(`${a.id}: Tally said "${err}"`);
+      continue;
+    }
+    const dates = voucherDates(reply);
+    if (!dates.length) {
+      // Vouchers with no readable date cannot be checked against the month; no vouchers at all is an empty month.
+      if (voucherBlocks(reply).length) undated ??= reply;
+      else empty ??= reply;
+      problems.push(`${a.id}: no dated vouchers`);
+      continue;
+    }
+    if (dates.every((d) => d >= from && d <= to)) {
+      onAttempt(a);
+      return reply;
+    }
+    sawWrongDates = true;
+    problems.push(`${a.id}: vouchers dated ${dates[0]} to ${dates[dates.length - 1]}, outside the month`);
+  }
+  if (!sawWrongDates && undated) return undated;
+  if (!sawWrongDates && empty) return empty;
+  throw new Error(`TallyPrime did not return the vouchers of ${month}. ${problems.join("; ")}. Nothing was sent for this month.`);
+}
+
+export function dayBookRequest(company, month, style = "dmy", onlyDay, how = { id: "Day Book", typed: false }) {
   const range = monthRange(month);
   const from = onlyDay ?? range.from;
   const to = onlyDay ?? range.to;
-  return `<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>Day Book</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>${esc(company)}</SVCURRENTCOMPANY><SVFROMDATE>${tallyDate(from, style)}</SVFROMDATE><SVTODATE>${tallyDate(to, style)}</SVTODATE><EXPLODEFLAG>Yes</EXPLODEFLAG></STATICVARIABLES></DESC></BODY></ENVELOPE>`;
+  const attr = how.typed ? ' TYPE="Date"' : "";
+  return `<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>${how.id}</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>${esc(company)}</SVCURRENTCOMPANY><SVFROMDATE${attr}>${tallyDate(from, style)}</SVFROMDATE><SVTODATE${attr}>${tallyDate(to, style)}</SVTODATE><EXPLODEFLAG>Yes</EXPLODEFLAG></STATICVARIABLES></DESC></BODY></ENVELOPE>`;
+}
+
+/**
+ * Safety for writing. Before anything is sent to Tally, the entry FynHelp provided must be exactly ONE new voucher
+ * (Receipt, Payment or Contra) for a company that is open and linked: never a ledger or other master, never a change or
+ * a deletion, never several vouchers. Returns null when it is fine, otherwise why it is refused.
+ */
+export function refuseImport(xml, company, linked) {
+  const x = String(xml);
+  if (!linked.includes(company)) return `"${company}" is not a linked, open company.`;
+  if (!/<TALLYREQUEST>\s*Import\s*<\/TALLYREQUEST>/i.test(x) || !/<ID>\s*Vouchers\s*<\/ID>/i.test(x)) return "This is not a voucher import.";
+  if (!new RegExp(`<SVCURRENTCOMPANY>${esc(company)}</SVCURRENTCOMPANY>`).test(x)) return "The entry names a different company.";
+  const vouchers = x.match(/<VOUCHER[\s>]/gi) ?? [];
+  if (vouchers.length !== 1) return `Expected exactly one voucher, found ${vouchers.length}.`;
+  if (!/<VOUCHER\b[^>]*\bACTION="Create"/i.test(x)) return "A voucher may only be created, never changed.";
+  if (/\bACTION="(Alter|Delete|Cancel|Remove)"/i.test(x) || /<(DELETE|CANCEL)\b/i.test(x)) return "Changing or deleting entries is not allowed.";
+  if (/<(LEDGER|GROUP|STOCKITEM|STOCKGROUP|COSTCENTRE|COSTCATEGORY|VOUCHERTYPE|UNIT|GODOWN|CURRENCY|COMPANY|EMPLOYEE|PAYHEAD)[\s>]/i.test(x)) return "Creating ledgers or other masters is not allowed.";
+  const type = /<VOUCHER\b[^>]*\bVCHTYPE="([^"]*)"/i.exec(x)?.[1] ?? "";
+  if (!/^(Receipt|Payment|Contra)$/.test(type)) return `Voucher type "${type}" is not allowed.`;
+  return null;
 }
 
 export function ledgerListRequest(company) {
@@ -179,16 +238,26 @@ async function askTally(tallyUrl, body, timeoutMs) {
   return sanitizeTallyXml(decodeTally(await res.arrayBuffer()));
 }
 
+const FYNHELP_HOSTS = new Set(["fynhelp.com", "www.fynhelp.com"]);
+
 async function fynhelp(cfg, path, init) {
-  const res = await fetch(`${cfg.server}${path}`, {
-    ...init,
-    headers: { Authorization: `Bearer ${cfg.token}`, ...(init.headers ?? {}) },
-    signal: AbortSignal.timeout(10 * 60_000),
-    // A redirect would drop the token and turn the request into a GET: say so instead of failing mysteriously.
-    redirect: "manual",
-  });
-  if (res.status >= 300 && res.status < 400)
-    throw new Error(`FynHelp redirected this request to ${res.headers.get("location") ?? "another address"}. Set "server" in fynhelp-connector.json to https://www.fynhelp.com`);
+  let url = `${cfg.server}${path}`;
+  let res;
+  // A redirect between FynHelp's own two addresses is followed with the same method, body and token. Any other redirect is
+  // refused, so the token can never be sent to another site.
+  for (let hop = 0; ; hop++) {
+    res = await fetch(url, {
+      ...init,
+      headers: { Authorization: `Bearer ${cfg.token}`, ...(init.headers ?? {}) },
+      signal: AbortSignal.timeout(10 * 60_000),
+      redirect: "manual",
+    });
+    if (!(res.status >= 300 && res.status < 400)) break;
+    const next = new URL(res.headers.get("location") ?? "", url);
+    if (hop >= 2 || next.protocol !== "https:" || !FYNHELP_HOSTS.has(next.hostname))
+      throw new Error(`FynHelp redirected this request to ${next.href}. Set "server" in fynhelp-connector.json to https://www.fynhelp.com`);
+    url = next.href;
+  }
   const text = await res.text();
   let json = null;
   try {
@@ -201,6 +270,18 @@ async function fynhelp(cfg, path, init) {
 }
 
 const log = (...a) => console.log(new Date().toISOString().replace("T", " ").slice(0, 19), ...a);
+
+/** "https://fynhelp.com" works too: it is changed to the www address, which is the real one. */
+export function normaliseServer(value) {
+  const v = String(value ?? "https://www.fynhelp.com").trim().replace(/\/+$/, "");
+  try {
+    const u = new URL(v);
+    if (u.hostname === "fynhelp.com") u.hostname = "www.fynhelp.com";
+    return u.origin + (u.pathname === "/" ? "" : u.pathname.replace(/\/+$/, ""));
+  } catch {
+    return v;
+  }
+}
 
 /** The folder this file is in. When packaged as a program there is no such address, so fall back to the program's folder. */
 function thisFolder() {
@@ -216,11 +297,12 @@ export function loadConfig(argv, cwd = process.cwd(), here = thisFolder()) {
   const candidates = i >= 0 && argv[i + 1] ? [resolve(argv[i + 1])] : [join(cwd, "fynhelp-connector.json"), join(here, "fynhelp-connector.json")];
   const file = candidates.find((f) => existsSync(f));
   if (!file) throw new Error(`Create fynhelp-connector.json with your token. Looked in: ${candidates.join(", ")}`);
-  const raw = JSON.parse(readFileSync(file, "utf8"));
+  // Windows tools may save the file with a byte-order mark; JSON.parse refuses it.
+  const raw = JSON.parse(readFileSync(file, "utf8").replace(/^\uFEFF/, ""));
   if (!/^fyn_tc_[A-Za-z0-9_-]{40,60}$/.test(raw.token ?? "")) throw new Error("The token in the config file is missing or wrong. Copy it again from FynHelp, Settings, TallyPrime.");
   return {
     token: raw.token,
-    server: String(raw.server ?? "https://www.fynhelp.com").replace(/\/+$/, ""),
+    server: normaliseServer(raw.server),
     tallyUrl: String(raw.tallyUrl ?? "http://localhost:9000"),
     checkMinutes: Math.max(1, Number(raw.checkMinutes) || 2),
     // Writing into Tally is OFF unless the person at this PC turns it on with "allowWrite": true.
@@ -247,12 +329,18 @@ async function sendLedgers(cfg, name) {
 }
 
 /** Writes lines a person approved in FynHelp. One at a time; every answer is reported back. Off unless allowWrite is true. */
-async function writeApproved(cfg, companies) {
+async function writeApproved(cfg, companies, linked) {
   if (!cfg.allowWrite) return;
   const { postings } = await fynhelp(cfg, "/api/public/tally-outbox", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
   for (const p of postings ?? []) {
     if (!companies.includes(p.company)) {
       await fynhelp(cfg, "/api/public/tally-result", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: p.id, error: `Company "${p.company}" is not open in Tally.` }) });
+      continue;
+    }
+    const refused = refuseImport(p.xml, p.company, linked);
+    if (refused) {
+      log(`✗ refused to write ${p.id.slice(0, 8)}: ${refused}`);
+      await fynhelp(cfg, "/api/public/tally-result", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: p.id, error: `The connector refused this entry: ${refused}` }) });
       continue;
     }
     let body;
@@ -288,7 +376,7 @@ async function round(cfg, state, forceSync) {
     return;
   }
   try {
-    await writeApproved(cfg, companies);
+    await writeApproved(cfg, companies, reply.companies.filter((c) => c.mapped).map((c) => c.name).filter((n) => companies.includes(n)));
   } catch (e) {
     log(`✗ writing approved entries: ${e.message}`);
   }
@@ -309,7 +397,7 @@ async function round(cfg, state, forceSync) {
     }
     for (const month of co.months) {
       try {
-        const xml = await fetchDayBook((body) => askTally(cfg.tallyUrl, body, 10 * 60_000), co.name, month);
+        const xml = await fetchDayBook((body) => askTally(cfg.tallyUrl, body, 10 * 60_000), co.name, month, (a) => log(`  ${co.name} ${month}: period honoured by Tally via "${a.id}" (${a.style})`));
         const err = tallyError(xml);
         if (err) throw new Error(`Tally said: ${err}`);
         const r = await fynhelp(cfg, `/api/public/tally-ledger?company=${encodeURIComponent(co.name)}&month=${month}`, {
@@ -339,7 +427,8 @@ export async function main() {
     cfg = loadConfig(argv);
   } catch (e) {
     console.error(e.message);
-    process.exit(2);
+    process.exitCode = 2;
+    return;
   }
   log(`FynHelp Connector ${VERSION} · Tally ${cfg.tallyUrl} · FynHelp ${cfg.server}`);
 
@@ -355,7 +444,9 @@ export async function main() {
       log(`✓ FynHelp accepted the token. Linked companies: ${r.companies.filter((c) => c.mapped).length}`);
     } catch (e) {
       log(`✗ FynHelp: ${e.message}`);
-      process.exit(1);
+      // Let the process end by itself: calling exit while requests are still closing makes Node print a scary message on Windows.
+      process.exitCode = 1;
+      return;
     }
     return;
   }

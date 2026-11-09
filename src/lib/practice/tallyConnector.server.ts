@@ -10,6 +10,7 @@ import { BUCKET, processExtraction, registerDocument } from "./documents.server"
 import {
   bearerOf,
   cleanCompanyNames,
+  datesOutsideMonth,
   connectorOnline,
   hashToken,
   looksLikeToken,
@@ -61,7 +62,10 @@ export async function hello(
     // Never swallow this: a failed save here is why "No Tally companies reported yet" can show while Tally has three open.
     if (error) {
       console.error(`[tally] could not save companies for connector ${c.id}: ${error.message}`);
-      problem = `FynHelp could not save the ${names.length} compan${names.length === 1 ? "y" : "ies"} Tally reported. Tell FynHelp support. (${error.message.slice(0, 120)})`;
+      const schema = /schema cache|column|does not exist/i.test(error.message);
+      problem = schema
+        ? "FynHelp's database is missing a column the connector needs (ca_tally_companies). Ask FynHelp support to run the Tally tables repair."
+        : `FynHelp could not save the ${names.length} compan${names.length === 1 ? "y" : "ies"} Tally reported. Tell FynHelp support. (${error.message.slice(0, 120)})`;
     }
   } else if (!problem) {
     problem = "The connector checked in, but TallyPrime listed no companies.";
@@ -103,7 +107,7 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
 
 export type LedgerResult =
   | { status: "synced" | "unchanged" | "empty"; note: string; extractionId?: string }
-  | { status: "unmapped" | "paused"; note: string };
+  | { status: "unmapped" | "paused" | "rejected"; note: string };
 
 /** One company's Day Book for one month, filed as a books-side document for the mapped client. */
 export async function ingestLedger(db: Db, c: ConnectorRow, company: string, month: string, bytes: Uint8Array): Promise<LedgerResult> {
@@ -126,6 +130,14 @@ export async function ingestLedger(db: Db, c: ConnectorRow, company: string, mon
   if (!vouchers) {
     await touch(`${label}: no vouchers in Tally`);
     return { status: "empty", note: `No vouchers in Tally for ${label}.` };
+  }
+
+  // Tally has been seen to ignore the requested period and answer with another date. Never file the wrong month.
+  const outside = datesOutsideMonth(new TextDecoder().decode(bytes), month);
+  if (outside.length) {
+    const fmt = (d: string) => `${d.slice(6)}-${d.slice(4, 6)}-${d.slice(0, 4)}`;
+    await touch(`${label}: refused, Tally sent vouchers dated ${fmt(outside[0])}${outside.length > 1 ? ` and ${outside.length - 1} other date${outside.length > 2 ? "s" : ""}` : ""}, outside the month`);
+    return { status: "rejected", note: `Tally answered with vouchers dated outside ${label} (for example ${fmt(outside[0])}). Nothing was filed. Update the connector to the latest version.` };
   }
 
   const hash = await sha256Hex(bytes);

@@ -28,7 +28,7 @@ export const Route = createFileRoute("/api/public/tally-ledger")({
         try {
           const bytes = new Uint8Array(await request.arrayBuffer());
           const result = await t.ingestLedger(db, connector, company, month, bytes);
-          return json(result, result.status === "paused" ? 402 : 200);
+          return json(result, result.status === "paused" ? 402 : result.status === "rejected" ? 422 : 200);
         } catch (e) {
           const code = (e as { code?: string }).code;
           const status = code === "billing_paused" || code === "plan_limit" ? 402 : code === "too_large" ? 413 : 422;

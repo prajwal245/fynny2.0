@@ -58,3 +58,18 @@ Every fix below is covered by unit tests built from the retest's own symptoms. *
 | N6 "Move it here" did nothing | **Not reproduced** | Now says so if the file could not be read after the move, and the exception card wording is corrected. |
 | 7 Same lines added twice (overlap between a full-year and a monthly file) | Not retested, not changed | |
 | Live connector, Windows setup, GST/TDS checks | Not part of this change | Still need the retests in the first table. |
+
+---
+
+# Live connector test, 9 Nov 2026 (connector 1.2.0, TallyPrime 7.2): what changed (connector 1.3.0)
+
+| Finding | Result | What changed |
+|---|---|---|
+| Companies not saved: "Could not find the 'company_name' column of 'ca_tally_companies' in the schema cache" | **Needs one SQL run** | The live table did not match the app. `supabase/migrations/20261109110000_tally_tables_repair.sql` (also inside `apply_tally_posting.sql`) adds every expected column, copies an older `name` column across, removes exact duplicates, builds the unique index the check-in needs and reloads the API schema. Tested on a scratch database that had the old shape; safe to run twice. **Until it is run in Supabase, linking, syncing and writing stay blocked.** |
+| Day Book returned the same 7 vouchers dated 31 March 2026 for any month | Fixed in code, unproven on Tally | Tally 7.2 ignores the period for the Day Book. The connector now asks the Voucher Register first (dates as `1-Jan-2026` with `TYPE="Date"`, then plain digits), then the Day Book, and **refuses any reply whose voucher dates fall outside the month**. If nothing works it sends nothing and logs why. The server also refuses a file whose voucher dates are outside the month. The log shows which way Tally honoured. |
+| Server without www: redirect, connector stops | Fixed | `https://fynhelp.com` is changed to the www address, and a redirect between FynHelp's own two addresses is followed (never to another site). |
+| "Export selected to Tally" does nothing, no message | Fixed | The button now says why (select lines from one client; only bank lines can be exported). |
+| Config file saved with a byte-order mark | Fixed | The connector accepts it, and the Windows setup no longer writes one. |
+| Exit crash message on Node 24 / Windows | Fixed | The connector ends normally instead of calling exit while requests are open. |
+| Safety of writing | Fixed | Before sending anything to Tally the connector checks the entry is exactly ONE new Receipt, Payment or Contra voucher for a linked company: no ledgers or other masters, no change or delete, no extra vouchers. Otherwise it refuses and reports why. |
+| Writing, changing and removing an entry | Not testable until companies link | Retest after the SQL is run. |

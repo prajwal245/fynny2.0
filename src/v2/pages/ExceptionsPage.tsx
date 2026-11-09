@@ -610,10 +610,15 @@ export default function ExceptionsPage({
             key={s}
             className="bx-btn bx-sm bx-logo"
             style={{ minHeight: 40, padding: "4px 12px" }}
-            disabled={selectedClients.size !== 1 || selected.every((e) => e.side === "books")}
+            // Never a silent dead button: say why nothing opens.
+            aria-disabled={selectedClients.size !== 1 || selected.every((e) => e.side === "books")}
             aria-label={`Export selected to ${SYSTEM_LABEL[s]}`}
             title={selectedClients.size !== 1 ? "Select lines from one client to export" : `Export selected to ${SYSTEM_LABEL[s]}`}
-            onClick={() => setBulkExport(s)}
+            onClick={() => {
+              if (selectedClients.size !== 1) return void toast.info("Select lines from one client first. An export is for one client at a time.");
+              if (selected.every((e) => e.side === "books")) return void toast.info(`Only bank lines can be exported to ${SYSTEM_LABEL[s]}. The lines you selected are from the books, so there is nothing missing to export.`);
+              setBulkExport(s);
+            }}
           >
             <SystemLogo system={s} />
           </button>

@@ -2,5 +2,5 @@
 import { main } from "../public/downloads/fynhelp-tally-connector.mjs";
 main().catch((e) => {
   console.error(e?.message ?? e);
-  process.exit(1);
+  process.exitCode = 1;
 });

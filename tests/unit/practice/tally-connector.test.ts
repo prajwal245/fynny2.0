@@ -216,43 +216,96 @@ describe("connector: ledger list and write safety", () => {
   });
 });
 
-describe("connector: a Day Book that arrives complete", () => {
+describe("connector: only the right month is ever sent (TallyPrime 7.2 ignored the period)", () => {
   const vch = (d, n) => `<VOUCHER VCHTYPE="Receipt"><DATE>${d}</DATE><VOUCHERNUMBER>${n}</VOUCHERNUMBER></VOUCHER>`;
   const env = (...v) => `<ENVELOPE><BODY><DATA><TALLYMESSAGE>${v.join("")}</TALLYMESSAGE></DATA></BODY></ENVELOPE>`;
   it("formats dates the way Tally prints them, or as plain digits", () => {
     expect(connector.tallyDate("20261101")).toBe("1-Nov-2026");
-    expect(connector.tallyDate("20261130", "dmy")).toBe("30-Nov-2026");
     expect(connector.tallyDate("20261101", "ymd")).toBe("20261101");
   });
-  it("lists the days of a month and the dates in a reply", () => {
-    expect(connector.daysOfMonth("2026-02")).toHaveLength(28);
-    expect(connector.voucherDates(env(vch("20261103", 1), vch("20261101", 2), vch("20261103", 3)))).toEqual(["20261101", "20261103"]);
+  it("finds the voucher dates and the ones outside a month", () => {
+    const x = env(vch("20260331", 1), vch("20260105", 2));
+    expect(connector.voucherDates(x)).toEqual(["20260105", "20260331"]);
+    expect(connector.datesOutsideMonth(x, "2026-01")).toEqual(["20260331"]);
   });
-  it("joins replies without repeating a voucher", () => {
-    const merged = connector.mergeDayBooks([env(vch("20261101", 1)), env(vch("20261101", 1), vch("20261102", 2))]);
-    expect(connector.voucherBlocks(merged)).toHaveLength(2);
+  it("the request carries TYPE=Date for the typed attempts and asks for the Voucher Register first", () => {
+    const first = connector.PERIOD_ATTEMPTS[0];
+    expect(first.id).toBe("Voucher Register");
+    const req = connector.dayBookRequest("Acme", "2026-01", first.style, undefined, first);
+    expect(req).toContain("<ID>Voucher Register</ID>");
+    expect(req).toContain('<SVFROMDATE TYPE="Date">1-Jan-2026</SVFROMDATE>');
+    expect(req).toContain('<SVTODATE TYPE="Date">31-Jan-2026</SVTODATE>');
   });
-  it("a reply that covers the period is used as it is", async () => {
+  it("a reply inside the month is used as it is, and the way that worked is reported", async () => {
+    const tried = [];
     const asked = [];
-    const xml = await connector.fetchDayBook(async (b) => { asked.push(b); return env(vch("20261101", 1), vch("20261110", 2)); }, "Acme", "2026-11");
+    const xml = await connector.fetchDayBook(async (b) => { asked.push(b); return env(vch("20260105", 1), vch("20260120", 2)); }, "Acme", "2026-01", (a) => tried.push(a.id));
     expect(asked).toHaveLength(1);
+    expect(tried).toEqual(["Voucher Register"]);
     expect(connector.voucherDates(xml)).toHaveLength(2);
   });
-  it("a reply with only one day triggers the other date format, then day by day, and joins the days", async () => {
-    const asked = [];
-    const ask = async (b) => {
-      asked.push(b);
-      const day = /<SVFROMDATE>(\d{8})<\/SVFROMDATE><SVTODATE>(\d{8})<\/SVTODATE>/.exec(b);
-      if (day && day[1] === day[2]) return day[1] === "20261105" || day[1] === "20261120" ? env(vch(day[1], day[1])) : env();
-      return env(vch("20261101", 1)); // Tally answered only the first day, whatever the period
-    };
-    const xml = await connector.fetchDayBook(ask, "Acme", "2026-11");
-    expect(connector.voucherDates(xml)).toEqual(["20261105", "20261120"]);
-    expect(asked.length).toBe(2 + 30);
+  it("a reply dated outside the month is refused and the next way of asking is tried", async () => {
+    let n = 0;
+    const xml = await connector.fetchDayBook(async (b) => {
+      n++;
+      return /Voucher Register/.test(b) ? env(vch("20260331", 1)) : env(vch("20260105", 7), vch("20260110", 8)); // only the Day Book honours it here
+    }, "Acme", "2026-01");
+    expect(n).toBe(3);
+    expect(connector.datesOutsideMonth(xml, "2026-01")).toEqual([]);
   });
-  it("a month that really has one busy day still returns it", async () => {
-    const ask = async () => env(vch("20261101", 1));
-    const xml = await connector.fetchDayBook(ask, "Acme", "2026-11");
-    expect(connector.voucherBlocks(xml).length).toBeGreaterThan(0);
+  it("when Tally never honours the period, it throws and nothing is sent (the 31 March bug)", async () => {
+    await expect(connector.fetchDayBook(async () => env(vch("20260331", 1), vch("20260331", 2)), "Acme", "2026-01")).rejects.toThrow(/did not return the vouchers of 2026-01.*Nothing was sent/s);
+  });
+  it("a month with no vouchers at all is genuinely empty and is returned", async () => {
+    const xml = await connector.fetchDayBook(async () => env(), "Acme", "2026-01");
+    expect(connector.voucherBlocks(xml)).toHaveLength(0);
+  });
+});
+
+describe("connector: the address, the config file and writing", () => {
+  it("fynhelp.com without www is changed to the www address", () => {
+    expect(connector.normaliseServer("https://fynhelp.com")).toBe("https://www.fynhelp.com");
+    expect(connector.normaliseServer("https://fynhelp.com/")).toBe("https://www.fynhelp.com");
+    expect(connector.normaliseServer("https://www.fynhelp.com")).toBe("https://www.fynhelp.com");
+    expect(connector.normaliseServer(undefined)).toBe("https://www.fynhelp.com");
+    expect(connector.normaliseServer("http://localhost:3000/")).toBe("http://localhost:3000");
+  });
+  it("a config file saved with a byte-order mark still loads", () => {
+    const dir = mkdtempSync(join(tmpdir(), "fyn-"));
+    const file = join(dir, "c.json");
+    const token = "fyn_tc_" + "a".repeat(43);
+    writeFileSync(file, "\uFEFF" + JSON.stringify({ token, server: "https://fynhelp.com" }));
+    const cfg = connector.loadConfig(["--config", file]);
+    expect(cfg.token).toBe(token);
+    expect(cfg.server).toBe("https://www.fynhelp.com");
+  });
+  const entry = (over = "") =>
+    `<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Import</TALLYREQUEST><TYPE>Data</TYPE><ID>Vouchers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVCURRENTCOMPANY>Acme &amp; Sons</SVCURRENTCOMPANY></STATICVARIABLES></DESC><DATA><TALLYMESSAGE><VOUCHER REMOTEID="x" VCHTYPE="Receipt" ACTION="Create"><DATE>20261102</DATE></VOUCHER>${over}</TALLYMESSAGE></DATA></BODY></ENVELOPE>`;
+  const linked = ["Acme & Sons"];
+  it("one new Receipt for a linked company is allowed", () => {
+    expect(connector.refuseImport(entry(), "Acme & Sons", linked)).toBeNull();
+  });
+  it("refuses an unlinked company, a master, a change, a deletion and extra vouchers", () => {
+    expect(connector.refuseImport(entry(), "Other Co", linked)).toMatch(/not a linked/);
+    expect(connector.refuseImport(entry("<LEDGER NAME=\"New\"></LEDGER>"), "Acme & Sons", linked)).toMatch(/masters/);
+    expect(connector.refuseImport(entry().replace('ACTION="Create"', 'ACTION="Alter"'), "Acme & Sons", linked)).toMatch(/created/);
+    expect(connector.refuseImport(entry().replace('ACTION="Create"', 'ACTION="Delete"'), "Acme & Sons", linked)).toMatch(/created|deleting/);
+    expect(connector.refuseImport(entry('<VOUCHER VCHTYPE="Payment" ACTION="Create"></VOUCHER>'), "Acme & Sons", linked)).toMatch(/exactly one/);
+    expect(connector.refuseImport(entry().replace('VCHTYPE="Receipt"', 'VCHTYPE="Journal"'), "Acme & Sons", linked)).toMatch(/not allowed/);
+    expect(connector.refuseImport("<ENVELOPE><HEADER><TALLYREQUEST>Export</TALLYREQUEST></HEADER></ENVELOPE>", "Acme & Sons", linked)).toMatch(/not a voucher import/);
+  });
+  it("a different company named in the entry is refused", () => {
+    expect(connector.refuseImport(entry().replace("Acme &amp; Sons", "Other"), "Acme & Sons", linked)).toMatch(/different company/);
+  });
+});
+
+import { datesOutsideMonth, voucherDatesOf } from "@/lib/practice/tallyConnector";
+describe("the server never files the wrong month", () => {
+  const x = (d: string) => `<ENVELOPE><VOUCHER VCHTYPE="Receipt"><DATE>${d}</DATE></VOUCHER></ENVELOPE>`;
+  it("finds voucher dates and the ones outside the month", () => {
+    expect(voucherDatesOf(x("20260331") + x("20260105"))).toEqual(["20260105", "20260331"]);
+    expect(datesOutsideMonth(x("20260331") + x("20260105"), "2026-01")).toEqual(["20260331"]);
+    expect(datesOutsideMonth(x("20260105") + x("20260131"), "2026-01")).toEqual([]);
+    expect(datesOutsideMonth(x("20260229"), "2026-02")).toEqual(["20260229"]); // 2026 is not a leap year
   });
 });

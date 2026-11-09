@@ -36,7 +36,7 @@ export const BX_STYLES = `
 .bx-btn:active:not(:disabled){transform:translateY(0) scale(.97);box-shadow:0 0 0 2px rgba(217,43,43,.22)}
 .bx-sm{min-height:38px;padding:7px 14px;font-size:13px}
 .bx-btn:focus-visible{outline:2px solid var(--v2-brand);outline-offset:3px}
-.bx-btn:disabled{opacity:.5;cursor:not-allowed}
+.bx-btn:disabled,.bx-btn[aria-disabled="true"]{opacity:.5;cursor:not-allowed}
 .bx-btn[aria-pressed="true"],.bx-primary{background:#fff;color:#141210;border-color:var(--v2-brand);box-shadow:0 0 0 3px rgba(217,43,43,.12)}
 .bx-logo{min-height:52px;padding:8px 20px}
 .bx-logo img{display:block;height:28px;width:auto;max-width:150px}

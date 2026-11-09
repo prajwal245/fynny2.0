@@ -64,3 +64,19 @@ export function cleanCompanyNames(raw: unknown): string[] {
 /** "Online" while the connector has checked in recently. */
 export const connectorOnline = (lastSeenAt: string | null | undefined, now: Date = new Date(), minutes = 15): boolean =>
   Boolean(lastSeenAt) && now.getTime() - Date.parse(lastSeenAt!) < minutes * 60_000;
+
+/** The distinct voucher dates (YYYYMMDD) in a Tally export. */
+export function voucherDatesOf(xml: string): string[] {
+  const out = new Set<string>();
+  for (const m of xml.matchAll(/<VOUCHER\b[\s\S]*?<DATE>\s*(\d{8})\s*<\/DATE>/gi)) out.add(m[1]);
+  return [...out].sort();
+}
+
+/** Voucher dates (YYYYMMDD) that fall outside the month ("2026-01"): proof Tally answered for another period. */
+export function datesOutsideMonth(xml: string, month: string): string[] {
+  const [y, m] = month.split("-").map(Number);
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const from = `${y}${String(m).padStart(2, "0")}01`;
+  const to = `${y}${String(m).padStart(2, "0")}${String(last).padStart(2, "0")}`;
+  return voucherDatesOf(xml).filter((d) => d < from || d > to);
+}

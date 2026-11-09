@@ -40,7 +40,8 @@ try {
   $write = (Read-Host "Let FynHelp write entries your team has approved into Tally? You can change this later. (y/N)").Trim().ToLower()
   $allowWrite = ($write -eq "y" -or $write -eq "yes")
   $config = [ordered]@{ token = $token; allowWrite = $allowWrite }
-  ($config | ConvertTo-Json) | Set-Content -Path $cfg -Encoding UTF8
+  # Windows PowerShell 5 adds a byte-order mark with -Encoding UTF8; write the file without one.
+  [System.IO.File]::WriteAllText($cfg, ($config | ConvertTo-Json), (New-Object System.Text.UTF8Encoding($false)))
 
   Step 4 "Checking TallyPrime and FynHelp"
   Write-Host "In TallyPrime: F1 (Help), Settings, Connectivity, Client/Server: TallyPrime acts as Both, port 9000. Keep your company open."

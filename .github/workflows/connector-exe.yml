@@ -46,6 +46,7 @@ jobs:
           $out = & ./build/fynhelp-connector.exe --check --config build/cfg.json 2>&1 | Out-String
           Write-Host $out
           if ($out -notmatch 'FynHelp') { throw "No readable message from the check." }
+          $global:LASTEXITCODE = 0
 
       - name: A missing config file is explained
         shell: pwsh
@@ -53,6 +54,7 @@ jobs:
           $out = & ./build/fynhelp-connector.exe --check --config build/missing.json 2>&1 | Out-String
           Write-Host $out
           if ($out -notmatch 'fynhelp-connector.json') { throw "The missing-config message did not name the file." }
+          $global:LASTEXITCODE = 0
 
       - name: The setup script is valid PowerShell
         shell: pwsh

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * FynHelp Connector for TallyPrime (version 1.3.0)
+ * FynHelp Connector for TallyPrime (version 1.4.0)
  *
  * Runs on the PC where TallyPrime is open. It asks Tally (on this PC) for each linked company's
  * Day Book and sends it to FynHelp over HTTPS. It only makes outbound connections, never opens a
@@ -32,7 +32,7 @@ import { dirname, join, resolve } from "node:path";
 import { hostname } from "node:os";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-export const VERSION = "1.3.0";
+export const VERSION = "1.4.0";
 
 /* ── Tally XML helpers (pure; tested) ───────────────────────── */
 
@@ -174,7 +174,10 @@ export function dayBookRequest(company, month, style = "dmy", onlyDay, how = { i
 export function refuseImport(xml, company, linked) {
   const x = String(xml);
   if (!linked.includes(company)) return `"${company}" is not a linked, open company.`;
-  if (!/<TALLYREQUEST>\s*Import\s*<\/TALLYREQUEST>/i.test(x) || !/<ID>\s*Vouchers\s*<\/ID>/i.test(x)) return "This is not a voucher import.";
+  // Two shapes of the same request: TallyPrime's own "Import Data" form (1.4.0 and later) and the older "Import / Data / Vouchers" form.
+  const modern = /<TALLYREQUEST>\s*Import Data\s*<\/TALLYREQUEST>/i.test(x) && /<REPORTNAME>\s*Vouchers\s*<\/REPORTNAME>/i.test(x);
+  const legacy = /<TALLYREQUEST>\s*Import\s*<\/TALLYREQUEST>/i.test(x) && /<ID>\s*Vouchers\s*<\/ID>/i.test(x);
+  if (!modern && !legacy) return "This is not a voucher import.";
   if (!new RegExp(`<SVCURRENTCOMPANY>${esc(company)}</SVCURRENTCOMPANY>`).test(x)) return "The entry names a different company.";
   const vouchers = x.match(/<VOUCHER[\s>]/gi) ?? [];
   if (vouchers.length !== 1) return `Expected exactly one voucher, found ${vouchers.length}.`;
@@ -183,7 +186,136 @@ export function refuseImport(xml, company, linked) {
   if (/<(LEDGER|GROUP|STOCKITEM|STOCKGROUP|COSTCENTRE|COSTCATEGORY|VOUCHERTYPE|UNIT|GODOWN|CURRENCY|COMPANY|EMPLOYEE|PAYHEAD)[\s>]/i.test(x)) return "Creating ledgers or other masters is not allowed.";
   const type = /<VOUCHER\b[^>]*\bVCHTYPE="([^"]*)"/i.exec(x)?.[1] ?? "";
   if (!/^(Receipt|Payment|Contra)$/.test(type)) return `Voucher type "${type}" is not allowed.`;
+  if (!/<VOUCHER\b[^>]*\bREMOTEID="[^"]+"/i.test(x)) return "The voucher has no id, so a resend could create a second one.";
+  const unsound = voucherProblems(voucherBlocks(x)[0] ?? "");
+  if (unsound.length) return `The voucher is not sound: ${unsound[0]}`;
   return null;
+}
+
+/* ── is a voucher sound, and did Tally really keep it? (pure; tested against real Tally exports) ── */
+
+const tagText = (block, tag) => {
+  const m = new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)</${tag}>`, "i").exec(block);
+  return m ? unesc(m[1]).trim() : "";
+};
+
+const entryBlocks = (block) => [...block.matchAll(/<(ALLLEDGERENTRIES|LEDGERENTRIES)\.LIST\b[^>]*>([\s\S]*?)<\/\1\.LIST>/gi)].map((m) => m[2]);
+
+/**
+ * Problems in a voucher: a valid date, at least two entries, each with a ledger and a non-zero amount of at most two decimals whose
+ * sign agrees with ISDEEMEDPOSITIVE (Yes = debit = negative), a debit and a credit, and debits equal to credits to the paisa.
+ * Mirrors src/lib/practice/tallyVoucher.ts and is held to a real 123 voucher Day Book and 104 voucher import file.
+ */
+export function voucherProblems(block) {
+  const out = [];
+  const date = tagText(block, "DATE");
+  if (!/^\d{8}$/.test(date) || Number.isNaN(Date.parse(`${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`))) out.push("The voucher date is not a valid date.");
+  const entries = entryBlocks(block);
+  if (entries.length < 2) out.push("A voucher needs at least two ledger entries.");
+  let sum = 0;
+  let debits = 0;
+  let credits = 0;
+  for (const e of entries) {
+    const name = tagText(e, "LEDGERNAME");
+    const amountText = tagText(e, "AMOUNT");
+    const deemed = tagText(e, "ISDEEMEDPOSITIVE");
+    if (!name) out.push("An entry has no ledger name.");
+    if (!/^-?\d+(\.\d{1,2})?$/.test(amountText)) {
+      out.push(`The amount "${amountText}" is not a number with at most two decimals.`);
+      continue;
+    }
+    const p = Math.round(Number(amountText) * 100);
+    if (p === 0) out.push(`The entry for "${name}" has no amount.`);
+    if (deemed !== "Yes" && deemed !== "No") out.push(`The entry for "${name}" does not say whether it is a debit.`);
+    else if ((deemed === "Yes") !== p < 0) out.push(`The entry for "${name}" has a sign that does not match its debit or credit.`);
+    if (p < 0) debits += -p;
+    else credits += p;
+    sum += p;
+  }
+  if (entries.length >= 2 && (debits === 0 || credits === 0)) out.push("A voucher needs a debit and a credit.");
+  if (sum !== 0) out.push(`Debits and credits differ by ₹${(Math.abs(sum) / 100).toFixed(2)}.`);
+  return out;
+}
+
+/** What the entry we sent should look like in Tally: id, type, date and the signed paise per ledger. */
+export function expectedVoucher(xml) {
+  const block = voucherBlocks(String(xml))[0] ?? "";
+  const head = /<VOUCHER\b([^>]*)>/i.exec(block)?.[1] ?? "";
+  const attr = (n) => new RegExp(`\\b${n}="([^"]*)"`, "i").exec(head)?.[1] ?? "";
+  return { remoteId: unesc(attr("REMOTEID")), type: attr("VCHTYPE"), date: tagText(block, "DATE"), ledgers: ledgerPaise(block) };
+}
+
+/** Signed paise per ledger (lower case name), so the same ledger twice in one voucher adds up. */
+function ledgerPaise(block) {
+  const m = new Map();
+  for (const e of entryBlocks(block)) {
+    const k = tagText(e, "LEDGERNAME").toLowerCase();
+    m.set(k, (m.get(k) ?? 0) + Math.round(Number(tagText(e, "AMOUNT") || "0") * 100));
+  }
+  return m;
+}
+
+const sameLedgers = (a, b) => a.size === b.size && [...a].every(([k, v]) => b.get(k) === v);
+
+const describe = (m) => [...m].map(([k, v]) => `${k} ${(v / 100).toFixed(2)}`).join(", ");
+
+/**
+ * Looks for the voucher we wrote in a reply from Tally. It is found by its id when Tally exports it, and otherwise by its
+ * type, date and entries. Found once with the same money on the same ledgers is "verified"; anything else is not:
+ * missing, found with different money, or found more than once (a possible duplicate).
+ */
+export function findWritten(reply, expected) {
+  const all = voucherBlocks(String(reply)).map((b) => ({
+    id: unesc(/<VOUCHER\b[^>]*\bREMOTEID="([^"]*)"/i.exec(b)?.[1] ?? ""),
+    type: (tagText(b, "VOUCHERTYPENAME") || /<VOUCHER\b[^>]*\bVCHTYPE="([^"]*)"/i.exec(b)?.[1] || ""),
+    date: tagText(b, "DATE"),
+    ledgers: ledgerPaise(b),
+  }));
+  const byId = expected.remoteId ? all.filter((v) => v.id === expected.remoteId) : [];
+  if (byId.length) {
+    // Tally's own exports can give two different vouchers the same id (Receipt 15 and Purchase 15 on one day), so an id is narrowed by content.
+    const exact = byId.filter((v) => v.type === expected.type && v.date === expected.date && sameLedgers(v.ledgers, expected.ledgers));
+    if (exact.length === 1) return { verified: true, note: "Read back from Tally by its id: same type, date, ledgers and amounts." };
+    if (exact.length > 1) return { verified: false, note: `Tally has ${exact.length} identical entries with this id: a possible duplicate. Check Tally.` };
+    if (byId.length === 1) {
+      const v = byId[0];
+      if (v.type !== expected.type || v.date !== expected.date) return { verified: false, note: `Tally kept it as ${v.type} dated ${v.date}, not ${expected.type} dated ${expected.date}.` };
+      return { verified: false, note: `Tally kept different money: ${describe(v.ledgers)} instead of ${describe(expected.ledgers)}.` };
+    }
+    return { verified: false, note: `Tally has ${byId.length} entries with this id and none holds the money we sent.` };
+  }
+  const same = all.filter((v) => v.type === expected.type && v.date === expected.date && sameLedgers(v.ledgers, expected.ledgers));
+  if (same.length > 1) return { verified: false, note: `Tally has ${same.length} identical entries on that date. Check Tally for a duplicate.` };
+  if (same.length === 1) return { verified: true, note: "Read back from Tally by its type, date and amounts (Tally did not export the id)." };
+  return { verified: false, note: "Tally said it created the entry, but it could not be found when read back." };
+}
+
+/**
+ * Asks Tally for the day of the entry, the same careful ways the sync does, and checks what came back.
+ * Anything that cannot be read back is reported as not verified, never as fine.
+ */
+export async function verifyWritten(ask, company, xml) {
+  const expected = expectedVoucher(xml);
+  if (!/^\d{8}$/.test(expected.date)) return { verified: false, note: "The entry has no valid date to read back." };
+  const month = `${expected.date.slice(0, 4)}-${expected.date.slice(4, 6)}`;
+  let last = { verified: false, note: "Tally could not be asked to read the entry back." };
+  for (const a of PERIOD_ATTEMPTS) {
+    let reply;
+    try {
+      reply = await ask(dayBookRequest(company, month, a.style, expected.date, a));
+    } catch (e) {
+      last = { verified: false, note: `Could not read the entry back: ${e.message}` };
+      continue;
+    }
+    if (tallyError(reply)) {
+      last = { verified: false, note: `Tally said "${tallyError(reply)}" when asked to read the entry back.` };
+      continue;
+    }
+    const r = findWritten(reply, expected);
+    if (r.verified || /not be found/.test(r.note) === false) return r;
+    last = r;
+  }
+  return last;
 }
 
 export function ledgerListRequest(company) {
@@ -348,6 +480,13 @@ async function writeApproved(cfg, companies, linked) {
       const reply = await askTally(cfg.tallyUrl, p.xml, 60_000);
       body = { id: p.id, reply };
       log(`→ wrote approved entry ${p.id.slice(0, 8)} to ${p.company}`);
+      // Tally says created: read the voucher back and check it holds the same money on the same ledgers before it counts as done.
+      if (/<CREATED>\s*1\s*<\/CREATED>/i.test(reply) && !tallyError(reply)) {
+        const check = await verifyWritten((b) => askTally(cfg.tallyUrl, b, 60_000), p.company, p.xml);
+        body.verified = check.verified;
+        body.verifyNote = check.note;
+        log(check.verified ? `  ✓ read back from Tally: ${check.note}` : `  ✗ NOT verified: ${check.note}`);
+      }
     } catch (e) {
       body = { id: p.id, error: e.message };
       log(`✗ could not write ${p.id.slice(0, 8)}: ${e.message}`);

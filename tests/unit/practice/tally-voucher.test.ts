@@ -24,15 +24,15 @@ describe("writing an approved line to Tally", () => {
     const x = importVoucherXml(line);
     expect(x).toContain('VCHTYPE="Receipt"');
     expect(x).toContain("<DATE>20260912</DATE>");
-    expect(x).toMatch(/<LEDGERNAME>Rao Steels<\/LEDGERNAME><ISDEEMEDPOSITIVE>No<\/ISDEEMEDPOSITIVE><AMOUNT>48200.00</);
-    expect(x).toMatch(/<LEDGERNAME>HDFC Bank<\/LEDGERNAME><ISDEEMEDPOSITIVE>Yes<\/ISDEEMEDPOSITIVE><AMOUNT>-48200.00</);
+    expect(x).toMatch(/<LEDGERNAME>Rao Steels<\/LEDGERNAME><ISDEEMEDPOSITIVE>No<\/ISDEEMEDPOSITIVE><ISPARTYLEDGER>(?:No|Yes)<\/ISPARTYLEDGER><AMOUNT>48200.00</);
+    expect(x).toMatch(/<LEDGERNAME>HDFC Bank<\/LEDGERNAME><ISDEEMEDPOSITIVE>Yes<\/ISDEEMEDPOSITIVE><ISPARTYLEDGER>(?:No|Yes)<\/ISPARTYLEDGER><AMOUNT>-48200.00</);
   });
 
   it("Payment debits the party and credits the bank", () => {
     const x = importVoucherXml({ ...line, direction: "out" });
     expect(x).toContain('VCHTYPE="Payment"');
-    expect(x).toMatch(/<LEDGERNAME>Rao Steels<\/LEDGERNAME><ISDEEMEDPOSITIVE>Yes<\/ISDEEMEDPOSITIVE><AMOUNT>-48200.00</);
-    expect(x).toMatch(/<LEDGERNAME>HDFC Bank<\/LEDGERNAME><ISDEEMEDPOSITIVE>No<\/ISDEEMEDPOSITIVE><AMOUNT>48200.00</);
+    expect(x).toMatch(/<LEDGERNAME>Rao Steels<\/LEDGERNAME><ISDEEMEDPOSITIVE>Yes<\/ISDEEMEDPOSITIVE><ISPARTYLEDGER>(?:No|Yes)<\/ISPARTYLEDGER><AMOUNT>-48200.00</);
+    expect(x).toMatch(/<LEDGERNAME>HDFC Bank<\/LEDGERNAME><ISDEEMEDPOSITIVE>No<\/ISDEEMEDPOSITIVE><ISPARTYLEDGER>(?:No|Yes)<\/ISPARTYLEDGER><AMOUNT>48200.00</);
   });
 
   it("carries the line id as REMOTEID so a resend names the same voucher", () => {
@@ -85,8 +85,8 @@ describe("contra, bank charges and GST splits", () => {
     expect(problemsWith(l, all, bankLike)).toEqual([]);
     const x = importVoucherXml(l);
     expect(x).toContain('VCHTYPE="Contra"');
-    expect(x).toMatch(/<LEDGERNAME>ICICI Bank<\/LEDGERNAME><ISDEEMEDPOSITIVE>Yes<\/ISDEEMEDPOSITIVE><AMOUNT>-48200.00</);
-    expect(x).toMatch(/<LEDGERNAME>HDFC Bank<\/LEDGERNAME><ISDEEMEDPOSITIVE>No<\/ISDEEMEDPOSITIVE><AMOUNT>48200.00</);
+    expect(x).toMatch(/<LEDGERNAME>ICICI Bank<\/LEDGERNAME><ISDEEMEDPOSITIVE>Yes<\/ISDEEMEDPOSITIVE><ISPARTYLEDGER>(?:No|Yes)<\/ISPARTYLEDGER><AMOUNT>-48200.00</);
+    expect(x).toMatch(/<LEDGERNAME>HDFC Bank<\/LEDGERNAME><ISDEEMEDPOSITIVE>No<\/ISDEEMEDPOSITIVE><ISPARTYLEDGER>(?:No|Yes)<\/ISPARTYLEDGER><AMOUNT>48200.00</);
   });
   it("a Contra to a non-bank ledger, and a Receipt from a bank ledger, are refused", () => {
     expect(problemsWith({ ...line, kind: "Contra", partyLedger: "Rao Steels" }, all, bankLike)[0]).toMatch(/not a bank or cash ledger/);
@@ -123,8 +123,8 @@ describe("contra, bank charges and GST splits", () => {
     const x = importVoucherXml(l);
     expect(x).toContain('VCHTYPE="Payment"');
     expect((x.match(/<ALLLEDGERENTRIES.LIST>/g) ?? []).length).toBe(4);
-    expect(x).toMatch(/<LEDGERNAME>Input CGST<\/LEDGERNAME><ISDEEMEDPOSITIVE>Yes<\/ISDEEMEDPOSITIVE><AMOUNT>-45.00</);
-    expect(x).toMatch(/<LEDGERNAME>HDFC Bank<\/LEDGERNAME><ISDEEMEDPOSITIVE>No<\/ISDEEMEDPOSITIVE><AMOUNT>590.00</);
+    expect(x).toMatch(/<LEDGERNAME>Input CGST<\/LEDGERNAME><ISDEEMEDPOSITIVE>Yes<\/ISDEEMEDPOSITIVE><ISPARTYLEDGER>(?:No|Yes)<\/ISPARTYLEDGER><AMOUNT>-45.00</);
+    expect(x).toMatch(/<LEDGERNAME>HDFC Bank<\/LEDGERNAME><ISDEEMEDPOSITIVE>No<\/ISDEEMEDPOSITIVE><ISPARTYLEDGER>(?:No|Yes)<\/ISPARTYLEDGER><AMOUNT>590.00</);
   });
 
   it("a split that does not add up, uses a missing ledger or is a Contra is refused", () => {

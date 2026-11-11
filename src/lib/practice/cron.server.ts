@@ -58,5 +58,9 @@ export async function practiceTick(
   const touchpoints = await import("./touchpoints/touchpoints.server")
     .then((m) => m.runTouchpoints(db, now))
     .catch((e) => ({ error: (e as Error).message }));
-  return { gmail, queue, autoChase, chaser, renewals, arrears, lifecycle, touchpoints, ms: Date.now() - started };
+  // Zoho Books: read each connected client's current month and check the entries FynHelp created. Reads only.
+  const zoho = await import("./zoho.server")
+    .then((m) => m.zohoTick(db, { now }))
+    .catch((e) => ({ error: (e as Error).message }));
+  return { gmail, queue, autoChase, chaser, renewals, arrears, lifecycle, touchpoints, zoho, ms: Date.now() - started };
 }

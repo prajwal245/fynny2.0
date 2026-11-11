@@ -121,7 +121,7 @@ const FAQS: [string, ReactNode][] = [
   ["Does AI do the matching?", "No. Matching is rule-based and every match can be traced. AI only helps sort documents into their type, and every amount it reads must appear in the document. Your team reviews the exceptions and a partner signs off the MIS."],
   ["Do we have to change our accounting software?", "No. FynHelp works on top of the tools your firm already uses: Tally, Zoho Books, Excel, CSV and PDF statements."],
   ["Does FynHelp file returns?", "No. FynHelp prepares the work. Your firm reviews, signs and files."],
-  ["Does it change anything in Tally?", "No. FynHelp reads your Tally data and never writes to it."],
+  ["Does it change anything in Tally?", "Not by default. FynHelp reads your Tally data. It writes only if you switch writing on at the connector, and then only an entry a partner has approved, one at a time. It never creates ledgers and never changes or deletes existing entries."],
   ["Do my clients need to install an app?", "No. They reply on WhatsApp or upload through a secure link, with no login needed."],
   ["How does the launch offer work?", `The first 100 CA firms get ${LAUNCH_DAYS} days free on any plan. Use code ${CODE}. Sign up from this page and it is applied for you. The ${LAUNCH_DAYS} days count from your first upload.`],
   ["What happens after 30 days?", "Choose a plan and continue, or simply stop. We remind you before the trial ends, and your data stays readable and exportable for 30 days after it."],

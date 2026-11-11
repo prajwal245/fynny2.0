@@ -1191,23 +1191,36 @@ export const zohoBooksSetPosting = createServerFn({ method: "POST" })
     }),
   );
 
+const zohoExpenseChoice = z.object({ accountId: z.string().min(1).max(64), taxId: z.string().min(1).max(64).optional() }).optional();
+
 export const zohoBooksPreviewPost = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({ linkId: uuid, txnId: uuid }).parse(d))
+  .inputValidator((d) => z.object({ linkId: uuid, txnId: uuid, expense: zohoExpenseChoice }).parse(d))
   .handler(async ({ data, context }) =>
     withFirm(context.userId, async (db, ctx) => {
       await asPartner(ctx, "post to Zoho Books");
-      return (await import("./zoho.server")).previewPost(db, ctx, data.linkId, data.txnId);
+      return (await import("./zoho.server")).previewPost(db, ctx, data.linkId, data.txnId, data.expense);
     }),
   );
 
 export const zohoBooksPost = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({ linkId: uuid, txnId: uuid }).parse(d))
+  .inputValidator((d) => z.object({ linkId: uuid, txnId: uuid, expense: zohoExpenseChoice }).parse(d))
   .handler(async ({ data, context }) =>
     withWork(context.userId, async (db, ctx) => {
       await asPartner(ctx, "post to Zoho Books");
-      return (await import("./zoho.server")).post(db, ctx, data.linkId, data.txnId);
+      return (await import("./zoho.server")).post(db, ctx, data.linkId, data.txnId, data.expense);
+    }),
+  );
+
+/** The expense accounts and taxes a partner can choose from when booking a payment. Reads only. */
+export const zohoBooksExpenseChoices = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ linkId: uuid }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      await asPartner(ctx, "post to Zoho Books");
+      return (await import("./zoho.server")).expenseChoices(db, ctx, data.linkId);
     }),
   );
 
@@ -1224,6 +1237,20 @@ export const zohoBooksUndoPost = createServerFn({ method: "POST" })
 export const zohoBooksPostings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => withFirm(context.userId, async (db, ctx) => (await import("./zoho.server")).listPostings(db, ctx)));
+
+export const zohoBooksOpenBills = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ linkId: uuid }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./zoho.server")).openBills(db, ctx, data.linkId)),
+  );
+
+/** Reads Zoho to see whether entries FynHelp created are unchanged, changed or deleted there. Changes nothing. */
+export const zohoBooksCheckPostings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) =>
+    withWork(context.userId, async (db, ctx) => (await import("./zoho.server")).checkPostings(db, ctx)),
+  );
 
 export const zohoBooksSync = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

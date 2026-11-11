@@ -1,12 +1,12 @@
 /**
- * In the exception drawer: for a bank charge, or a receipt that names one open invoice, a partner
+ * In the exception drawer: for a bank charge, a receipt that names one open invoice, or a payment that names one open bill, a partner
  * can have FynHelp create that one entry in the client's Zoho Books. Always previewed first,
  * always approved by a person, always undoable. Hidden unless posting is switched on for the client.
  */
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Check, Undo2 } from "lucide-react";
-import { zohoBooksPost, zohoBooksPreviewPost, zohoBooksStatus, zohoBooksUndoPost } from "@/lib/practice/practice.functions";
+import { zohoBooksExpenseChoices, zohoBooksPost, zohoBooksPreviewPost, zohoBooksStatus, zohoBooksSync, zohoBooksUndoPost } from "@/lib/practice/practice.functions";
 import { V } from "../ui";
 import { useV2 } from "../store";
 
@@ -21,12 +21,18 @@ export function ZohoPostPanel({ clientId, txnId, side, open }: { clientId: strin
   const [busy, setBusy] = useState<"preview" | "post" | "undo" | null>(null);
   const [posted, setPosted] = useState<{ postingId: string } | null>(null);
   const [undone, setUndone] = useState(false);
+  const [choices, setChoices] = useState<Awaited<ReturnType<typeof zohoBooksExpenseChoices>> | null>(null);
+  const [expense, setExpense] = useState<{ accountId: string; taxId?: string } | null>(null);
+  const [pulled, setPulled] = useState<"busy" | "done" | "failed" | null>(null);
 
   useEffect(() => {
     setView(null);
     setWhy(null);
     setPosted(null);
     setUndone(false);
+    setPulled(null);
+    setChoices(null);
+    setExpense(null);
     setLinkId(null);
     if (!canSignOff || !txnId || side !== "bank" || !open) return;
     let live = true;
@@ -48,7 +54,20 @@ export function ZohoPostPanel({ clientId, txnId, side, open }: { clientId: strin
     setBusy("preview");
     setWhy(null);
     try {
-      setView(await zohoBooksPreviewPost({ data: { linkId, txnId } }));
+      setView(await zohoBooksPreviewPost({ data: { linkId, txnId, ...(expense ? { expense } : {}) } }));
+    } catch (e) {
+      setWhy(msg(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+  const chooseExpense = async () => {
+    setBusy("preview");
+    try {
+      const c = await zohoBooksExpenseChoices({ data: { linkId } });
+      setChoices(c);
+      setExpense({ accountId: c.accounts.find((a) => /^other expenses$/i.test(a.name))?.id ?? c.accounts[0]?.id ?? "" });
+      setWhy(null);
     } catch (e) {
       setWhy(msg(e));
     } finally {
@@ -58,10 +77,16 @@ export function ZohoPostPanel({ clientId, txnId, side, open }: { clientId: strin
   const approve = async () => {
     setBusy("post");
     try {
-      const r = await zohoBooksPost({ data: { linkId, txnId } });
+      const date = view?.lines.find(([k]) => k === "Date")?.[1] ?? "";
+      const r = await zohoBooksPost({ data: { linkId, txnId, ...(expense ? { expense } : {}) } });
       setPosted({ postingId: r.postingId });
       setView(null);
       toast.success("Entry created in Zoho Books");
+      // Two-way: read the month back so the new entry is in FynHelp's books and Recon can match it. A failure here never undoes the entry.
+      if (/^\d{4}-\d{2}/.test(date)) {
+        setPulled("busy");
+        zohoBooksSync({ data: { linkId, month: date.slice(0, 7) } }).then(() => setPulled("done"), () => setPulled("failed"));
+      }
     } catch (e) {
       toast.error(msg(e));
     } finally {
@@ -89,7 +114,9 @@ export function ZohoPostPanel({ clientId, txnId, side, open }: { clientId: strin
       {posted ? (
         <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
           <span className="ic-check"><Check size={12} strokeWidth={3} /></span>
-          <span style={{ color: "#1F6B45", fontWeight: 600 }}>Created in Zoho Books. Pull the month again to match it.</span>
+          <span style={{ color: "#1F6B45", fontWeight: 600 }} data-testid="zoho-created">
+            {pulled === "busy" ? "Created in Zoho Books. Reading the month back…" : pulled === "done" ? "Created in Zoho Books and read back. Run Recon to match it." : "Created in Zoho Books. Pull the month again to match it."}
+          </span>
           <button className="v2-btn v2-btn-quiet" style={{ padding: "6px 10px", fontSize: 12.5 }} disabled={busy === "undo"} onClick={() => void undo()}>
             <Undo2 size={13} /> Undo
           </button>
@@ -115,6 +142,32 @@ export function ZohoPostPanel({ clientId, txnId, side, open }: { clientId: strin
       ) : (
         <>
           {why && <div style={{ fontSize: 12.5, color: V.body }} data-testid="zoho-why">{why}</div>}
+          {choices && expense && (
+            <div style={{ display: "grid", gap: 8, fontSize: 13 }} data-testid="zoho-expense-form">
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ color: V.muted }}>Book it as</span>
+                <select value={expense.accountId} onChange={(e) => setExpense({ ...expense, accountId: e.target.value })} data-testid="zoho-expense-account">
+                  {choices.accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </label>
+              {choices.taxes.length > 0 ? (
+                <label style={{ display: "grid", gap: 4 }}>
+                  <span style={{ color: V.muted }}>GST on this payment (included in the amount)</span>
+                  <select value={expense.taxId ?? ""} onChange={(e) => { const v = e.target.value; setExpense(v ? { ...expense, taxId: v } : { accountId: expense.accountId }); }} data-testid="zoho-expense-tax">
+                    <option value="">None. Do not claim input tax credit</option>
+                    {choices.taxes.map((x) => <option key={x.id} value={x.id}>{x.name} ({x.percentage}%)</option>)}
+                  </select>
+                </label>
+              ) : (
+                <div style={{ color: V.muted, fontSize: 12.5 }}>No GST is set up in this client's Zoho Books, so no input tax credit is claimed.</div>
+              )}
+            </div>
+          )}
+          {why && !choices && (
+            <button className="v2-btn v2-btn-quiet" style={{ justifySelf: "start", padding: "6px 12px", fontSize: 12.5 }} disabled={busy === "preview"} data-testid="zoho-book-expense" onClick={() => void chooseExpense()}>
+              Book as an expense instead…
+            </button>
+          )}
           {undone && <div style={{ fontSize: 12.5, color: V.body }}>Removed from Zoho Books.</div>}
           <button className="v2-btn v2-btn-ghost" style={{ justifySelf: "start", padding: "8px 14px", fontSize: 13 }} disabled={busy === "preview"} data-testid="zoho-preview" onClick={() => void show()}>
             {busy === "preview" ? <><span className="ic-spin" /> Checking…</> : "Post to Zoho Books…"}

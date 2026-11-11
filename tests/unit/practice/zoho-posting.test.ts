@@ -168,3 +168,68 @@ describe("vendor payments and the two-way check", () => {
     expect(driftOf(posted, null)).toBe("removed");
   });
 });
+
+describe("categorised expenses with Indian rules", () => {
+  const t = (amount: number, description = "UPI DR OFFICE CHAIRS") => ({ id: "11111111-2222-3333-4444-555555555555", date: "2026-10-12", amount, direction: "out" as const, description });
+
+  it("allows an ordinary payment from a bank account", async () => {
+    const { expenseAllowed } = await import("@/lib/practice/zohoPosting");
+    expect(expenseAllowed(t(8000), "bank")).toEqual({ ok: true });
+  });
+  it("blocks a cash payment above ₹10,000 under Section 40A(3), but not at or below it", async () => {
+    const { expenseAllowed } = await import("@/lib/practice/zohoPosting");
+    expect(expenseAllowed(t(10_000), "cash")).toEqual({ ok: true });
+    const r = expenseAllowed(t(10_001), "cash");
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.why).toMatch(/40A\(3\)/);
+  });
+  it("leaves anything above ₹1,00,000 to a person, and refuses receipts", async () => {
+    const { expenseAllowed } = await import("@/lib/practice/zohoPosting");
+    expect(expenseAllowed(t(100_001), "bank").ok).toBe(false);
+    expect(expenseAllowed({ ...t(500), direction: "in" }, "bank").ok).toBe(false);
+  });
+  it("reminds about TDS for rent, professional fees, contractors and commission, and never computes it", async () => {
+    const { tdsReminder } = await import("@/lib/practice/zohoPosting");
+    expect(tdsReminder("NEFT DR OFFICE RENT OCT", 40_000)).toMatch(/194I/);
+    expect(tdsReminder("IMPS AUDIT FEES", 25_000)).toMatch(/194J/);
+    expect(tdsReminder("UPI DR OFFICE CHAIRS", 8000)).toBeNull();
+    expect(tdsReminder("RENT", 40_000)).not.toMatch(/\d+%/);
+  });
+  it("sends the tax as included in the amount, and nothing when none is chosen", async () => {
+    const { categorisedExpensePayload } = await import("@/lib/practice/zohoPosting");
+    const withTax = categorisedExpensePayload(t(1180), "acc1", "bank1", "gst18");
+    expect(withTax).toMatchObject({ account_id: "acc1", paid_through_account_id: "bank1", amount: 1180, tax_id: "gst18", is_inclusive_tax: true });
+    const none = categorisedExpensePayload(t(1180), "acc1", "bank1");
+    expect("tax_id" in none).toBe(false);
+  });
+  it("shows what will be booked, with no tax credit claimed unless chosen", async () => {
+    const { expensePreview } = await import("@/lib/practice/zohoPosting");
+    const v = expensePreview(t(8000), { id: "a", name: "Office Supplies" }, "HDFC Current");
+    expect(v.title).toContain("Office Supplies");
+    expect(v.lines.find(([k]) => k === "Tax")?.[1]).toMatch(/not claimed/);
+    const g = expensePreview(t(1180), { id: "a", name: "Office Supplies" }, "HDFC Current", { id: "g", name: "GST18", percentage: 18 });
+    expect(g.lines.find(([k]) => k === "Tax")?.[1]).toContain("18%");
+  });
+  it("offers only real expense accounts", async () => {
+    const { choosableExpenseAccounts } = await import("@/lib/practice/zohoPosting");
+    const r = choosableExpenseAccounts([
+      { account_id: "1", account_name: "Rent Expense", account_type: "expense" },
+      { account_id: "2", account_name: "Old", account_type: "expense", is_active: false },
+      { account_id: "3", account_name: "Cash at Bank", account_type: "bank" },
+    ]);
+    expect(r).toEqual([{ id: "1", name: "Rent Expense" }]);
+  });
+});
+
+describe("Zoho's 100-character description limit", () => {
+  it("never sends a description Zoho would reject, whatever the narration", async () => {
+    const { expensePayload, paymentPayload, vendorPaymentPayload, categorisedExpensePayload, ZOHO_DESCRIPTION_MAX, TAG } = await import("@/lib/practice/zohoPosting");
+    const t = { id: "11111111-2222-3333-4444-555555555555", date: "2026-10-12", amount: 10, direction: "out" as const, description: "NEFT DR ".padEnd(400, "X") };
+    const inv = { id: "i", number: "INV1", customerId: "c", customer: "C", total: 10, balance: 10, dueDate: null, status: "sent" };
+    const bill = { id: "b", number: "BILL1", vendorId: "v", vendor: "V", total: 10, balance: 10, dueDate: null, status: "open" };
+    for (const d of [expensePayload(t, "a", "b").description, paymentPayload(t, inv, "b").description, vendorPaymentPayload(t, bill, "b").description, categorisedExpensePayload(t, "a", "b").description]) {
+      expect(d.length).toBeLessThanOrEqual(ZOHO_DESCRIPTION_MAX);
+      expect(d.startsWith(TAG)).toBe(true);
+    }
+  });
+});

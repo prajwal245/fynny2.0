@@ -195,13 +195,17 @@ export interface PaymentPayload {
 
 const short = (s: string) => s.replace(/\s+/g, " ").trim().slice(0, 140);
 
+/** Zoho rejects a description over 100 characters, so the tag and the narration are cut to fit together. */
+export const ZOHO_DESCRIPTION_MAX = 100;
+const note = (narration: string) => `${TAG}: ${short(narration)}`.slice(0, ZOHO_DESCRIPTION_MAX);
+
 export function expensePayload(t: BankTxn, expenseAccountId: string, bankAccountId: string): ExpensePayload {
   return {
     account_id: expenseAccountId,
     paid_through_account_id: bankAccountId,
     date: t.date,
     amount: t.amount,
-    description: `${TAG}: ${short(t.description)}`,
+    description: note(t.description),
     reference_number: idempotencyRef(t.id),
   };
 }
@@ -213,7 +217,7 @@ export function paymentPayload(t: BankTxn, invoice: OpenInvoice, bankAccountId: 
     amount: t.amount,
     date: t.date,
     reference_number: idempotencyRef(t.id),
-    description: `${TAG}: ${short(t.description)}`,
+    description: note(t.description),
     account_id: bankAccountId,
     invoices: [{ invoice_id: invoice.id, amount_applied: t.amount }],
   };
@@ -237,14 +241,14 @@ export function vendorPaymentPayload(t: BankTxn, bill: OpenBill, bankAccountId: 
     amount: t.amount,
     date: t.date,
     reference_number: idempotencyRef(t.id),
-    description: `${TAG}: ${short(t.description)}`,
+    description: note(t.description),
     paid_through_account_id: bankAccountId,
     bills: [{ bill_id: bill.id, amount_applied: t.amount }],
   };
 }
 
 export interface Preview {
-  kind: "bank_charge" | "receipt" | "vendor_payment";
+  kind: "bank_charge" | "receipt" | "vendor_payment" | "expense";
   title: string;
   lines: [string, string][];
 }
@@ -262,7 +266,7 @@ export function preview(t: BankTxn, p: Extract<Postable, { kind: "bank_charge" |
         ["Amount", rupees(t.amount)],
         ["Applied to", `${p.bill.number} (${rupees(p.bill.balance)} due, ${rupees(p.bill.balance - t.amount)} after)`],
         ["Paid through", accountName],
-        ["Note in Zoho", `${TAG}: ${short(t.description)}`],
+        ["Note in Zoho", note(t.description)],
       ],
     };
   }
@@ -275,7 +279,7 @@ export function preview(t: BankTxn, p: Extract<Postable, { kind: "bank_charge" |
         ["Amount", rupees(t.amount)],
         ["Expense account", expenseAccountName ?? "Bank charges"],
         ["Paid through", accountName],
-        ["Note in Zoho", `${TAG}: ${short(t.description)}`],
+        ["Note in Zoho", note(t.description)],
       ],
     };
   }
@@ -288,7 +292,7 @@ export function preview(t: BankTxn, p: Extract<Postable, { kind: "bank_charge" |
       ["Amount", rupees(t.amount)],
       ["Applied to", `${p.invoice.number} (${rupees(p.invoice.balance)} due, ${rupees(p.invoice.balance - t.amount)} after)`],
       ["Deposited to", accountName],
-      ["Note in Zoho", `${TAG}: ${short(t.description)}`],
+      ["Note in Zoho", note(t.description)],
     ],
   };
 }
@@ -317,3 +321,73 @@ export const DRIFT_WORDS: Record<Drift, string> = {
   changed: "Changed in Zoho Books since FynHelp created it",
   removed: "No longer in Zoho Books",
 };
+
+/* ── a categorised expense: any bank payment, with the account chosen by a partner ── */
+
+/** Above this, an entry needs a person in Zoho Books, not a click here. */
+export const EXPENSE_LIMIT = 100_000;
+/** Section 40A(3) of the Income-tax Act: a cash payment above this to one person in a day is disallowed as an expense. */
+export const CASH_PAYMENT_LIMIT = 10_000;
+
+export interface ExpenseAccount { id: string; name: string }
+export interface ZohoTax { id: string; name: string; percentage: number }
+
+/** Whether this line may be booked as an expense at all, and why not in words a person can act on. */
+export function expenseAllowed(t: BankTxn, bankKind: AccountKind): { ok: true } | { ok: false; why: string } {
+  if (t.direction !== "out") return { ok: false, why: "Only money going out can be booked as an expense. Record a receipt in Zoho Books." };
+  if (t.amount > EXPENSE_LIMIT) return { ok: false, why: `Expenses above ₹${EXPENSE_LIMIT.toLocaleString("en-IN")} need a person to book them in Zoho Books.` };
+  if (bankKind === "cash" && t.amount > CASH_PAYMENT_LIMIT)
+    return { ok: false, why: `A cash payment above ₹${CASH_PAYMENT_LIMIT.toLocaleString("en-IN")} is disallowed as an expense under Section 40A(3). Check the payment, then book it in Zoho Books yourself.` };
+  return { ok: true };
+}
+
+/**
+ * TDS is the client's liability and depends on the vendor's PAN and the year's totals, so FynHelp never computes
+ * it. It only says when the narration looks like a payment where TDS usually applies, so a partner checks first.
+ */
+export function tdsReminder(description: string, amount: number): string | null {
+  const d = description.toLowerCase();
+  const rules: [RegExp, string][] = [
+    [/\b(rent|lease)\b/, "194I (rent)"],
+    [/\b(professional|consult\w*|legal|audit|retainer|technical)\b/, "194J (professional or technical fees)"],
+    [/\b(contract|contractor|labou?r|transport|freight)\b/, "194C (contractors)"],
+    [/\b(commission|brokerage)\b/, "194H (commission)"],
+  ];
+  // The thresholds are yearly and per vendor, which FynHelp cannot see, so the reminder does not depend on the amount.
+  for (const [re, section] of rules)
+    if (re.test(d) && amount > 0) return `This looks like a payment where TDS may apply (section ${section}). FynHelp does not deduct TDS. Check it in Zoho Books before approving.`;
+  return null;
+}
+
+export interface CategorisedExpensePayload extends ExpensePayload {
+  tax_id?: string;
+  is_inclusive_tax?: boolean;
+}
+
+/** A bank debit is the full amount paid, so any tax chosen is inclusive in it. */
+export function categorisedExpensePayload(t: BankTxn, expenseAccountId: string, bankAccountId: string, taxId?: string): CategorisedExpensePayload {
+  const base = expensePayload(t, expenseAccountId, bankAccountId);
+  return taxId ? { ...base, tax_id: taxId, is_inclusive_tax: true } : base;
+}
+
+export function expensePreview(t: BankTxn, account: ExpenseAccount, bankAccountName: string, tax?: ZohoTax): Preview {
+  const lines: [string, string][] = [
+    ["Date", t.date],
+    ["Amount", rupees(t.amount)],
+    ["Expense account", account.name],
+    ["Paid through", bankAccountName],
+    ["Tax", tax ? `${tax.name} (${tax.percentage}%), included in the amount` : "None. Input tax credit is not claimed."],
+  ];
+  const tds = tdsReminder(t.description, t.amount);
+  if (tds) lines.push(["Check first", tds]);
+  lines.push(["Note in Zoho", note(t.description)]);
+  return { kind: "expense", title: `Book this payment as ${account.name}`, lines };
+}
+
+/** The accounts a partner may choose from: expense accounts only, never a system suspense account. */
+export function choosableExpenseAccounts(accounts: { account_id: string; account_name: string; account_type?: string; is_active?: boolean }[]): ExpenseAccount[] {
+  return accounts
+    .filter((a) => a.is_active !== false && ["expense", "other_expense", "cost_of_goods_sold"].includes(String(a.account_type ?? "expense")))
+    .map((a) => ({ id: String(a.account_id), name: a.account_name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}

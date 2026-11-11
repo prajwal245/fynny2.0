@@ -4,14 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const fn = {
   status: vi.fn(), connect: vi.fn(), disconnect: vi.fn(), link: vi.fn(), orgs: vi.fn(), accounts: vi.fn(), sync: vi.fn(),
-  unlink: vi.fn(), owed: vi.fn(), postings: vi.fn(), setPosting: vi.fn(), undo: vi.fn(), preview: vi.fn(), post: vi.fn(), check: vi.fn(),
+  unlink: vi.fn(), owed: vi.fn(), postings: vi.fn(), setPosting: vi.fn(), undo: vi.fn(), preview: vi.fn(), post: vi.fn(), check: vi.fn(), choices: vi.fn(),
 };
 vi.mock("@/lib/practice/practice.functions", () => ({
   zohoBooksStatus: () => fn.status(), zohoBooksConnect: (a: unknown) => fn.connect(a), zohoBooksDisconnect: () => fn.disconnect(),
   zohoBooksLink: (a: unknown) => fn.link(a), zohoBooksOrganizations: () => fn.orgs(), zohoBooksBankAccounts: (a: unknown) => fn.accounts(a),
   zohoBooksSync: (a: unknown) => fn.sync(a), zohoBooksUnlink: (a: unknown) => fn.unlink(a), zohoBooksOpenInvoices: (a: unknown) => fn.owed(a),
   zohoBooksPostings: () => fn.postings(), zohoBooksSetPosting: (a: unknown) => fn.setPosting(a), zohoBooksUndoPost: (a: unknown) => fn.undo(a),
-  zohoBooksCheckPostings: () => fn.check(), zohoBooksPreviewPost: (a: unknown) => fn.preview(a), zohoBooksPost: (a: unknown) => fn.post(a),
+  zohoBooksCheckPostings: () => fn.check(), zohoBooksExpenseChoices: (a: unknown) => fn.choices(a), zohoBooksPreviewPost: (a: unknown) => fn.preview(a), zohoBooksPost: (a: unknown) => fn.post(a),
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const v2 = { clients: [{ id: "b1", name: "Kaveri Textiles Pvt Ltd" }, { id: "b2", name: "Mehta Foods LLP" }], canSignOff: true };

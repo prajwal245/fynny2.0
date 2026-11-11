@@ -44,6 +44,8 @@ Write (only when a partner clicks "Allow approved entries"): `ZohoBooks.expenses
 - Bank charges only, up to ₹5,000, booked to the "Bank Fees and Charges" expense account (FynHelp will not create accounts).
 - Receipts only when the narration names exactly one open invoice and the amount does not exceed what is due.
 - Vendor payments only when the narration names exactly one open bill and the amount does not exceed what is due.
+- Any other bank payment can be booked as an expense in an account a partner chooses (from the client's own expense accounts; FynHelp never creates accounts or vendors). Rules built in for India: up to ₹1,00,000 per entry; a payment from a cash account above ₹10,000 is refused (Section 40A(3)); GST is claimed only if a partner picks a tax the client's Zoho already has, and is sent as included in the amount; a TDS reminder shows for rent, professional fees, contractors and commission, and FynHelp never computes or deducts TDS.
+- Daily read: the existing morning job pulls each connected client's current month (and last month in the first five days) for links not read in 20 hours, then checks created entries. It reads only, oldest first, within a time budget.
 - Two-way: after an entry is created FynHelp reads that month back from Zoho. "Check against Zoho" (Settings → Zoho Books) reads each entry FynHelp created and flags any that were changed or deleted in Zoho. It only reads; it never edits or re-creates anything.
 - One live entry per bank line (database-enforced), so a double click or retry cannot post twice.
 - A write is never retried automatically. If Zoho does not answer, the line is held as "check Zoho" until a person looks.
@@ -57,6 +59,7 @@ Write (only when a partner clicks "Allow approved entries"): `ZohoBooks.expenses
 5. Click approve twice quickly; confirm only one expense exists.
 6. Post a receipt whose narration names one open invoice; confirm the payment is applied to it, then undo.
 7. Post a payment whose narration names one open bill; confirm it is applied to the bill and the bill's balance drops, then undo.
+9. Book an outgoing payment as an expense in a chosen account (and with a GST tax if the client has one); confirm the amount, account, tax and the "Created by FynHelp" note in Zoho. Try a cash-account payment above ₹10,000 and confirm it is refused.
 8. Create an entry, edit its amount in Zoho, press "Check against Zoho"; confirm it shows "Changed in Zoho Books". Delete it in Zoho and check again; confirm "No longer in Zoho Books".
 
 ## Export for Zoho (no connection needed)

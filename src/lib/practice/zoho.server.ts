@@ -19,7 +19,11 @@ import {
   pickChargeAccount,
   alreadyInZoho,
   duplicateWindow,
+  categorisedExpensePayload,
+  choosableExpenseAccounts,
   driftOf,
+  expenseAllowed,
+  expensePreview,
   postable,
   postingAllowedFor,
   preview,
@@ -27,8 +31,11 @@ import {
   zohoErrorMessage,
   type BankTxn,
   type Drift,
+  type ExpenseAccount,
+  type ZohoTax,
   type OpenBill,
   type OpenInvoice,
+  type Postable,
 } from "./zohoPosting";
 
 const READ_SCOPES = ["ZohoBooks.settings.READ", "ZohoBooks.banking.READ", "ZohoBooks.accountants.READ", "ZohoBooks.invoices.READ", "ZohoBooks.bills.READ"];
@@ -713,27 +720,72 @@ async function plan(db: Db, ctx: FirmContext, c: Conn, l: Awaited<ReturnType<typ
   return { t, p, chargeAccount };
 }
 
-/** What posting would create, shown before anyone approves. Changes nothing. */
-export async function previewPost(db: Db, ctx: FirmContext, linkId: string, txnId: string) {
+/** What a partner may choose from when booking a payment as an expense: this client's expense accounts and, if the organisation is registered for GST, its taxes. */
+export async function expenseChoices(db: Db, ctx: FirmContext, linkId: string) {
   const { c, l } = await requirePosting(db, ctx, linkId);
+  const accounts = await zohoGet<{ chartofaccounts?: { account_id: string; account_name: string; account_type?: string; is_active?: boolean }[] }>(db, c, "/chartofaccounts", {
+    organization_id: l.organization_id, filter_by: "AccountType.Expense", per_page: "200",
+  });
+  const taxes = await zohoGet<{ taxes?: { tax_id: string; tax_name: string; tax_percentage: number }[] }>(db, c, "/settings/taxes", { organization_id: l.organization_id }).catch(() => ({ taxes: [] }));
+  return {
+    accounts: choosableExpenseAccounts(accounts.chartofaccounts ?? []),
+    taxes: (taxes.taxes ?? []).map((x): ZohoTax => ({ id: String(x.tax_id), name: x.tax_name, percentage: Number(x.tax_percentage) })),
+  };
+}
+
+export interface ExpenseChoice { accountId: string; taxId?: string }
+
+/** The choice is checked against Zoho's own lists, never trusted from the browser. */
+async function planExpense(db: Db, ctx: FirmContext, c: Conn, l: Awaited<ReturnType<typeof linkOf>>, txnId: string, choice: ExpenseChoice) {
+  const t = await bankTxn(db, ctx, l.business_id, txnId);
+  const banks = await zohoGet<{ bankaccounts?: { account_id: string; account_type?: string }[] }>(db, c, "/bankaccounts", { organization_id: l.organization_id });
+  const bank = (banks.bankaccounts ?? []).find((b) => String(b.account_id) === l.account_id);
+  const ok = expenseAllowed(t, accountKind(bank?.account_type));
+  if (!ok.ok) throw new PracticeError("not_postable", ok.why);
+  const { accounts, taxes } = await expenseChoices(db, ctx, l.id);
+  const account: ExpenseAccount | undefined = accounts.find((a) => a.id === choice.accountId);
+  if (!account) throw new PracticeError("bad_choice", "That expense account is not in this client's Zoho Books. Choose one from the list.");
+  const tax = choice.taxId ? taxes.find((x) => x.id === choice.taxId) : undefined;
+  if (choice.taxId && !tax) throw new PracticeError("bad_choice", "That tax is not set up in this client's Zoho Books.");
+  const win = duplicateWindow(t.date);
+  const r = await zohoGet<{ expenses?: { date: string; total?: number; amount?: number }[] }>(db, c, "/expenses", { organization_id: l.organization_id, date_start: win.start, date_end: win.end, per_page: "200" });
+  const dup = alreadyInZoho(t, (r.expenses ?? []).map((x) => ({ date: x.date, amount: num(x.total ?? x.amount) })));
+  if (dup) throw new PracticeError("already_in_zoho", `Zoho Books already has an entry of ₹${dup.amount.toLocaleString("en-IN")} on ${dup.date.slice(0, 10)}. Pull the month again so it matches, instead of posting.`);
+  return { t, account, tax };
+}
+
+/** What posting would create, shown before anyone approves. Changes nothing. */
+export async function previewPost(db: Db, ctx: FirmContext, linkId: string, txnId: string, choice?: ExpenseChoice) {
+  const { c, l } = await requirePosting(db, ctx, linkId);
+  if (choice) {
+    const x = await planExpense(db, ctx, c, l, txnId, choice);
+    return expensePreview(x.t, x.account, l.account_name, x.tax);
+  }
   const { t, p, chargeAccount } = await plan(db, ctx, c, l, txnId);
   return preview(t, p, l.account_name, chargeAccount?.name);
 }
 
-export async function post(db: Db, ctx: FirmContext, linkId: string, txnId: string) {
+export async function post(db: Db, ctx: FirmContext, linkId: string, txnId: string, choice?: ExpenseChoice) {
   const { c, l } = await requirePosting(db, ctx, linkId);
-  const { t, p, chargeAccount } = await plan(db, ctx, c, l, txnId);
-  const view = preview(t, p, l.account_name, chargeAccount?.name);
+  const chosen = choice ? await planExpense(db, ctx, c, l, txnId, choice) : null;
+  const planned = chosen ? null : await plan(db, ctx, c, l, txnId);
+  const t = (chosen?.t ?? planned!.t) as BankTxn;
+  const p = chosen ? ({ kind: "expense" } as const) : planned!.p;
+  const chargeAccount = planned?.chargeAccount ?? null;
+  const view = chosen ? expensePreview(t, chosen.account, l.account_name, chosen.tax) : preview(t, planned!.p as Extract<Postable, { kind: "bank_charge" | "receipt" | "vendor_payment" }>, l.account_name, chargeAccount?.name);
   // Claim the line first. The partial unique index makes a second click or retry fail here, before Zoho is touched.
   const row = {
     ca_firm_id: ctx.firmId, link_id: l.id, business_id: l.business_id, txn_id: t.id, kind: p.kind, amount: t.amount, txn_date: t.date,
-    summary: view.title, zoho_type: p.kind === "bank_charge" ? "expense" : p.kind === "vendor_payment" ? "vendorpayment" : "customerpayment", approved_by: ctx.userId,
+    summary: view.title, zoho_type: p.kind === "bank_charge" || p.kind === "expense" ? "expense" : p.kind === "vendor_payment" ? "vendorpayment" : "customerpayment", approved_by: ctx.userId,
   };
   const { data: claim, error: claimErr } = await db.from("ca_zoho_postings").insert(row).select("id").single();
   if (claimErr || !claim) throw new PracticeError("already_posted", "This bank line has already been posted to Zoho Books.");
   try {
     let zohoId: string;
-    if (p.kind === "bank_charge") {
+    if (p.kind === "expense") {
+      const r = await zohoCall<{ expense?: { expense_id: string } }>(db, c, "POST", "/expenses", { organization_id: l.organization_id }, categorisedExpensePayload(t, chosen!.account.id, l.account_id, chosen!.tax?.id));
+      zohoId = String(r.expense?.expense_id ?? "");
+    } else if (p.kind === "bank_charge") {
       const r = await zohoCall<{ expense?: { expense_id: string } }>(db, c, "POST", "/expenses", { organization_id: l.organization_id }, expensePayload(t, chargeAccount!.id, l.account_id));
       zohoId = String(r.expense?.expense_id ?? "");
     } else if (p.kind === "vendor_payment") {
@@ -824,4 +876,49 @@ export async function listPostings(db: Db, ctx: FirmContext) {
     .order("created_at", { ascending: false })
     .limit(30);
   return data ?? [];
+}
+
+/**
+ * The daily read: for each connected firm, pull this month (and last month in the first days of a month) for the
+ * links not read in the last 20 hours, then check the entries FynHelp created. Reads only. Oldest first, within a
+ * time budget, so a big firm base is spread over runs and a Zoho outage costs one link, not the run.
+ */
+export async function zohoTick(db: Db, opts: { now?: Date; budgetMs?: number; maxLinks?: number } = {}) {
+  const now = opts.now ?? new Date();
+  const budget = opts.budgetMs ?? 40_000;
+  const started = Date.now();
+  const ist = new Date(now.getTime() + 5.5 * 3_600_000);
+  const month = (d: Date) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+  const months = [month(ist)];
+  if (ist.getUTCDate() <= 5) months.push(month(new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth() - 1, 1))));
+  const cutoff = new Date(now.getTime() - 20 * 3_600_000).toISOString();
+  const { data: conns } = await db.from("ca_zoho_connections").select("ca_firm_id, connected_by").eq("status", "connected").limit(200);
+  const out = { firms: 0, pulled: 0, unchanged: 0, failed: 0, checked: 0, changed: 0, removed: 0, skipped: 0 };
+  let left = opts.maxLinks ?? 40;
+  for (const conn of conns ?? []) {
+    if (!left || Date.now() - started > budget) { out.skipped++; continue; }
+    const ctx: FirmContext = { firmId: conn.ca_firm_id, firmName: "", firmEmail: null, userId: conn.connected_by, role: "partner" };
+    const { data: links } = await db.from("ca_zoho_links").select("id, last_synced_at").eq("ca_firm_id", conn.ca_firm_id).or(`last_synced_at.is.null,last_synced_at.lt.${cutoff}`).order("last_synced_at", { ascending: true, nullsFirst: true }).limit(left);
+    if (!links?.length) continue;
+    out.firms++;
+    for (const l of links) {
+      if (!left || Date.now() - started > budget) break;
+      left--;
+      for (const m of months) {
+        try {
+          const r = await sync(db, ctx, l.id, m);
+          if (r.status === "synced") out.pulled++; else if (r.status === "unchanged") out.unchanged++;
+        } catch {
+          out.failed++;
+        }
+      }
+    }
+    try {
+      const d = await checkPostings(db, ctx);
+      out.checked += d.checked; out.changed += d.changed; out.removed += d.removed;
+    } catch {
+      out.failed++;
+    }
+  }
+  return out;
 }

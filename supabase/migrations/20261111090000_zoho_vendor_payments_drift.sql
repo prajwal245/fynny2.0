@@ -18,3 +18,9 @@ alter table public.ca_zoho_postings add constraint ca_zoho_postings_drift_check
 alter table public.ca_zoho_postings add column if not exists drift_checked_at timestamptz;
 
 notify pgrst, 'reload schema';
+
+-- A categorised expense: any bank payment booked to an expense account a partner chose.
+alter table public.ca_zoho_postings drop constraint if exists ca_zoho_postings_kind_check;
+alter table public.ca_zoho_postings add constraint ca_zoho_postings_kind_check
+  check (kind in ('bank_charge', 'receipt', 'vendor_payment', 'expense'));
+notify pgrst, 'reload schema';

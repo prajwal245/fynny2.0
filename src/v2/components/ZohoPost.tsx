@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Check, Undo2 } from "lucide-react";
-import { zohoBooksPost, zohoBooksPreviewPost, zohoBooksStatus, zohoBooksSync, zohoBooksUndoPost } from "@/lib/practice/practice.functions";
+import { zohoBooksExpenseChoices, zohoBooksPost, zohoBooksPreviewPost, zohoBooksStatus, zohoBooksSync, zohoBooksUndoPost } from "@/lib/practice/practice.functions";
 import { V } from "../ui";
 import { useV2 } from "../store";
 
@@ -21,6 +21,8 @@ export function ZohoPostPanel({ clientId, txnId, side, open }: { clientId: strin
   const [busy, setBusy] = useState<"preview" | "post" | "undo" | null>(null);
   const [posted, setPosted] = useState<{ postingId: string } | null>(null);
   const [undone, setUndone] = useState(false);
+  const [choices, setChoices] = useState<Awaited<ReturnType<typeof zohoBooksExpenseChoices>> | null>(null);
+  const [expense, setExpense] = useState<{ accountId: string; taxId?: string } | null>(null);
   const [pulled, setPulled] = useState<"busy" | "done" | "failed" | null>(null);
 
   useEffect(() => {
@@ -29,6 +31,8 @@ export function ZohoPostPanel({ clientId, txnId, side, open }: { clientId: strin
     setPosted(null);
     setUndone(false);
     setPulled(null);
+    setChoices(null);
+    setExpense(null);
     setLinkId(null);
     if (!canSignOff || !txnId || side !== "bank" || !open) return;
     let live = true;
@@ -50,7 +54,20 @@ export function ZohoPostPanel({ clientId, txnId, side, open }: { clientId: strin
     setBusy("preview");
     setWhy(null);
     try {
-      setView(await zohoBooksPreviewPost({ data: { linkId, txnId } }));
+      setView(await zohoBooksPreviewPost({ data: { linkId, txnId, ...(expense ? { expense } : {}) } }));
+    } catch (e) {
+      setWhy(msg(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+  const chooseExpense = async () => {
+    setBusy("preview");
+    try {
+      const c = await zohoBooksExpenseChoices({ data: { linkId } });
+      setChoices(c);
+      setExpense({ accountId: c.accounts.find((a) => /^other expenses$/i.test(a.name))?.id ?? c.accounts[0]?.id ?? "" });
+      setWhy(null);
     } catch (e) {
       setWhy(msg(e));
     } finally {
@@ -61,7 +78,7 @@ export function ZohoPostPanel({ clientId, txnId, side, open }: { clientId: strin
     setBusy("post");
     try {
       const date = view?.lines.find(([k]) => k === "Date")?.[1] ?? "";
-      const r = await zohoBooksPost({ data: { linkId, txnId } });
+      const r = await zohoBooksPost({ data: { linkId, txnId, ...(expense ? { expense } : {}) } });
       setPosted({ postingId: r.postingId });
       setView(null);
       toast.success("Entry created in Zoho Books");
@@ -125,6 +142,32 @@ export function ZohoPostPanel({ clientId, txnId, side, open }: { clientId: strin
       ) : (
         <>
           {why && <div style={{ fontSize: 12.5, color: V.body }} data-testid="zoho-why">{why}</div>}
+          {choices && expense && (
+            <div style={{ display: "grid", gap: 8, fontSize: 13 }} data-testid="zoho-expense-form">
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ color: V.muted }}>Book it as</span>
+                <select value={expense.accountId} onChange={(e) => setExpense({ ...expense, accountId: e.target.value })} data-testid="zoho-expense-account">
+                  {choices.accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </label>
+              {choices.taxes.length > 0 ? (
+                <label style={{ display: "grid", gap: 4 }}>
+                  <span style={{ color: V.muted }}>GST on this payment (included in the amount)</span>
+                  <select value={expense.taxId ?? ""} onChange={(e) => { const v = e.target.value; setExpense(v ? { ...expense, taxId: v } : { accountId: expense.accountId }); }} data-testid="zoho-expense-tax">
+                    <option value="">None. Do not claim input tax credit</option>
+                    {choices.taxes.map((x) => <option key={x.id} value={x.id}>{x.name} ({x.percentage}%)</option>)}
+                  </select>
+                </label>
+              ) : (
+                <div style={{ color: V.muted, fontSize: 12.5 }}>No GST is set up in this client's Zoho Books, so no input tax credit is claimed.</div>
+              )}
+            </div>
+          )}
+          {why && !choices && (
+            <button className="v2-btn v2-btn-quiet" style={{ justifySelf: "start", padding: "6px 12px", fontSize: 12.5 }} disabled={busy === "preview"} data-testid="zoho-book-expense" onClick={() => void chooseExpense()}>
+              Book as an expense instead…
+            </button>
+          )}
           {undone && <div style={{ fontSize: 12.5, color: V.body }}>Removed from Zoho Books.</div>}
           <button className="v2-btn v2-btn-ghost" style={{ justifySelf: "start", padding: "8px 14px", fontSize: 13 }} disabled={busy === "preview"} data-testid="zoho-preview" onClick={() => void show()}>
             {busy === "preview" ? <><span className="ic-spin" /> Checking…</> : "Post to Zoho Books…"}

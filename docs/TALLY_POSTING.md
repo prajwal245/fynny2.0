@@ -14,7 +14,8 @@ Reads were already live (the connector sends the Day Book). This adds the write 
 - A line whose result never came back is **held**, not retried (Tally may already have it). A person checks Tally and either approves again or presses **It is in Tally: mark as posted** (note required, kept in the history).
 - A ledger renamed or deleted in Tally after approval stops the write.
 - Tally offline: the line waits as "Approved, waiting for Tally".
-- The Tally XML details (field names, repeated-ID behaviour, reply format) are **not yet proven against a real Tally**. Test on a test company first.
+- The XML now has the shape of a real TallyPrime import file and is checked against it in tests; what Tally does on a live company (resend with the same id, manual numbering, billwise parties) is **not yet proven**. Test on a test company first (`docs/ACCURACY.md` has the checklist).
+- From connector 1.4.0, after Tally says "created" the connector **reads the voucher back** and checks type, date, ledgers and amounts. Only a match becomes "In Tally"; otherwise the line is held as "Needs a look" with the reason.
 
 ## Tally posting pages (credits, like WhatsApp credits)
 - 1 credit = 1 page of a document posted to Tally. PDF: real pages (when known); Excel/CSV: 1 page per 30 lines, minimum 1. Taken **once per document**, when its first line is approved; refunded if the approval is not queued. Cancelling later does not refund (the document was used).

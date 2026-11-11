@@ -20,4 +20,4 @@ export function unsupportedReport(table: string[][]): string | null {
 
 /** A Tally XML file with no vouchers is a report export (such as a Ledger), not a Day Book. */
 export const TALLY_XML_NO_VOUCHERS =
-  "This Tally XML has no vouchers in it, so it is probably a report export (for example Ledger as XML). In Tally, export the ledger as Excel (Spreadsheet) instead, or export the Day Book as XML.";
+  "This Tally XML has no vouchers and no ledger entries in it, so it is a report FynHelp does not use (for example a Trial Balance). In Tally, export the Day Book as XML, or the ledger as XML or Excel (Spreadsheet).";

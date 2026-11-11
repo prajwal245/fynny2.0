@@ -6,16 +6,24 @@
 export const TOKEN_PREFIX = "fyn_tc_";
 
 /** A new connector secret: shown once, only its hash is stored. */
-export function newConnectorToken(bytes: Uint8Array = crypto.getRandomValues(new Uint8Array(32))): string {
+export function newConnectorToken(
+  bytes: Uint8Array = crypto.getRandomValues(new Uint8Array(32)),
+): string {
   let s = "";
   for (const b of bytes) s += String.fromCharCode(b);
-  return TOKEN_PREFIX + btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return (
+    TOKEN_PREFIX +
+    btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
+  );
 }
 
-export const looksLikeToken = (t: string | null | undefined): t is string => /^fyn_tc_[A-Za-z0-9_-]{40,60}$/.test(t ?? "");
+export const looksLikeToken = (t: string | null | undefined): t is string =>
+  /^fyn_tc_[A-Za-z0-9_-]{40,60}$/.test(t ?? "");
 
 export async function hashToken(token: string): Promise<string> {
-  const d = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token)));
+  const d = new Uint8Array(
+    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token)),
+  );
   return [...d].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
@@ -35,13 +43,18 @@ const shift = (month: string, d: number) => {
  * has something to work on at once; after that the current and previous month are refreshed
  * (late entries and back-dated vouchers land in the previous month).
  */
-export function monthsToPull(lastSyncedAt: string | null, now: Date = new Date(), backfill = 3): string[] {
+export function monthsToPull(
+  lastSyncedAt: string | null,
+  now: Date = new Date(),
+  backfill = 3,
+): string[] {
   const cur = now.toISOString().slice(0, 7);
   const back = lastSyncedAt ? 1 : Math.max(1, backfill);
   return Array.from({ length: back + 1 }, (_, i) => shift(cur, -(back - i)));
 }
 
-export const validMonth = (m: unknown): m is string => typeof m === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(m);
+export const validMonth = (m: unknown): m is string =>
+  typeof m === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(m);
 
 /** Number of vouchers in a Tally export, without parsing the whole file. */
 export function voucherCount(xml: string): number {
@@ -62,13 +75,21 @@ export function cleanCompanyNames(raw: unknown): string[] {
 }
 
 /** "Online" while the connector has checked in recently. */
-export const connectorOnline = (lastSeenAt: string | null | undefined, now: Date = new Date(), minutes = 15): boolean =>
-  Boolean(lastSeenAt) && now.getTime() - Date.parse(lastSeenAt!) < minutes * 60_000;
+export const connectorOnline = (
+  lastSeenAt: string | null | undefined,
+  now: Date = new Date(),
+  minutes = 15,
+): boolean =>
+  Boolean(lastSeenAt) &&
+  now.getTime() - Date.parse(lastSeenAt!) < minutes * 60_000;
 
 /** The distinct voucher dates (YYYYMMDD) in a Tally export. */
 export function voucherDatesOf(xml: string): string[] {
   const out = new Set<string>();
-  for (const m of xml.matchAll(/<VOUCHER\b[\s\S]*?<DATE>\s*(\d{8})\s*<\/DATE>/gi)) out.add(m[1]);
+  for (const m of xml.matchAll(
+    /<VOUCHER\b[\s\S]*?<DATE>\s*(\d{8})\s*<\/DATE>/gi,
+  ))
+    out.add(m[1]);
   return [...out].sort();
 }
 
@@ -80,3 +101,23 @@ export function datesOutsideMonth(xml: string, month: string): string[] {
   const to = `${y}${String(m).padStart(2, "0")}${String(last).padStart(2, "0")}`;
   return voucherDatesOf(xml).filter((d) => d < from || d > to);
 }
+
+/** True when a connector's version ("1.4.0") is at least `min`. An unknown or malformed version is older than anything. */
+export function versionAtLeast(
+  version: string | null | undefined,
+  min: string,
+): boolean {
+  const parse = (v: string | null | undefined) => {
+    const m = /^(\d+)\.(\d+)\.(\d+)/.exec((v ?? "").trim());
+    return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+  };
+  const a = parse(version);
+  const b = parse(min);
+  if (!a || !b) return false;
+  for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i]! > b[i]!;
+  return true;
+}
+
+/** The Tally group a party ledger sits under. Sundry Debtors and Sundry Creditors are the parties Tally flags in a voucher. */
+export const isPartyGroup = (parent: string | null | undefined): boolean =>
+  /^sundry\s+(debtors|creditors)$/i.test((parent ?? "").trim());

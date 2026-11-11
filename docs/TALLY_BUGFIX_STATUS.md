@@ -83,3 +83,18 @@ Fixed:
 - The check-in card now carries the database's own words and, when columns are missing, names them (`ca_tally_companies.company_name`).
 - `20261111120000_tally_tables_repair_2.sql` makes every column the code does not write nullable, gives ids their default, grants the API role, and reloads the schema. Safe to run twice; tested on the old shape.
 - `tests/unit/practice/tally-schema.test.ts` fails if the code uses a column no migration creates.
+
+
+## 11 Nov: Ledger XML, and writing to Tally checked against real Tally files
+
+Three real files were supplied: a Ledger Vouchers export (cash book, XML), a November Day Book (123 vouchers) and an October Import Data file (104 vouchers). They are kept in `tests/fixtures/tally/`.
+
+| What | Result |
+|---|---|
+| Ledger XML (the long-open gap) | Now read. It is UTF-16, has no `<VOUCHER>`, writes the debit negative, and names no ledger or opening balance. The reader decides the side by which tag carries the amount, skips headings and totals, and reports the debit and credit totals for a person to tick against Tally. |
+| Writing to Tally | The XML now has the shape Tally itself uses (Import Data envelope, OBJVIEW, ISPARTYLEDGER, debits first). Connectors before 1.4.0 are sent the older shape. |
+| Last-line checks | The server and the connector both refuse an entry that is not balanced to the paisa, has a wrong sign, no id, a bad date or more than two decimals. Every one of the 227 real vouchers passes the rules (no false alarms). |
+| Read-back | Connector 1.4.0 reads each written voucher back from Tally and only then reports it as done; a mismatch holds the line for a person. |
+| Found in the files | Two different vouchers can share a REMOTEID in Tally's own exports. Handled. |
+
+See `docs/ACCURACY.md` for the full list of controls and the live proof still needed.

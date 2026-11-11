@@ -29,10 +29,23 @@ import {
   isTallyLedger,
 } from "./table";
 import { isTallyXml, readTally } from "./tally";
+import {
+  isTallyLedgerXml,
+  ledgerTotalsNote,
+  readTallyLedgerXml,
+} from "./tallyLedger";
 import { TALLY_XML_NO_VOUCHERS, unsupportedReport } from "./unsupported";
 import { selectSheet } from "./sheets";
-import { passwordNeededMessage, passwordWrongMessage, type ProtectedKind } from "../passwordFile";
-import { detectRegister, summariseRegister, type RegisterSummary } from "./registers";
+import {
+  passwordNeededMessage,
+  passwordWrongMessage,
+  type ProtectedKind,
+} from "../passwordFile";
+import {
+  detectRegister,
+  summariseRegister,
+  type RegisterSummary,
+} from "./registers";
 import { rowsFromStatementText } from "./textStatement";
 
 export type FileKind =
@@ -162,7 +175,8 @@ export function detectKind(
   // Named .pdf (or sent as a PDF) but no PDF signature: damaged or renamed.
   if (/\.pdf$/.test(name) || mime === "application/pdf") return "unsupported";
   // Word, PowerPoint and similar share Excel's zip container: name them before sniffing.
-  if (/\.(docx?|pptx?|odt|pages|rtf|zip|rar|7z)$/.test(name)) return "unsupported";
+  if (/\.(docx?|pptx?|odt|pages|rtf|zip|rar|7z)$/.test(name))
+    return "unsupported";
   if (looksLikeSpreadsheetBinary(bytes)) return "xlsx"; // includes Excel renamed to .csv
   if (
     head.startsWith("<") &&
@@ -286,7 +300,13 @@ async function aiClassify(
           system: CLASSIFY_SYSTEM_PROMPT,
           user,
         }),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("AI classification took too long; rules used")), left)),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () =>
+              reject(new Error("AI classification took too long; rules used")),
+            left,
+          ),
+        ),
       ]);
       const list = ((res.data ?? {}) as { rows?: AiRowVerdict[] }).rows ?? [];
       for (const v of list)
@@ -337,7 +357,6 @@ function fail(
   };
 }
 
-
 /** OCR text must carry at least this much before it is worth reading. */
 const MIN_OCR_CHARS = 40;
 /** Lines read from a scan never outrank a person's glance unless the balances verify. */
@@ -346,17 +365,36 @@ const OCR_CONFIDENCE_CAP = 0.8;
 /** Says why a photo could not be read, from what the OCR and AI calls actually did. */
 function photoFailureMessage(calls: AiCallRecord[], ocrOn: boolean): string {
   const ocr = calls.find((c) => c.purpose === "extract_ocr");
-  const tail = " Upload the document as a PDF, Excel or CSV instead, or send a clearer, closer photo.";
+  const tail =
+    " Upload the document as a PDF, Excel or CSV instead, or send a clearer, closer photo.";
   if (ocr?.status === "error") {
     const why = ocr.error ?? "";
     if (/size|limit|1024|1 ?MB|large/i.test(why))
-      return "This photo is too large for the reader (about 1 MB maximum). Send a smaller or compressed copy." + tail;
-    if (/timed out/i.test(why)) return "Reading this photo took too long. Please try again in a minute." + tail;
-    return "The photo reader could not read this image: " + why.slice(0, 160) + "." + tail;
+      return (
+        "This photo is too large for the reader (about 1 MB maximum). Send a smaller or compressed copy." +
+        tail
+      );
+    if (/timed out/i.test(why))
+      return (
+        "Reading this photo took too long. Please try again in a minute." + tail
+      );
+    return (
+      "The photo reader could not read this image: " +
+      why.slice(0, 160) +
+      "." +
+      tail
+    );
   }
   if (ocr?.status === "success")
-    return "The photo was read, but not enough text could be made out, or turning it into entries needs the AI reader, which is not switched on." + tail;
-  return (ocrOn ? "The photo could not be read." : "Reading photos isn't switched on yet.") + tail;
+    return (
+      "The photo was read, but not enough text could be made out, or turning it into entries needs the AI reader, which is not switched on." +
+      tail
+    );
+  return (
+    (ocrOn
+      ? "The photo could not be read."
+      : "Reading photos isn't switched on yet.") + tail
+  );
 }
 
 /**
@@ -370,15 +408,42 @@ async function readViaOcr(
   calls: AiCallRecord[],
   bytes: Uint8Array,
   mime: string,
-): Promise<{ text: string; rows: ExtractedRow[]; kind: string | null; ai: boolean } | null> {
+): Promise<{
+  text: string;
+  rows: ExtractedRow[];
+  kind: string | null;
+  ai: boolean;
+} | null> {
   if (!deps.ocr) return null;
   let text = "";
   const started = Date.now();
   try {
     text = (await deps.ocr(bytes, mime)).slice(0, MAX_TEXT_CHARS);
-    calls.push({ purpose: "extract_ocr", provider: "ocr.space", model: null, input: mime, output: text.slice(0, 2000), latency_ms: Date.now() - started, status: "success", error: null, units: 1, cost_usd: ocrCostUsd() });
+    calls.push({
+      purpose: "extract_ocr",
+      provider: "ocr.space",
+      model: null,
+      input: mime,
+      output: text.slice(0, 2000),
+      latency_ms: Date.now() - started,
+      status: "success",
+      error: null,
+      units: 1,
+      cost_usd: ocrCostUsd(),
+    });
   } catch (e) {
-    calls.push({ purpose: "extract_ocr", provider: "ocr.space", model: null, input: mime, output: null, latency_ms: Date.now() - started, status: "error", error: e instanceof Error ? e.message : String(e), units: 1, cost_usd: 0 });
+    calls.push({
+      purpose: "extract_ocr",
+      provider: "ocr.space",
+      model: null,
+      input: mime,
+      output: null,
+      latency_ms: Date.now() - started,
+      status: "error",
+      error: e instanceof Error ? e.message : String(e),
+      units: 1,
+      cost_usd: 0,
+    });
     return null;
   }
   if (text.replace(/\s/g, "").length < MIN_OCR_CHARS) return null;
@@ -386,7 +451,10 @@ async function readViaOcr(
   if (statement.rows.length >= 3 && statement.verifiedShare >= 0.7)
     return {
       text,
-      rows: statement.rows.map((r) => ({ ...r, parse_confidence: Math.min(r.parse_confidence, OCR_CONFIDENCE_CAP) })),
+      rows: statement.rows.map((r) => ({
+        ...r,
+        parse_confidence: Math.min(r.parse_confidence, OCR_CONFIDENCE_CAP),
+      })),
       kind: "bank_statement",
       ai: false,
     };
@@ -396,12 +464,22 @@ async function readViaOcr(
     user: `Text read by OCR from a scanned document. OCR can confuse similar characters (0/O, 1/l, 5/S); lower confidence where a value is doubtful.\n\n${text}`,
   });
   if (!read) return null;
-  return { text, rows: rowsFromAiRead(read.rows, text), kind: read.kind, ai: true };
+  return {
+    text,
+    rows: rowsFromAiRead(read.rows, text),
+    kind: read.kind,
+    ai: true,
+  };
 }
 
 const LEGAL = /\b(pvt|private|ltd|limited|llp|llc|inc|co|company|the|and)\b/g;
 function partyTokens(name: string): string[] {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(LEGAL, " ").split(/\s+/).filter((t) => t.length > 1);
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(LEGAL, " ")
+    .split(/\s+/)
+    .filter((t) => t.length > 1);
 }
 /** True when two names refer to the same business ("Sundara Textiles" vs "SUNDARA TEXTILES PVT LTD"). */
 export function sameParty(a: string, b: string): boolean {
@@ -425,7 +503,10 @@ export async function runExtract(
     const base = deps.llm;
     const gstin = input.clientGstin?.trim().toUpperCase();
     const who = `These are the books of the client "${client}"${gstin ? ` (GSTIN ${gstin}, state code ${gstin.slice(0, 2)}: supplies within that state carry CGST + SGST, others IGST)` : ""}. Direction is from the client's side: money the client receives is "in"; money the client pays, including bills and invoices addressed to the client, is "out". The counterparty is always the other party, never "${client}".\n\n`;
-    deps = { ...deps, llm: { json: (req) => base.json({ ...req, user: who + req.user }) } };
+    deps = {
+      ...deps,
+      llm: { json: (req) => base.json({ ...req, user: who + req.user }) },
+    };
   }
   const kind = detectKind(input.bytes, input.filename, input.mime);
   let parsed: ExtractedRow[] | null = null;
@@ -452,7 +533,16 @@ export async function runExtract(
     const reg = detectRegister(table, input.filename);
     if (!reg) return null;
     const register = summariseRegister(reg, table);
-    return { kind, rows: [], duplicateRows: 0, sourceText: sourceText.slice(0, 200_000), aiCalls: calls, documentKind: reg, register, error: null };
+    return {
+      kind,
+      rows: [],
+      duplicateRows: 0,
+      sourceText: sourceText.slice(0, 200_000),
+      aiCalls: calls,
+      documentKind: reg,
+      register,
+      error: null,
+    };
   };
 
   if (kind === "csv") {
@@ -462,7 +552,8 @@ export async function runExtract(
     if (unsupported) return fail(kind, "unsupported_report", unsupported);
     const reg = asRegister(table);
     if (reg) return reg;
-    if (input.side !== "books" && isTallyLedger(table)) input = { ...input, side: "books" };
+    if (input.side !== "books" && isTallyLedger(table))
+      input = { ...input, side: "books" };
     parsed = rowsFromTable(table, input.side);
     documentKind = input.side === "bank" ? "bank_statement" : "ledger_export";
   } else if (kind === "xlsx") {
@@ -474,7 +565,9 @@ export async function runExtract(
       );
     let rows: string[][];
     try {
-      const chosen = deps.sheetsAll ? selectSheet(deps.sheetsAll(input.bytes), input.clientName) : null;
+      const chosen = deps.sheetsAll
+        ? selectSheet(deps.sheetsAll(input.bytes), input.clientName)
+        : null;
       if (chosen) {
         rows = chosen.sheet.rows;
         if (chosen.note) note = chosen.note;
@@ -482,7 +575,13 @@ export async function runExtract(
     } catch (e) {
       // A locked workbook is opened before this point (see unlockWorkbook); this catches a damaged or unsupported file.
       if (e instanceof PdfPasswordError)
-        return fail(kind, e.reason === "wrong" ? "password_wrong" : "password_protected", e.reason === "wrong" ? passwordWrongMessage("Excel file") : passwordNeededMessage("Excel file"));
+        return fail(
+          kind,
+          e.reason === "wrong" ? "password_wrong" : "password_protected",
+          e.reason === "wrong"
+            ? passwordWrongMessage("Excel file")
+            : passwordNeededMessage("Excel file"),
+        );
       return fail(
         kind,
         "unreadable",
@@ -497,20 +596,40 @@ export async function runExtract(
     if (unsupported) return fail(kind, "unsupported_report", unsupported);
     const reg = asRegister(rows);
     if (reg) return reg;
-    if (input.side !== "books" && isTallyLedger(rows)) input = { ...input, side: "books" };
+    if (input.side !== "books" && isTallyLedger(rows))
+      input = { ...input, side: "books" };
     parsed = rowsFromTable(rows, input.side);
     documentKind = input.side === "bank" ? "bank_statement" : "ledger_export";
   } else if (kind === "tally_xml") {
     sourceText = decodeText(input.bytes);
     try {
       const read = readTally(sourceText);
-      if (read.vouchers === 0) return fail(kind, "no_vouchers", TALLY_XML_NO_VOUCHERS);
-      parsed = read.rows;
-      const left = [
-        read.skippedNonBank ? `${read.skippedNonBank} sales, purchase or journal voucher${read.skippedNonBank === 1 ? "" : "s"} with no bank or cash entry were left out of bank reconciliation` : "",
-        read.skippedCancelled ? `${read.skippedCancelled} cancelled or optional voucher${read.skippedCancelled === 1 ? "" : "s"} were skipped` : "",
-      ].filter(Boolean);
-      if (left.length) note = left.join("; ") + ".";
+      if (read.vouchers === 0) {
+        // Tally's Ledger Vouchers report as XML has no <VOUCHER>; it is a flat list of display tags.
+        const ledger = isTallyLedgerXml(sourceText)
+          ? readTallyLedgerXml(sourceText)
+          : null;
+        if (!ledger) return fail(kind, "no_vouchers", TALLY_XML_NO_VOUCHERS);
+        if (!ledger.rows.length)
+          return fail(
+            kind,
+            "no_vouchers",
+            "This Tally ledger export has no entries with an amount in it.",
+          );
+        parsed = ledger.rows;
+        note = ledgerTotalsNote(ledger);
+      } else {
+        parsed = read.rows;
+        const left = [
+          read.skippedNonBank
+            ? `${read.skippedNonBank} sales, purchase or journal voucher${read.skippedNonBank === 1 ? "" : "s"} with no bank or cash entry were left out of bank reconciliation`
+            : "",
+          read.skippedCancelled
+            ? `${read.skippedCancelled} cancelled or optional voucher${read.skippedCancelled === 1 ? "" : "s"} were skipped`
+            : "",
+        ].filter(Boolean);
+        if (left.length) note = left.join("; ") + ".";
+      }
     } catch (e) {
       return fail(
         kind,
@@ -529,7 +648,9 @@ export async function runExtract(
           return fail(
             kind,
             e.reason === "wrong" ? "password_wrong" : "password_protected",
-            e.reason === "wrong" ? passwordWrongMessage("PDF") : passwordNeededMessage("PDF"),
+            e.reason === "wrong"
+              ? passwordWrongMessage("PDF")
+              : passwordNeededMessage("PDF"),
           );
         // A real PDF opens even when it is a scan; one that cannot be opened is damaged.
         return fail(
@@ -589,12 +710,17 @@ export async function runExtract(
         documentKind = ocr.kind;
         aiReadUsed = ocr.ai;
       }
-      const read = parsed ? null : await aiRead(deps, calls, {
-        purpose: "extract_read_scan",
-        system: READ_SYSTEM_PROMPT,
-        user: "This is a scanned document. Read it carefully.",
-        attachment: { mime: "application/pdf", base64: toBase64(input.bytes) },
-      });
+      const read = parsed
+        ? null
+        : await aiRead(deps, calls, {
+            purpose: "extract_read_scan",
+            system: READ_SYSTEM_PROMPT,
+            user: "This is a scanned document. Read it carefully.",
+            attachment: {
+              mime: "application/pdf",
+              base64: toBase64(input.bytes),
+            },
+          });
       if (!parsed && !read)
         return fail(
           kind,
@@ -616,7 +742,9 @@ export async function runExtract(
         "too_large",
         "Images larger than 10 MB cannot be read.",
       );
-    const imageMime = input.mime?.startsWith("image/") ? input.mime : "image/jpeg";
+    const imageMime = input.mime?.startsWith("image/")
+      ? input.mime
+      : "image/jpeg";
     const ocr = await readViaOcr(deps, calls, input.bytes, imageMime);
     if (ocr) {
       sourceText = ocr.text;
@@ -624,17 +752,24 @@ export async function runExtract(
       documentKind = ocr.kind;
       aiReadUsed = ocr.ai;
     }
-    const read = parsed ? null : await aiRead(deps, calls, {
-      purpose: "extract_read_image",
-      system: READ_SYSTEM_PROMPT,
-      user: "This is a photo of a financial document. Read it carefully; photos may be blurred or tilted.",
-      attachment: {
-        mime: input.mime?.startsWith("image/") ? input.mime : "image/jpeg",
-        base64: toBase64(input.bytes),
-      },
-    });
+    const read = parsed
+      ? null
+      : await aiRead(deps, calls, {
+          purpose: "extract_read_image",
+          system: READ_SYSTEM_PROMPT,
+          user: "This is a photo of a financial document. Read it carefully; photos may be blurred or tilted.",
+          attachment: {
+            mime: input.mime?.startsWith("image/") ? input.mime : "image/jpeg",
+            base64: toBase64(input.bytes),
+          },
+        });
     if (!parsed && !read)
-      return fail(kind, "needs_ai", photoFailureMessage(calls, Boolean(deps.ocr)), calls);
+      return fail(
+        kind,
+        "needs_ai",
+        photoFailureMessage(calls, Boolean(deps.ocr)),
+        calls,
+      );
     if (read) {
       aiReadUsed = true;
       parsed = rowsFromAiRead(read.rows, "");
@@ -675,41 +810,54 @@ export async function runExtract(
   // Identical rows inside one file: keep the first, send the rest to a person.
   const seen = new Map<string, number>();
   let duplicateRows = 0;
-  const rows = scored.map((r) => {
-    if (!r.date || !r.amount || !r.direction) return r;
-    const key = dedupeKey({
-      business_id: input.businessId,
-      side: input.side,
-      date: r.date,
-      direction: r.direction,
-      amount: r.amount,
-      reference: r.reference,
-      description: r.description,
+  const rows = scored
+    .map((r) => {
+      if (!r.date || !r.amount || !r.direction) return r;
+      const key = dedupeKey({
+        business_id: input.businessId,
+        side: input.side,
+        date: r.date,
+        direction: r.direction,
+        amount: r.amount,
+        reference: r.reference,
+        description: r.description,
+      });
+      const first = seen.get(key);
+      if (first === undefined) {
+        seen.set(key, r.row_index);
+        return r;
+      }
+      duplicateRows++;
+      return {
+        ...r,
+        route: "review" as const,
+        confidence: Math.min(r.confidence, 0.5),
+        reason: `Identical to row ${first + 1} in the same file. Confirm only if it is a genuine second transaction.`,
+      };
+    })
+    .map((r) => {
+      // An AI-read line naming the client as its own counterparty has its direction
+      // backwards or is misread. (Statements read in code keep own-account transfers.)
+      if (
+        !aiReadUsed ||
+        !client ||
+        !r.counterparty ||
+        !sameParty(r.counterparty, client)
+      )
+        return r;
+      return {
+        ...r,
+        counterparty: null,
+        route: "review" as const,
+        confidence: Math.min(r.confidence, 0.5),
+        reason: [
+          r.reason,
+          "The reader named the client as the other party, so money in/out may be reversed",
+        ]
+          .filter(Boolean)
+          .join("; "),
+      };
     });
-    const first = seen.get(key);
-    if (first === undefined) {
-      seen.set(key, r.row_index);
-      return r;
-    }
-    duplicateRows++;
-    return {
-      ...r,
-      route: "review" as const,
-      confidence: Math.min(r.confidence, 0.5),
-      reason: `Identical to row ${first + 1} in the same file. Confirm only if it is a genuine second transaction.`,
-    };
-  }).map((r) => {
-    // An AI-read line naming the client as its own counterparty has its direction
-    // backwards or is misread. (Statements read in code keep own-account transfers.)
-    if (!aiReadUsed || !client || !r.counterparty || !sameParty(r.counterparty, client)) return r;
-    return {
-      ...r,
-      counterparty: null,
-      route: "review" as const,
-      confidence: Math.min(r.confidence, 0.5),
-      reason: [r.reason, "The reader named the client as the other party, so money in/out may be reversed"].filter(Boolean).join("; "),
-    };
-  });
 
   return {
     kind,

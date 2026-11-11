@@ -28,7 +28,7 @@ export const Route = createFileRoute("/api/public/tally-result")({
         }
         const p = await import("@/lib/practice/tallyPosting.server");
         try {
-          return json(await p.reportResult(db, connector, String(body.id ?? ""), { reply: body.reply, error: body.error }));
+          return json(await p.reportResult(db, connector, String(body.id ?? ""), { reply: body.reply, error: body.error, verified: body.verified, verifyNote: body.verifyNote }));
         } catch (e) {
           return json({ error: (e as Error).message }, 422);
         }

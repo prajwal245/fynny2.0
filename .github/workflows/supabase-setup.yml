@@ -45,7 +45,7 @@ jobs:
       - name: Apply migrations
         run: node scripts/supabase-apply-migrations.mjs "$PROJECT_REF"
 
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         with:
           version: latest
 

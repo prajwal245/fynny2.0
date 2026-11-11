@@ -9,6 +9,7 @@
  * from transactions read out of files the practice actually uploaded.
  */
 import { WorkspaceUnavailable, loadWorkspaceWithRetry, messageOf } from "./lib/workspaceLoad";
+import { workflowFor, type WorkflowStep } from "./lib/closeWorkflow";
 import { signupAttribution } from "@/lib/attribution";
 import { getLeadAttribution } from "@/lib/leadAttribution";
 import {
@@ -290,6 +291,8 @@ export type CloseStep = { stage: CloseStage; done: boolean; detail: string };
 
 export type CloseState = {
   steps: CloseStep[];
+  /** The same close in finer steps, with who does each one. See lib/closeWorkflow. */
+  workflow: WorkflowStep[];
   percent: number;
   stage: CloseStage;
   /** The single most useful thing to do next for this client. */
@@ -1816,6 +1819,21 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
         },
       ];
 
+      const monthRows = parsed.flatMap((d) => d.rows).filter((r) => r.date && monthOf(r.date) === period);
+      const workflow = workflowFor({
+        period,
+        docsRead: parsed.length,
+        reading: cDocs.some((d) => d.status === "Uploading" || d.status === "Processing" || d.status === "Queued"),
+        openChases: openChase.length,
+        bankLines: monthRows.filter((r) => r.side === "bank").length,
+        bookLines: monthRows.filter((r) => r.side === "books").length,
+        openReview: openReview.length,
+        recon: reconRun ? { matched: reconRun.matched, bank: reconRun.bank } : null,
+        openExceptions: openEx.length,
+        misCount: mis.length,
+        signedOff: mis.some((r) => r.signedOff),
+      });
+
       const firstOpen = steps.find((s) => !s.done);
       const percent = Math.round(
         (steps.filter((s) => s.done).length / steps.length) * 100,
@@ -1884,6 +1902,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
 
       return {
         steps,
+        workflow,
         percent,
         stage: firstOpen ? firstOpen.stage : "MIS",
         next,

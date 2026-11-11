@@ -73,3 +73,13 @@ Every fix below is covered by unit tests built from the retest's own symptoms. *
 | Exit crash message on Node 24 / Windows | Fixed | The connector ends normally instead of calling exit while requests are open. |
 | Safety of writing | Fixed | Before sending anything to Tally the connector checks the entry is exactly ONE new Receipt, Payment or Contra voucher for a linked company: no ledgers or other masters, no change or delete, no extra vouchers. Otherwise it refuses and reports why. |
 | Writing, changing and removing an entry | Not testable until companies link | Retest after the SQL is run. |
+
+
+## 11 Nov: "Could not find the 'company_name' column ... schema cache" still showing
+
+Cause found while reproducing on a scratch database built with the old table shape: the first repair adds the missing columns, but an old column the code does not know (for example `name` or `tally_company`) can stay NOT NULL, so the connector's save still fails with `null value in column ... violates not-null constraint`. The check-in then showed the same "missing a column" sentence, because the wording matched any error containing the word "column". So the card said the same thing whatever the real error was.
+
+Fixed:
+- The check-in card now carries the database's own words and, when columns are missing, names them (`ca_tally_companies.company_name`).
+- `20261111120000_tally_tables_repair_2.sql` makes every column the code does not write nullable, gives ids their default, grants the API role, and reloads the schema. Safe to run twice; tested on the old shape.
+- `tests/unit/practice/tally-schema.test.ts` fails if the code uses a column no migration creates.

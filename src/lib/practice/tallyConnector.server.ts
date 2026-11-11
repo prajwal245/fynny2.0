@@ -5,6 +5,7 @@
  * way as Zoho Books, so Extract, Recon and the MIS treat them like an uploaded Tally export.
  */
 import { PracticeError } from "./core";
+import { TALLY_SCHEMA, companiesSaveProblem, looksLikeSchemaError } from "./tallySchema";
 import { assertClient, logActivity, type Db, type FirmContext } from "./db.server";
 import { BUCKET, processExtraction, registerDocument } from "./documents.server";
 import {
@@ -43,6 +44,19 @@ export async function authConnector(db: Db, authorization: string | null): Promi
   return (data as ConnectorRow | null) ?? null;
 }
 
+/** Which expected columns the live database does not have, as "table.column". Each is asked for on its own, so the error names it. */
+export async function missingTallyColumns(db: Db): Promise<string[]> {
+  const out: string[] = [];
+  for (const [table, columns] of Object.entries(TALLY_SCHEMA)) {
+    for (const col of columns) {
+      const { error } = await db.from(table).select(col).limit(1);
+      if (error && /schema cache|does not exist/i.test(error.message)) out.push(`${table}.${col}`);
+      if (out.length >= 8) return out;
+    }
+  }
+  return out;
+}
+
 /** The connector says hello: record it, learn its companies, say what to send. */
 export async function hello(
   db: Db,
@@ -62,10 +76,8 @@ export async function hello(
     // Never swallow this: a failed save here is why "No Tally companies reported yet" can show while Tally has three open.
     if (error) {
       console.error(`[tally] could not save companies for connector ${c.id}: ${error.message}`);
-      const schema = /schema cache|column|does not exist/i.test(error.message);
-      problem = schema
-        ? "FynHelp's database is missing a column the connector needs (ca_tally_companies). Ask FynHelp support to run the Tally tables repair."
-        : `FynHelp could not save the ${names.length} compan${names.length === 1 ? "y" : "ies"} Tally reported. Tell FynHelp support. (${error.message.slice(0, 120)})`;
+      const missing = looksLikeSchemaError(error.message) ? await missingTallyColumns(db).catch(() => [] as string[]) : [];
+      problem = companiesSaveProblem(names.length, error.message, missing);
     }
   } else if (!problem) {
     problem = "The connector checked in, but TallyPrime listed no companies.";

@@ -57,15 +57,30 @@ const STAGE_STYLE: Record<StageKey, { from: string; to: string; ink: string }> =
 const PW_STYLES = `
 .pw { display:grid; gap:18px; min-width:0; }
 .pw button { font-family:inherit; }
-.pw-hero { border-radius:24px; padding:22px 24px; color:#FAF7F2; background:radial-gradient(120% 140% at 100% 0%, rgba(217,43,43,.38) 0%, transparent 55%), linear-gradient(135deg,#2A1816 0%,#43201D 55%,#5E1E20 100%); box-shadow:0 18px 40px -26px rgba(60,20,16,.7); }
-.pw-hero h2 { font-size:21px; font-weight:600; letter-spacing:-.01em; margin:0; }
-.pw-hero p { margin:4px 0 0; font-size:14px; color:rgba(250,247,242,.72); }
+.pw-hero { border-radius:24px; padding:22px 24px 20px; color:#FAF7F2; background:radial-gradient(120% 140% at 100% 0%, rgba(217,43,43,.38) 0%, transparent 55%), linear-gradient(135deg,#2A1816 0%,#43201D 55%,#5E1E20 100%); box-shadow:0 18px 40px -26px rgba(60,20,16,.7); }
+.pw .pw-hero h2 { font-size:22px; font-weight:600; letter-spacing:-.015em; margin:0; color:#FAF7F2; }
+.pw .pw-hero p { margin:4px 0 0; font-size:14px; color:rgba(250,247,242,.74); }
+.pw-hero-top { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.pw-ring { --p:0; position:relative; width:68px; height:68px; flex:none; border-radius:999px; display:grid; place-items:center; background:conic-gradient(#8FD6B0 calc(var(--p) * 1%), rgba(255,255,255,.14) 0); }
+.pw-ring::before { content:""; position:absolute; inset:6px; border-radius:999px; background:#3A1D1B; }
+.pw-ring span { position:relative; text-align:center; line-height:1.1; }
+.pw-ring b { display:block; font-size:19px; font-weight:600; font-variant-numeric:tabular-nums; }
+.pw-ring em { display:block; font-style:normal; font-size:11px; color:rgba(250,247,242,.7); }
+.pw-mixhead { display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 16px; margin-top:22px; font-size:14px; font-weight:600; }
+.pw-mixhead span:last-child { font-weight:400; font-size:12.5px; }
+.pw-hero .pw-mix { background:rgba(255,255,255,.07); box-shadow:inset 0 0 0 1px rgba(255,255,255,.08); margin-top:10px; }
+.pw-hero .pw-seg[aria-pressed="true"] { box-shadow:0 0 0 2px #FAF7F2; }
+.pw-hero .pw-pill { background:rgba(255,255,255,.07); color:#FAF7F2; box-shadow:inset 0 0 0 1px rgba(255,255,255,.14); }
+.pw-hero .pw-pill:hover { background:rgba(255,255,255,.13); }
+.pw-hero .pw-pill[aria-pressed="true"] { box-shadow:inset 0 0 0 1.5px #FAF7F2; }
+.pw-hero .pw-pill em { color:rgba(250,247,242,.6); }
+.pw-hero .pw-pill:focus-visible, .pw-hero .pw-seg:focus-visible { outline-color:#FAF7F2; }
 .pw-tiles { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:18px; }
 .pw-tile { display:grid; grid-template-columns:auto minmax(0,1fr); gap:12px; align-items:center; padding:14px 16px; border-radius:16px; background:rgba(255,255,255,.07); box-shadow:inset 0 0 0 1px rgba(255,255,255,.10); color:inherit; text-decoration:none; text-align:left; cursor:pointer; border:0; transition:background .16s ease, transform .12s ease; }
-.pw-tile:hover { background:rgba(255,255,255,.12); }
+.pw-tile:hover { background:rgba(255,255,255,.13); transform:translateY(-1px); }
 .pw-tile:focus-visible { outline:2px solid #FAF7F2; outline-offset:2px; }
 .pw-tile-ic { width:38px; height:38px; border-radius:12px; display:grid; place-items:center; background:rgba(255,255,255,.12); }
-.pw-tile-t b { display:block; font-size:24px; font-weight:600; line-height:1.1; font-variant-numeric:tabular-nums; }
+.pw-tile-t b { display:block; font-size:26px; font-weight:600; line-height:1.1; font-variant-numeric:tabular-nums; }
 .pw-tile-t em { display:block; font-style:normal; font-size:12.5px; color:rgba(250,247,242,.72); margin-top:2px; }
 .pw-card-box { border-radius:22px; background:var(--v2-card); border:1px solid var(--v2-line); box-shadow:var(--v2-card-shadow); padding:20px 22px; }
 .pw-title { font-size:17px; font-weight:600; margin:0; }
@@ -94,7 +109,7 @@ const PW_STYLES = `
 .pw-bar .grow { flex:1 1 auto; font-size:13.5px; color:var(--v2-muted); }
 .pw-search { display:flex; align-items:center; gap:8px; padding:0 12px; height:38px; border-radius:12px; background:var(--v2-input); box-shadow:inset 0 0 0 1px var(--v2-line); min-width:200px; }
 .pw-search:focus-within { box-shadow:inset 0 0 0 1.5px var(--v2-brand); }
-.pw-search input { all:unset; flex:1; min-width:0; font-size:14px; color:var(--v2-ink); }
+.pw .pw-search input { all:unset; box-sizing:border-box; flex:1; min-width:0; height:100%; font-size:14px; color:var(--v2-ink); background:transparent !important; box-shadow:none !important; border:0 !important; padding:0 !important; }
 .pw-select { height:38px; border-radius:12px; border:0; padding:0 12px; font-size:13.5px; color:var(--v2-ink); background:var(--v2-input); box-shadow:inset 0 0 0 1px var(--v2-line); cursor:pointer; }
 .pw-toggle { display:inline-flex; padding:3px; border-radius:12px; background:var(--v2-gray); }
 .pw-toggle button { all:unset; box-sizing:border-box; cursor:pointer; width:34px; height:32px; border-radius:9px; display:grid; place-items:center; color:var(--v2-muted); }
@@ -121,10 +136,11 @@ const PW_STYLES = `
 .pw-next::before { content:""; border-radius:999px; background:linear-gradient(180deg,var(--v2-brand),var(--v2-brandDeep)); }
 .pw-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; text-align:left; }
 .pw-stats b { display:block; font-size:21px; font-weight:600; font-variant-numeric:tabular-nums; }
+.pw-stats b[data-zero="true"] { color:var(--v2-muted); font-weight:500; opacity:.7; }
 .pw-stats span { font-size:12px; color:var(--v2-muted); }
 .pw-foot { display:flex; align-items:center; justify-content:space-between; gap:10px; min-width:0; }
-.pw-foot > :first-child { flex:1 1 0; min-width:0; }
-.pw-foot .pw-act { flex:none; }
+.pw-foot .pw-act { flex:1 1 auto; justify-content:center; }
+.pw-step { font-size:13px; color:var(--v2-body); margin-top:-6px; line-height:1.4; }
 .pw-act { position:relative; z-index:1; display:inline-flex; align-items:center; gap:7px; padding:8px 14px; border-radius:11px; font-size:13px; font-weight:600; text-decoration:none; white-space:nowrap; max-width:100%; transition:transform .12s ease, background .16s ease; }
 .pw-act span { overflow:hidden; text-overflow:ellipsis; }
 .pw-act:hover { transform:translateY(-1px); }
@@ -154,7 +170,13 @@ const PW_STYLES = `
   .pw-tr > :nth-child(5) { grid-column:1 / -1; justify-content:flex-start; }
 }
 @media (max-width:560px){ .pw-search { min-width:0; flex:1 1 100%; } .pw-hero { padding:18px; } }
-@media (prefers-reduced-motion:reduce){ .pw *, .pw *::before { transition:none !important; } }
+@keyframes pw-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+.pw > * { animation:pw-in .42s cubic-bezier(.2,.7,.2,1) both; }
+.pw > :nth-child(2) { animation-delay:.04s; }
+.pw > :nth-child(3) { animation-delay:.08s; }
+.pw > :nth-child(4) { animation-delay:.12s; }
+.pw-grid > *, .pw-table > * { animation:pw-in .4s cubic-bezier(.2,.7,.2,1) both; }
+@media (prefers-reduced-motion:reduce){ .pw > *, .pw-grid > *, .pw-table > * { animation:none !important; } .pw *, .pw *::before { transition:none !important; } }
 `;
 
 const initials = (name: string) =>
@@ -258,31 +280,23 @@ function ClientCard({ r, close }: { r: PortfolioRow; close?: CloseState }) {
       <div className="pw-next">{next}</div>
       <div className="pw-stats">
         <div>
-          <b>{r.exceptions}</b>
+          <b data-zero={r.exceptions === 0}>{r.exceptions}</b>
           <span>{r.exceptions === 1 ? "exception" : "exceptions"}</span>
         </div>
         <div>
-          <b>{r.review}</b>
+          <b data-zero={r.review === 0}>{r.review}</b>
           <span>to review</span>
         </div>
         <div>
-          <b>{r.chases}</b>
+          <b data-zero={r.chases === 0}>{r.chases}</b>
           <span>{r.chases === 1 ? "chase" : "chases"}</span>
         </div>
       </div>
       {close ? <CloseProgress state={close} compact /> : null}
+      <div className="pw-step" title={r.stepTitle}>
+        {r.stepTitle}
+      </div>
       <div className="pw-foot">
-        <span
-          className="pw-ent"
-          style={{
-            minWidth: 0,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {r.stepTitle}
-        </span>
         <ActionLink r={r} />
       </div>
     </article>
@@ -374,6 +388,7 @@ export function PortfolioOverview({
       ),
     [rows, tab, query, stage, sort],
   );
+  const closedCount = counts.Closed;
   const filtered = Boolean(stage) || Boolean(query.trim()) || tab !== "all";
   const reset = () => {
     setStage(null);
@@ -443,8 +458,33 @@ export function PortfolioOverview({
       <style>{PW_STYLES}</style>
 
       <div className="pw-hero">
-        <h2>Close for {period}</h2>
-        <p data-testid="portfolio-closed-line">{closedLine(rows, period)}</p>
+        <div className="pw-hero-top">
+          <div style={{ minWidth: 0 }}>
+            <h2 style={{ color: "#FAF7F2" }}>Close for {period}</h2>
+            <p
+              data-testid="portfolio-closed-line"
+              style={{ color: "rgba(250,247,242,.74)" }}
+            >
+              {closedLine(rows, period)}
+            </p>
+          </div>
+          <div
+            className="pw-ring"
+            role="img"
+            aria-label={`${closedCount} of ${rows.length} clients closed`}
+            style={{
+              ["--p" as string]: rows.length
+                ? Math.round((closedCount / rows.length) * 100)
+                : 0,
+            }}
+          >
+            <span>
+              <b>{closedCount}</b>
+              <em>of {rows.length}</em>
+            </span>
+          </div>
+        </div>
+
         <div className="pw-tiles">
           {tiles.map((t) => {
             const inner = (
@@ -480,15 +520,15 @@ export function PortfolioOverview({
             );
           })}
         </div>
-      </div>
 
-      <div className="pw-card-box">
-        <h3 className="pw-title">Where every client stands</h3>
-        <p className="pw-sub">
-          {stage
-            ? `Showing clients at ${stage}. Click it again to show all.`
-            : "Click any segment to filter"}
-        </p>
+        <div className="pw-mixhead">
+          <span style={{ color: "#FAF7F2" }}>Where every client stands</span>
+          <span style={{ color: "rgba(250,247,242,.6)" }}>
+            {stage
+              ? `Showing clients at ${stage}. Click it again to show all.`
+              : "Click any segment to filter"}
+          </span>
+        </div>
         <div
           className="pw-mix"
           data-filtered={stage ? "true" : "false"}
@@ -514,7 +554,13 @@ export function PortfolioOverview({
               </button>
             ))
           ) : (
-            <span className="pw-sub" style={{ margin: "auto" }}>
+            <span
+              style={{
+                margin: "auto",
+                color: "rgba(250,247,242,.6)",
+                fontSize: 13,
+              }}
+            >
               No clients yet
             </span>
           )}
@@ -530,7 +576,7 @@ export function PortfolioOverview({
               disabled={counts[s] === 0 && stage !== s}
               style={
                 counts[s] === 0
-                  ? { opacity: 0.5, cursor: "default" }
+                  ? { opacity: 0.45, cursor: "default" }
                   : undefined
               }
             >

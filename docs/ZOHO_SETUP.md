@@ -6,7 +6,7 @@
 |---|---|---|
 | Pull a client's bank ledger for Recon | on | Connect (partner) |
 | Read open invoices (sent, overdue, part-paid) | on | the `invoices.READ` scope; older connections reconnect once |
-| Create one approved entry (bank charge, or a receipt naming one open invoice) | **off** | platform switch + a second Zoho consent + a per-client switch |
+| Create one approved entry (bank charge, a receipt naming one open invoice, or a payment naming one open bill) | **off** | platform switch + a second Zoho consent + a per-client switch |
 
 FynHelp never edits or deletes anything it did not create. Every entry it creates is tagged "Created by FynHelp", logged in Settings → Zoho Books, and can be undone there.
 
@@ -30,12 +30,12 @@ Paste each value without a trailing line break, space or quotes. FynHelp cleans 
 
 ## 3. Database (Supabase SQL editor)
 
-Run `supabase/migrations/20261103090000_zoho_posting.sql` once. It only adds columns and one table, and everything defaults to off.
+Run `supabase/migrations/20261103090000_zoho_posting.sql` once, then `supabase/migrations/20261111090000_zoho_vendor_payments_drift.sql` (adds the vendor-payment kind and the drift columns; safe to run twice). Everything defaults to off.
 
 ## 4. Scopes FynHelp asks for
 
-Read (always): `ZohoBooks.settings.READ`, `ZohoBooks.banking.READ`, `ZohoBooks.accountants.READ`, `ZohoBooks.invoices.READ`
-Write (only when a partner clicks "Allow approved entries"): `ZohoBooks.expenses.CREATE`, `ZohoBooks.expenses.DELETE`, `ZohoBooks.customerpayments.CREATE`, `ZohoBooks.customerpayments.DELETE`
+Read (always): `ZohoBooks.settings.READ`, `ZohoBooks.banking.READ`, `ZohoBooks.accountants.READ`, `ZohoBooks.invoices.READ`, `ZohoBooks.bills.READ` (connections made before this need one reconnect for bills; without it payments stay manual and charges still work)
+Write (only when a partner clicks "Allow approved entries"): `ZohoBooks.expenses.CREATE`, `ZohoBooks.expenses.DELETE`, `ZohoBooks.customerpayments.CREATE`, `ZohoBooks.customerpayments.DELETE`, `ZohoBooks.vendorpayments.CREATE`, `ZohoBooks.vendorpayments.DELETE`. A firm that already allowed approved entries must click "Allow approved entries" again to grant the two new vendor-payment scopes.
 
 ## 5. Safety rules built in
 
@@ -43,6 +43,8 @@ Write (only when a partner clicks "Allow approved entries"): `ZohoBooks.expenses
 - Only a partner can approve; the bank line's amount, date and narration are read from FynHelp's database, never from the browser.
 - Bank charges only, up to ₹5,000, booked to the "Bank Fees and Charges" expense account (FynHelp will not create accounts).
 - Receipts only when the narration names exactly one open invoice and the amount does not exceed what is due.
+- Vendor payments only when the narration names exactly one open bill and the amount does not exceed what is due.
+- Two-way: after an entry is created FynHelp reads that month back from Zoho. "Check against Zoho" (Settings → Zoho Books) reads each entry FynHelp created and flags any that were changed or deleted in Zoho. It only reads; it never edits or re-creates anything.
 - One live entry per bank line (database-enforced), so a double click or retry cannot post twice.
 - A write is never retried automatically. If Zoho does not answer, the line is held as "check Zoho" until a person looks.
 
@@ -54,6 +56,8 @@ Write (only when a partner clicks "Allow approved entries"): `ZohoBooks.expenses
 4. Click Undo; confirm the expense is gone in Zoho.
 5. Click approve twice quickly; confirm only one expense exists.
 6. Post a receipt whose narration names one open invoice; confirm the payment is applied to it, then undo.
+7. Post a payment whose narration names one open bill; confirm it is applied to the bill and the bill's balance drops, then undo.
+8. Create an entry, edit its amount in Zoho, press "Check against Zoho"; confirm it shows "Changed in Zoho Books". Delete it in Zoho and check again; confirm "No longer in Zoho Books".
 
 ## Export for Zoho (no connection needed)
 

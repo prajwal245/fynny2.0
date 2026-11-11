@@ -1,12 +1,12 @@
 /**
- * In the exception drawer: for a bank charge, or a receipt that names one open invoice, a partner
+ * In the exception drawer: for a bank charge, a receipt that names one open invoice, or a payment that names one open bill, a partner
  * can have FynHelp create that one entry in the client's Zoho Books. Always previewed first,
  * always approved by a person, always undoable. Hidden unless posting is switched on for the client.
  */
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Check, Undo2 } from "lucide-react";
-import { zohoBooksPost, zohoBooksPreviewPost, zohoBooksStatus, zohoBooksUndoPost } from "@/lib/practice/practice.functions";
+import { zohoBooksPost, zohoBooksPreviewPost, zohoBooksStatus, zohoBooksSync, zohoBooksUndoPost } from "@/lib/practice/practice.functions";
 import { V } from "../ui";
 import { useV2 } from "../store";
 
@@ -21,12 +21,14 @@ export function ZohoPostPanel({ clientId, txnId, side, open }: { clientId: strin
   const [busy, setBusy] = useState<"preview" | "post" | "undo" | null>(null);
   const [posted, setPosted] = useState<{ postingId: string } | null>(null);
   const [undone, setUndone] = useState(false);
+  const [pulled, setPulled] = useState<"busy" | "done" | "failed" | null>(null);
 
   useEffect(() => {
     setView(null);
     setWhy(null);
     setPosted(null);
     setUndone(false);
+    setPulled(null);
     setLinkId(null);
     if (!canSignOff || !txnId || side !== "bank" || !open) return;
     let live = true;
@@ -58,10 +60,16 @@ export function ZohoPostPanel({ clientId, txnId, side, open }: { clientId: strin
   const approve = async () => {
     setBusy("post");
     try {
+      const date = view?.lines.find(([k]) => k === "Date")?.[1] ?? "";
       const r = await zohoBooksPost({ data: { linkId, txnId } });
       setPosted({ postingId: r.postingId });
       setView(null);
       toast.success("Entry created in Zoho Books");
+      // Two-way: read the month back so the new entry is in FynHelp's books and Recon can match it. A failure here never undoes the entry.
+      if (/^\d{4}-\d{2}/.test(date)) {
+        setPulled("busy");
+        zohoBooksSync({ data: { linkId, month: date.slice(0, 7) } }).then(() => setPulled("done"), () => setPulled("failed"));
+      }
     } catch (e) {
       toast.error(msg(e));
     } finally {
@@ -89,7 +97,9 @@ export function ZohoPostPanel({ clientId, txnId, side, open }: { clientId: strin
       {posted ? (
         <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
           <span className="ic-check"><Check size={12} strokeWidth={3} /></span>
-          <span style={{ color: "#1F6B45", fontWeight: 600 }}>Created in Zoho Books. Pull the month again to match it.</span>
+          <span style={{ color: "#1F6B45", fontWeight: 600 }} data-testid="zoho-created">
+            {pulled === "busy" ? "Created in Zoho Books. Reading the month back…" : pulled === "done" ? "Created in Zoho Books and read back. Run Recon to match it." : "Created in Zoho Books. Pull the month again to match it."}
+          </span>
           <button className="v2-btn v2-btn-quiet" style={{ padding: "6px 10px", fontSize: 12.5 }} disabled={busy === "undo"} onClick={() => void undo()}>
             <Undo2 size={13} /> Undo
           </button>

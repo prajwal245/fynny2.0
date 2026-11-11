@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { AlertTriangle, Check, ChevronRight, Link2, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
 import {
   zohoBooksBankAccounts,
+  zohoBooksCheckPostings,
   zohoBooksConnect,
   zohoBooksDisconnect,
   zohoBooksLink,
@@ -26,6 +27,7 @@ import { V, formatDate, formatINR } from "../ui";
 import { useV2 } from "../store";
 import { ZohoIcon } from "./BrandIcons";
 import { IntegrationCard } from "./IntegrationCard";
+import { DRIFT_WORDS } from "@/lib/practice/zohoPosting";
 import { defaultMonth, monthOptions, owedSummary, setupStage, suggestOrganisation } from "@/lib/practice/zohoLink";
 
 type Status = Awaited<ReturnType<typeof zohoBooksStatus>>;
@@ -155,6 +157,7 @@ export function ZohoBooksSection({ index = 0 }: { index?: number }) {
   const [confirm, setConfirm] = useState<string | null>(null);
   const [justConnected, setJustConnected] = useState(false);
   const [postings, setPostings] = useState<Posting[]>([]);
+  const [checkNote, setCheckNote] = useState<string | null>(null);
   const monthList = useMemo(() => monthOptions(new Date()), []);
   const fallbackMonth = useMemo(() => defaultMonth(new Date()), []);
 
@@ -462,7 +465,7 @@ export function ZohoBooksSection({ index = 0 }: { index?: number }) {
                 <ShieldCheck size={18} style={{ flex: "none", marginTop: 2, color: V.maroon }} />
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 650 }}>Optional: let FynHelp create entries you approve</div>
-                  <div className="zb-note">Off by default. A partner can approve a single bank charge, or a receipt for one named invoice. Each is previewed first, tagged &ldquo;Created by FynHelp&rdquo;, logged below and can be undone. Zoho will ask you to approve one extra permission.</div>
+                  <div className="zb-note">Off by default. A partner can approve a single bank charge, a receipt for one named invoice, or a payment for one named bill. Each is previewed first, tagged &ldquo;Created by FynHelp&rdquo;, logged below and can be undone. Zoho will ask you to approve one extra permission.</div>
                 </div>
               </div>
               <button className="v2-btn v2-btn-ghost zb-btn" style={{ justifySelf: "start", padding: "8px 16px", fontSize: 13 }} disabled={!!busy} onClick={() => void connect(true)}>Allow approved entries</button>
@@ -471,12 +474,22 @@ export function ZohoBooksSection({ index = 0 }: { index?: number }) {
 
           {st.writeEnabled && postings.length > 0 && (
             <div className="zb-card" data-testid="zoho-postings">
-              <div style={{ fontSize: 13.5, fontWeight: 650 }}>Entries FynHelp created</div>
+              <div className="zb-row" style={{ justifyContent: "space-between" }}>
+                <div style={{ fontSize: 13.5, fontWeight: 650 }}>Entries FynHelp created</div>
+                <button className="v2-btn v2-btn-quiet" style={{ padding: "4px 10px", fontSize: 12 }} disabled={!!busy} data-testid="zoho-check"
+                  onClick={() => void act("check", async () => { const r = await zohoBooksCheckPostings(); setCheckNote(r.changed + r.removed ? `${r.changed} changed and ${r.removed} deleted in Zoho Books.` : `All ${r.ok} checked entries match Zoho Books.`); }, undefined)}>
+                  <RefreshCw size={12} /> Check against Zoho
+                </button>
+              </div>
+              {checkNote && <div style={{ fontSize: 12.5, color: V.body }} data-testid="zoho-check-note">{checkNote}</div>}
               {postings.slice(0, 8).map((p) => (
                 <div key={p.id} className="zb-row" style={{ justifyContent: "space-between", fontSize: 12.5, color: V.body }}>
                   <span style={{ minWidth: 0, flex: "1 1 220px" }}>
                     {formatDate(p.txn_date)} · {clientName(p.business_id)} · {p.summary} · {formatINR(Number(p.amount))} ·{" "}
                     <strong style={{ color: p.status === "posted" ? "#1F6B45" : V.muted }}>{p.status === "pending" ? "check Zoho" : p.status}</strong>
+                    {p.status === "posted" && (p.drift === "changed" || p.drift === "removed") && (
+                      <span style={{ color: "#A33A2C", fontWeight: 600 }} data-testid="zoho-drift"> · {DRIFT_WORDS[p.drift as "changed" | "removed"]}</span>
+                    )}
                   </span>
                   {canSignOff && p.status === "posted" && (
                     <button className="v2-btn v2-btn-quiet" style={{ padding: "4px 10px", fontSize: 12 }} disabled={!!busy} onClick={() => void act(`undo:${p.id}`, () => zohoBooksUndoPost({ data: { postingId: p.id } }), "Entry removed from Zoho Books")}>Undo</button>

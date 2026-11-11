@@ -126,3 +126,45 @@ describe("posting is opt-in per firm", () => {
     expect(postingAllowedFor("*", "anyone")).toBe(true);
   });
 });
+
+describe("vendor payments and the two-way check", () => {
+  const bill = { id: "b1", number: "BILL-1042", vendorId: "v1", vendor: "Acme Supplies", total: 5000, balance: 5000, dueDate: null, status: "open" };
+  const out = (description: string, amount = 5000) => ({ id: "11111111-2222-3333-4444-555555555555", date: "2026-10-12", amount, direction: "out" as const, description });
+
+  it("a payment naming exactly one open bill is a vendor payment", async () => {
+    const { postable } = await import("@/lib/practice/zohoPosting");
+    expect(postable(out("NEFT DR ACME BILL-1042"), [], [bill])).toEqual({ kind: "vendor_payment", bill });
+  });
+  it("does not match a longer bill number, more than the balance, or two bills", async () => {
+    const { postable, billHint } = await import("@/lib/practice/zohoPosting");
+    expect(postable(out("NEFT DR BILL-10421"), [], [bill]).kind).toBe("none");
+    expect(postable(out("NEFT DR BILL-1042", 6000), [], [bill]).kind).toBe("none");
+    expect(billHint("BILL-1042 BILL-1043", 100, [bill, { ...bill, id: "b2", number: "BILL-1043" }])).toBeNull();
+  });
+  it("a bank charge still posts as a charge, and other payments stay manual", async () => {
+    const { postable } = await import("@/lib/practice/zohoPosting");
+    expect(postable(out("SMS charges", 20), [], [bill]).kind).toBe("bank_charge");
+    expect(postable(out("NEFT DR SOME VENDOR"), [], [bill]).kind).toBe("none");
+  });
+  it("builds the vendor payment Zoho expects, tagged and idempotent", async () => {
+    const { vendorPaymentPayload, TAG, idempotencyRef } = await import("@/lib/practice/zohoPosting");
+    const t = out("NEFT DR ACME BILL-1042");
+    const p = vendorPaymentPayload(t, bill, "bank9");
+    expect(p).toMatchObject({ vendor_id: "v1", paid_through_account_id: "bank9", amount: 5000, reference_number: idempotencyRef(t.id), bills: [{ bill_id: "b1", amount_applied: 5000 }] });
+    expect(p.description.startsWith(TAG)).toBe(true);
+  });
+  it("previews what would be created", async () => {
+    const { preview } = await import("@/lib/practice/zohoPosting");
+    const v = preview(out("NEFT DR ACME BILL-1042"), { kind: "vendor_payment", bill }, "HDFC Current");
+    expect(v.title).toContain("BILL-1042");
+    expect(v.lines.find(([k]) => k === "Paid through")?.[1]).toBe("HDFC Current");
+  });
+  it("tells unchanged, changed and deleted entries apart", async () => {
+    const { driftOf } = await import("@/lib/practice/zohoPosting");
+    const posted = { amount: 500, date: "2026-10-12" };
+    expect(driftOf(posted, { amount: 500, date: "2026-10-12T00:00:00" })).toBe("ok");
+    expect(driftOf(posted, { amount: 450, date: "2026-10-12" })).toBe("changed");
+    expect(driftOf(posted, { amount: 500, date: "2026-10-13" })).toBe("changed");
+    expect(driftOf(posted, null)).toBe("removed");
+  });
+});

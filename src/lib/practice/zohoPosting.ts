@@ -46,6 +46,17 @@ export interface OpenInvoice {
   status: string;
 }
 
+export interface OpenBill {
+  id: string;
+  number: string;
+  vendorId: string;
+  vendor: string;
+  total: number;
+  balance: number;
+  dueDate: string | null;
+  status: string;
+}
+
 const compact = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
 
 /**
@@ -53,9 +64,20 @@ const compact = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
  * names exactly one and the money does not exceed what is still owed.
  */
 export function invoiceHint(narration: string, amount: number, invoices: OpenInvoice[]): { invoice: OpenInvoice; fits: boolean } | null {
+  const hit = namedDocument(narration, amount, invoices);
+  return hit ? { invoice: hit.doc, fits: hit.fits } : null;
+}
+
+/** The open bill a bank narration names ("NEFT DR-ACME-BILL-1042"), by the same rule as invoices. */
+export function billHint(narration: string, amount: number, bills: OpenBill[]): { bill: OpenBill; fits: boolean } | null {
+  const hit = namedDocument(narration, amount, bills);
+  return hit ? { bill: hit.doc, fits: hit.fits } : null;
+}
+
+function namedDocument<T extends { number: string; balance: number }>(narration: string, amount: number, docs: T[]): { doc: T; fits: boolean } | null {
   const text = compact(narration);
   if (!text) return null;
-  const named = invoices.filter((i) => {
+  const named = docs.filter((i) => {
     const n = compact(i.number);
     if (n.length < 4) return false;
     // "INV2601" must not match inside "INV26011": the next character may not continue the number.
@@ -68,8 +90,8 @@ export function invoiceHint(narration: string, amount: number, invoices: OpenInv
     return false;
   });
   if (named.length !== 1) return null;
-  const invoice = named[0]!;
-  return { invoice, fits: amount > 0 && amount <= invoice.balance + 0.005 };
+  const doc = named[0]!;
+  return { doc, fits: amount > 0 && amount <= doc.balance + 0.005 };
 }
 
 /* ── what may be posted ──────────────────────────────────── */
@@ -89,11 +111,18 @@ const CHARGE_WORDS = /\b(charges?|chgs?|fees?|sms|amc|commission|min(?:imum)? ba
 export type Postable =
   | { kind: "bank_charge" }
   | { kind: "receipt"; invoice: OpenInvoice }
+  | { kind: "vendor_payment"; bill: OpenBill }
   | { kind: "none"; why: string };
 
-export function postable(t: BankTxn, openInvoices: OpenInvoice[]): Postable {
+export function postable(t: BankTxn, openInvoices: OpenInvoice[], openBills: OpenBill[] = []): Postable {
   if (t.direction === "out") {
-    if (!CHARGE_WORDS.test(t.description)) return { kind: "none", why: "Only bank charges can be posted. Make this entry in Zoho Books." };
+    // A narration that names exactly one open bill is a payment of that bill, whatever else it says.
+    const owed = billHint(t.description, t.amount, openBills);
+    if (owed) {
+      if (!owed.fits) return { kind: "none", why: `${owed.bill.number} has only ₹${owed.bill.balance.toLocaleString("en-IN")} due. Record this payment in Zoho Books.` };
+      return { kind: "vendor_payment", bill: owed.bill };
+    }
+    if (!CHARGE_WORDS.test(t.description)) return { kind: "none", why: "Only bank charges, or a payment that names exactly one open bill, can be posted. Make this entry in Zoho Books." };
     if (t.amount > BANK_CHARGE_LIMIT) return { kind: "none", why: `Charges above ₹${BANK_CHARGE_LIMIT.toLocaleString("en-IN")} need a person to post them in Zoho Books.` };
     return { kind: "bank_charge" };
   }
@@ -190,15 +219,53 @@ export function paymentPayload(t: BankTxn, invoice: OpenInvoice, bankAccountId: 
   };
 }
 
+export interface VendorPaymentPayload {
+  vendor_id: string;
+  payment_mode: "banktransfer";
+  amount: number;
+  date: string;
+  reference_number: string;
+  description: string;
+  paid_through_account_id: string;
+  bills: { bill_id: string; amount_applied: number }[];
+}
+
+export function vendorPaymentPayload(t: BankTxn, bill: OpenBill, bankAccountId: string): VendorPaymentPayload {
+  return {
+    vendor_id: bill.vendorId,
+    payment_mode: "banktransfer",
+    amount: t.amount,
+    date: t.date,
+    reference_number: idempotencyRef(t.id),
+    description: `${TAG}: ${short(t.description)}`,
+    paid_through_account_id: bankAccountId,
+    bills: [{ bill_id: bill.id, amount_applied: t.amount }],
+  };
+}
+
 export interface Preview {
-  kind: "bank_charge" | "receipt";
+  kind: "bank_charge" | "receipt" | "vendor_payment";
   title: string;
   lines: [string, string][];
 }
 
 const rupees = (n: number) => `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-export function preview(t: BankTxn, p: Extract<Postable, { kind: "bank_charge" | "receipt" }>, accountName: string, expenseAccountName?: string): Preview {
+export function preview(t: BankTxn, p: Extract<Postable, { kind: "bank_charge" | "receipt" | "vendor_payment" }>, accountName: string, expenseAccountName?: string): Preview {
+  if (p.kind === "vendor_payment") {
+    return {
+      kind: "vendor_payment",
+      title: `Record a payment against ${p.bill.number}`,
+      lines: [
+        ["Date", t.date],
+        ["Vendor", p.bill.vendor],
+        ["Amount", rupees(t.amount)],
+        ["Applied to", `${p.bill.number} (${rupees(p.bill.balance)} due, ${rupees(p.bill.balance - t.amount)} after)`],
+        ["Paid through", accountName],
+        ["Note in Zoho", `${TAG}: ${short(t.description)}`],
+      ],
+    };
+  }
   if (p.kind === "bank_charge") {
     return {
       kind: "bank_charge",
@@ -232,3 +299,21 @@ export function pickChargeAccount(accounts: { account_id: string; account_name: 
   const best = [...accounts].sort((a, b) => rank(a.account_name) - rank(b.account_name))[0];
   return best && rank(best.account_name) < 9 ? { id: String(best.account_id), name: best.account_name } : null;
 }
+
+/* ── two-way: has an entry FynHelp created been changed in Zoho since? ── */
+
+export type Drift = "ok" | "changed" | "removed";
+
+/** What FynHelp recorded against what Zoho holds now. `null` means Zoho no longer has the entry. */
+export function driftOf(posted: { amount: number; date: string }, now: { amount: number; date: string } | null): Drift {
+  if (!now) return "removed";
+  const sameAmount = Math.abs(now.amount - posted.amount) < 0.005;
+  const sameDate = now.date.slice(0, 10) === posted.date.slice(0, 10);
+  return sameAmount && sameDate ? "ok" : "changed";
+}
+
+export const DRIFT_WORDS: Record<Drift, string> = {
+  ok: "Matches Zoho Books",
+  changed: "Changed in Zoho Books since FynHelp created it",
+  removed: "No longer in Zoho Books",
+};

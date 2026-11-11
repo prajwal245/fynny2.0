@@ -1225,6 +1225,20 @@ export const zohoBooksPostings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => withFirm(context.userId, async (db, ctx) => (await import("./zoho.server")).listPostings(db, ctx)));
 
+export const zohoBooksOpenBills = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ linkId: uuid }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./zoho.server")).openBills(db, ctx, data.linkId)),
+  );
+
+/** Reads Zoho to see whether entries FynHelp created are unchanged, changed or deleted there. Changes nothing. */
+export const zohoBooksCheckPostings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) =>
+    withWork(context.userId, async (db, ctx) => (await import("./zoho.server")).checkPostings(db, ctx)),
+  );
+
 export const zohoBooksSync = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ linkId: uuid, month: z.string().regex(/^\d{4}-\d{2}$/) }).parse(d))

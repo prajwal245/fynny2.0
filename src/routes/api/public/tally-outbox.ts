@@ -28,7 +28,8 @@ export const Route = createFileRoute("/api/public/tally-outbox")({
         }
         const p = await import("@/lib/practice/tallyPosting.server");
         try {
-          return json({ postings: await p.claimPostings(db, connector) });
+          const l = await import("@/lib/practice/tallyLedgerRequests.server");
+          return json({ postings: await p.claimPostings(db, connector), ledgers: await l.claimLedgerRequests(db, connector) });
         } catch (e) {
           return json({ error: (e as Error).message }, 422);
         }

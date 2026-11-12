@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle2, ChevronDown, Clock, Link2Off, Loader2, RefreshCw, Send, ShieldCheck, TriangleAlert, Undo2 } from "lucide-react";
-import { tallyApprove, tallyCancel, tallyMarkPosted, tallyWorkbench } from "@/lib/practice/practice.functions";
+import { tallyApprove, tallyCancel, tallyCancelLedger, tallyCreateLedger, tallyMarkPosted, tallyWorkbench } from "@/lib/practice/practice.functions";
 import { splitGstInclusive, type Split } from "@/lib/practice/tallyVoucher";
 import { PagesChip, PagesTopUpModal } from "./PagesPanel";
 import { refreshPages } from "../lib/pages";
@@ -41,6 +41,69 @@ const STATUS: Record<string, { label: string; tone: "info" | "good" | "warn" | "
   posted: { label: "In Tally", tone: "good" },
   failed: { label: "Needs a look", tone: "warn" },
 };
+
+/**
+ * Asks Tally to create a ledger that is not there yet. Shown when the typed name is not an existing ledger: a group is
+ * chosen, a partner or manager confirms, and the connector creates it and reads it back before the line can use it.
+ */
+function CreateLedgerBox({ clientId, name, linked, reload }: { clientId: string; name: string; linked: Linked; reload: () => Promise<void> }) {
+  const [group, setGroup] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [similar, setSimilar] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState(false);
+  const clean = name.replace(/\s+/g, " ").trim();
+  const pending = linked.ledgerRequests.find((r) => r.name.trim().toLowerCase() === clean.toLowerCase());
+  if (!clean) return null;
+  if (pending && pending.status !== "failed") {
+    return (
+      <div style={{ fontSize: 12.5, color: V.body, display: "flex", gap: 8, alignItems: "center" }}>
+        <Loader2 size={14} className="fh-spin" /> Asked Tally to create <b>{pending.name}</b> under {pending.parent}. It appears here as soon as Tally confirms it.
+        <button className="v2-btn v2-btn-ghost" style={{ padding: "2px 8px", fontSize: 12 }} disabled={pending.status !== "queued"} onClick={async () => { try { await tallyCancelLedger({ data: { id: pending.id } }); await reload(); } catch (e) { toast.error(errMsg(e)); } }}>Cancel</button>
+      </div>
+    );
+  }
+  if (!linked.canCreateLedgers) {
+    return <div style={{ fontSize: 12.5, color: V.muted }}>"{clean}" is not in Tally. Create it in Tally, or update the connector to 1.5 (Settings, TallyPrime) to create ledgers from here.</div>;
+  }
+  const create = async () => {
+    setBusy(true);
+    try {
+      await tallyCreateLedger({ data: { business_id: clientId, name: clean, parent: group, allow_similar: confirmed || undefined } });
+      toast.success("Asked Tally to create the ledger. It is added the next time the connector checks in.");
+      setSimilar(null);
+      await reload();
+    } catch (e) {
+      const m = errMsg(e);
+      if (/looks like/i.test(m)) setSimilar(m);
+      else toast.error(m);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div style={{ display: "grid", gap: 8, background: V.gray, borderRadius: 12, padding: 12, fontSize: 13 }}>
+      <div>
+        <b>"{clean}" is not in Tally yet.</b> Create it from here: FynHelp asks Tally, then reads the ledger back to make sure it is there.
+        {pending?.status === "failed" && <div role="alert" style={{ color: V.maroon, marginTop: 4 }}>{pending.last_error || "The last attempt did not reach Tally."}</div>}
+      </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <select className="v2-input" aria-label="Group for the new ledger" value={group} onChange={(e) => setGroup(e.target.value)} style={{ minWidth: 220 }}>
+          <option value="">Choose the group…</option>
+          {linked.groups.map((g) => <option key={g.name} value={g.name}>{g.name}: {g.use}</option>)}
+        </select>
+        <button className="v2-btn v2-btn-primary" disabled={!group || busy} onClick={() => void create()}>
+          {busy ? <Loader2 size={15} className="fh-spin" /> : <Send size={15} />} Create in Tally
+        </button>
+      </div>
+      {similar && (
+        <label style={{ display: "flex", gap: 8, alignItems: "flex-start", color: V.maroon }}>
+          <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} style={{ marginTop: 3 }} />
+          <span>{similar} Tick this if it really is a different party, then press Create again.</span>
+        </label>
+      )}
+    </div>
+  );
+}
 
 export function TallyPosting({ clientId }: { clientId: string }) {
   const [bench, setBench] = useState<Bench | null>(null);
@@ -252,12 +315,13 @@ export function TallyPosting({ clientId }: { clientId: string }) {
                     <button
                       className="v2-btn v2-btn-primary"
                       disabled={!exists || !bank || busy === l.txn_id}
-                      title={!typed ? "Choose a ledger first" : !exists ? "This ledger is not in Tally. A new ledger must be created in Tally first." : undefined}
+                      title={!typed ? "Choose a ledger first" : !exists ? "This ledger is not in Tally yet. Create it with the button below, then approve." : undefined}
                       onClick={() => void approve(l, typed)}
                     >
                       {busy === l.txn_id ? <Loader2 size={15} className="fh-spin" /> : <Send size={15} />} Approve for Tally
                     </button>
                   </div>
+                  {typed.trim() && !exists && <CreateLedgerBox clientId={clientId} name={typed} linked={linked} reload={load} />}
                   <button type="button" className="v2-btn v2-btn-ghost" style={{ justifySelf: "start", padding: "4px 10px", fontSize: 12.5 }} aria-expanded={!!opts[l.txn_id]?.open} onClick={() => setOpt(l.txn_id, { open: !opts[l.txn_id]?.open })}>
                     <ChevronDown size={14} style={{ transform: opts[l.txn_id]?.open ? "rotate(180deg)" : "none", transition: "transform .2s" }} /> More options
                   </button>

@@ -137,22 +137,25 @@ ${LIQUID_BUTTON_CSS}
 .v2-scroll:focus-visible { outline:2px solid var(--v2-brand); outline-offset:2px; }
 .v2-scrollbtn { position:absolute; z-index:6; width:36px; height:36px; border-radius:999px; border:1px solid ${V.line}; background:var(--v2-pop, #fff); color:${V.ink}; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 6px 18px -6px rgba(20,18,16,.35); padding:0; }
 .v2-scrollbtn:hover { background:${V.gray}; }
-.v2-scrollbtn-l { left:8px; top:50%; transform:translateY(-50%); }
-.v2-scrollbtn-r { right:22px; top:50%; transform:translateY(-50%); }
+.v2-scrollbtn-l { left:10px; bottom:26px; }
+.v2-scrollbtn-r { right:24px; bottom:26px; }
 .v2-scrollbtn-t { top:46px; left:50%; transform:translateX(-50%); }
-.v2-scrollbtn-b { bottom:22px; left:50%; transform:translateX(-50%); }
+.v2-scrollbtn-b { bottom:26px; left:50%; transform:translateX(-50%); }
 @media (max-width:760px){ .v2-scrollbtn { display:none; } }
 .v2-scroll:has(> table) > table > thead > tr > th { position:sticky; top:0; z-index:2; background:var(--v2-sticky, #fff); box-shadow:0 1px 0 ${V.line}; }
 .v2-scroll .v2-head2 th { top:32px; }
+/* Tables use Geist (self-hosted), with its mono face for raw text and references; figures line up in columns. */
+.v2-scroll, .v2-table, .v2-table th, .v2-table td, .v2-scroll button, .v2-scroll input, .v2-scroll select, .v2-scroll label { font-family:var(--font-geist-sans, "Geist"), system-ui, sans-serif; font-feature-settings:"tnum" 1, "cv11" 1; }
+.v2-table .v2-mono, .v2-scroll .v2-mono { font-family:var(--font-geist-mono, "Geist Mono"), ui-monospace, monospace; }
 /* Review Queue: slim rows that fit the screen. Long text is cut to one or two lines (the full text is in the tooltip and the side panel). */
-.v2-review-table { table-layout:fixed; min-width:880px; }
+.v2-review-table { table-layout:fixed; min-width:100%; }
 .v2-review-table td, .v2-review-table th { padding:9px 12px; }
 .v2-review-table td { vertical-align:middle; }
 .v2-review-table .rv-cut { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
 .v2-review-table .rv-cut2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; line-height:1.35; }
 .v2-review-table .rv-nowrap { white-space:nowrap; }
 .v2-review-table .sel-cell { padding-left:14px; }
-@media (max-width:760px){ .v2-review-table { min-width:0; table-layout:auto; } .v2-review-table .rv-cut, .v2-review-table .rv-cut2 { white-space:normal; display:block; -webkit-line-clamp:unset; } }
+@media (max-width:760px){ .v2-review-table { min-width:0; width:100%; table-layout:auto; } .v2-review-table .rv-cut, .v2-review-table .rv-cut2 { white-space:normal; display:block; -webkit-line-clamp:unset; } }
 .v2-skel { background:linear-gradient(90deg, ${V.gray} 25%, ${V.cream} 50%, ${V.gray} 75%); background-size:200% 100%; animation:v2shimmer 1.3s infinite linear; border-radius:10px; }
 @keyframes v2shimmer { from { background-position:200% 0; } to { background-position:-200% 0; } }
 .v2-grid-cards { display:grid; gap:16px; grid-template-columns:repeat(auto-fill, minmax(min(280px, 100%), 1fr)); }

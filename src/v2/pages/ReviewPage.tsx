@@ -184,16 +184,16 @@ export default function ReviewPage({
         />
       ) : (
         <Card style={{ padding: 0 }} className="v2-scroll">
-          <table className="v2-table v2-table-stack v2-review-table">
+          <table className="v2-table v2-table-stack v2-review-table" style={{ width: scopedClient ? 1286 : 1466 }}>
             <colgroup>
-              <col style={{ width: 44 }} />
-              {!scopedClient && <col style={{ width: 150 }} />}
-              <col style={{ width: 100 }} />
-              <col />
-              <col style={{ width: 128 }} />
-              <col style={{ width: "26%" }} />
-              <col style={{ width: 116 }} />
-              <col style={{ width: 92 }} />
+              <col style={{ width: 48 }} />
+              {!scopedClient && <col style={{ width: 180 }} />}
+              <col style={{ width: 118 }} />
+              <col style={{ width: 400 }} />
+              <col style={{ width: 140 }} />
+              <col style={{ width: 340 }} />
+              <col style={{ width: 130 }} />
+              <col style={{ width: 110 }} />
             </colgroup>
             <thead>
               <tr>

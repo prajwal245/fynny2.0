@@ -4,6 +4,8 @@
  * queue decisions. Every document, whatever its channel, goes through
  * `processExtraction`.
  */
+import { compareOwner, compareWithBankLedgers, holderName, statementAccount } from "./extract/statementOwner";
+import { checkStatement, findOverlap, overlapSentence, type Overlap, type StatementCheck } from "./extract/statementCheck";
 import {
   PracticeError,
   dedupeKey,
@@ -436,6 +438,10 @@ export async function processExtraction(
   const remembered = applyMemory(outcome.rows, memories);
   const rows = remembered.rows;
 
+  // A Tally sync is the books as they stand in Tally today. An entry deleted or changed in Tally must disappear here too,
+  // matched or not, so the next Recon sees what Tally really holds.
+  if (side === "books" && /tally/i.test(String((doc.extracted as { source?: string } | null)?.source ?? ""))) await dropSyncedBooks(db, doc.id);
+
   // Replace the previous run's unconfirmed output.
   await db
     .from("ca_txns")
@@ -499,6 +505,63 @@ export async function processExtraction(
     inserted += data?.length ?? 0;
   }
   const crossDocDuplicates = txnRows.length - inserted;
+
+  // Is the statement correct and complete? Checked from its own running balance, and against earlier statements of the account.
+  let statementReport: (StatementCheck & { overlap: Overlap | null }) | null = null;
+  if (side === "bank" && outcome.documentKind !== "invoice" && rows.length) {
+    const usable = rows.filter((r) => r.date && r.amount && r.direction);
+    const check = checkStatement(
+      usable.map((r) => ({ index: r.row_index, date: r.date!, amount: r.amount!, direction: r.direction!, balance: r.balance ?? null })),
+    );
+    let overlap: Overlap | null = null;
+    if (check.first && check.last) {
+      const { data: earlier } = await db
+        .from("ca_txns")
+        .select("txn_date, amount, direction, balance")
+        .eq("ca_firm_id", doc.ca_firm_id)
+        .eq("business_id", doc.business_id)
+        .eq("side", "bank")
+        .neq("extraction_id", doc.id)
+        .gte("txn_date", check.first)
+        .lte("txn_date", check.last)
+        .limit(20000);
+      overlap = findOverlap(
+        usable.map((r) => ({ date: r.date!, amount: r.amount!, direction: r.direction!, balance: r.balance ?? null })),
+        ((earlier ?? []) as { txn_date: string; amount: number | string; direction: "in" | "out"; balance: number | string | null }[]).map((e) => ({
+          date: String(e.txn_date),
+          amount: Number(e.amount),
+          direction: e.direction,
+          balance: e.balance === null || e.balance === undefined ? null : Number(e.balance),
+        })),
+      );
+    }
+    statementReport = { ...check, overlap };
+
+    // Does the statement belong to this client? The holder named on it and its account number are compared with the client.
+    try {
+      const text = outcome.sourceText ?? "";
+      const { data: cl } = await db.from("ca_clients").select("client_name").eq("id", doc.business_id).maybeSingle();
+      const owner = compareOwner(holderName(text), String((cl as { client_name?: string } | null)?.client_name ?? ""));
+      const { data: co } = await db.from("ca_tally_companies").select("id").eq("ca_firm_id", doc.ca_firm_id).eq("business_id", doc.business_id).maybeSingle();
+      let account: ReturnType<typeof compareWithBankLedgers> | null = null;
+      if (co) {
+        const { data: lg } = await db.from("ca_tally_ledgers").select("name, parent").eq("company_id", (co as { id: string }).id);
+        const banks = ((lg ?? []) as { name: string; parent: string | null }[]).filter((l) => /bank/i.test(l.parent ?? "")).map((l) => l.name);
+        account = compareWithBankLedgers(statementAccount(text, filename), banks);
+      }
+      const extra = [
+        { ok: owner.state === "match" ? true : owner.state === "mismatch" ? false : null, label: "Account holder", detail: owner.message },
+        ...(account ? [{ ok: account.state === "match" ? true : account.state === "mismatch" ? false : null, label: "Account number", detail: account.message }] : []),
+      ];
+      statementReport.checks.push(...extra);
+      if (extra.some((c) => c.ok === false)) {
+        statementReport.status = "fail";
+        statementReport.headline = `This statement may belong to another client or account. ${extra.find((c) => c.ok === false)!.detail}`;
+      }
+    } catch (e) {
+      console.error(`[practice] owner check for ${doc.id} failed: ${(e as Error).message}`);
+    }
+  }
 
   const reviewRows = rows
     .filter((r) => r.route === "review")
@@ -566,6 +629,7 @@ export async function processExtraction(
           (doc.extracted as { source?: string } | null)?.source ?? "Manual",
         kind: outcome.kind,
         text_preview: outcome.sourceText.slice(0, 20_000),
+        ...(statementReport ? { statement_check: statementReport } : {}),
       },
       extract_finished_at: new Date().toISOString(),
     })
@@ -584,12 +648,13 @@ export async function processExtraction(
     parts.push(
       `${outcome.duplicateRows + crossDocDuplicates} duplicate${outcome.duplicateRows + crossDocDuplicates === 1 ? "" : "s"} skipped or flagged`,
     );
+  const overlapLine = statementReport?.overlap ? overlapSentence(statementReport.overlap, rows.length) : null;
   await logActivity(
     db,
     doc.ca_firm_id,
     doc.business_id,
     "extract",
-    `${parts.join(", ")}.${outcome.note ? ` ${outcome.note}` : ""}`,
+    `${parts.join(", ")}.${outcome.note ? ` ${outcome.note}` : ""}${statementReport ? ` Statement check: ${statementReport.headline}` : ""}${overlapLine ? ` ${overlapLine}` : ""}`.slice(0, 1900),
   );
 
   if (doc.business_id) await autoResolveChases(db, { ...doc, side }, filename);
@@ -624,6 +689,31 @@ export async function processExtraction(
     duplicates: outcome.duplicateRows + crossDocDuplicates,
     pipeline,
   };
+}
+
+/**
+ * Removes every line a Tally sync filed for one document, including lines already matched. A bank line that was matched
+ * to one of them is un-matched again (the match is kept in the history as reversed), and the exceptions of the removed
+ * lines go with them, so a deleted voucher leaves no stale book line and no false exception behind.
+ */
+export async function dropSyncedBooks(db: Db, extractionId: string): Promise<{ removed: number; reopened: number }> {
+  const { data: lines } = await db.from("ca_txns").select("id").eq("extraction_id", extractionId).eq("side", "books").limit(50_000);
+  const ids = ((lines ?? []) as { id: string }[]).map((l) => l.id);
+  if (!ids.length) return { removed: 0, reopened: 0 };
+  const banks = new Set<string>();
+  const now = new Date().toISOString();
+  for (let i = 0; i < ids.length; i += 200) {
+    const chunk = ids.slice(i, i + 200);
+    const { data: ms } = await db.from("ca_recon_matches").select("id, bank_txn_id").eq("status", "active").overlaps("book_txn_ids", chunk);
+    for (const m of (ms ?? []) as { id: string; bank_txn_id: string }[]) {
+      banks.add(m.bank_txn_id);
+      await db.from("ca_recon_matches").update({ status: "reversed", reversed_at: now, notes: "The book entry is no longer in Tally." }).eq("id", m.id).eq("status", "active");
+    }
+  }
+  const bankIds = [...banks];
+  for (let i = 0; i < bankIds.length; i += 200) await db.from("ca_txns").update({ match_status: "unmatched" }).in("id", bankIds.slice(i, i + 200)).eq("match_status", "matched");
+  for (let i = 0; i < ids.length; i += 200) await db.from("ca_txns").delete().in("id", ids.slice(i, i + 200));
+  return { removed: ids.length, reopened: bankIds.length };
 }
 
 const CHASE_HINTS: { re: RegExp; side: Side | null }[] = [

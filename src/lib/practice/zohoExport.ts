@@ -187,7 +187,7 @@ export interface TallyExport {
  */
 export function buildTallyExport(
   list: ExportException[],
-  opts: { clientId: string; clientName: string; period: string | null; stamp?: string; bankLedger: string },
+  opts: { clientId: string; clientName: string; period: string | null; stamp?: string; bankLedger: string; /** The Tally company the file is for. Without it Tally imports into whichever company is open. */ company?: string | null },
 ): TallyExport {
   const lines = openBank(list, opts.clientId, opts.period);
   const slug = opts.clientName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "client";
@@ -206,14 +206,16 @@ export function buildTallyExport(
     const type = out ? "Payment" : "Receipt";
     const entry = (name: string, debit: boolean) =>
       `<ALLLEDGERENTRIES.LIST><LEDGERNAME>${xml(name)}</LEDGERNAME><ISDEEMEDPOSITIVE>${debit ? "Yes" : "No"}</ISDEEMEDPOSITIVE><AMOUNT>${debit ? "-" : ""}${amt}</AMOUNT></ALLLEDGERENTRIES.LIST>`;
+    // The bank line comes first, with its own sign: the amount and the side of a voucher are read from the bank, never from
+    // whichever ledger happens to be listed first.
     vouchers.push(
-      `<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER VCHTYPE="${type}" ACTION="Create"><DATE>${tallyDate(e.date)}</DATE><VOUCHERTYPENAME>${type}</VOUCHERTYPENAME><NARRATION>${narr}</NARRATION>${out ? entry(other, true) + entry(bank, false) : entry(bank, true) + entry(other, false)}</VOUCHER></TALLYMESSAGE>`,
+      `<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER VCHTYPE="${type}" ACTION="Create"><DATE>${tallyDate(e.date)}</DATE><VOUCHERTYPENAME>${type}</VOUCHERTYPENAME><NARRATION>${narr}</NARRATION>${out ? entry(bank, false) + entry(other, true) : entry(bank, true) + entry(other, false)}</VOUCHER></TALLYMESSAGE>`,
     );
   }
   const ledgers = [...masters].map(
     ([name, parent]) => `<TALLYMESSAGE xmlns:UDF="TallyUDF"><LEDGER NAME="${xml(name)}" ACTION="Create"><NAME.LIST><NAME>${xml(name)}</NAME></NAME.LIST><PARENT>${xml(parent)}</PARENT></LEDGER></TALLYMESSAGE>`,
   );
-  const body = [`<?xml version="1.0" encoding="UTF-8"?>`, `<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>All Masters</REPORTNAME></REQUESTDESC><REQUESTDATA>`, ...ledgers, ...vouchers, `</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>`].join("\n");
+  const body = [`<?xml version="1.0" encoding="UTF-8"?>`, `<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>All Masters</REPORTNAME>${opts.company ? `<STATICVARIABLES><SVCURRENTCOMPANY>${xml(clean(opts.company))}</SVCURRENTCOMPANY></STATICVARIABLES>` : ""}</REQUESTDESC><REQUESTDATA>`, ...ledgers, ...vouchers, `</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>`].join("\n");
   return { filename: `tally-vouchers_${slug}_${stamp}.xml`, count: lines.length, total: lines.reduce((s, e) => s + Math.abs(e.amount), 0), xml: body };
 }
 

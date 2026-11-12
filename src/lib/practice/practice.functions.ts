@@ -1300,9 +1300,9 @@ export const tallyCompanyMap = createServerFn({ method: "POST" })
 
 export const tallySyncNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({ id: uuid }).parse(d))
+  .inputValidator((d) => z.object({ id: uuid, months: z.array(z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/)).max(12).optional() }).parse(d))
   .handler(async ({ data, context }) =>
-    withFirm(context.userId, async (db, ctx) => (await import("./tallyConnector.server")).requestSync(db, ctx, data.id)),
+    withFirm(context.userId, async (db, ctx) => (await import("./tallyConnector.server")).requestSync(db, ctx, data.id, data.months)),
   );
 
 /* ── Referrals ────────────────────────────────────────── */

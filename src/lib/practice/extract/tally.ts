@@ -192,8 +192,13 @@ export function readTally(xml: string): TallyRead {
     }
     if (!amount) return;
 
+    // The counterparty is the other side of the money, never the bank itself: a voucher whose party ledger is the bank
+    // (a Receipt made out to the bank ledger) names the first ledger that is not a bank or cash account instead.
+    const partyIsBank = Boolean(party && entries.some((e) => e.ledger === party && (e.isBank || e.isCash || e.hasAllocation)));
     const counterparty =
-      party ?? entries.find((e) => !e.isBank && e !== pick)?.ledger ?? null;
+      (party && !partyIsBank ? party : null) ??
+      entries.find((e) => !e.isBank && !e.isCash && !e.hasAllocation)?.ledger ??
+      (party && !partyIsBank ? party : null);
     const reference = bankEntry?.instrument || childText(v, "REFERENCE") || vno;
     const rawText = [
       `Voucher ${vtype} #${vno ?? "?"}`,

@@ -27,7 +27,7 @@
  * Flags: --check (test Tally and FynHelp, then exit)   --once (one round, then exit)
  *        --config <file> (use another config file)
  */
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, appendFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { hostname } from "node:os";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -451,7 +451,25 @@ async function fynhelp(cfg, path, init) {
   return json;
 }
 
-const log = (...a) => console.log(new Date().toISOString().replace("T", " ").slice(0, 19), ...a);
+/**
+ * The log is written by the connector itself, as UTF-8, to the file named with --log. Redirecting the output from Windows
+ * PowerShell writes UTF-16, which Notepad shows as garbled symbols for a tick or an arrow.
+ */
+let logFile = null;
+export function setLogFile(path) {
+  logFile = path || null;
+}
+const log = (...a) => {
+  const line = [new Date().toISOString().replace("T", " ").slice(0, 19), ...a].join(" ");
+  console.log(line);
+  if (logFile) {
+    try {
+      appendFileSync(logFile, line + "\n", "utf8");
+    } catch {
+      /* a log that cannot be written must never stop the connector */
+    }
+  }
+};
 
 /** "https://fynhelp.com" works too: it is changed to the www address, which is the real one. */
 export function normaliseServer(value) {
@@ -642,6 +660,8 @@ async function round(cfg, state, forceSync) {
 
 export async function main() {
   const argv = process.argv.slice(2);
+  const li = argv.indexOf("--log");
+  if (li >= 0 && argv[li + 1]) setLogFile(resolve(argv[li + 1]));
   if (argv.includes("--version")) {
     console.log(VERSION);
     return;

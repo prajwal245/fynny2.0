@@ -33,6 +33,8 @@ interface LedgerEntry {
   ledger: string;
   amount: number; // signed as in Tally: negative = debit
   isBank: boolean;
+  /** The cash-in-hand ledger itself ("Cash", "Petty Cash", "Cash in Hand"), not a bank or a "Cash Credit" loan account. */
+  isCash: boolean;
   hasAllocation: boolean;
   instrument: string | null;
 }
@@ -40,6 +42,8 @@ interface LedgerEntry {
 const NOT_BANK = /\b(charges?|interest|commission|fees?|gst|tds|loan)\b/i;
 const BANK_HINT =
   /\b(bank|hdfc|icici|sbi|axis|kotak|yes bank|idfc|indusind|federal|canara|pnb|bob|union bank|cash)\b/i;
+
+const CASH_LEDGER = /^(petty\s+)?cash(\s*-?\s*in\s*-?\s*hand)?(\s+a\/c)?$/i;
 
 function ledgerEntries(v: XmlNode): LedgerEntry[] {
   const lists = [
@@ -62,6 +66,7 @@ function ledgerEntries(v: XmlNode): LedgerEntry[] {
       // "Bank Charges" / "Bank Interest" are expense or income ledgers, not the bank account.
       isBank:
         Boolean(alloc) || (BANK_HINT.test(ledger) && !NOT_BANK.test(ledger)),
+      isCash: !alloc && CASH_LEDGER.test(ledger.trim()),
       hasAllocation: Boolean(alloc),
       instrument,
     };
@@ -78,10 +83,21 @@ export function isTallyXml(text: string): boolean {
 }
 
 /** Voucher types that move no money through the bank or cash: they are not bank-reconciliation lines. */
-const NON_BANK_TYPES = new Set(["sales", "purchase", "journal", "credit note", "debit note", "memorandum", "rejections out", "rejections in"]);
+const NON_BANK_TYPES = new Set([
+  "sales",
+  "purchase",
+  "journal",
+  "credit note",
+  "debit note",
+  "memorandum",
+  "rejections out",
+  "rejections in",
+]);
 
 export interface TallyRead {
   rows: ExtractedRow[];
+  /** Vouchers paid or received in cash only: real entries, but they never appear on a bank statement. */
+  skippedCash: number;
   /** Vouchers read but left out of bank reconciliation because no bank or cash ledger is in them (sales, purchase, journal...). */
   skippedNonBank: number;
   /** Cancelled and optional vouchers. */
@@ -101,6 +117,7 @@ export function readTally(xml: string): TallyRead {
   const out: ExtractedRow[] = [];
   let skippedNonBank = 0;
   let skippedCancelled = 0;
+  let skippedCash = 0;
   vouchers.forEach((v, idx) => {
     const vtype = (
       childText(v, "VOUCHERTYPENAME") ||
@@ -129,7 +146,14 @@ export function readTally(xml: string): TallyRead {
 
     // A ledger with bank allocations is certainly the bank account; a name match is second best.
     const bankEntry =
-      entries.find((e) => e.hasAllocation) ?? entries.find((e) => e.isBank);
+      entries.find((e) => e.hasAllocation) ??
+      entries.find((e) => e.isBank && !e.isCash);
+    // Money paid or received in cash never reaches the bank statement, so it is not a line to reconcile with it.
+    // (A cash deposit or withdrawal has the bank on its other side and is kept.)
+    if (!bankEntry && entries.some((e) => e.isCash)) {
+      skippedCash++;
+      return;
+    }
     const partyEntry = party
       ? entries.find((e) => e.ledger === party)
       : undefined;
@@ -198,5 +222,11 @@ export function readTally(xml: string): TallyRead {
       parse_issues: issues,
     });
   });
-  return { rows: out, skippedNonBank, skippedCancelled, vouchers: vouchers.length };
+  return {
+    rows: out,
+    skippedNonBank,
+    skippedCancelled,
+    skippedCash,
+    vouchers: vouchers.length,
+  };
 }

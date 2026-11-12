@@ -33,7 +33,13 @@ import {
   isTallyLedgerXml,
   ledgerTotalsNote,
   readTallyLedgerXml,
+  partyLedgerSummary,
 } from "./tallyLedger";
+import {
+  isTallyMastersXml,
+  mastersSummary,
+  readTallyMasters,
+} from "./tallyMasters";
 import { TALLY_XML_NO_VOUCHERS, unsupportedReport } from "./unsupported";
 import { selectSheet } from "./sheets";
 import {
@@ -42,6 +48,7 @@ import {
   type ProtectedKind,
 } from "../passwordFile";
 import {
+  REGISTER_LABELS,
   detectRegister,
   summariseRegister,
   type RegisterSummary,
@@ -604,6 +611,29 @@ export async function runExtract(
     sourceText = decodeText(input.bytes);
     try {
       const read = readTally(sourceText);
+      if (read.vouchers === 0 && isTallyMastersXml(sourceText)) {
+        // Ledger masters (a company's ledgers and opening balances): no transactions, summarised and checked.
+        const masters = readTallyMasters(sourceText);
+        const sum = mastersSummary(masters);
+        return {
+          kind,
+          rows: [],
+          duplicateRows: 0,
+          sourceText: sourceText.slice(0, 200_000),
+          aiCalls: calls,
+          documentKind: "tally_masters",
+          register: {
+            kind: "tally_masters",
+            label: REGISTER_LABELS.tally_masters,
+            entries: sum.entries,
+            totals: sum.totals,
+            groups: sum.groups,
+            checks: sum.checks,
+            note: sum.note,
+          },
+          error: null,
+        };
+      }
       if (read.vouchers === 0) {
         // Tally's Ledger Vouchers report as XML has no <VOUCHER>; it is a flat list of display tags.
         const ledger = isTallyLedgerXml(sourceText)
@@ -616,6 +646,27 @@ export async function runExtract(
             "no_vouchers",
             "This Tally ledger export has no entries with an amount in it.",
           );
+        if (ledger.party) {
+          // A customer or supplier ledger holds invoices as well as settlements: summarised, never used as bank lines.
+          const sum = partyLedgerSummary(ledger);
+          return {
+            kind,
+            rows: [],
+            duplicateRows: 0,
+            sourceText: sourceText.slice(0, 200_000),
+            aiCalls: calls,
+            documentKind: "tally_party_ledger",
+            register: {
+              kind: "tally_party_ledger",
+              label: REGISTER_LABELS.tally_party_ledger,
+              entries: sum.entries,
+              totals: sum.totals,
+              checks: sum.checks,
+              note: sum.note,
+            },
+            error: null,
+          };
+        }
         parsed = ledger.rows;
         note = ledgerTotalsNote(ledger);
       } else {
@@ -623,6 +674,9 @@ export async function runExtract(
         const left = [
           read.skippedNonBank
             ? `${read.skippedNonBank} sales, purchase or journal voucher${read.skippedNonBank === 1 ? "" : "s"} with no bank or cash entry were left out of bank reconciliation`
+            : "",
+          read.skippedCash
+            ? `${read.skippedCash} cash-only voucher${read.skippedCash === 1 ? "" : "s"} (no bank leg) were left out because they never appear on a bank statement`
             : "",
           read.skippedCancelled
             ? `${read.skippedCancelled} cancelled or optional voucher${read.skippedCancelled === 1 ? "" : "s"} were skipped`

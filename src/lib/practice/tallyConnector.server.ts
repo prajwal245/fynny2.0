@@ -96,13 +96,18 @@ export async function hello(
     .from("ca_tally_companies")
     .select("company_name, business_id, last_synced_at")
     .eq("connector_id", c.id);
+  // Months a person asked for by hand (an older month with entries added later). Read apart from the connector's row so a
+  // database without the column yet still serves every connector; cleared once handed out.
+  const { data: asked } = await db.from("ca_tally_connectors").select("sync_months").eq("id", c.id).maybeSingle();
+  const extra = ((asked as { sync_months?: string[] | null } | null)?.sync_months ?? []).filter(validMonth);
+  if (extra.length) await db.from("ca_tally_connectors").update({ sync_months: null }).eq("id", c.id);
   return {
-    syncNow: Boolean(c.sync_requested_at),
+    syncNow: Boolean(c.sync_requested_at) || extra.length > 0,
     intervalMinutes: SYNC_INTERVAL_MINUTES,
     companies: (rows ?? []).map((r) => ({
       name: r.company_name as string,
       mapped: Boolean(r.business_id),
-      months: r.business_id ? monthsToPull(r.last_synced_at as string | null, now) : [],
+      months: r.business_id ? [...new Set([...monthsToPull(r.last_synced_at as string | null, now), ...extra])].sort() : [],
     })),
   };
 }
@@ -140,8 +145,16 @@ export async function ingestLedger(db: Db, c: ConnectorRow, company: string, mon
   const touch = (n: string) => db.from("ca_tally_companies").update({ last_synced_at: new Date().toISOString(), last_sync_note: n }).eq("id", co.id);
   const vouchers = voucherCount(new TextDecoder().decode(bytes));
   if (!vouchers) {
-    await touch(`${label}: no vouchers in Tally`);
-    return { status: "empty", note: `No vouchers in Tally for ${label}.` };
+    // Every entry of the month was deleted in Tally: the lines FynHelp filed earlier must go too.
+    const path0 = `${c.ca_firm_id}/${co.business_id}/tally/${co.id}-${month}.xml`;
+    const { data: was } = await db.from("ca_document_extractions").select("id").eq("ca_firm_id", c.ca_firm_id).eq("storage_path", path0).maybeSingle();
+    let removed = 0;
+    if (was) {
+      removed = (await (await import("./documents.server")).dropSyncedBooks(db, was.id as string)).removed;
+      await db.from("ca_document_extractions").update({ content_hash: null, row_count: 0, txn_count: 0 }).eq("id", was.id);
+    }
+    await touch(`${label}: no vouchers in Tally${removed ? ` (${removed} earlier line${removed === 1 ? "" : "s"} removed)` : ""}`);
+    return { status: "empty", note: `No vouchers in Tally for ${label}.${removed ? ` ${removed} line${removed === 1 ? "" : "s"} filed earlier ${removed === 1 ? "was" : "were"} removed.` : ""}` };
   }
 
   // Tally has been seen to ignore the requested period and answer with another date. Never file the wrong month.
@@ -232,8 +245,16 @@ export async function mapCompany(db: Db, ctx: FirmContext, companyId: string, bu
   return { ok: true };
 }
 
-export async function requestSync(db: Db, ctx: FirmContext, connectorId: string) {
-  const { error } = await db.from("ca_tally_connectors").update({ sync_requested_at: new Date().toISOString() }).eq("id", connectorId).eq("ca_firm_id", ctx.firmId);
+export async function requestSync(db: Db, ctx: FirmContext, connectorId: string, months?: string[]) {
+  const asked = [...new Set((months ?? []).filter(validMonth))].slice(0, 12);
+  if ((months ?? []).length && !asked.length) throw new PracticeError("bad_month", "Choose a month like 2026-09.");
+  const future = new Date().toISOString().slice(0, 7);
+  if (asked.some((m) => m > future)) throw new PracticeError("bad_month", "That month has not started yet.");
+  const { error } = await db
+    .from("ca_tally_connectors")
+    .update({ sync_requested_at: new Date().toISOString(), ...(asked.length ? { sync_months: asked } : {}) })
+    .eq("id", connectorId)
+    .eq("ca_firm_id", ctx.firmId);
   if (error) throw new PracticeError("db_error", error.message);
   return { ok: true };
 }

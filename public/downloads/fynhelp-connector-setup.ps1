@@ -49,10 +49,14 @@ try {
   if ($LASTEXITCODE -ne 0) { throw "FynHelp did not accept the token. Copy it again from FynHelp and run this setup again." }
 
   Step 5 "Making it start by itself"
-  $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -WindowStyle Hidden -Command `"& '$nodePath' '$js' --config '$cfg' *>> '$log'`"" -WorkingDirectory $dir
-  $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
-  $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit (New-TimeSpan -Days 0)
-  Register-ScheduledTask -TaskName "FynHelp Connector" -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
+  # The connector writes its own UTF-8 log (--log). It also restarts itself if it ever exits, and the task is started again
+  # every 10 minutes if the whole process has gone, so a stopped connector never stays stopped.
+  $run = "while (`$true) { & '$nodePath' '$js' --config '$cfg' --log '$log'; Start-Sleep -Seconds 15 }"
+  $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -WindowStyle Hidden -Command `"$run`"" -WorkingDirectory $dir
+  $atLogon = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+  $repeat = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 10)
+  $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -MultipleInstances IgnoreNew -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit (New-TimeSpan -Days 0)
+  Register-ScheduledTask -TaskName "FynHelp Connector" -Action $action -Trigger @($atLogon, $repeat) -Settings $settings -Force | Out-Null
   Start-ScheduledTask -TaskName "FynHelp Connector"
 
   Write-Host ""

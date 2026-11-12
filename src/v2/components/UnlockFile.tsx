@@ -67,7 +67,11 @@ export function UnlockFile({ docId, fileName, lastError, compact = false }: { do
           className="v2-input"
           value={pw}
           onChange={(e) => setPw(e.target.value)}
-          autoComplete="off"
+          // A file's password is not a login: stop Chrome offering saved logins, and never ask to "update password".
+          autoComplete="new-password"
+          name="file-password"
+          data-lpignore="true"
+          data-1p-ignore="true"
           spellCheck={false}
           maxLength={128}
           placeholder="Enter the password for this file"

@@ -129,7 +129,7 @@ export interface PostingView {
   } | null;
 }
 
-export async function workbench(db: Db, ctx: FirmContext, businessId: string) {
+export async function workbench(db: Db, ctx: FirmContext, businessId: string, documentId?: string | null) {
   const co = await companyFor(db, ctx, businessId);
   if (!co) return { linked: false as const };
   const { data: lg } = await db
@@ -217,6 +217,15 @@ export async function workbench(db: Db, ctx: FirmContext, businessId: string) {
     groups: CREATABLE_GROUPS,
     ledgerRequests: await (await import("./tallyLedgerRequests.server")).openLedgerRequests(db, ctx, co.id),
     canCreateLedgers: versionAtLeast((con?.agent_version as string | null) ?? null, "1.5.0"),
+    // The reconciliation as a person reads it: statement beside Tally, tagged, with debit and credit apart.
+    view: await (async () => {
+      const { data: allPosts } = await db.from("ca_tally_postings").select("txn_id, status").eq("ca_firm_id", ctx.firmId).eq("business_id", businessId).in("status", ["queued", "sent", "posted"]);
+      return (await import("./tallyReconView.server")).reconView(db, ctx, businessId, {
+        documentId: documentId ?? null,
+        bankLedgers: bankNames,
+        postedByTxn: new Map(((allPosts ?? []) as { txn_id: string; status: string }[]).map((x) => [x.txn_id, x.status])),
+      });
+    })(),
   };
 }
 
@@ -231,6 +240,9 @@ export async function approvePosting(
     bankLedger: string;
     kind?: "Contra";
     splits?: Split[] | null;
+    /** The person has confirmed the statement belongs to this bank ledger, or that Tally does not already hold this entry. */
+    confirmBank?: boolean;
+    confirmNotDuplicate?: boolean;
   },
 ) {
   if (!canApprove(ctx))
@@ -288,6 +300,15 @@ export async function approvePosting(
   };
   const problems = problemsWith(line, existing, bankLike);
   if (problems.length) throw new PracticeError("not_allowed", problems[0]);
+  // A statement that seems to belong to another account, or an entry Tally seems to hold already, waits for a person's word.
+  const hold = await (await import("./tallyReconView.server")).approvalHolds(
+    db,
+    ctx,
+    { business_id: t.business_id as string, extraction_id: (t.extraction_id as string | null) ?? null, direction: line.direction, amount: line.amount, txn_date: line.date },
+    input.bankLedger,
+    { bank: input.confirmBank, notDuplicate: input.confirmNotDuplicate },
+  );
+  if (hold) throw new PracticeError(hold.code, hold.message);
   // Pages for this document, taken once however many of its lines are approved. Short of pages: nothing is queued.
   let charged = false;
   if (t.extraction_id) {

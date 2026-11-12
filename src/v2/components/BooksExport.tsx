@@ -158,6 +158,22 @@ export function BooksExportDrawer({ open, onClose, clientId, allPeriods, initial
   useEffect(() => {
     if (id) setBank(readLedger(id));
   }, [id]);
+  // The Tally company this client is linked to: written into the file, so Tally cannot import into another client's company.
+  const [tallyCompany, setTallyCompany] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    setTallyCompany(null);
+    if (id)
+      void tallyConnectors()
+        .then((cs) => {
+          const co = cs.flatMap((c) => c.companies).find((x) => x.business_id === id);
+          if (live) setTallyCompany(co?.company_name ?? null);
+        })
+        .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [id]);
   useEffect(() => {
     if (open) setSystem(initialSystem ?? connected[0] ?? "zoho");
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -173,7 +189,7 @@ export function BooksExportDrawer({ open, onClose, clientId, allPeriods, initial
   const name = clientName(id);
   const opts = { clientId: id, clientName: name, period: null, stamp: month ?? "all periods" };
   const n = countFor(list, id, null);
-  const tally = buildTallyExport(list, { ...opts, bankLedger: bank });
+  const tally = buildTallyExport(list, { ...opts, bankLedger: bank, company: tallyCompany });
 
   return (
     <Drawer open={open} onClose={onClose} title={`Export to ${SYSTEM_LABEL[system]}`}>
@@ -240,6 +256,7 @@ export function BooksExportDrawer({ open, onClose, clientId, allPeriods, initial
         <>
           <ol style={{ fontSize: 12.5, color: V.muted, lineHeight: 1.7, paddingLeft: 18 }}>
             <li>Type the exact name of the bank ledger in Tally, then download the file.</li>
+            <li>{tallyCompany ? <>Open the company <b>{tallyCompany}</b> in Tally (the file names it, so Tally imports into that company only).</> : <>Open the right client's company in Tally first: this client is not linked to a Tally company, so the file does not name one and Tally imports into whichever company is open.</>}</li>
             <li>In Tally: Gateway of Tally → Import → Data, choose the file, and set "If data already exists" to "Ignore duplicates".</li>
             <li>Check the new vouchers (Day Book) and reclassify any ledger the guess got wrong.</li>
             <li>Sync Tally to FynHelp again and run Recon: the lines should now match.</li>

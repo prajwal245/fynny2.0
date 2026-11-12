@@ -28,6 +28,7 @@ import {
 import { AgentStatusBadge, RowSkeleton } from "../agents";
 import { IntakePanel } from "../components/IntakePanel";
 import { TallyPosting } from "../components/TallyPosting";
+import { StatementCheckCard } from "../components/StatementCheckCard";
 import { UnlockFile } from "../components/UnlockFile";
 import { isPasswordMessage } from "@/lib/practice/passwordFile";
 import { SourceIcon } from "../components/BrandIcons";
@@ -170,6 +171,7 @@ export default function DocumentsPage({
     reprocessDoc,
     assignDoc,
     openDocument,
+    period,
   } = useV2();
   const [tab, setTab] = useState("All");
   const [open, setOpen] = useState<string | null>(null);
@@ -735,6 +737,7 @@ export default function DocumentsPage({
               </div>
             </div>
 
+            {active.statementCheck && active.side === "bank" && active.status !== "Processing" && active.status !== "Uploading" && <StatementCheckCard report={active.statementCheck} lineCount={active.rows.length || active.txnCount || 0} period={period} />}
             {active.status === "Processing" || active.status === "Uploading" ? (
               <RowSkeleton rows={4} />
             ) : active.register ? (
@@ -837,7 +840,7 @@ export default function DocumentsPage({
               </motion.table>
               </>
             )}
-            {active.side === "bank" && active.clientId && active.status === "Parsed" && <TallyPosting clientId={active.clientId} />}
+            {active.side === "bank" && active.clientId && active.status === "Parsed" && <TallyPosting clientId={active.clientId} documentId={active.id} />}
             <style>{BX_STYLES + SEL_STYLES}</style>
             <BulkBar sel={sel} total={active.rows.length} noun={pickedRows.length === 1 ? "transaction" : "transactions"} inDrawer>
               {active.side === "bank" && active.clientId

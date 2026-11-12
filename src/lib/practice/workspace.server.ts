@@ -276,6 +276,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       source?: string;
       rows?: { date: string; particulars: string; amount: number }[];
       register?: { kind: string; label: string; entries: number; totals: { label: string; amount: number }[]; groups?: { key: string; amount: number; count: number }[]; note: string };
+      statement_check?: import("./extract/statementCheck").StatementCheck & { overlap: import("./extract/statementCheck").Overlap | null };
     };
     docName.set(r.id, r.original_filename ?? "Document");
     const rows =
@@ -313,6 +314,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
         undefined,
       subject: r.gmail_subject ?? undefined,
       register: ex.register ?? undefined,
+      statementCheck: ex.statement_check ?? undefined,
     };
   });
 

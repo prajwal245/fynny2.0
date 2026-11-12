@@ -22,10 +22,20 @@ const errMsg = (e: unknown) => (e instanceof Error && e.message ? e.message : "S
 /** none: no connector online. connected: online but no books have arrived. active: books have arrived. */
 export type TallyLink = "none" | "connected" | "active";
 
+/** The last 12 months, newest first, for fetching an older month again from Tally. */
+const lastMonths = (): { value: string; label: string }[] => {
+  const now = new Date();
+  return Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    return { value: d.toISOString().slice(0, 7), label: d.toLocaleString("en-IN", { month: "long", year: "numeric", timeZone: "UTC" }) };
+  });
+};
+
 export function TallyConnector({ onChange }: { onChange?: (state: TallyLink) => void }) {
   const { clients, canSignOff } = useV2();
   const [list, setList] = useState<Connector[] | null>(null);
   const [name, setName] = useState("");
+  const [month, setMonth] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [fresh, setFresh] = useState<{ name: string; token: string } | null>(null);
 
@@ -106,10 +116,15 @@ export function TallyConnector({ onChange }: { onChange?: (state: TallyLink) => 
                 {c.agent_version && <span style={{ color: V.muted }}> · v{c.agent_version}</span>}
               </div>
               {canSignOff && (
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button className="v2-btn v2-btn-ghost" disabled={busy === `sync-${c.id}` || !c.online} title={c.online ? "Ask the connector to send now" : "The connector is offline"}
-                    onClick={() => run(`sync-${c.id}`, () => tallySyncNow({ data: { id: c.id } }), "Asked the connector to sync. It starts within a few minutes.")}>
-                    <RefreshCw size={14} /> Sync now
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <label className="v2-label" htmlFor={`month-${c.id}`} style={{ margin: 0 }}>Month</label>
+                  <select id={`month-${c.id}`} className="v2-input" style={{ width: "auto" }} value={month} onChange={(e) => setMonth(e.target.value)} aria-label="Month to fetch from Tally">
+                    <option value="">Recent months</option>
+                    {lastMonths().map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                  </select>
+                  <button className="v2-btn v2-btn-ghost" disabled={busy === `sync-${c.id}` || !c.online} title={c.online ? (month ? "Fetch this month again from Tally, including entries added later" : "Ask the connector to send now") : "The connector is offline"}
+                    onClick={() => run(`sync-${c.id}`, () => tallySyncNow({ data: { id: c.id, months: month ? [month] : undefined } }), month ? `Asked the connector to fetch ${month} again. It starts within a few minutes.` : "Asked the connector to sync. It starts within a few minutes.")}>
+                    <RefreshCw size={14} /> {month ? "Fetch this month" : "Sync now"}
                   </button>
                   <button className="v2-btn v2-btn-quiet" disabled={busy === `rm-${c.id}`}
                     onClick={() => { if (window.confirm(`Remove the connector "${c.name}"? It will stop sending.`)) void run(`rm-${c.id}`, () => tallyConnectorRevoke({ data: { id: c.id } }), "Connector removed"); }}>

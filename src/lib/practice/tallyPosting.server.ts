@@ -188,6 +188,7 @@ export async function workbench(db: Db, ctx: FirmContext, businessId: string) {
           counterparty: t.counterparty as string | null,
           description: t.description as string | null,
           reference: t.reference as string | null,
+          direction: t.direction as "in" | "out",
         },
         names,
         bankNames[0],

@@ -484,7 +484,15 @@ export default function DocumentsPage({
         )
       ) : (
         <Card style={{ padding: 0 }} className="v2-scroll">
-          <table className="v2-table v2-table-stack">
+          <table className="v2-table v2-table-stack v2-review-table" style={{ width: scopedClient ? 1000 : 1200 }}>
+            <colgroup>
+              <col style={{ width: 420 }} />
+              {!scopedClient && <col style={{ width: 200 }} />}
+              <col style={{ width: 130 }} />
+              <col style={{ width: 150 }} />
+              <col style={{ width: 170 }} />
+              <col style={{ width: 130 }} />
+            </colgroup>
             <thead>
               <tr>
                 <th>File</th>
@@ -510,23 +518,16 @@ export default function DocumentsPage({
                     className="clickable"
                     onClick={() => openDoc(d)}
                   >
-                    <td style={{ fontWeight: 600 }}>
-                      {d.name}
+                    <td style={{ fontWeight: 600 }} title={d.status === "Failed" && d.error ? `${d.name}\n\n${d.error}` : d.name}>
+                      <div className="rv-cut">{d.name}</div>
                       {d.status === "Failed" && d.error && (
-                        <div
-                          style={{
-                            fontSize: 12,
-                            color: V.maroon,
-                            fontWeight: 400,
-                            marginTop: 3,
-                          }}
-                        >
+                        <div className="rv-cut" style={{ fontSize: 12, color: V.maroon, fontWeight: 400, marginTop: 2 }}>
                           {d.error}
                         </div>
                       )}
                     </td>
                     {!scopedClient && (
-                      <td style={{ color: V.body }}>
+                      <td className="rv-cut" style={{ color: V.body }}>
                         {d.clientId
                           ? clientName(d.clientId)
                           : (d.sender ?? "Unknown sender")}

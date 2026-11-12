@@ -6,7 +6,8 @@
  *  - a bank line can be queued once (database unique index) and carries a fixed REMOTEID;
  *  - the connector only claims queued lines, one attempt each; a line whose result never came back
  *    is NOT retried automatically (Tally may already have it): it is marked failed for a person to check;
- *  - nothing is created in Tally except vouchers, and no ledger is ever created.
+ *  - nothing is created in Tally except vouchers here. A new ledger is a separate, approved request
+ *    (tallyLedgerRequests.server.ts) that the connector reads back from Tally before it counts.
  */
 import { PracticeError } from "./core";
 import { logActivity, type Db, type FirmContext } from "./db.server";
@@ -22,6 +23,7 @@ import {
 import { isPartyGroup, versionAtLeast } from "./tallyConnector";
 import { pagesForDocument } from "./billing/pageCredits";
 import { suggestLedger } from "./tallyLedgerSuggest";
+import { CREATABLE_GROUPS } from "./tallyLedgerCreate";
 
 /** A claimed line not reported back within this time is treated as interrupted. */
 export const LEASE_MINUTES = 10;
@@ -138,7 +140,7 @@ export async function workbench(db: Db, ctx: FirmContext, businessId: string) {
   const ledgers = (lg ?? []) as { name: string; parent: string | null }[];
   const { data: con } = await db
     .from("ca_tally_connectors")
-    .select("last_seen_at")
+    .select("last_seen_at, agent_version")
     .eq("id", co.connector_id)
     .maybeSingle();
   const { data: txns } = await db
@@ -211,6 +213,10 @@ export async function workbench(db: Db, ctx: FirmContext, businessId: string) {
     ledgers,
     bankLedgers: bankNames,
     lines,
+    // Creating a ledger in Tally: the groups offered, what is already asked for, and whether the connector can do it.
+    groups: CREATABLE_GROUPS,
+    ledgerRequests: await (await import("./tallyLedgerRequests.server")).openLedgerRequests(db, ctx, co.id),
+    canCreateLedgers: versionAtLeast((con?.agent_version as string | null) ?? null, "1.5.0"),
   };
 }
 

@@ -25,7 +25,8 @@ Use a throwaway company in Tally Prime with the connector 1.4.0 running and "Y" 
 3. Approve the same line twice (double click, then again after a refresh). Tally must show one voucher.
 4. Stop the connector, approve a line, start the connector. The entry must post once.
 5. Close the Tally company, approve a line. FynHelp must say why it did not post and must not mark it posted.
-6. Import a real Day Book from a client, reconcile, and compare the exception list with the client's own reconciliation by hand.
+6. Type a payee that is not a ledger yet, choose a group and press "Create in Tally". The ledger must appear in Tally under that group within one check-in and in FynHelp's list, and the line must then be approvable. Ask for the same ledger again: FynHelp must refuse it, and Tally must show one ledger. Try a name close to an existing one: FynHelp must stop and say which.
+7. Import a real Day Book from a client, reconcile, and compare the exception list with the client's own reconciliation by hand.
 
 ## Show-and-tell order (about 8 minutes)
 

@@ -32,7 +32,7 @@ import { dirname, join, resolve } from "node:path";
 import { hostname } from "node:os";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-export const VERSION = "1.4.0";
+export const VERSION = "1.5.0";
 
 /* ── Tally XML helpers (pure; tested) ───────────────────────── */
 
@@ -190,6 +190,56 @@ export function refuseImport(xml, company, linked) {
   const unsound = voucherProblems(voucherBlocks(x)[0] ?? "");
   if (unsound.length) return `The voucher is not sound: ${unsound[0]}`;
   return null;
+}
+
+/**
+ * Safety for creating a ledger. The request must be exactly ONE ledger, created and never altered or deleted, with a name and a
+ * group, no opening balance, for a company that is open and linked, and nothing else in it. Returns null when it is fine.
+ * Mirrors src/lib/practice/tallyLedgerCreate.ts.
+ */
+export function refuseLedgerImport(xml, company, linked) {
+  const x = String(xml);
+  if (!linked.includes(company)) return `"${company}" is not a linked, open company.`;
+  if (!/<TALLYREQUEST>\s*Import Data\s*<\/TALLYREQUEST>/i.test(x) || !/<REPORTNAME>\s*All Masters\s*<\/REPORTNAME>/i.test(x)) return "This is not a masters import.";
+  if (!new RegExp(`<SVCURRENTCOMPANY>${esc(company)}</SVCURRENTCOMPANY>`).test(x)) return "The request names a different company.";
+  const ledgers = x.match(/<LEDGER[\s>]/gi) ?? [];
+  if (ledgers.length !== 1) return `Expected exactly one ledger, found ${ledgers.length}.`;
+  if (!/<LEDGER\b[^>]*\bACTION="Create"/i.test(x)) return "A ledger may only be created, never changed.";
+  if (/\bACTION="(Alter|Delete|Cancel|Remove)"/i.test(x) || /<(DELETE|CANCEL)\b/i.test(x)) return "Changing or deleting is not allowed.";
+  if (/<(VOUCHER|GROUP|STOCKITEM|STOCKGROUP|COSTCENTRE|VOUCHERTYPE|UNIT|GODOWN|CURRENCY|COMPANY|EMPLOYEE|PAYHEAD)[\s>]/i.test(x)) return "Only a ledger may be created.";
+  if (/<OPENINGBALANCE\b/i.test(x)) return "An opening balance may not be set from FynHelp.";
+  const attr = /<LEDGER\b[^>]*\bNAME="([^"]*)"/i.exec(x)?.[1] ?? "";
+  const inner = /<NAME\.LIST>\s*<NAME>([^<]*)<\/NAME>/i.exec(x)?.[1] ?? "";
+  if (!attr.trim()) return "The ledger has no name.";
+  if (attr !== inner) return "The ledger name is not the same in both places.";
+  if (!/<PARENT>\s*[^<\s][^<]*<\/PARENT>/i.test(x)) return "The ledger has no group.";
+  // Never under a group that needs tax, bank or stock settings.
+  const parent = unesc(/<PARENT>([^<]*)<\/PARENT>/i.exec(x)?.[1] ?? "").trim();
+  if (/bank|cash|duties|tax|gst|tds|capital|stock|reserve|primary|branch|suspense|profit/i.test(parent)) return `Ledgers under "${parent}" must be created in Tally.`;
+  return null;
+}
+
+/** The ledger name and group a creation request asks for. */
+export function requestedLedger(xml) {
+  const x = String(xml);
+  return { name: unesc(/<LEDGER\b[^>]*\bNAME="([^"]*)"/i.exec(x)?.[1] ?? "").trim(), parent: unesc(/<PARENT>([^<]*)<\/PARENT>/i.exec(x)?.[1] ?? "").trim() };
+}
+
+/** Did Tally really keep the ledger? Reads the company's ledgers back and looks for this name under this group. */
+export async function verifyLedgerCreated(ask, company, xml) {
+  const want = requestedLedger(xml);
+  let reply;
+  try {
+    reply = await ask(ledgerListRequest(company));
+  } catch (e) {
+    return { verified: false, note: `Could not read the ledgers back: ${e.message}` };
+  }
+  const err = tallyError(reply);
+  if (err) return { verified: false, note: `Tally said "${err}" when asked to read the ledgers back.` };
+  const found = parseLedgers(reply).find((l) => l.name.trim().toLowerCase() === want.name.toLowerCase());
+  if (!found) return { verified: false, note: `"${want.name}" is not in the company's ledgers.` };
+  if ((found.parent ?? "").trim().toLowerCase() !== want.parent.toLowerCase()) return { verified: false, note: `"${found.name}" is in Tally but under "${found.parent ?? "no group"}", not "${want.parent}".` };
+  return { verified: true, note: `"${found.name}" is in Tally under ${found.parent}.` };
 }
 
 /* ── is a voucher sound, and did Tally really keep it? (pure; tested against real Tally exports) ── */
@@ -463,7 +513,42 @@ async function sendLedgers(cfg, name) {
 /** Writes lines a person approved in FynHelp. One at a time; every answer is reported back. Off unless allowWrite is true. */
 async function writeApproved(cfg, companies, linked) {
   if (!cfg.allowWrite) return;
-  const { postings } = await fynhelp(cfg, "/api/public/tally-outbox", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+  const { postings, ledgers } = await fynhelp(cfg, "/api/public/tally-outbox", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+  const report = (body) => fynhelp(cfg, "/api/public/tally-result", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  // Ledgers first, so an entry waiting on a new ledger finds it in the same round.
+  for (const p of ledgers ?? []) {
+    if (!companies.includes(p.company)) {
+      await report({ kind: "ledger", id: p.id, error: `Company "${p.company}" is not open in Tally.` });
+      continue;
+    }
+    const refused = refuseLedgerImport(p.xml, p.company, linked);
+    if (refused) {
+      log(`✗ refused to create ledger ${p.id.slice(0, 8)}: ${refused}`);
+      await report({ kind: "ledger", id: p.id, error: `The connector refused this ledger: ${refused}` });
+      continue;
+    }
+    let body;
+    try {
+      const reply = await askTally(cfg.tallyUrl, p.xml, 60_000);
+      body = { kind: "ledger", id: p.id, reply };
+      log(`→ asked Tally to create the ledger "${requestedLedger(p.xml).name}" in ${p.company}`);
+      if (/<CREATED>\s*1\s*<\/CREATED>/i.test(reply) && !tallyError(reply)) {
+        const check = await verifyLedgerCreated((b) => askTally(cfg.tallyUrl, b, 60_000), p.company, p.xml);
+        body.verified = check.verified;
+        body.verifyNote = check.note;
+        log(check.verified ? `  ✓ read back from Tally: ${check.note}` : `  ✗ NOT verified: ${check.note}`);
+      }
+    } catch (e) {
+      body = { kind: "ledger", id: p.id, error: e.message };
+      log(`✗ could not create ledger ${p.id.slice(0, 8)}: ${e.message}`);
+    }
+    await report(body);
+    try {
+      await sendLedgers(cfg, p.company);
+    } catch (e) {
+      log(`✗ ${p.company} ledgers: ${e.message}`);
+    }
+  }
   for (const p of postings ?? []) {
     if (!companies.includes(p.company)) {
       await fynhelp(cfg, "/api/public/tally-result", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: p.id, error: `Company "${p.company}" is not open in Tally.` }) });

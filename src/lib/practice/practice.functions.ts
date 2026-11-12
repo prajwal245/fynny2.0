@@ -1347,6 +1347,22 @@ export const tallyApprove = createServerFn({ method: "POST" })
     ),
   );
 
+export const tallyCreateLedger = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ business_id: uuid, name: z.string().min(1).max(200), parent: z.string().min(1).max(120), allow_similar: z.boolean().optional() }).parse(d))
+  .handler(async ({ context, data }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      const { assertClient } = await import("./db.server");
+      await assertClient(db, ctx, data.business_id);
+      return (await import("./tallyLedgerRequests.server")).requestLedger(db, ctx, { businessId: data.business_id, name: data.name, parent: data.parent, allowSimilar: data.allow_similar });
+    }),
+  );
+
+export const tallyCancelLedger = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ id: uuid }).parse(d))
+  .handler(async ({ context, data }) => withFirm(context.userId, async (db, ctx) => (await import("./tallyLedgerRequests.server")).cancelLedgerRequest(db, ctx, data.id)));
+
 export const tallyCancel = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ id: uuid }).parse(d))

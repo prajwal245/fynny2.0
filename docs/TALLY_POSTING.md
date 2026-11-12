@@ -33,3 +33,13 @@ Reads were already live (the connector sends the Day Book). This adds the write 
 npm test -- tests/unit/practice/tally-voucher.test.ts tests/unit/practice/page-credits.test.ts
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/test_page_credits.sql   # rolls back
 ```
+
+## Creating a ledger from FynHelp (connector 1.5.0)
+
+When the payee of a bank line is not a ledger in Tally yet, a partner or manager can create it from the line: type the name, choose a group, press "Create in Tally".
+
+- One ledger per request, with a name and a group. No opening balance, never altered or deleted.
+- Only parties, income, expense and plain asset or liability groups (see `CREATABLE_GROUPS`, plus any group the company already uses). Ledgers that need tax, bank or stock settings (GST, TDS, bank, cash, capital, stock) stay in Tally.
+- An existing ledger, or one whose name is close to an existing one, is refused with the name of the existing one; a person can confirm a close name is a different party.
+- The connector checks the request again before sending it, asks Tally, then reads the company's ledgers back and looks for the name under the group. Only then is the ledger counted as created and usable. A request whose answer never came back is held for a person, never retried by itself.
+- Needs connector 1.5.0. An older connector is never sent a request and the screen says to update it.

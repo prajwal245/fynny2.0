@@ -122,7 +122,7 @@ ${LIQUID_BUTTON_CSS}
 .v2-scroll { overflow-x:auto; }
 /* A wide or long table scrolls inside its own frame, so the sideways scrollbar is always on screen (not at the bottom of a
    page-long table), stays visible on Mac (no hidden overlay bar), and the column headings stay in view. */
-.v2-scroll:has(> table) { overflow:auto; max-height:min(78vh, 920px); overscroll-behavior:contain; scrollbar-gutter:stable; }
+.v2-scroll:has(> table) { overflow:auto; max-height:max(420px, calc(100vh - 170px)); overscroll-behavior:contain; scrollbar-gutter:stable; }
 .v2-scroll { scrollbar-width:thin; scrollbar-color:#b9b4ac transparent; }
 .v2-scroll::-webkit-scrollbar { height:12px; width:12px; }
 .v2-scroll::-webkit-scrollbar-track { background:rgba(120,114,104,.10); border-radius:8px; }
@@ -144,6 +144,15 @@ ${LIQUID_BUTTON_CSS}
 @media (max-width:760px){ .v2-scrollbtn { display:none; } }
 .v2-scroll:has(> table) > table > thead > tr > th { position:sticky; top:0; z-index:2; background:var(--v2-sticky, #fff); box-shadow:0 1px 0 ${V.line}; }
 .v2-scroll .v2-head2 th { top:32px; }
+/* Review Queue: slim rows that fit the screen. Long text is cut to one or two lines (the full text is in the tooltip and the side panel). */
+.v2-review-table { table-layout:fixed; min-width:880px; }
+.v2-review-table td, .v2-review-table th { padding:9px 12px; }
+.v2-review-table td { vertical-align:middle; }
+.v2-review-table .rv-cut { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+.v2-review-table .rv-cut2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; line-height:1.35; }
+.v2-review-table .rv-nowrap { white-space:nowrap; }
+.v2-review-table .sel-cell { padding-left:14px; }
+@media (max-width:760px){ .v2-review-table { min-width:0; table-layout:auto; } .v2-review-table .rv-cut, .v2-review-table .rv-cut2 { white-space:normal; display:block; -webkit-line-clamp:unset; } }
 .v2-skel { background:linear-gradient(90deg, ${V.gray} 25%, ${V.cream} 50%, ${V.gray} 75%); background-size:200% 100%; animation:v2shimmer 1.3s infinite linear; border-radius:10px; }
 @keyframes v2shimmer { from { background-position:200% 0; } to { background-position:-200% 0; } }
 .v2-grid-cards { display:grid; gap:16px; grid-template-columns:repeat(auto-fill, minmax(min(280px, 100%), 1fr)); }

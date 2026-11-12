@@ -184,16 +184,27 @@ export default function ReviewPage({
         />
       ) : (
         <Card style={{ padding: 0 }} className="v2-scroll">
-          <table className="v2-table v2-table-stack">
+          <table className="v2-table v2-table-stack v2-review-table">
+            <colgroup>
+              <col style={{ width: 44 }} />
+              {!scopedClient && <col style={{ width: 150 }} />}
+              <col style={{ width: 100 }} />
+              <col />
+              <col style={{ width: 128 }} />
+              <col style={{ width: "26%" }} />
+              <col style={{ width: 116 }} />
+              <col style={{ width: 92 }} />
+            </colgroup>
             <thead>
               <tr>
                 <SelectAllHeader sel={sel} total={list.length} />
                 {!scopedClient && <th>Client</th>}
-                <th>Document</th>
-                <th>Raw text</th>
-                <th>Suggestion</th>
-                <th>Why</th>
+                <th>Date</th>
+                <th>Line</th>
+                <th style={{ textAlign: "right" }}>Amount</th>
+                <th>Why it needs a look</th>
                 <th>Confidence</th>
+                <th aria-label="Open" />
               </tr>
             </thead>
             <tbody>
@@ -204,58 +215,35 @@ export default function ReviewPage({
                     layout
                     initial={{ opacity: 0, x: -12 }}
                     animate={{ opacity: 1, x: 0 }}
-                    exit={{
-                      opacity: 0,
-                      x: 32,
-                      backgroundColor: "rgba(31,90,70,0.08)",
-                    }}
+                    exit={{ opacity: 0, x: 32, backgroundColor: "rgba(31,90,70,0.08)" }}
                     transition={{ duration: 0.32, ease: "easeOut" }}
                     className={`clickable${sel.has(r.id) ? " is-selected" : ""}`}
                     onClick={() => openItem(r)}
                   >
                     <SelectCell sel={sel} id={r.id} label={`${r.suggestion.particulars.slice(0, 40)}, ${formatINR(r.suggestion.amount)}`} />
                     {!scopedClient && (
-                      <td style={{ fontWeight: 600 }}>
+                      <td className="rv-cut" style={{ fontWeight: 600 }} title={clientName(r.clientId)}>
                         {clientName(r.clientId)}
                       </td>
                     )}
-                    <td style={{ color: V.body }}>{r.docName}</td>
-                    <td
-                      className="v2-mono"
-                      style={{
-                        color: V.muted,
-                        fontSize: 12.5,
-                        maxWidth: 240,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {r.rawText}
+                    <td className="num rv-nowrap" data-label="Date">{r.suggestion.date ? formatDate(r.suggestion.date) : <span style={{ color: V.muted }}>No date</span>}</td>
+                    <td className="rv-cut" title={`${r.suggestion.particulars}\n\n${r.rawText}`}>
+                      <div className="rv-cut" style={{ fontWeight: 500 }}>{r.suggestion.particulars || r.rawText || "No description"}</div>
+                      <div className="rv-cut" style={{ fontSize: 11.5, color: V.muted }}>{r.docName}</div>
+                    </td>
+                    <td className="num rv-nowrap" style={{ textAlign: "right", color: r.suggestion.amount < 0 ? V.maroon : V.green, fontWeight: 600 }}>
+                      {r.suggestion.amount ? formatINR(r.suggestion.amount) : <span style={{ color: V.muted, fontWeight: 400 }}>No amount</span>}
+                    </td>
+                    <td style={{ color: V.body, fontSize: 12.5 }} title={r.reason}>
+                      <div className="rv-cut2">{r.reason}</div>
                     </td>
                     <td>
-                      {r.suggestion.particulars}
-                      {r.suggestion.amount ? (
-                        <div
-                          className="num"
-                          style={{
-                            fontSize: 12,
-                            color: r.suggestion.amount < 0 ? V.maroon : V.green,
-                          }}
-                        >
-                          {formatINR(r.suggestion.amount)}
-                        </div>
-                      ) : null}
+                      <Badge tone={tone(r.confidence)}>{Math.round(r.confidence * 100)}%</Badge>
                     </td>
-                    <td
-                      style={{ color: V.body, fontSize: 12.5, maxWidth: 220 }}
-                    >
-                      {r.reason}
-                    </td>
-                    <td>
-                      <Badge tone={tone(r.confidence)}>
-                        {Math.round(r.confidence * 100)} percent
-                      </Badge>
+                    <td style={{ textAlign: "right" }}>
+                      <button type="button" className="v2-btn v2-btn-ghost" style={{ padding: "4px 10px", fontSize: 12.5 }} onClick={(e) => { e.stopPropagation(); openItem(r); }}>
+                        Review
+                      </button>
                     </td>
                   </motion.tr>
                 ))}

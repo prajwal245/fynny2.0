@@ -11,7 +11,7 @@ import { tallyApprove, tallyCancel, tallyCancelLedger, tallyCreateLedger, tallyM
 import { splitGstInclusive, type Split } from "@/lib/practice/tallyVoucher";
 import { PagesChip, PagesTopUpModal } from "./PagesPanel";
 import { refreshPages } from "../lib/pages";
-import { Badge, V, formatDate, formatINR } from "../ui";
+import { Badge, Card, V, formatDate, formatINR } from "../ui";
 
 type Bench = Awaited<ReturnType<typeof tallyWorkbench>>;
 type Linked = Extract<Bench, { linked: true }>;
@@ -206,7 +206,7 @@ function ReconView(props: {
       {rows.length === 0 ? (
         <div style={{ fontSize: 13.5, color: V.body, padding: 12, background: V.gray, borderRadius: 12 }}>Nothing to show for this view.</div>
       ) : (
-        <div className="v2-scroll" style={{ border: `1px solid ${V.line}`, borderRadius: 14 }}>
+        <Card className="v2-scroll" style={{ padding: 0 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 860 }}>
             <thead>
               <tr style={{ height: 32, color: V.muted, fontSize: 11.5, textTransform: "uppercase", letterSpacing: ".06em" }}>
@@ -308,7 +308,7 @@ function ReconView(props: {
               })}
             </tbody>
           </table>
-        </div>
+        </Card>
       )}
 
       {allTickable.length > 0 && (

@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
  */
 import { ReactNode, CSSProperties, useEffect, useId, useRef, useState } from "react";
 import { motion, AnimatePresence, useIsPresent } from "framer-motion";
-import { Maximize2, Minimize2, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Maximize2, Minimize2, X } from "lucide-react";
 import { LIQUID_BUTTON_CSS } from "@/lib/liquidButton";
 
 /** Palette: red #D92B2B and #8E1B1F, cream #EADBC8, ink #141210, mist #FAF7F2. Green and amber are for status only. */
@@ -128,6 +128,20 @@ ${LIQUID_BUTTON_CSS}
 .v2-scroll::-webkit-scrollbar-track { background:rgba(120,114,104,.10); border-radius:8px; }
 .v2-scroll::-webkit-scrollbar-thumb { background:#b9b4ac; border-radius:8px; border:2px solid transparent; background-clip:content-box; }
 .v2-scroll::-webkit-scrollbar-thumb:hover { background:#8f8a82; background-clip:content-box; }
+/* An edge with more beyond it gets a shadow, so it is plain that the table goes on. */
+.v2-scroll[data-l="1"] { --sh-l: inset 16px 0 14px -14px rgba(20,18,16,.30); }
+.v2-scroll[data-r="1"] { --sh-r: inset -16px 0 14px -14px rgba(20,18,16,.30); }
+.v2-scroll[data-t="1"] { --sh-t: inset 0 16px 14px -14px rgba(20,18,16,.22); }
+.v2-scroll[data-b="1"] { --sh-b: inset 0 -16px 14px -14px rgba(20,18,16,.30); }
+.v2-scroll { box-shadow: var(--v2-card-shadow), var(--sh-l, 0 0 #0000), var(--sh-r, 0 0 #0000), var(--sh-t, 0 0 #0000), var(--sh-b, 0 0 #0000); }
+.v2-scroll:focus-visible { outline:2px solid var(--v2-brand); outline-offset:2px; }
+.v2-scrollbtn { position:absolute; z-index:6; width:36px; height:36px; border-radius:999px; border:1px solid ${V.line}; background:var(--v2-pop, #fff); color:${V.ink}; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 6px 18px -6px rgba(20,18,16,.35); padding:0; }
+.v2-scrollbtn:hover { background:${V.gray}; }
+.v2-scrollbtn-l { left:8px; top:50%; transform:translateY(-50%); }
+.v2-scrollbtn-r { right:22px; top:50%; transform:translateY(-50%); }
+.v2-scrollbtn-t { top:46px; left:50%; transform:translateX(-50%); }
+.v2-scrollbtn-b { bottom:22px; left:50%; transform:translateX(-50%); }
+@media (max-width:760px){ .v2-scrollbtn { display:none; } }
 .v2-scroll:has(> table) > table > thead > tr > th { position:sticky; top:0; z-index:2; background:var(--v2-sticky, #fff); box-shadow:0 1px 0 ${V.line}; }
 .v2-scroll .v2-head2 th { top:32px; }
 .v2-skel { background:linear-gradient(90deg, ${V.gray} 25%, ${V.cream} 50%, ${V.gray} 75%); background-size:200% 100%; animation:v2shimmer 1.3s infinite linear; border-radius:10px; }
@@ -187,9 +201,81 @@ ${LIQUID_BUTTON_CSS}
 `;
 
 export function Card({ children, style, className = "", onClick, hover = false, ...rest }: { children: ReactNode; style?: CSSProperties; className?: string; onClick?: () => void; hover?: boolean; "data-testid"?: string }) {
+  // A card that holds a wide or long table scrolls in its own frame, with arrows and edge shadows that say there is more.
+  if (/\bv2-scroll\b/.test(className) && !onClick) return <ScrollFrame className={className} style={style} {...rest}>{children}</ScrollFrame>;
   return (
     <div className={`v2-card ${hover || onClick ? "v2-lift" : ""} ${className}`} style={{ padding: 20, ...style }} onClick={onClick} {...rest}>
       {children}
+    </div>
+  );
+}
+
+/**
+ * A frame that scrolls both ways and says so: a scrollbar that is always drawn, a shadow on every edge that has more
+ * beyond it, arrow buttons for left, right, up and down, and keyboard scrolling (focus it and use the arrow keys, Page
+ * Up and Page Down, Home and End). It measures itself again whenever its size or its content changes.
+ */
+export function ScrollFrame({ children, style, className = "", ...rest }: { children: ReactNode; style?: CSSProperties; className?: string; "data-testid"?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [edge, setEdge] = useState({ l: false, r: false, t: false, b: false });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => {
+      const next = {
+        l: el.scrollLeft > 2,
+        r: el.scrollLeft + el.clientWidth < el.scrollWidth - 2,
+        t: el.scrollTop > 2,
+        b: el.scrollTop + el.clientHeight < el.scrollHeight - 2,
+      };
+      setEdge((cur) => (cur.l === next.l && cur.r === next.r && cur.t === next.t && cur.b === next.b ? cur : next));
+    };
+    measure();
+    el.addEventListener("scroll", measure, { passive: true });
+    window.addEventListener("resize", measure);
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    ro?.observe(el);
+    for (const c of Array.from(el.children)) ro?.observe(c);
+    // Rows added or removed change the height without a resize of the frame itself.
+    const mo = typeof MutationObserver === "undefined" ? null : new MutationObserver(measure);
+    mo?.observe(el, { childList: true, subtree: true });
+    return () => {
+      el.removeEventListener("scroll", measure);
+      window.removeEventListener("resize", measure);
+      ro?.disconnect();
+      mo?.disconnect();
+    };
+  }, []);
+  const by = (dx: number, dy: number) => ref.current?.scrollBy({ left: dx, top: dy, behavior: "smooth" });
+  const w = () => Math.max(240, Math.round((ref.current?.clientWidth ?? 600) * 0.7));
+  const h = () => Math.max(200, Math.round((ref.current?.clientHeight ?? 400) * 0.8));
+  const btn = (side: "l" | "r" | "t" | "b", label: string, icon: ReactNode, onClick: () => void) =>
+    edge[side] ? (
+      <button type="button" className={`v2-scrollbtn v2-scrollbtn-${side}`} aria-label={label} title={label} onClick={onClick}>
+        {icon}
+      </button>
+    ) : null;
+  return (
+    <div className="v2-scrollshell" style={{ position: "relative", marginTop: style?.marginTop, marginBottom: style?.marginBottom }}>
+      <div
+        ref={ref}
+        className={`v2-card v2-scroll ${className}`}
+        style={{ padding: 20, ...style, marginTop: 0, marginBottom: 0 }}
+        tabIndex={0}
+        role="region"
+        aria-label="Scrollable table. Use the arrow keys to move around."
+        data-l={edge.l ? "1" : undefined}
+        data-r={edge.r ? "1" : undefined}
+        data-t={edge.t ? "1" : undefined}
+        data-b={edge.b ? "1" : undefined}
+        {...rest}
+      >
+        {children}
+      </div>
+      {btn("l", "Scroll left", <ChevronLeft size={18} />, () => by(-w(), 0))}
+      {btn("r", "Scroll right", <ChevronRight size={18} />, () => by(w(), 0))}
+      {btn("t", "Scroll up", <ChevronUp size={18} />, () => by(0, -h()))}
+      {btn("b", "Scroll down", <ChevronDown size={18} />, () => by(0, h()))}
     </div>
   );
 }

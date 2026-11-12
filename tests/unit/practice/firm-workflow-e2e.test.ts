@@ -216,8 +216,9 @@ describe("Flow A: the client's books are in Tally", () => {
       { llm: null },
     );
     expect(out.kind).toBe("tally_xml");
-    expect(out.rows).toHaveLength(51);
+    expect(out.rows).toHaveLength(42);
     expect(out.note).toMatch(/72 sales, purchase or journal vouchers/);
+    expect(out.note).toMatch(/9 cash-only vouchers/);
     for (const r of out.rows) {
       expect(r.date).toMatch(/^2026-11-\d\d$/);
       expect(["in", "out"]).toContain(r.direction);

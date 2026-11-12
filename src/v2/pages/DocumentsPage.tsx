@@ -837,7 +837,7 @@ export default function DocumentsPage({
               </motion.table>
               </>
             )}
-            {active.side === "bank" && active.clientId && active.status === "Parsed" && <TallyPosting clientId={active.clientId} />}
+            {active.side === "bank" && active.clientId && active.status === "Parsed" && <TallyPosting clientId={active.clientId} documentId={active.id} />}
             <style>{BX_STYLES + SEL_STYLES}</style>
             <BulkBar sel={sel} total={active.rows.length} noun={pickedRows.length === 1 ? "transaction" : "transactions"} inDrawer>
               {active.side === "bank" && active.clientId

@@ -120,6 +120,16 @@ ${LIQUID_BUTTON_CSS}
 .v2-nav a[data-status="active"] { background:linear-gradient(90deg, rgba(217,43,43,.26), rgba(217,43,43,.06)); color:${V.ink}; font-weight:600; box-shadow:inset 3px 0 0 ${V.brand}; }
 .v2-nav a[data-status="active"] svg { color:${V.brand}; }
 .v2-scroll { overflow-x:auto; }
+/* A wide or long table scrolls inside its own frame, so the sideways scrollbar is always on screen (not at the bottom of a
+   page-long table), stays visible on Mac (no hidden overlay bar), and the column headings stay in view. */
+.v2-scroll:has(> table) { overflow:auto; max-height:min(78vh, 920px); overscroll-behavior:contain; scrollbar-gutter:stable; }
+.v2-scroll { scrollbar-width:thin; scrollbar-color:#b9b4ac transparent; }
+.v2-scroll::-webkit-scrollbar { height:12px; width:12px; }
+.v2-scroll::-webkit-scrollbar-track { background:rgba(120,114,104,.10); border-radius:8px; }
+.v2-scroll::-webkit-scrollbar-thumb { background:#b9b4ac; border-radius:8px; border:2px solid transparent; background-clip:content-box; }
+.v2-scroll::-webkit-scrollbar-thumb:hover { background:#8f8a82; background-clip:content-box; }
+.v2-scroll:has(> table) > table > thead > tr > th { position:sticky; top:0; z-index:2; background:var(--v2-sticky, #fff); box-shadow:0 1px 0 ${V.line}; }
+.v2-scroll .v2-head2 th { top:32px; }
 .v2-skel { background:linear-gradient(90deg, ${V.gray} 25%, ${V.cream} 50%, ${V.gray} 75%); background-size:200% 100%; animation:v2shimmer 1.3s infinite linear; border-radius:10px; }
 @keyframes v2shimmer { from { background-position:200% 0; } to { background-position:-200% 0; } }
 .v2-grid-cards { display:grid; gap:16px; grid-template-columns:repeat(auto-fill, minmax(min(280px, 100%), 1fr)); }
@@ -151,6 +161,7 @@ ${LIQUID_BUTTON_CSS}
 .v2 h1 { letter-spacing:-0.03em; }
 .v2-card { backdrop-filter:none; -webkit-backdrop-filter:none; border-radius:16px; }
 .v2-card.v2-scroll { overflow-x:auto; overflow-y:hidden; }
+.v2-card.v2-scroll:has(> table) { overflow:auto; }
 .v2-btn { border-radius:10px; padding:9px 14px; font-size:13.5px; gap:7px; letter-spacing:-0.005em; transition:background .16s ease, box-shadow .16s ease, border-color .16s ease, transform .12s ease; }
 .v2-btn:hover { transform:none; }
 .v2-btn:active { transform:scale(.985); }

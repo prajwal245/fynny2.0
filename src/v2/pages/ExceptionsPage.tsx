@@ -283,17 +283,28 @@ export default function ExceptionsPage({
         />
       ) : (
         <Card style={{ padding: 0 }} className="v2-scroll">
-          <table className="v2-table v2-table-stack">
+          <table className="v2-table v2-table-stack v2-review-table" style={{ width: scopedClient ? 1426 : 1606 }}>
+            <colgroup>
+              <col style={{ width: 48 }} />
+              {!scopedClient && <col style={{ width: 180 }} />}
+              <col style={{ width: 200 }} />
+              <col style={{ width: 80 }} />
+              <col style={{ width: 420 }} />
+              <col style={{ width: 140 }} />
+              <col style={{ width: 118 }} />
+              <col style={{ width: 260 }} />
+              <col style={{ width: 160 }} />
+            </colgroup>
             <thead>
               <tr>
                 <SelectAllHeader sel={sel} total={list.length} />
                 {!scopedClient && <th>Client</th>}
                 <th>Reason</th>
-                <th className="v2-hide-md">Side</th>
-                <th style={{ minWidth: 220 }}>Narration</th>
-                <th>Amount</th>
+                <th>Side</th>
+                <th>Narration</th>
+                <th style={{ textAlign: "right" }}>Amount</th>
                 <th>Date</th>
-                <th className="v2-hide-md">Best candidate</th>
+                <th>Best candidate</th>
                 <th className="v2-sticky-end" />
               </tr>
             </thead>
@@ -312,37 +323,31 @@ export default function ExceptionsPage({
                   >
                     <SelectCell sel={sel} id={e.id} label={`${e.narration.slice(0, 40)}, ${formatINR(e.amount)}`} />
                     {!scopedClient && (
-                      <td style={{ fontWeight: 600 }}>
+                      <td className="rv-cut" style={{ fontWeight: 600 }} title={clientName(e.clientId)}>
                         {clientName(e.clientId)}
                       </td>
                     )}
-                    <td>
+                    <td className="rv-nowrap">
                       <Badge tone="warn">{e.reason}</Badge>{e.precedent && <span title="The Recon agent learned a decision for this line" style={{ marginLeft: 6 }}><Badge tone="info">Learned</Badge></span>}
                     </td>
-                    <td className="v2-hide-md" style={{ color: V.body }}>
+                    <td style={{ color: V.body }}>
                       {e.side === "books" ? "Books" : "Bank"}
                     </td>
-                    <td style={{ color: V.body }}>
-                      <span className="v2-mono" style={{ fontSize: 13 }}>{e.narration}</span>
-                      {e.detail && (
-                        <div
-                          style={{ fontSize: 12, color: V.muted, marginTop: 3 }}
-                        >
-                          {e.detail}
-                        </div>
-                      )}
+                    <td style={{ color: V.body }} title={`${e.narration}${e.detail ? `\n\n${e.detail}` : ""}`}>
+                      <div className="rv-cut v2-mono" style={{ fontSize: 13 }}>{e.narration}</div>
+                      {e.detail && <div className="rv-cut" style={{ fontSize: 11.5, color: V.muted, marginTop: 2 }}>{e.detail}</div>}
                     </td>
                     <td
-                      className="num"
-                      style={{ color: e.amount < 0 ? V.maroon : V.green }}
+                      className="num rv-nowrap"
+                      style={{ textAlign: "right", fontWeight: 600, color: e.amount < 0 ? V.maroon : V.green }}
                     >
                       {formatINR(e.amount)}
                     </td>
-                    <td className="num" style={{ color: V.body }}>
+                    <td className="num rv-nowrap" style={{ color: V.body }}>
                       {formatDate(e.date)}
                     </td>
-                    <td className="v2-hide-md" style={{ color: V.body, fontSize: 12.5 }}>
-                      {liveCandidates(e)[0]?.label ?? "No candidate found"}
+                    <td style={{ color: V.body, fontSize: 12.5 }} title={liveCandidates(e)[0]?.label ?? ""}>
+                      <div className="rv-cut2">{liveCandidates(e)[0]?.label ?? "No candidate found"}</div>
                     </td>
                     <td className="v2-sticky-end">
                       <div

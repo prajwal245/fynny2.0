@@ -28,7 +28,7 @@ import {
   runExtract,
   type AiCallRecord,
 } from "./extract/pipeline";
-import { loadSheetReader, loadSheetsReader, pdfText, unlockWorkbook } from "./files.server";
+import { loadSheetReader, loadSheetsReader, pdfItems, pdfText, unlockWorkbook } from "./files.server";
 import { PdfPasswordError } from "./extract/pipeline";
 import { reconStatusFor } from "./reconScope";
 import { passwordNeededMessage, passwordWrongMessage } from "./passwordFile";
@@ -387,6 +387,7 @@ export async function processExtraction(
       llm: (await withinAiCap(db, doc.ca_firm_id)) ? practiceLlm() : null,
       ocr: practiceOcr(),
       pdfText: (b) => pdfText(b, opts.password),
+      pdfItems: (b) => pdfItems(b, opts.password),
       sheetRows: kind === "xlsx" ? await loadSheetReader() : undefined,
       sheetsAll: kind === "xlsx" ? await loadSheetsReader() : undefined,
     },
@@ -490,8 +491,9 @@ export async function processExtraction(
     // is compared with the client's Tally bank ledgers. A statement for another client is held, not filed.
     try {
       const text = outcome.sourceText ?? "";
-      const { data: cl } = await db.from("ca_clients").select("id, client_name").eq("ca_firm_id", doc.ca_firm_id).limit(2000);
-      const clients = ((cl ?? []) as { id: string; client_name: string }[]).map((c) => ({ id: c.id, name: c.client_name }));
+      // A document carries the client's business id, which is not the id of the ca_clients row: compare on the same key.
+      const { data: cl } = await db.from("ca_clients").select("id, business_id, client_name").eq("ca_firm_id", doc.ca_firm_id).limit(2000);
+      const clients = ((cl ?? []) as { id: string; business_id: string | null; client_name: string }[]).map((c) => ({ id: c.business_id ?? c.id, name: c.client_name }));
       const mine = clients.find((c) => c.id === doc.business_id);
       const { data: co } = await db.from("ca_tally_companies").select("id").eq("ca_firm_id", doc.ca_firm_id).eq("business_id", doc.business_id).limit(1);
       let banks: string[] | null = null;

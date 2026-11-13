@@ -35,6 +35,11 @@ export function StatementCheckCard({ report, lineCount, period, onMove, onConfir
         <div style={{ display: "grid", gap: 4 }}>
           <div style={{ fontWeight: 700, color: t.fg }}>Statement check: {t.title}</div>
           <div style={{ fontSize: 13.5 }}>{report.headline}</div>
+          {(report.lines || lineCount) > 0 && (
+            <div style={{ fontSize: 12.5, color: V.muted }} data-testid="lines-read">
+              Lines read from the file: <b>{(report.lines || lineCount).toLocaleString("en-IN")}</b>. Compare with the bank's own count of transactions.
+            </div>
+          )}
         </div>
       </div>
 

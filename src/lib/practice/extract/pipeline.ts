@@ -42,6 +42,7 @@ import {
 } from "./tallyMasters";
 import { TALLY_XML_NO_VOUCHERS, unsupportedReport } from "./unsupported";
 import { chooseSheet } from "./sheets";
+import { rowsFromPositioned, type PosItem } from "./pdfTable";
 import {
   passwordNeededMessage,
   passwordWrongMessage,
@@ -108,6 +109,8 @@ export interface ExtractDeps {
   sheetRows?: (bytes: Uint8Array) => string[][];
   /** Every sheet with data. When given, the right sheet for this client is chosen instead of always the first. */
   sheetsAll?: (bytes: Uint8Array) => { name: string; rows: string[][] }[];
+  /** Every text piece of a PDF with its position on the page (for reading a statement table by its columns). */
+  pdfItems?: (bytes: Uint8Array) => Promise<PosItem[][]>;
   /** Text of a scanned PDF or photo (OCR.space). Null when OCR is not configured. */
   ocr?: ((bytes: Uint8Array, mime: string) => Promise<string>) | null;
   threshold?: number;
@@ -723,8 +726,22 @@ export async function runExtract(
       : false;
     if (textRich) {
       sourceText = text.slice(0, MAX_TEXT_CHARS);
-      const statement = rowsFromStatementText(sourceText);
-      if (statement.rows.length >= 3 && statement.verifiedShare >= 0.7) {
+      // First choice: read the table by where the text sits. It keeps wrapped narrations whole, takes each amount from its own
+      // column, and lets the running balance prove the direction of every line.
+      let positioned: ReturnType<typeof rowsFromPositioned> = null;
+      if (deps.pdfItems) {
+        try {
+          positioned = rowsFromPositioned(await deps.pdfItems(input.bytes));
+        } catch {
+          positioned = null; // fall back to the text readers below
+        }
+      }
+      const statement = positioned && positioned.rows.length >= 3 && positioned.verifiedShare >= 0.7 ? positioned : rowsFromStatementText(sourceText);
+      if (statement === positioned && positioned) {
+        parsed = positioned.rows;
+        documentKind = "bank_statement";
+        if (positioned.notes.length) note = positioned.notes.join(" ");
+      } else if (statement.rows.length >= 3 && statement.verifiedShare >= 0.7) {
         parsed = statement.rows;
         documentKind = "bank_statement";
       } else {

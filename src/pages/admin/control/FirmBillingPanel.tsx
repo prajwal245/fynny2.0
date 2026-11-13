@@ -74,6 +74,8 @@ export function FirmBillingPanel({ firmId, canAdjust }: { firmId: string; canAdj
   const [plan, setPlan] = useState<PlanKey | null>(null);
   const [cycle, setCycle] = useState<Cycle | null>(null);
   const [endsOn, setEndsOn] = useState(plusDays(30));
+  const [byHand, setByHand] = useState(false);
+  const [endRz, setEndRz] = useState(false);
   // credits form
   const [mode, setMode] = useState<"add" | "take">("add");
   const [amount, setAmount] = useState("");
@@ -83,7 +85,7 @@ export function FirmBillingPanel({ firmId, canAdjust }: { firmId: string; canAdj
 
   const b = q.data;
   const refresh = () => Promise.all([qc.invalidateQueries({ queryKey: ["admin", "firm-billing", firmId] }), qc.invalidateQueries({ queryKey: ["admin", "firm", firmId] }), qc.invalidateQueries({ queryKey: ["admin", "firms"] })]);
-  const close = () => { setOpen(null); setConfirming(false); setReason(""); setAmount(""); setPlan(null); setCycle(null); };
+  const close = () => { setOpen(null); setConfirming(false); setReason(""); setAmount(""); setPlan(null); setCycle(null); setByHand(false); setEndRz(false); };
   const toggle = (o: Exclude<Open, null>) => { setConfirming(false); setReason(""); setOpen((cur) => (cur === o ? null : o)); };
   const run = async (fn: () => Promise<unknown>, ok: string) => {
     setBusy(true);
@@ -111,11 +113,15 @@ export function FirmBillingPanel({ firmId, canAdjust }: { firmId: string; canAdj
   /* plan preview */
   const toPlan = plan ?? b.plan;
   const toCycle = cycle ?? b.cycle;
-  const razorpay = b.route === "razorpay";
+  // A firm paying through Razorpay can be switched there, or given a manual plan (which ends that subscription).
+  const paysRz = b.route === "razorpay";
+  const manualMode = byHand || b.route !== "razorpay";
+  const razorpay = paysRz && !manualMode;
   const timing = razorpay ? changeTiming({ plan: b.plan, cycle: b.cycle }, { plan: toPlan, cycle: toCycle }) : null;
   const misfit = planFitsUsage(toPlan, b.usage.activeClients);
-  const end = !razorpay ? manualPlanEnd(endsOn) : null;
-  const planProblem = b.route === "blocked" ? "This firm has cancelled and its plan is ending. Let it end first." : razorpay && timing === "same" ? "The firm is already on this plan." : misfit ?? (end && !end.ok ? end.problem : null);
+  const end = manualMode ? manualPlanEnd(endsOn) : null;
+  const needEndRz = paysRz && manualMode;
+  const planProblem = razorpay && timing === "same" ? "The firm is already on this plan." : misfit ?? (end && !end.ok ? end.problem : null);
   const planReasonOk = cleanReason(reason).length >= MIN_REASON;
   const planPreview = razorpay
     ? timing === "now"
@@ -140,7 +146,7 @@ export function FirmBillingPanel({ firmId, canAdjust }: { firmId: string; canAdj
         <b>{shownPlan.name}</b>{b.onTrial ? " (trial)" : `, ${cycleLabel(b.cycle)}`} <Pill tone={st.tone}>{st.label}</Pill>
         {b.periodEnd && !b.onTrial && <span style={{ color: muted }}> · {b.cancelAtPeriodEnd || b.status === "cancelled" ? "ends" : "renews"} {day(b.periodEnd)}</span>}
         {b.scheduled && <div className="text-xs mt-1" style={{ color: muted }}>Switches to {PLANS[b.scheduled.plan].name} ({cycleLabel(b.scheduled.cycle)}) at renewal.</div>}
-        <div className="text-xs mt-1" style={{ color: muted }}>{b.route === "razorpay" ? "Pays through Razorpay: plan changes go through Razorpay." : b.route === "manual" ? "No Razorpay subscription: a plan given here is manual, dated and never billed." : "Cancelled: plan is ending."}</div>
+        <div className="text-xs mt-1" style={{ color: muted }}>{b.route === "razorpay" ? "Pays through Razorpay: switch the plan there, or assign one manually (that ends the subscription)." : b.route === "manual" ? "No Razorpay subscription: a plan given here is manual, dated and never billed." : "Cancelled and ending: a plan can still be assigned manually."}</div>
       </div>
 
       <div className="grid gap-3 mb-3 sm:grid-cols-2">
@@ -163,6 +169,15 @@ export function FirmBillingPanel({ firmId, canAdjust }: { firmId: string; canAdj
 
       <Reveal show={open === "plan"}>
         <div className="rounded-lg p-3 mb-3 grid gap-2" style={{ background: "rgba(23,18,8,.03)" }} data-testid="plan-form">
+          {paysRz && (
+            <div role="group" aria-label="How to change the plan" className="inline-flex rounded-lg overflow-hidden justify-self-start" style={{ border: `1px solid ${line}` }}>
+              {([false, true] as const).map((hand) => (
+                <button key={String(hand)} type="button" aria-pressed={byHand === hand} onClick={() => { setByHand(hand); setConfirming(false); setEndRz(false); }} className="px-3 py-1.5 text-sm font-semibold" style={{ background: byHand === hand ? maroon : "#fff", color: byHand === hand ? "#fff" : "#171208" }} data-testid={hand ? "plan-mode-manual" : "plan-mode-razorpay"}>
+                  {hand ? "Assign manually" : "Switch in Razorpay"}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="flex flex-wrap gap-2">
             <select className="rounded-lg border px-3 py-2 text-sm" aria-label="Plan" value={toPlan} onChange={(e) => { setPlan(e.target.value as PlanKey); setConfirming(false); }} data-testid="plan-select">
               {(Object.keys(PLANS) as PlanKey[]).map((k) => <option key={k} value={k}>{PLANS[k].name}</option>)}
@@ -171,17 +186,23 @@ export function FirmBillingPanel({ firmId, canAdjust }: { firmId: string; canAdj
               <option value="monthly">Monthly</option>
               <option value="annual">Yearly</option>
             </select>
-            {!razorpay && (
+            {manualMode && (
               <label className="flex items-center gap-2 text-sm">Ends on <input type="date" className="rounded-lg border px-2 py-1.5" min={plusDays(1)} value={endsOn} onChange={(e) => { setEndsOn(e.target.value); setConfirming(false); }} data-testid="plan-ends" /></label>
             )}
           </div>
           <input className="rounded-lg border px-3 py-2 text-sm" placeholder="Reason (required, kept in the audit log)" value={reason} onChange={(e) => { setReason(e.target.value); setConfirming(false); }} maxLength={300} data-testid="plan-reason" />
           <p className="text-xs" style={{ color: planProblem ? maroon : muted }} data-testid="plan-preview">{planProblem ?? planPreview}</p>
+          {needEndRz && (
+            <label className="flex items-start gap-2 text-xs" style={{ color: maroon }}>
+              <input type="checkbox" className="mt-0.5" checked={endRz} onChange={(e) => { setEndRz(e.target.checked); setConfirming(false); }} data-testid="plan-end-razorpay" />
+              <span>This firm pays through Razorpay. Assigning by hand <b>cancels its Razorpay subscription now</b>, so it is not billed twice. No refund is issued. I understand.</span>
+            </label>
+          )}
           <div className="flex gap-2">
             {!confirming ? (
-              <Btn kind="primary" disabled={busy || !!planProblem || !planReasonOk} onClick={() => setConfirming(true)} testId="plan-review">Review change</Btn>
+              <Btn kind="primary" disabled={busy || !!planProblem || !planReasonOk || (needEndRz && !endRz)} onClick={() => setConfirming(true)} testId="plan-review">Review change</Btn>
             ) : (
-              <Btn kind="danger" disabled={busy} testId="plan-confirm" onClick={() => void run(() => adminSetFirmPlan({ data: { firmId, plan: toPlan, cycle: toCycle, endsOn: razorpay ? null : endsOn, reason } }), razorpay ? (timing === "now" ? "Plan upgraded in Razorpay." : "Plan change scheduled for renewal.") : `${PLANS[toPlan].name} given until ${end?.ok ? day(end.endsAt) : ""}.`)}>
+              <Btn kind="danger" disabled={busy} testId="plan-confirm" onClick={() => void run(() => adminSetFirmPlan({ data: { firmId, plan: toPlan, cycle: toCycle, endsOn: manualMode ? endsOn : null, reason, mode: manualMode ? "manual" : "auto", endRazorpay: endRz } }), razorpay ? (timing === "now" ? "Plan upgraded in Razorpay." : "Plan change scheduled for renewal.") : `${PLANS[toPlan].name} given until ${end?.ok ? day(end.endsAt) : ""}.`)}>
                 {busy ? "Working…" : `Confirm: ${PLANS[toPlan].name}, ${cycleLabel(toCycle)}`}
               </Btn>
             )}

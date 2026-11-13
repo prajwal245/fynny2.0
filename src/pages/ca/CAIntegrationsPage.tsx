@@ -273,6 +273,18 @@ export default function CAIntegrationsPage() {
         Syncs every 6 hours
       </p>
 
+      <CACard style={{ marginTop: 20, padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+        <div>
+          <div style={{ fontFamily: CA.sans, fontSize: 14, fontWeight: 700, color: CA.ink }}>TallyPrime connector</div>
+          <div style={{ fontFamily: CA.sans, fontSize: 12.5, color: CA.muted, marginTop: 2 }}>
+            Add the connector, link each Tally company to a client, see when it last checked in, sync now or fetch an older month, and approve entries for Tally.
+          </div>
+        </div>
+        <a href="/app/settings?tab=integrations" style={{ flexShrink: 0, fontFamily: CA.sans, fontSize: 13, fontWeight: 600, color: CA.ink, border: `1px solid ${CA.line}`, borderRadius: 10, padding: "8px 14px", textDecoration: "none" }}>
+          Open TallyPrime settings
+        </a>
+      </CACard>
+
       <CACard style={{ marginTop: 20, padding: 0, overflow: "hidden" }}>
         <div style={{ padding: "14px 20px", borderBottom: `0.5px solid ${CA.line}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
           <div>

@@ -11,7 +11,7 @@ import { tallyApprove, tallyCancel, tallyCancelLedger, tallyCreateLedger, tallyM
 import { splitGstInclusive, type Split } from "@/lib/practice/tallyVoucher";
 import { PagesChip, PagesTopUpModal } from "./PagesPanel";
 import { refreshPages } from "../lib/pages";
-import { Badge, Card, V, formatDate, formatINR } from "../ui";
+import { Badge, Card, SortTh, V, formatDate, formatINR, useSort } from "../ui";
 
 type Bench = Awaited<ReturnType<typeof tallyWorkbench>>;
 type Linked = Extract<Bench, { linked: true }>;
@@ -151,6 +151,18 @@ function ReconView(props: {
     return Boolean(l && (!l.posting || l.posting.status === "failed"));
   };
   const rows = view.rows.filter((r) => (props.filter === "all" ? true : props.filter === "missing" ? r.status === "missing" || r.status === "pushed" : r.status === props.filter));
+  // Click a heading to sort the statement lines: by date, particulars, debit, credit or status.
+  const sorter = useSort(
+    rows,
+    {
+      date: (r) => r.date,
+      particulars: (r) => r.particulars,
+      debit: (r) => r.debit,
+      credit: (r) => r.credit,
+      status: (r) => r.label,
+    },
+    null,
+  );
   // A line can be ticked when it is missing, has an existing ledger, and nothing is waiting for a person's word.
   const tickable = (r: VRow) => {
     const l = props.lineFor(r.txn_id);
@@ -217,19 +229,19 @@ function ReconView(props: {
               </tr>
               <tr className="v2-head2" style={{ height: 28, color: V.muted, fontSize: 11.5 }}>
                 <th />
-                <th style={{ textAlign: "left", padding: "4px 10px" }}>Date</th>
-                <th style={{ textAlign: "left", padding: "4px 10px" }}>Particulars</th>
-                <th style={{ textAlign: "right", padding: "4px 10px" }}>Debit</th>
-                <th style={{ textAlign: "right", padding: "4px 10px" }}>Credit</th>
+                <SortTh label="Date" k="date" sort={sorter.sort} toggle={sorter.toggle} />
+                <SortTh label="Particulars" k="particulars" sort={sorter.sort} toggle={sorter.toggle} />
+                <SortTh label="Debit" k="debit" sort={sorter.sort} toggle={sorter.toggle} align="right" />
+                <SortTh label="Credit" k="credit" sort={sorter.sort} toggle={sorter.toggle} align="right" />
                 <th style={{ textAlign: "left", padding: "4px 10px", borderLeft: `1px solid ${V.line}` }}>Date</th>
                 <th style={{ textAlign: "left", padding: "4px 10px" }}>Entry</th>
                 <th style={{ textAlign: "right", padding: "4px 10px" }}>Debit</th>
                 <th style={{ textAlign: "right", padding: "4px 10px" }}>Credit</th>
-                <th style={{ borderLeft: `1px solid ${V.line}` }} />
+                <SortTh label="Sort by status" k="status" sort={sorter.sort} toggle={sorter.toggle} className="rv-statushead" />
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, i) => {
+              {sorter.sorted.map((r, i) => {
                 const t = TAG[r.status]!;
                 const l = props.lineFor(r.txn_id);
                 const showCard = Boolean(l && open(r) && (r.status === "missing" || (r.status === "partial" && props.asSeparate[r.txn_id])));

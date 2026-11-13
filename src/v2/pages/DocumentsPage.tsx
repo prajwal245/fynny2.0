@@ -20,11 +20,13 @@ import {
   Drawer,
   EmptyState,
   PageHeader,
+  SortTh,
   Tabs,
   Tone,
   V,
   formatDate,
   formatINR,
+  useSort,
 } from "../ui";
 import { AgentStatusBadge, RowSkeleton } from "../agents";
 import { IntakePanel } from "../components/IntakePanel";
@@ -33,7 +35,7 @@ import { StatementCheckCard } from "../components/StatementCheckCard";
 import { UnlockFile } from "../components/UnlockFile";
 import { isPasswordMessage } from "@/lib/practice/passwordFile";
 import { SourceIcon } from "../components/BrandIcons";
-import { Doc, useV2 } from "../store";
+import { Doc, Txn, useV2 } from "../store";
 import { BulkBar, SEL_STYLES, SelectAllHeader, SelectCell, useSelection } from "../components/Selection";
 import { BX_STYLES, BooksExportDrawer, SYSTEM_LABEL, SystemLogo } from "../components/BooksExport";
 import type { BooksSystem } from "@/lib/practice/zohoExport";
@@ -241,6 +243,25 @@ export default function DocumentsPage({
       return false;
     return true;
   });
+  // Click a column heading to sort the files, or the lines of the open statement. Lines start in date order.
+  const docSort = useSort(list, {
+    name: (d) => d.name,
+    client: (d) => (d.clientId ? clientName(d.clientId) : (d.sender ?? "")),
+    source: (d) => d.source,
+    status: (d) => d.status,
+    rows: (d) => d.register ? d.register.entries : (d.txnCount ?? d.rows.length),
+    date: (d) => d.date,
+  });
+  const lineSort = useSort<Txn, "date" | "particulars" | "amount" | "status">(
+    active?.rows ?? [],
+    {
+      date: (r) => r.date,
+      particulars: (r) => r.particulars,
+      amount: (r) => r.amount,
+      status: (r) => r.matchStatus ?? "",
+    },
+    { key: "date", dir: "asc" },
+  );
   const count = (s: Doc["status"]) =>
     scoped.filter((d) => (d.clientId || scopedClient) && d.status === s).length;
 
@@ -497,19 +518,19 @@ export default function DocumentsPage({
             </colgroup>
             <thead>
               <tr>
-                <th>File</th>
+                <SortTh label="File" k="name" sort={docSort.sort} toggle={docSort.toggle} />
                 {!scopedClient && (
-                  <th>{tab.startsWith("Unassigned") ? "From" : "Client"}</th>
+                  <SortTh label={tab.startsWith("Unassigned") ? "From" : "Client"} k="client" sort={docSort.sort} toggle={docSort.toggle} />
                 )}
-                <th>Source</th>
-                <th>Status</th>
-                <th>Rows</th>
-                <th>Received</th>
+                <SortTh label="Source" k="source" sort={docSort.sort} toggle={docSort.toggle} />
+                <SortTh label="Status" k="status" sort={docSort.sort} toggle={docSort.toggle} />
+                <SortTh label="Rows" k="rows" sort={docSort.sort} toggle={docSort.toggle} />
+                <SortTh label="Received" k="date" sort={docSort.sort} toggle={docSort.toggle} />
               </tr>
             </thead>
             <tbody>
               <AnimatePresence initial={false}>
-                {list.map((d) => (
+                {docSort.sorted.map((d) => (
                   <motion.tr
                     key={d.id}
                     layout
@@ -808,14 +829,14 @@ export default function DocumentsPage({
                 <thead>
                   <tr>
                     <SelectAllHeader sel={sel} total={active.rows.length} />
-                    <th>Date</th>
-                    <th>Particulars</th>
-                    <th style={{ textAlign: "right" }}>Amount</th>
-                    <th>Recon</th>
+                    <SortTh label="Date" k="date" sort={lineSort.sort} toggle={lineSort.toggle} />
+                    <SortTh label="Particulars" k="particulars" sort={lineSort.sort} toggle={lineSort.toggle} />
+                    <SortTh label="Amount" k="amount" sort={lineSort.sort} toggle={lineSort.toggle} align="right" />
+                    <SortTh label="Recon" k="status" sort={lineSort.sort} toggle={lineSort.toggle} />
                   </tr>
                 </thead>
                 <tbody>
-                  {active.rows.map((r, i) => ({ r, i })).filter(({ r }) => rowMatches(r, rowQuery)).map(({ r, i }) => (
+                  {lineSort.sorted.map((r) => ({ r, i: active.rows.indexOf(r) })).filter(({ r }) => rowMatches(r, rowQuery)).map(({ r, i }) => (
                     <tr key={r.id ?? i} className={sel.has(rowKey(r, i)) ? "is-selected" : undefined}>
                       <SelectCell sel={sel} id={rowKey(r, i)} label={`${r.particulars.slice(0, 40)}, ${formatINR(r.amount)}`} />
                       <td className="num">{formatDate(r.date)}</td>

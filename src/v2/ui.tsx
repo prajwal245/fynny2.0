@@ -3,9 +3,9 @@ import { createPortal } from "react-dom";
  * FynHelp v2 dashboard — design system primitives.
  * Self-contained: does not touch any existing app styling.
  */
-import { ReactNode, CSSProperties, useEffect, useId, useRef, useState } from "react";
+import { ReactNode, CSSProperties, useEffect, useId, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence, useIsPresent } from "framer-motion";
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Maximize2, Minimize2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Maximize2, Minimize2, X } from "lucide-react";
 import { LIQUID_BUTTON_CSS } from "@/lib/liquidButton";
 
 /** Palette: red #D92B2B and #8E1B1F, cream #EADBC8, ink #141210, mist #FAF7F2. Green and amber are for status only. */
@@ -135,6 +135,10 @@ ${LIQUID_BUTTON_CSS}
 .v2-scroll[data-b="1"] { --sh-b: inset 0 -16px 14px -14px rgba(20,18,16,.30); }
 .v2-scroll { box-shadow: var(--v2-card-shadow), var(--sh-l, 0 0 #0000), var(--sh-r, 0 0 #0000), var(--sh-t, 0 0 #0000), var(--sh-b, 0 0 #0000); }
 .v2-scroll:focus-visible { outline:2px solid var(--v2-brand); outline-offset:2px; }
+.v2-sortbtn { all:unset; display:inline-flex; align-items:center; gap:4px; cursor:pointer; font:inherit; letter-spacing:inherit; text-transform:inherit; color:inherit; }
+.v2-sortbtn:focus-visible { outline:2px solid var(--v2-brand); outline-offset:2px; border-radius:4px; }
+.v2-sortico { opacity:.35; display:inline-flex; } .v2-sortico[data-on="1"], .v2-sortbtn:hover .v2-sortico { opacity:1; }
+.v2-table th[aria-sort="ascending"], .v2-table th[aria-sort="descending"] { color:var(--v2-ink); }
 .v2-scrollbtn { position:absolute; z-index:6; width:36px; height:36px; border-radius:999px; border:1px solid ${V.line}; background:var(--v2-pop, #fff); color:${V.ink}; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 6px 18px -6px rgba(20,18,16,.35); padding:0; }
 .v2-scrollbtn:hover { background:${V.gray}; }
 .v2-scrollbtn-l { left:10px; bottom:26px; }
@@ -289,6 +293,52 @@ export function ScrollFrame({ children, style, className = "", ...rest }: { chil
       {btn("t", "Scroll up", <ChevronUp size={18} />, () => by(0, -h()))}
       {btn("b", "Scroll down", <ChevronDown size={18} />, () => by(0, h()))}
     </div>
+  );
+}
+
+/* ── sorting a table by its column headings ──────────────── */
+
+export type SortState<K extends string> = { key: K; dir: "asc" | "desc" } | null;
+
+/**
+ * Sorts rows by a column the person clicks: first click ascending, second descending, third back to the order the rows came in.
+ * Empty values go last either way, text sorts the way a person reads it (numbers inside names in order), and the sort is stable,
+ * so lines with the same date stay in the order of the statement.
+ */
+/** Sorts a copy of the rows by one column. Empty values go last either way, text sorts the way a person reads it, and it is stable. */
+export function sortRows<T>(rows: T[], get: (r: T) => string | number | null | undefined, dir: "asc" | "desc"): T[] {
+  const d = dir === "asc" ? 1 : -1;
+  return rows
+    .map((r, i) => ({ r, i, v: get(r) }))
+    .sort((a, b) => {
+      const aNone = a.v === null || a.v === undefined || a.v === "";
+      const bNone = b.v === null || b.v === undefined || b.v === "";
+      if (aNone || bNone) return aNone === bNone ? a.i - b.i : aNone ? 1 : -1;
+      const c = typeof a.v === "number" && typeof b.v === "number" ? a.v - b.v : String(a.v).localeCompare(String(b.v), "en", { numeric: true, sensitivity: "base" });
+      return c * d || a.i - b.i;
+    })
+    .map((x) => x.r);
+}
+
+export function useSort<T, K extends string>(rows: T[], getters: Record<K, (r: T) => string | number | null | undefined>, initial: SortState<K> = null) {
+  const [sort, setSort] = useState<SortState<K>>(initial);
+  const sorted = useMemo(() => (sort ? sortRows(rows, getters[sort.key], sort.dir) : rows),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rows, sort]);
+  const toggle = (key: K) => setSort((cur) => (!cur || cur.key !== key ? { key, dir: "asc" } : cur.dir === "asc" ? { key, dir: "desc" } : null));
+  return { sorted, sort, toggle };
+}
+
+/** A column heading that sorts the table when clicked, and says which way it is sorted. */
+export function SortTh<K extends string>({ label, k, sort, toggle, align = "left", className }: { label: string; k: K; sort: SortState<K>; toggle: (k: K) => void; align?: "left" | "right"; className?: string }) {
+  const on = sort?.key === k;
+  return (
+    <th className={className} aria-sort={on ? (sort!.dir === "asc" ? "ascending" : "descending") : "none"} style={{ textAlign: align }}>
+      <button type="button" className="v2-sortbtn" onClick={() => toggle(k)} title={`Sort by ${label.toLowerCase()}`} style={{ marginLeft: align === "right" ? "auto" : undefined }}>
+        {label}
+        <span aria-hidden className="v2-sortico" data-on={on ? "1" : undefined}>{on ? (sort!.dir === "asc" ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : <ChevronDown size={12} />}</span>
+      </button>
+    </th>
   );
 }
 

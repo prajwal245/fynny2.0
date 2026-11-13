@@ -27,7 +27,21 @@ export default function FollowUpsPage() {
   const [doing, setDoing] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<Outcome>("reached");
   const [note, setNote] = useState("");
+  const [checking, setChecking] = useState(false);
   const list = useQuery({ queryKey: ["admin", "follow-ups", tab], queryFn: () => adminCall(() => adminFollowUps({ data: { status: tab } })), placeholderData: (p) => p });
+  // Reads the templates from Meta now, not from the list kept for a few minutes.
+  const checkAgain = async () => {
+    setChecking(true);
+    try {
+      const fresh = await adminCall(() => adminFollowUps({ data: { status: tab, refresh: true } }));
+      qc.setQueryData(["admin", "follow-ups", tab], fresh);
+      toast.success("Read the templates from WhatsApp just now.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not check.");
+    } finally {
+      setChecking(false);
+    }
+  };
   const act = useMutation({
     mutationFn: (v: { id: string; action: "done" | "snooze" | "dismiss" | "reopen"; outcome?: Outcome; note?: string }) => adminCall(() => adminFollowUpAct({ data: v })),
     onSuccess: () => {
@@ -69,7 +83,7 @@ export default function FollowUpsPage() {
       )}
 
       {d && (
-        <Panel title="WhatsApp follow-ups" testId="wa-ready">
+        <Panel title="WhatsApp follow-ups" testId="wa-ready" action={<Btn disabled={checking} onClick={() => void checkAgain()} testId="wa-check-again">{checking ? "Checking…" : "Check again"}</Btn>}>
           {d.whatsapp.problem ? (
             <p className="text-sm" style={{ color: muted }}>{d.whatsapp.problem} Until then follow-ups go by email and by a person.</p>
           ) : (
@@ -83,6 +97,25 @@ export default function FollowUpsPage() {
                 </div>
               ))}
             </div>
+          )}
+          {d.whatsapp.account && (
+            <details className="mt-3 text-xs" data-testid="wa-found">
+              <summary className="cursor-pointer" style={{ color: muted }}>
+                What WhatsApp returned for account {d.whatsapp.account}: {d.whatsapp.found.length} FynHelp template{d.whatsapp.found.length === 1 ? "" : "s"} of {d.whatsapp.totalTemplates}, language {d.whatsapp.language}
+              </summary>
+              {d.whatsapp.found.length === 0 ? (
+                <p className="mt-1" style={{ color: muted }}>No template starting with fh_ is on this account. If you created them, they are on a different WhatsApp Business Account than WHATSAPP_WABA_ID points to, or the token cannot see them.</p>
+              ) : (
+                <ul className="mt-1 grid gap-0.5">
+                  {d.whatsapp.found.map((t) => (
+                    <li key={`${t.name}-${t.language}`} className="flex flex-wrap gap-2"><code>{t.name}</code><span>{t.language}</span><Pill tone={t.status.toUpperCase() === "APPROVED" ? "good" : "warn"}>{t.status.toLowerCase()}</Pill><span style={{ color: muted }}>{(t.category ?? "").toLowerCase()}</span></li>
+                  ))}
+                </ul>
+              )}
+            </details>
+          )}
+          {d.whatsapp.ready && !d.whatsapp.marketingAllowed && (
+            <p className="text-xs mt-2" style={{ color: "#92400e" }} data-testid="wa-marketing-off">Marketing templates are switched off here (WHATSAPP_TOUCH_ALLOW_MARKETING is set to off in Vercel), so a template Meta classed as Marketing waits for a person. Remove that setting to let it send at the Marketing rate.</p>
           )}
           <p className="text-xs mt-3" style={{ color: muted }}>Sent only to people who agreed to WhatsApp, about their own set-up, trial, plan, documents or results, 9 am to 8 pm IST, at most once in 3 days. Each message has Call me, Not now and Stop messages buttons.</p>
         </Panel>

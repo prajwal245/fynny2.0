@@ -33,22 +33,28 @@ export const forgetTemplates = () => {
   inflight.clear();
 };
 
-export async function listTemplates(sender: Pick<Sender, "wabaId" | "token">, now = Date.now()): Promise<MetaTemplate[] | null> {
+/** Meta returns templates in pages; an account with many templates would otherwise hide the newest. */
+const MAX_PAGES = 10;
+
+export async function listTemplates(sender: Pick<Sender, "wabaId" | "token">, now = Date.now(), opts: { fresh?: boolean } = {}): Promise<MetaTemplate[] | null> {
   if (!sender.wabaId) return null;
   const hit = cache.get(sender.wabaId);
-  if (hit && now - hit.at < TTL_MS) return hit.list;
+  if (!opts.fresh && hit && now - hit.at < TTL_MS) return hit.list;
   const waiting = inflight.get(sender.wabaId);
-  if (waiting) return waiting;
+  if (waiting && !opts.fresh) return waiting;
   const wabaId = sender.wabaId;
   const read = (async () => {
     try {
-      const res = await fetch(`${GRAPH}/${wabaId}/message_templates?fields=name,status,language,category,components&limit=200`, {
-        headers: { Authorization: `Bearer ${sender.token}` },
-      });
-      // If Meta cannot be asked, the last good list keeps reminders going.
-      if (!res.ok) return hit?.list ?? null;
-      const body = (await res.json()) as { data?: MetaTemplate[] };
-      const list = body.data ?? [];
+      const list: MetaTemplate[] = [];
+      let url: string | null = `${GRAPH}/${wabaId}/message_templates?fields=name,status,language,category,components&limit=200`;
+      for (let page = 0; url && page < MAX_PAGES; page++) {
+        const res: Response = await fetch(url, { headers: { Authorization: `Bearer ${sender.token}` } });
+        // If Meta cannot be asked, the last good list keeps reminders going.
+        if (!res.ok) return hit?.list ?? null;
+        const body = (await res.json()) as { data?: MetaTemplate[]; paging?: { next?: string } };
+        list.push(...(body.data ?? []));
+        url = body.paging?.next ?? null;
+      }
       cache.set(wabaId, { at: now, list });
       return list;
     } catch {

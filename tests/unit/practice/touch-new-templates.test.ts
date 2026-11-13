@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pickTouchTemplate, touchParams, TOUCH_TEMPLATES } from "@/lib/practice/touchpoints/whatsapp";
+import { pickTouchTemplate, touchParams, TOUCH_TEMPLATES, TOUCH_TEMPLATES_UTILITY, type TouchTemplateKey } from "@/lib/practice/touchpoints/whatsapp";
 import type { MetaTemplate } from "@/lib/practice/whatsappFlow";
 
 const threeButtons = [
@@ -39,5 +39,41 @@ describe("fh_account_update and fh_results_ready are picked once approved", () =
   it("fills three fields for both", () => {
     expect(touchParams("processing_issue", { name: "Asha Rao", firmName: "Rao & Co" }, { failedDocs: 2 })).toHaveLength(3);
     expect(touchParams("results_ready", { name: "Asha Rao", firmName: "Rao & Co" }, { readyDocs: 3, readyReports: 1 })?.[2]).toBe("3 documents were read and 1 report is ready.");
+  });
+});
+
+describe("Utility names for every follow-up", () => {
+  const keys = ["setup", "trial", "plan", "issue", "ready"] as const;
+  const o = { language: "en", allowMarketing: true };
+  it("every Utility name differs from the original, because Meta locks a name's category", () => {
+    for (const k of keys) expect(TOUCH_TEMPLATES_UTILITY[k].name, k).not.toBe(TOUCH_TEMPLATES[k].name);
+    expect(TOUCH_TEMPLATES_UTILITY.issue.name).toBe("fh_account_update_v2");
+    expect(TOUCH_TEMPLATES_UTILITY.ready.name).toBe("fh_results_ready_v2");
+  });
+  for (const k of keys as readonly TouchTemplateKey[]) {
+    it(`${k}: an approved Utility _v2 beats a Marketing original`, () => {
+      const list = [tpl(TOUCH_TEMPLATES[k].name, "MARKETING", "APPROVED", threeButtons), tpl(TOUCH_TEMPLATES_UTILITY[k].name, "UTILITY", "APPROVED", threeButtons)];
+      const p = pickTouchTemplate(k, list, o);
+      expect(p.template?.name).toBe(TOUCH_TEMPLATES_UTILITY[k].name);
+      expect(p.marketing).toBe(false);
+    });
+    it(`${k}: when Marketing is off and only the Marketing original exists, the reason names the template to submit`, () => {
+      const p = pickTouchTemplate(k, [tpl(TOUCH_TEMPLATES[k].name, "MARKETING", "APPROVED", threeButtons)], { ...o, allowMarketing: false });
+      expect(p.template).toBeUndefined();
+      expect(p.name).toBe(TOUCH_TEMPLATES_UTILITY[k].name);
+      expect(p.why).toMatch(/exist/);
+    });
+  }
+  it("a template in another language code that starts with the wanted one still counts", () => {
+    const t = { ...tpl("fh_setup_help_v2", "UTILITY", "APPROVED", threeButtons), language: "en_US" } as MetaTemplate;
+    expect(pickTouchTemplate("setup", [t], o).template?.name).toBe("fh_setup_help_v2");
+  });
+  it("the template script creates exactly the Utility templates the app expects, with the same wording", async () => {
+    const { TEMPLATES } = (await import("../../../scripts/whatsapp-templates.mjs")) as { TEMPLATES: { name: string; components: { type: string; text?: string }[] }[] };
+    for (const k of keys) {
+      const t = TEMPLATES.find((x) => x.name === TOUCH_TEMPLATES_UTILITY[k].name);
+      expect(t, TOUCH_TEMPLATES_UTILITY[k].name).toBeTruthy();
+      expect(t!.components.find((c) => c.type === "BODY")?.text).toBe(TOUCH_TEMPLATES_UTILITY[k].body);
+    }
   });
 });

@@ -43,8 +43,9 @@ export const TOUCH_TEMPLATES: Record<TouchTemplateKey, { name: string; body: str
 export const TOUCH_BUTTONS = { url: { text: "Open FynHelp", url: "https://fynhelp.com/app" }, replies: ["Call me", "Not now", "Stop messages"] as const };
 
 /**
- * Plainer wording for the same three messages, to submit as Utility under new names (Meta locks a name's
- * category once it is approved, so a reclassified template needs a new name). They say only what happened on the
+ * Plainer wording for the same messages, to submit as Utility under new names (Meta locks a name's
+ * category once it is approved, so a template Meta classed as Marketing can never become Utility under its own
+ * name: every one needs a new name, including the document-problem and results-ready messages). They say only what happened on the
  * person's own account and what the buttons do: no question, no offer. The variables mean the same as above.
  */
 export const TOUCH_TEMPLATES_UTILITY: Record<TouchTemplateKey, { name: string; body: string; example: [string, string, string] }> = {
@@ -64,12 +65,12 @@ export const TOUCH_TEMPLATES_UTILITY: Record<TouchTemplateKey, { name: string; b
     example: TOUCH_TEMPLATES.plan.example,
   },
   issue: {
-    name: "fh_account_update",
+    name: "fh_account_update_v2",
     body: "Hello {{1}}, this is FynHelp with an update on {{2}}. {{3}} The details are in your FynHelp account. The buttons below let you open it, ask us to call, pause these messages or stop them.",
     example: ["Asha", "Rao & Co", "1 document could not be read. Uploading it again as a PDF, Excel or CSV usually fixes this."],
   },
   ready: {
-    name: "fh_results_ready",
+    name: "fh_results_ready_v2",
     body: "Hello {{1}}, this is FynHelp with an update on {{2}}. {{3}} You can view the results in your FynHelp account. The buttons below let you open it, ask us to call, pause these messages or stop them.",
     example: ["Asha", "Rao & Co", "3 documents were read and 1 report is ready."],
   },

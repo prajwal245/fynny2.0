@@ -243,16 +243,24 @@ export async function extendTrial(ctx: AdminCtx, firmId: string, days: number) {
 export async function setFirmsTest(ctx: AdminCtx, firmIds: string[], isTest: boolean, note: string) {
   const ids = [...new Set(firmIds)].slice(0, 100);
   if (!ids.length) throw new PracticeError("none", "Pick at least one firm.");
-  const { data: rows } = await ctx.db.from("ca_firms").select("id, firm_name, is_demo").in("id", ids);
-  const ok = (rows ?? []).filter((r) => !r.is_demo);
+  const { data: rows } = await ctx.db.from("ca_firms").select("id, firm_name, is_demo, is_test").in("id", ids);
+  const found = rows ?? [];
+  // Demo firms are never switched; firms already in the wanted state are left alone, so Undo never touches them.
+  const todo = found.filter((r) => !r.is_demo && Boolean(r.is_test) !== isTest);
+  const alreadyThere = found.filter((r) => !r.is_demo && Boolean(r.is_test) === isTest).length;
+  const skippedDemo = found.filter((r) => r.is_demo).length;
   const failed: string[] = [];
-  for (const r of ok) {
+  const changedIds: string[] = [];
+  for (const r of todo) {
     // The database refuses a test firm and a real firm sharing one person; say so plainly.
     const { error } = await ctx.db.from("ca_firms").update({ is_test: isTest } as never).eq("id", r.id);
     if (error) failed.push(`${r.firm_name}: ${/cannot be part|tester/i.test(error.message) ? "its owner also belongs to another firm of the other kind" : error.message}`);
-    else await audit(ctx, isTest ? "firm_marked_test" : "firm_marked_real", "ca_firm", r.id, { firm: r.firm_name, note: note.trim() });
+    else {
+      changedIds.push(r.id);
+      await audit(ctx, isTest ? "firm_marked_test" : "firm_marked_real", "ca_firm", r.id, { firm: r.firm_name, note: note.trim() });
+    }
   }
-  return { changed: ok.length - failed.length, failed };
+  return { changed: changedIds.length, changedIds, failed, alreadyThere, skippedDemo };
 }
 
 /**

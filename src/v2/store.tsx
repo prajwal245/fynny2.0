@@ -590,7 +590,11 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     if (!firmId.current) return;
     try {
-      apply(await getPracticeWorkspace());
+      const w = await getPracticeWorkspace();
+      // A firm switched between test and real by the platform changes on screen without a reload.
+      const isTest = Boolean((w.firm as { isTest?: boolean } | null)?.isTest);
+      setFirm((f) => (f && Boolean(f.isTest) !== isTest ? { ...f, isTest } : f));
+      apply(w);
     } catch (e) {
       console.error("[v2] workspace load failed", errMsg(e));
     }

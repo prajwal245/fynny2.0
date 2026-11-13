@@ -68,4 +68,20 @@ describe("the admin plan, credits and usage panel", () => {
     await waitFor(() => expect(adjust).toHaveBeenCalledTimes(1));
     expect(adjust.mock.calls[0]?.[0]).toMatchObject({ data: { firmId: "f1", delta: 500, reason: "Goodwill after outage" } });
   });
+
+  it("offers manual assignment for a paying firm only after an explicit Razorpay confirmation", async () => {
+    setPlan.mockClear();
+    mount();
+    fireEvent.click(await screen.findByTestId("open-change-plan"));
+    fireEvent.click(screen.getByTestId("plan-mode-manual"));
+    fireEvent.change(screen.getByTestId("plan-select"), { target: { value: "scale" } });
+    fireEvent.change(screen.getByTestId("plan-reason"), { target: { value: "Pilot partner, invoiced offline" } });
+    expect(screen.getByTestId("plan-ends")).toBeTruthy();
+    expect((screen.getByTestId("plan-review") as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByTestId("plan-end-razorpay"));
+    fireEvent.click(screen.getByTestId("plan-review"));
+    fireEvent.click(await screen.findByTestId("plan-confirm"));
+    await waitFor(() => expect(setPlan).toHaveBeenCalledTimes(1));
+    expect(setPlan.mock.calls[0]?.[0]).toMatchObject({ data: { plan: "scale", mode: "manual", endRazorpay: true } });
+  });
 });

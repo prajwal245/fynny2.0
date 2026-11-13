@@ -53,9 +53,10 @@ describe("rules for admin plan and credit changes", () => {
 
 vi.mock("@/lib/admin/security.server", () => ({ audit: vi.fn(async () => undefined) }));
 vi.mock("@/lib/practice/db.server", () => ({ logActivity: vi.fn(async () => undefined) }));
-const state = { billing: {} as Record<string, unknown>, usage: { activeClients: 3, documents: 10, month: "2026-11" }, changed: [] as unknown[] };
+const state = { billing: {} as Record<string, unknown>, usage: { activeClients: 3, documents: 10, month: "2026-11" }, changed: [] as unknown[], rz: [] as string[], rzFails: false };
 vi.mock("@/lib/practice/billing.server", () => ({
   loadBilling: async () => state.billing,
+  razorpayApi: async (_m: string, path: string) => { if (state.rzFails) throw new Error("Razorpay could not cancel the subscription"); state.rz.push(path); return {}; },
   changePlan: async (_db: unknown, _ctx: unknown, plan: string, cycle: string) => { state.changed.push({ plan, cycle }); return { timing: "now" }; },
 }));
 vi.mock("@/lib/practice/billing/usage.server", () => ({ usageFor: async () => state.usage }));
@@ -97,7 +98,7 @@ function ctx(opts: { balance?: number; isTest?: boolean; charge?: Json | null } 
   return { c: { db, userId: "admin1", email: "a@fynhelp.com", roles: ["super_admin"], adminSessionId: "s", ip: "1.1.1.1" } as never, calls, updates };
 }
 
-beforeEach(() => { vi.mocked(audit).mockClear(); state.changed = []; state.usage = { activeClients: 3, documents: 10, month: "2026-11" }; });
+beforeEach(() => { vi.mocked(audit).mockClear(); state.changed = []; state.rz = []; state.rzFails = false; state.usage = { activeClients: 3, documents: 10, month: "2026-11" }; });
 
 describe("admin credit adjustment", () => {
   it("adds bonus credits and records who, why and the balance before and after", async () => {
@@ -153,6 +154,43 @@ describe("admin plan change", () => {
     await expect(setFirmPlan(ctx().c, "f1", "scale", "monthly", soon, "x")).rejects.toThrow(/why/i);
     state.billing = { plan: "starter", cycle: "monthly", status: "active", razorpay_subscription_id: "sub_1", cancel_at_period_end: true };
     await expect(setFirmPlan(ctx().c, "f1", "scale", "monthly", null, "Pilot partner")).rejects.toThrow(/cancelled/i);
+  });
+});
+
+describe("assigning a plan manually to a firm that pays through Razorpay", () => {
+  const paying = { plan: "starter", cycle: "monthly", status: "active", razorpay_subscription_id: "sub_9", current_period_end: "2026-12-01" };
+  const soon = new Date(Date.now() + 60 * 86_400_000).toISOString().slice(0, 10);
+  it("asks for explicit confirmation first and touches nothing without it", async () => {
+    state.billing = paying;
+    const { c, updates } = ctx();
+    await expect(setFirmPlan(c, "f1", "scale", "annual", soon, "Pilot partner, invoiced offline", { mode: "manual" })).rejects.toThrow(/cancels that subscription/);
+    expect(state.rz).toHaveLength(0);
+    expect(updates).toHaveLength(0);
+  });
+  it("cancels the Razorpay subscription, then records the manual plan", async () => {
+    state.billing = paying;
+    const { c, updates } = ctx();
+    const r = await setFirmPlan(c, "f1", "scale", "annual", soon, "Pilot partner, invoiced offline", { mode: "manual", endRazorpay: true });
+    expect(r.route).toBe("manual");
+    expect(state.rz).toEqual(["/subscriptions/sub_9/cancel"]);
+    expect(updates.find((u) => u.table === "ca_billing")?.patch).toMatchObject({ plan: "scale", cycle: "annual", status: "cancelled" });
+    expect(vi.mocked(audit).mock.calls[0]?.[4]).toMatchObject({ route: "manual", endedRazorpay: true });
+  });
+  it("validates the date before Razorpay is touched, and changes nothing if Razorpay refuses", async () => {
+    state.billing = paying;
+    await expect(setFirmPlan(ctx().c, "f1", "scale", "annual", "yesterday", "Pilot partner, invoiced offline", { mode: "manual", endRazorpay: true })).rejects.toThrow(/day/i);
+    expect(state.rz).toHaveLength(0);
+    state.rzFails = true;
+    const { c, updates } = ctx();
+    await expect(setFirmPlan(c, "f1", "scale", "annual", soon, "Pilot partner, invoiced offline", { mode: "manual", endRazorpay: true })).rejects.toThrow(/cancel the subscription/);
+    expect(updates).toHaveLength(0);
+  });
+  it("lets a firm that is already cancelling be given a manual plan, without another cancel", async () => {
+    state.billing = { ...paying, cancel_at_period_end: true };
+    const { c } = ctx();
+    const r = await setFirmPlan(c, "f1", "professional", "monthly", soon, "Keeping them on, agreed by phone", { mode: "manual" });
+    expect(r.route).toBe("manual");
+    expect(state.rz).toHaveLength(0);
   });
 });
 

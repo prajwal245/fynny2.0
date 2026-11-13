@@ -131,10 +131,10 @@ export const adminFirmBilling = createServerFn({ method: "POST" })
 export const adminSetFirmPlan = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) =>
-    z.object({ firmId: FIRM, plan: z.enum(["starter", "professional", "scale"]), cycle: z.enum(["monthly", "annual"]), endsOn: z.string().max(10).nullable(), reason: REASON }).parse(d),
+    z.object({ firmId: FIRM, plan: z.enum(["starter", "professional", "scale"]), cycle: z.enum(["monthly", "annual"]), endsOn: z.string().max(10).nullable(), reason: REASON, mode: z.enum(["auto", "manual"]).default("auto"), endRazorpay: z.boolean().default(false) }).parse(d),
   )
   .handler(async ({ data, context }) =>
-    (await import("./adminBilling.server")).setFirmPlan(await gate(context, "billing.adjust"), data.firmId, data.plan, data.cycle, data.endsOn, data.reason),
+    (await import("./adminBilling.server")).setFirmPlan(await gate(context, "billing.adjust"), data.firmId, data.plan, data.cycle, data.endsOn, data.reason, { mode: data.mode, endRazorpay: data.endRazorpay }),
   );
 
 export const adminAdjustCredits = createServerFn({ method: "POST" })

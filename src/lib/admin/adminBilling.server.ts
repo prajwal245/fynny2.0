@@ -67,7 +67,15 @@ export async function firmBillingView(ctx: AdminCtx, firmId: string) {
  * Changes a firm's plan. Firms paying through Razorpay switch there (a higher plan now with the pro-rated difference,
  * a lower one or another cycle at renewal) and are emailed; other firms get a manual plan until `endsOn`.
  */
-export async function setFirmPlan(ctx: AdminCtx, firmId: string, plan: PlanKey, cycle: Cycle, endsOn: string | null, reasonRaw: string) {
+export async function setFirmPlan(
+  ctx: AdminCtx,
+  firmId: string,
+  plan: PlanKey,
+  cycle: Cycle,
+  endsOn: string | null,
+  reasonRaw: string,
+  opts: { mode?: "auto" | "manual"; endRazorpay?: boolean } = {},
+) {
   const reason = needReason(reasonRaw);
   const firm = await firmOf(ctx, firmId);
   if (firm.is_demo) throw new PracticeError("demo_firm", "A demo firm has no plan to change.");
@@ -76,14 +84,20 @@ export async function setFirmPlan(ctx: AdminCtx, firmId: string, plan: PlanKey, 
   const { usageFor } = await import("../practice/billing/usage.server");
   const row = await billing.loadBilling(ctx.db, firmId);
   const route = planRoute(row);
-  if (route === "blocked")
-    throw new PracticeError("cancelled", "This firm has cancelled and its plan is ending. Let it end, then give a plan after that day.");
+  const manual = opts.mode === "manual";
+  // A cancelling firm can only be given a manual plan (its Razorpay subscription is already ending).
+  if (route === "blocked" && !manual)
+    throw new PracticeError("cancelled", "This firm has cancelled and its plan is ending. Assign a plan manually, or let it end and give one after that day.");
+  // A firm still paying through Razorpay would be billed twice, so assigning by hand ends that subscription, and only on an explicit yes.
+  const endsSubscription = manual && route === "razorpay";
+  if (endsSubscription && !opts.endRazorpay)
+    throw new PracticeError("confirm_end_razorpay", "This firm pays through Razorpay. Assigning a plan by hand cancels that subscription now (no refund is issued), so confirm that first.");
   const usage = await usageFor(ctx.db, firmId);
   const misfit = planFitsUsage(plan, usage.activeClients);
   if (misfit) throw new PracticeError("plan_too_small", misfit);
   const before = { plan: row.plan, cycle: row.cycle, status: row.status };
 
-  if (route === "razorpay") {
+  if (route === "razorpay" && !manual) {
     const asFirm: FirmContext = { firmId, firmName: firm.firm_name, firmEmail: firm.email, userId: ctx.userId, role: "owner" };
     const r = await billing.changePlan(ctx.db, asFirm, plan, cycle);
     await audit(ctx, "firm_plan_changed", "ca_firm", firmId, { route, reason, before, to: { plan, cycle }, timing: r.timing });
@@ -93,15 +107,30 @@ export async function setFirmPlan(ctx: AdminCtx, firmId: string, plan: PlanKey, 
   const end = manualPlanEnd(endsOn ?? "");
   if (!end.ok) throw new PracticeError("bad_end_date", end.problem);
   const now = new Date().toISOString();
+  if (endsSubscription) {
+    // Everything is checked above; only now is Razorpay touched. If it refuses, nothing has changed.
+    await billing.razorpayApi(
+      "POST",
+      `/subscriptions/${encodeURIComponent(row.razorpay_subscription_id!)}/cancel`,
+      { cancel_at_cycle_end: 0 },
+      "Razorpay could not cancel the subscription, so nothing was changed. Try again in a minute.",
+    );
+  }
   const { error } = await ctx.db
     .from("ca_billing")
     .update({ plan, cycle, status: "cancelled", current_period_end: end.endsAt, cancel_at_period_end: false, scheduled_plan: null, scheduled_cycle: null, updated_at: now })
     .eq("ca_firm_id", firmId);
-  if (error) throw new PracticeError("db_error", `Could not save the plan: ${error.message}`);
-  await ctx.db.from("ca_billing_events").insert({ id: `manual:${firmId}:${Date.now()}`, event: "admin.manual_plan", ca_firm_id: firmId, payload: { by: ctx.userId, reason, before, to: { plan, cycle }, endsAt: end.endsAt } });
+  if (error)
+    throw new PracticeError(
+      "db_error",
+      endsSubscription
+        ? `The Razorpay subscription was cancelled, but the new plan could not be saved (${error.message}). Give the plan again now, or the firm is left without one.`
+        : `Could not save the plan: ${error.message}`,
+    );
+  await ctx.db.from("ca_billing_events").insert({ id: `manual:${firmId}:${Date.now()}`, event: "admin.manual_plan", ca_firm_id: firmId, payload: { by: ctx.userId, reason, before, to: { plan, cycle }, endsAt: end.endsAt, endedRazorpay: endsSubscription } });
   await logActivity(ctx.db, firmId, null, "system", `FynHelp gave this firm the ${PLANS[plan].name} plan until ${end.endsAt.slice(0, 10)}.`);
-  await audit(ctx, "firm_plan_changed", "ca_firm", firmId, { route, reason, before, to: { plan, cycle }, endsAt: end.endsAt });
-  return { route, timing: "now" as const, endsAt: end.endsAt };
+  await audit(ctx, "firm_plan_changed", "ca_firm", firmId, { route: "manual", reason, before, to: { plan, cycle }, endsAt: end.endsAt, endedRazorpay: endsSubscription });
+  return { route: "manual" as const, timing: "now" as const, endsAt: end.endsAt };
 }
 
 /**

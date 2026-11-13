@@ -361,11 +361,23 @@ export async function processExtraction(
       throw e;
     }
   }
+  // An Excel file with several sheets: remember their names so a person can pick another one, and honour an earlier pick.
+  let sheetNames: string[] | undefined;
+  if (kind === "xlsx") {
+    try {
+      const all = (await loadSheetsReader())(readBytes);
+      if (all.length > 1) sheetNames = all.map((x) => x.name);
+    } catch {
+      /* the read below reports an unreadable file */
+    }
+  }
+  const sheetInfo = sheetNames ? { sheet_names: sheetNames } : {};
   const outcome = await runExtract(
     {
       bytes: readBytes,
       filename,
       mime: null,
+      sheetName: (doc.extracted as { sheet_name?: string } | null)?.sheet_name ?? null,
       side,
       businessId: doc.business_id,
       clientName: clientRow?.client_name ?? null,
@@ -413,6 +425,7 @@ export async function processExtraction(
           kind: outcome.kind,
           register: reg,
           text_preview: outcome.sourceText.slice(0, 20_000),
+          ...sheetInfo,
         },
         extract_finished_at: new Date().toISOString(),
       })
@@ -524,7 +537,7 @@ export async function processExtraction(
         review_count: 0,
         duplicate_count: 0,
         error_message: "This statement looks like it belongs to another client. Its lines are held.",
-        extracted: { ...(doc.extracted ?? {}), source: (doc.extracted as { source?: string } | null)?.source ?? "Manual", kind: outcome.kind, text_preview: outcome.sourceText.slice(0, 20_000), statement_check: statementReport },
+        extracted: { ...(doc.extracted ?? {}), source: (doc.extracted as { source?: string } | null)?.source ?? "Manual", kind: outcome.kind, text_preview: outcome.sourceText.slice(0, 20_000), statement_check: statementReport, ...sheetInfo },
         extract_finished_at: new Date().toISOString(),
       })
       .eq("id", doc.id);
@@ -667,6 +680,7 @@ export async function processExtraction(
         kind: outcome.kind,
         text_preview: outcome.sourceText.slice(0, 20_000),
         ...(statementReport ? { statement_check: statementReport } : {}),
+        ...sheetInfo,
       },
       extract_finished_at: new Date().toISOString(),
     })

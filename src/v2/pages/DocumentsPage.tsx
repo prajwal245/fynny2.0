@@ -1,7 +1,7 @@
 import { txnType, txnDirection } from "@/lib/practice/txnType";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { confirmStatementOwner } from "@/lib/practice/practice.functions";
+import { chooseDocumentSheet, confirmStatementOwner } from "@/lib/practice/practice.functions";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertTriangle,
@@ -764,6 +764,30 @@ export default function DocumentsPage({
               </div>
             </div>
 
+            {active.sheetNames && active.sheetNames.length > 1 && active.status !== "Processing" && active.status !== "Uploading" && (
+              <div style={{ margin: "0 0 12px", padding: "10px 12px", border: `1px solid ${V.line}`, borderRadius: 8, fontSize: 13 }}>
+                <label htmlFor="sheet-pick" style={{ fontWeight: 600 }}>This Excel file has {active.sheetNames.length} sheets. Sheet to read: </label>
+                <select
+                  id="sheet-pick"
+                  value={active.sheetChoice ?? ""}
+                  disabled={holdBusy}
+                  onChange={(e) => {
+                    setHoldBusy(true);
+                    void chooseDocumentSheet({ data: { id: active.id, sheet: e.target.value || null } })
+                      .then(() => reprocessDoc(active.id))
+                      .catch((err: unknown) => toast.error(err instanceof Error ? err.message : "Could not read that sheet."))
+                      .finally(() => setHoldBusy(false));
+                  }}
+                  style={{ marginLeft: 6, padding: "4px 8px", borderRadius: 6 }}
+                >
+                  <option value="">Let FynHelp choose</option>
+                  {active.sheetNames.map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+                <div style={{ color: V.muted, marginTop: 4 }}>If the lines look wrong or are missing, pick the sheet that holds the transactions. The file is read again.</div>
+              </div>
+            )}
             {active.statementCheck && active.side === "bank" && active.status !== "Processing" && active.status !== "Uploading" && <StatementCheckCard
                 report={active.statementCheck}
                 lineCount={active.rows.length || active.txnCount || 0}

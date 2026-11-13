@@ -41,7 +41,7 @@ import {
   readTallyMasters,
 } from "./tallyMasters";
 import { TALLY_XML_NO_VOUCHERS, unsupportedReport } from "./unsupported";
-import { selectSheet } from "./sheets";
+import { chooseSheet } from "./sheets";
 import {
   passwordNeededMessage,
   passwordWrongMessage,
@@ -125,6 +125,8 @@ export interface ExtractInput {
   clientName?: string | null;
   /** The client's GSTIN: its state code tells the AI whether GST should be IGST or CGST/SGST. */
   clientGstin?: string | null;
+  /** The sheet a person chose for an Excel file with several sheets; wins over the automatic choice. */
+  sheetName?: string | null;
 }
 
 export interface ExtractOutcome {
@@ -573,7 +575,7 @@ export async function runExtract(
     let rows: string[][];
     try {
       const chosen = deps.sheetsAll
-        ? selectSheet(deps.sheetsAll(input.bytes), input.clientName)
+        ? chooseSheet(deps.sheetsAll(input.bytes), input.clientName, input.side, input.sheetName)
         : null;
       if (chosen) {
         rows = chosen.sheet.rows;

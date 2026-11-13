@@ -351,7 +351,28 @@ export function counterpartyScore(
   );
 }
 
+
+/**
+ * Payment reference numbers found in a line: the UPI / IMPS reference (12 digits), a NEFT / RTGS UTR (bank code and digits),
+ * or a long reference column. They sit in the narration on both sides, so one that appears on a bank line and on a book entry
+ * says they are the same payment even when many receipts have the same amount on the same day.
+ */
+export function paymentRefs(t: ReconTxn): string[] {
+  const text = `${t.reference ?? ""} ${t.description ?? ""} ${t.counterparty ?? ""}`.toUpperCase();
+  const out = new Set<string>();
+  for (const m of text.match(/(?<![0-9])\d{12}(?![0-9])/g) ?? []) out.add(m);
+  for (const m of text.match(/\b[A-Z]{4}[A-Z0-9]\d{10,18}\b/g) ?? []) out.add(m);
+  const own = normaliseRef(t.reference);
+  if (own.length >= 8) out.add(own);
+  return [...out];
+}
+
 export function referenceScore(a: ReconTxn, b: ReconTxn): number {
+  const pa = paymentRefs(a);
+  const pb = paymentRefs(b);
+  if (pa.some((r) => pb.includes(r))) return 1;
+  // Both lines carry a UPI / UTR number and they differ: these are different payments.
+  if (pa.some((r) => r.length >= 12) && pb.some((r) => r.length >= 12)) return 0;
   const ra = normaliseRef(a.reference);
   const rb = normaliseRef(b.reference);
   if (!ra && !rb) return 0.5;
@@ -466,6 +487,44 @@ export function reconcile(
   const matches: MatchDecision[] = [];
   const tags: Record<string, string> = {};
   const ambiguous = new Set<string>();
+
+  // Stage 0 — the same UPI / UTR reference on both sides. Shops and restaurants book hundreds of receipts of the same amount;
+  // the reference is what tells them apart. A reference is used only when it points to one entry on each side.
+  const REF_WINDOW = 10;
+  const bookRefs = new Map<string, ReconTxn[]>();
+  for (const b of books) for (const r of paymentRefs(b)) (bookRefs.get(r) ?? bookRefs.set(r, []).get(r)!).push(b);
+  const bankRefs = new Map<string, ReconTxn[]>();
+  for (const t of bank) for (const r of paymentRefs(t)) (bankRefs.get(r) ?? bankRefs.set(r, []).get(r)!).push(t);
+  for (const t of bank) {
+    if (usedBank.has(t.id)) continue;
+    const cands = new Map<string, ReconTxn>();
+    for (const r of paymentRefs(t))
+      for (const b of bookRefs.get(r) ?? [])
+        if (
+          !usedBook.has(b.id) &&
+          b.direction === t.direction &&
+          toPaise(b.amount) === toPaise(t.amount) &&
+          daysBetween(t.txn_date, b.txn_date) <= REF_WINDOW
+        )
+          cands.set(b.id, b);
+    if (cands.size !== 1) continue;
+    const b = [...cands.values()][0]!;
+    const rivals = new Set<string>();
+    for (const r of paymentRefs(b))
+      for (const o of bankRefs.get(r) ?? [])
+        if (!usedBank.has(o.id) && o.direction === b.direction && toPaise(o.amount) === toPaise(b.amount)) rivals.add(o.id);
+    if (rivals.size !== 1) continue;
+    usedBank.add(t.id);
+    usedBook.add(b.id);
+    const s = fuzzyScore(t, b, cfg, aliases);
+    matches.push({
+      bank_txn_id: t.id,
+      book_txn_ids: [b.id],
+      stage: "exact",
+      score: 1,
+      explanation: { ...s.explanation, reference_score: 1, note: "Same UPI / UTR reference number on the bank line and the book entry" },
+    });
+  }
 
   // Stage 1 — exact.
   const bucket = new Map<string, ReconTxn[]>();

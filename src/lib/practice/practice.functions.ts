@@ -230,6 +230,22 @@ export const confirmStatementOwner = createServerFn({ method: "POST" })
     }),
   );
 
+/** A person picks which sheet of an Excel file with several sheets to read (empty = let FynHelp choose). The file is read again. */
+export const chooseDocumentSheet = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: uuid, sheet: z.string().max(200).nullable() }).parse(d))
+  .handler(async ({ data, context }) =>
+    withWork(context.userId, async (db, ctx) => {
+      const { data: doc } = await db.from("ca_document_extractions").select("id, extracted").eq("id", data.id).eq("ca_firm_id", ctx.firmId).maybeSingle();
+      if (!doc) throw new Error("Document not found.");
+      const ex = { ...((doc.extracted as Record<string, unknown> | null) ?? {}) };
+      if (data.sheet) ex.sheet_name = data.sheet;
+      else delete ex.sheet_name;
+      await db.from("ca_document_extractions").update({ extracted: ex, extract_status: "queued", extract_attempts: 0, extract_next_attempt_at: null }).eq("id", data.id);
+      return (await import("./documents.server")).processExtraction(db, data.id, { trigger: "user", userId: ctx.userId });
+    }),
+  );
+
 /**
  * Opens a password-protected PDF or Excel file with the password the person typed, and reads it. The password is used for this
  * one read in memory: it is not saved, not logged, and not sent to the AI. Tries are limited per document.

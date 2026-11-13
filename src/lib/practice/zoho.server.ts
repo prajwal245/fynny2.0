@@ -646,6 +646,25 @@ export async function openBills(db: Db, ctx: FirmContext, linkId: string): Promi
   return out;
 }
 
+/**
+ * Open invoices (receivables) or bills (payables) of a client from its linked Zoho Books organisation, shaped for the aging
+ * reports. Null when the client has no Zoho link. Used when FynHelp's own receivables / payables ledger is empty, so the
+ * reports show what Zoho says is owed instead of "no receivables recorded".
+ */
+export async function agingRowsFromZoho(
+  db: Db,
+  ctx: FirmContext,
+  businessId: string,
+  kind: "receivable" | "payable",
+): Promise<{ id: string; party: string; ref: string | null; date: string | null; due: string | null; amount: number; settled: number; outstanding: number }[] | null> {
+  const { data: l } = await db.from("ca_zoho_links").select("id").eq("ca_firm_id", ctx.firmId).eq("business_id", businessId).limit(1).maybeSingle();
+  if (!l) return null;
+  if (kind === "receivable") {
+    return (await openInvoices(db, ctx, l.id as string)).map((i) => ({ id: `zoho-${i.id}`, party: i.customer, ref: i.number, date: null, due: i.dueDate, amount: i.total, settled: Math.max(0, i.total - i.balance), outstanding: i.balance }));
+  }
+  return (await openBills(db, ctx, l.id as string)).map((b) => ({ id: `zoho-${b.id}`, party: b.vendor, ref: b.number, date: null, due: b.dueDate, amount: b.total, settled: Math.max(0, b.total - b.balance), outstanding: b.balance }));
+}
+
 /* ── approved posting (opt-in, one entry at a time) ─────── */
 
 const FALLBACK_CHARGE_HELP = "Zoho Books has no \"Bank Fees and Charges\" account. Add one under Chart of Accounts, then try again.";

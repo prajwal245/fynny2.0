@@ -107,11 +107,19 @@ export interface ZohoExport {
   csv: string;
 }
 
+/** The vendor of an expense. Bank charges and tax payments have none: the bank or the government is not a vendor to create. */
+export function vendorOf(narration: string): string {
+  const account = expenseAccount(narration);
+  if (account === "Bank Fees and Charges" || account === "Tax Payable") return "";
+  return partyOf(narration);
+}
+
 export function buildZohoExport(
   kind: ExportKind,
   list: ExportException[],
-  opts: { clientId: string; clientName: string; period: string | null; stamp?: string },
+  opts: { clientId: string; clientName: string; period: string | null; stamp?: string; /** The Zoho bank account the client's statement belongs to: "Paid Through" and "Deposit To". */ bankAccount?: string | null },
 ): ZohoExport {
+  const bankAccount = clean(opts.bankAccount ?? "");
   const lines = openBank(list, opts.clientId, opts.period);
   const slug = opts.clientName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "client";
   const stamp = (opts.stamp ?? opts.period ?? "all-periods").toLowerCase().replace(/[^a-z0-9]+/g, "-");
@@ -123,7 +131,7 @@ export function buildZohoExport(
       kind, filename: `zoho-expenses_${slug}_${stamp}.csv`, count: out.length, total: out.reduce((s, e) => s - e.amount, 0),
       csv: csv(
         ["Expense Date", "Expense Account", "Paid Through", "Amount", "Vendor", "Reference#", "Notes"],
-        out.map((e) => [zohoDate(e.date), expenseAccount(e.narration), "", money(e.amount), partyOf(e.narration), bankRef(e.narration), clean(e.narration).slice(0, 200)]),
+        out.map((e) => [zohoDate(e.date), expenseAccount(e.narration), bankAccount, money(e.amount), vendorOf(e.narration), bankRef(e.narration), clean(e.narration).slice(0, 200)]),
       ),
     };
   }
@@ -132,7 +140,7 @@ export function buildZohoExport(
       kind, filename: `zoho-receipts_${slug}_${stamp}.csv`, count: inn.length, total: inn.reduce((s, e) => s + e.amount, 0),
       csv: csv(
         ["Payment Date", "Customer Name", "Amount", "Payment Mode", "Deposit To", "Reference#", "Invoice Number", "Notes"],
-        inn.map((e) => [zohoDate(e.date), partyOf(e.narration), money(e.amount), "Bank Transfer", "", bankRef(e.narration), invoiceRef(e.narration), clean(e.narration).slice(0, 200)]),
+        inn.map((e) => [zohoDate(e.date), partyOf(e.narration), money(e.amount), "Bank Transfer", bankAccount, bankRef(e.narration), invoiceRef(e.narration), clean(e.narration).slice(0, 200)]),
       ),
     };
   }

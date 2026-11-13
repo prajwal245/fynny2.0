@@ -452,9 +452,10 @@ export async function processExtraction(
   const remembered = applyMemory(outcome.rows, memories);
   const rows = remembered.rows;
 
-  // A Tally sync is the books as they stand in Tally today. An entry deleted or changed in Tally must disappear here too,
-  // matched or not, so the next Recon sees what Tally really holds.
-  if (side === "books" && /tally/i.test(String((doc.extracted as { source?: string } | null)?.source ?? ""))) await dropSyncedBooks(db, doc.id);
+  // A Tally or Zoho sync is the books as they stand in that system today. An entry deleted or changed there must disappear here too,
+  // matched or not, so the next Recon sees what the books really hold.
+  const syncSource = /tally/i.test(String((doc.extracted as { source?: string } | null)?.source ?? "")) ? "Tally" : /zoho/i.test(String((doc.extracted as { source?: string } | null)?.source ?? "")) ? "Zoho Books" : null;
+  if (side === "books" && syncSource) await dropSyncedBooks(db, doc.id, syncSource);
 
   // Is the statement correct and complete? Checked from its own running balance, and against earlier statements of the account.
   let statementReport: (StatementCheck & { overlap: Overlap | null; hold?: { reason: string; suggested: { id: string; name: string } | null } }) | null = null;
@@ -749,7 +750,7 @@ export async function processExtraction(
  * to one of them is un-matched again (the match is kept in the history as reversed), and the exceptions of the removed
  * lines go with them, so a deleted voucher leaves no stale book line and no false exception behind.
  */
-export async function dropSyncedBooks(db: Db, extractionId: string): Promise<{ removed: number; reopened: number }> {
+export async function dropSyncedBooks(db: Db, extractionId: string, system = "Tally"): Promise<{ removed: number; reopened: number }> {
   const { data: lines } = await db.from("ca_txns").select("id").eq("extraction_id", extractionId).eq("side", "books").limit(50_000);
   const ids = ((lines ?? []) as { id: string }[]).map((l) => l.id);
   if (!ids.length) return { removed: 0, reopened: 0 };
@@ -760,7 +761,7 @@ export async function dropSyncedBooks(db: Db, extractionId: string): Promise<{ r
     const { data: ms } = await db.from("ca_recon_matches").select("id, bank_txn_id").eq("status", "active").overlaps("book_txn_ids", chunk);
     for (const m of (ms ?? []) as { id: string; bank_txn_id: string }[]) {
       banks.add(m.bank_txn_id);
-      await db.from("ca_recon_matches").update({ status: "reversed", reversed_at: now, notes: "The book entry is no longer in Tally." }).eq("id", m.id).eq("status", "active");
+      await db.from("ca_recon_matches").update({ status: "reversed", reversed_at: now, notes: `The book entry is no longer in ${system}.` }).eq("id", m.id).eq("status", "active");
     }
   }
   const bankIds = [...banks];

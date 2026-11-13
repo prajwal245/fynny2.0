@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { getFirmIntegrations, syncZohoBooks, syncRazorpay, getAutoSyncSettings, setAutoSync, type AutoSyncSetting } from "@/lib/caSync.functions";
+import { tallyConnectors, zohoBooksStatus } from "@/lib/practice/practice.functions";
 import { CA, CACard, CABadge, CAButton, dateIN, caTh, caTd, CAEmpty } from "@/components/ca/portalUi";
 
 interface SyncJob {
@@ -21,12 +22,38 @@ export default function ClientSyncPanel({ firmId, businessId }: { firmId: string
   const [providers, setProviders] = useState<string[]>([]);
   const [jobs, setJobs] = useState<SyncJob[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  // Books connected through the practice workspace: a Zoho Books link and a Tally company mapped to this client.
+  const [books, setBooks] = useState<string[]>([]);
   const runZoho = useServerFn(syncZohoBooks);
   const runRazorpay = useServerFn(syncRazorpay);
   const loadIntegrations = useServerFn(getFirmIntegrations);
   const loadAuto = useServerFn(getAutoSyncSettings);
   const saveAuto = useServerFn(setAutoSync);
   const [autoSettings, setAutoSettings] = useState<AutoSyncSetting[]>([]);
+
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      const out: string[] = [];
+      try {
+        const z = await zohoBooksStatus();
+        for (const l of z.links.filter((x) => x.business_id === businessId))
+          out.push(`Zoho Books · ${l.account_name}${l.last_synced_at ? ` · pulled ${dateIN(l.last_synced_at)}` : " · not pulled yet"}`);
+      } catch {
+        /* not connected */
+      }
+      try {
+        const cs = await tallyConnectors();
+        for (const co of cs.flatMap((c) => c.companies).filter((x) => x.business_id === businessId)) out.push(`TallyPrime · ${co.company_name}`);
+      } catch {
+        /* no connector */
+      }
+      if (live) setBooks(out);
+    })();
+    return () => {
+      live = false;
+    };
+  }, [businessId]);
 
   const load = useCallback(async () => {
     try {
@@ -101,7 +128,10 @@ export default function ClientSyncPanel({ firmId, businessId }: { firmId: string
               {busy === "razorpay" ? "Syncing…" : "Sync Razorpay"}
             </CAButton>
           )}
-          {providers.length === 0 && (
+          {books.map((b) => (
+            <span key={b} data-testid="practice-books" style={{ fontFamily: CA.sans, fontSize: 12.5, color: CA.ink }}>Books: {b}</span>
+          ))}
+          {providers.length === 0 && books.length === 0 && (
             <span style={{ fontFamily: CA.sans, fontSize: 12.5, color: CA.faint }}>
               No accounting or payment source connected by this client yet.
             </span>

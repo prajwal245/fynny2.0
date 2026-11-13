@@ -159,6 +159,21 @@ export function BooksExportDrawer({ open, onClose, clientId, allPeriods, initial
     if (id) setBank(readLedger(id));
   }, [id]);
   // The Tally company this client is linked to: written into the file, so Tally cannot import into another client's company.
+  // The Zoho bank account this client is linked to: filled into "Paid Through" and "Deposit To", so Zoho posts to the bank.
+  const [zohoBank, setZohoBank] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    setZohoBank(null);
+    if (id)
+      void zohoBooksStatus()
+        .then((st) => {
+          if (live) setZohoBank(st.links.find((l) => l.business_id === id)?.account_name ?? null);
+        })
+        .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [id]);
   const [tallyCompany, setTallyCompany] = useState<string | null>(null);
   useEffect(() => {
     let live = true;
@@ -187,7 +202,7 @@ export function BooksExportDrawer({ open, onClose, clientId, allPeriods, initial
     );
   }
   const name = clientName(id);
-  const opts = { clientId: id, clientName: name, period: null, stamp: month ?? "all periods" };
+  const opts = { clientId: id, clientName: name, period: null, stamp: month ?? "all periods", bankAccount: zohoBank };
   const n = countFor(list, id, null);
   const tally = buildTallyExport(list, { ...opts, bankLedger: bank, company: tallyCompany });
 

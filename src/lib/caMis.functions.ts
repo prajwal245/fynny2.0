@@ -337,6 +337,18 @@ export const generateTypedMis = createServerFn({ method: "POST" })
 
     const bid = data.business_id;
     const fid = data.firm_id;
+    /** Open invoices or bills from the client's Zoho Books link, when there is one; never throws (the report just stays empty). */
+    const zohoAging = async (userId: string, businessId: string, kind: "receivable" | "payable") => {
+      try {
+        const { adminDb, firmContext } = await import("./practice/db.server");
+        const db = await adminDb();
+        const ctx = await firmContext(db, userId);
+        return await (await import("./practice/zoho.server")).agingRowsFromZoho(db, ctx, businessId, kind);
+      } catch (e) {
+        console.error(`[mis] zoho aging failed: ${(e as Error).message}`);
+        return null;
+      }
+    };
     let built: BuiltReport;
 
     if (kind === "pnl") {
@@ -402,7 +414,10 @@ export const generateTypedMis = createServerFn({ method: "POST" })
         id: string; customer_name: string; invoice_number: string | null; invoice_date: string | null;
         due_date: string | null; amount: number; received: number | null; outstanding: number | null;
       }[];
-      const aging: AgingRow[] = rows.map((r) => ({
+      // FynHelp's own ledger is empty: read what Zoho Books says is owed, if the client is linked to Zoho.
+      const zohoRows = rows.length ? null : await zohoAging(context.userId, bid, "receivable");
+      if (zohoRows) sources.push({ name: "Zoho Books open invoices", table: "zoho_invoices", records: zohoRows.length, status: zohoRows.length ? "ok" : "empty" });
+      const aging: AgingRow[] = zohoRows ?? rows.map((r) => ({
         id: r.id, party: r.customer_name, ref: r.invoice_number, date: r.invoice_date, due: r.due_date,
         amount: Number(r.amount), settled: r.received, outstanding: r.outstanding,
       }));
@@ -415,7 +430,9 @@ export const generateTypedMis = createServerFn({ method: "POST" })
         id: string; vendor_name: string; invoice_number: string | null; created_at: string;
         due_date: string | null; amount: number; paid: number | null; outstanding: number | null;
       }[];
-      const aging: AgingRow[] = rows.map((r) => ({
+      const zohoRows = rows.length ? null : await zohoAging(context.userId, bid, "payable");
+      if (zohoRows) sources.push({ name: "Zoho Books open bills", table: "zoho_bills", records: zohoRows.length, status: zohoRows.length ? "ok" : "empty" });
+      const aging: AgingRow[] = zohoRows ?? rows.map((r) => ({
         id: r.id, party: r.vendor_name, ref: r.invoice_number, date: r.created_at.slice(0, 10), due: r.due_date,
         amount: Number(r.amount), settled: r.paid, outstanding: r.outstanding,
       }));

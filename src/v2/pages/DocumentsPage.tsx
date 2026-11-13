@@ -31,7 +31,7 @@ import {
 } from "../ui";
 import { AgentStatusBadge, RowSkeleton } from "../agents";
 import { IntakePanel } from "../components/IntakePanel";
-import { TallyPosting } from "../components/TallyPosting";
+import { BooksPanel } from "../components/BooksPanel";
 import { StatementCheckCard } from "../components/StatementCheckCard";
 import { UnlockFile } from "../components/UnlockFile";
 import { isPasswordMessage } from "@/lib/practice/passwordFile";
@@ -902,7 +902,7 @@ export default function DocumentsPage({
               </motion.table>
               </>
             )}
-            {active.side === "bank" && active.clientId && active.status === "Parsed" && <TallyPosting clientId={active.clientId} documentId={active.id} />}
+            {active.side === "bank" && active.clientId && active.status === "Parsed" && <BooksPanel clientId={active.clientId} documentId={active.id} />}
             <style>{BX_STYLES + SEL_STYLES}</style>
             <BulkBar sel={sel} total={active.rows.length} noun={pickedRows.length === 1 ? "transaction" : "transactions"} inDrawer>
               {active.side === "bank" && active.clientId

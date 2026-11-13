@@ -563,6 +563,9 @@ export async function processExtraction(
     .eq("extraction_id", doc.id)
     .eq("status", "open");
 
+  // Two lines of one file with the same date, direction, amount and narration but different running balances are two real
+  // transactions: the second gets a key of its own (the first keeps the plain key, so existing data is unaffected).
+  const keyCount = new Map<string, number>();
   const txnRows = rows
     .filter(
       (r) => r.route === "transaction" && r.date && r.amount && r.direction,
@@ -584,15 +587,20 @@ export async function processExtraction(
       confidence: r.confidence,
       raw_text: r.raw_text.slice(0, 4000),
       row_index: r.row_index,
-      dedupe_key: dedupeKey({
-        business_id: doc.business_id,
-        side,
-        date: r.date!,
-        direction: r.direction!,
-        amount: r.amount!,
-        reference: r.reference,
-        description: r.description,
-      }),
+      dedupe_key: (() => {
+        const base = dedupeKey({
+          business_id: doc.business_id,
+          side,
+          date: r.date!,
+          direction: r.direction!,
+          amount: r.amount!,
+          reference: r.reference,
+          description: r.description,
+        });
+        const n = keyCount.get(base) ?? 0;
+        keyCount.set(base, n + 1);
+        return n > 0 && r.balance != null ? `${base}~${Math.round(r.balance * 100)}` : base;
+      })(),
       created_via: "extract",
       created_by: doc.uploaded_by,
       ...reconStatusFor(outcome.documentKind),

@@ -881,7 +881,7 @@ export async function runExtract(
   );
 
   // Identical rows inside one file: keep the first, send the rest to a person.
-  const seen = new Map<string, number>();
+  const seen = new Map<string, { index: number; balance: number | null }>();
   let duplicateRows = 0;
   const rows = scored
     .map((r) => {
@@ -897,15 +897,18 @@ export async function runExtract(
       });
       const first = seen.get(key);
       if (first === undefined) {
-        seen.set(key, r.row_index);
+        seen.set(key, { index: r.row_index, balance: r.balance ?? null });
         return r;
       }
+      // On a statement with a running balance, a line that looks the same but leaves a different balance is a real second
+      // transaction (two identical bank charges, two equal UPI payments), not a repeated import.
+      if (first.balance !== null && r.balance != null && Math.round(first.balance * 100) !== Math.round(r.balance * 100)) return r;
       duplicateRows++;
       return {
         ...r,
         route: "review" as const,
         confidence: Math.min(r.confidence, 0.5),
-        reason: `Identical to row ${first + 1} in the same file. Confirm only if it is a genuine second transaction.`,
+        reason: `Identical to row ${first.index + 1} in the same file. Confirm only if it is a genuine second transaction.`,
       };
     })
     .map((r) => {

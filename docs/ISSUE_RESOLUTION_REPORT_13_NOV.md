@@ -12,7 +12,7 @@ This report lists a fix as **Tested** only when a test passed. It never says "wo
 | **Built, needs a live test** | The code is written and builds, but proving it needs something I do not have here: a running TallyPrime, a Zoho Books organisation, or the deployed site. |
 | **Not done** | Not built, or not possible yet. The reason is given. |
 
-Checks run on the branch: 1,098 of 1,099 unit tests pass, the production build passes, and TypeScript shows only the 2 errors that were there before. The one failing test (`touch-whatsapp`, template check) fails the same way on main without these changes.
+Checks run on the branch: 1,103 of 1,104 unit tests pass, the production build passes, and TypeScript shows only the 2 errors that were there before. The one failing test (`touch-whatsapp`, template check) fails the same way on main without these changes.
 
 ## 1. Bank statements as downloaded from the bank (four-client test, 10 PDFs)
 
@@ -34,6 +34,12 @@ Result on the real files. "Direction confirmed" is the share of lines whose in/o
 The four ICICI files total 5,827 lines, in line with the tester's "about 5,800".
 
 **Tested: yes** (8 of 8 files read; 7 pass the balance check; plus 7 unit tests on made-up statements in the three layouts, `pdf-table.test.ts`).
+
+**End-to-end upload test (added after the first version of this report).** `upload-e2e-pdf.test.ts` runs the real server code (`processExtraction`) on a PDF in an in-memory database: stored file → read → statement check → owner check → filed lines. It passes on a made-up 60-page statement (1,200 lines, every amount, direction and balance equal to the source; balance check passes; re-reading files no second copy; a statement for another client is held with both names in the message). Run on the tester's 8 real statements the same way, all 8 are read and filed, none is held, and the line counts filed equal the lines read (HDFC 161, ICICI 1,464 / 1,461 / 1,292 / 1,610, SBI CA 179, SBI OD 110, Union Bank 836).
+
+That run found one more problem, now fixed: two lines that look identical in one statement (same date, amount and narration) were sent to the review queue as duplicates, 3 per ICICI quarter, 11 on SBI CA and 4 on SBI OD, even though the running balance moved each time. A repeat with a different balance is now filed as a real second transaction; a repeat with the same balance is still sent to review.
+
+Still unproven: a real upload in the deployed app (the browser, storage bucket and the live database). The test uses an in-memory database.
 
 What still needs a person:
 - **ICICI Oct-Dec has one real break.** At line 1,100 (16 Dec 2025) the balance printed in the PDF is ₹18,97,787.52 where the lines before it give ₹81,02,212.48, a gap of ₹62,04,424.96. The reader found no missing serial number before that line, so the PDF's own balance column is the likely cause. The check correctly flags it and no file is accepted silently. Check that page of the PDF.

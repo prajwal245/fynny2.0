@@ -1,17 +1,55 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
 import { adminDeleteFirm, adminExtendTrial, adminFirm, adminFirms, adminSetFirmStatus, adminSetFirmsTest, adminSignupSources } from "@/lib/admin/admin.functions";
 import { adminCall, adminError } from "@/components/admin/adminClient";
 import { useAdminSession } from "@/components/admin/AdminSessionGate";
 import { FirmActivityPanel } from "./FirmActivityPanel";
-import { Btn, Empty, ErrorNote, PageHead, Panel, Pill, Table, Td, day, line, muted, when } from "./ui";
+import { Btn, Empty, ErrorNote, PageHead, Panel, Pill, Table, Td, day, line, maroon, muted, when } from "./ui";
 
 type Status = "" | "active" | "suspended" | "flagged";
 type PlanFilter = "" | "trial" | "paid" | "paused" | "cancelled";
 
 const STATE_TONE = { trial: "info", paid: "good", paused: "warn", cancelled: "bad" } as const;
 const STATUS_TONE = { active: "good", suspended: "bad", flagged: "warn" } as const;
+
+const plural = (n: number) => `${n} firm${n === 1 ? "" : "s"}`;
+
+/**
+ * Marks firms as test or real. Every change comes back with an Undo that reverses exactly the firms that moved
+ * (never one that was already in that state), and rows leave the list at once instead of waiting for the reload.
+ */
+function useMarkFirms(onDone?: () => void) {
+  const qc = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const [leaving, setLeaving] = useState<Set<string>>(new Set());
+  const mark = useCallback(async (ids: string[], isTest: boolean): Promise<void> => {
+    if (!ids.length) return;
+    setBusy(true);
+    setLeaving(new Set(ids));
+    try {
+      const r = await adminCall(() => adminSetFirmsTest({ data: { firmIds: ids, isTest } }));
+      if (r.failed.length) toast.error(r.failed.join("; "));
+      if (r.changed) {
+        toast.success(isTest ? `${plural(r.changed)} marked as test and removed from reports.` : `${plural(r.changed)} marked as real and counted again.`, {
+          duration: 8000,
+          action: { label: "Undo", onClick: () => void mark(r.changedIds, !isTest) },
+        });
+      } else if (!r.failed.length) {
+        toast.message(r.skippedDemo ? "Demo firms cannot be switched." : `Already ${isTest ? "test" : "real"}: nothing to change.`);
+      }
+      await qc.invalidateQueries({ queryKey: ["admin"] });
+      onDone?.();
+    } catch (e) {
+      toast.error(adminError(e));
+    } finally {
+      setLeaving(new Set());
+      setBusy(false);
+    }
+  }, [qc, onDone]);
+  return { mark, busy, leaving };
+}
 
 export default function FirmsPage() {
   const { can } = useAdminSession();
@@ -22,28 +60,26 @@ export default function FirmsPage() {
   const [open, setOpen] = useState<string | null>(null);
   const [tests, setTests] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(new Set());
-  const [bulkBusy, setBulkBusy] = useState(false);
-  const qc = useQueryClient();
+  const [confirmPaid, setConfirmPaid] = useState(false);
+  const reduce = useReducedMotion();
+  const clear = useCallback(() => { setPicked(new Set()); setConfirmPaid(false); }, []);
+  const { mark, busy: bulkBusy, leaving } = useMarkFirms(clear);
   const list = useQuery({
     queryKey: ["admin", "firms", q, status, plan, page, tests],
     queryFn: () => adminCall(() => adminFirms({ data: { q, status, plan, page, tests } })),
     placeholderData: (p) => p,
   });
-  const toggle = (id: string) => setPicked((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
-  const bulkMark = async (isTest: boolean) => {
-    setBulkBusy(true);
-    try {
-      const r = await adminCall(() => adminSetFirmsTest({ data: { firmIds: [...picked], isTest } }));
-      if (r.failed.length) toast.error(r.failed.join("; "));
-      if (r.changed) toast.success(isTest ? `${r.changed} firm${r.changed === 1 ? "" : "s"} marked as test and removed from reports.` : `${r.changed} firm${r.changed === 1 ? "" : "s"} marked as real.`);
-      setPicked(new Set());
-      await qc.invalidateQueries({ queryKey: ["admin"] });
-    } catch (e) {
-      toast.error(adminError(e));
-    } finally {
-      setBulkBusy(false);
-    }
+  const rows = list.data?.rows ?? [];
+  const toggle = (id: string) => { setConfirmPaid(false); setPicked((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; }); };
+  const allShown = rows.length > 0 && rows.every((r) => picked.has(r.id));
+  const lookalikes = rows.filter((r) => r.looksLikeTest);
+  // Taking a paying firm out of the revenue figures needs a second, deliberate click.
+  const paidPicked = !tests ? rows.filter((r) => picked.has(r.id) && r.planState === "paid") : [];
+  const startBulk = () => {
+    if (!tests && paidPicked.length && !confirmPaid) { setConfirmPaid(true); return; }
+    void mark([...picked], !tests);
   };
+  const switchTab = (t: boolean) => { setTests(t); clear(); setPage(0); };
 
   return (
     <div>
@@ -51,19 +87,43 @@ export default function FirmsPage() {
       <SourcesPanel />
       <Panel>
         <div className="flex gap-2 mb-3" role="tablist" aria-label="Real or test firms">
-          <Btn kind={tests ? undefined : "primary"} onClick={() => { setTests(false); setPicked(new Set()); setPage(0); }}>Real firms</Btn>
-          <Btn kind={tests ? "primary" : undefined} onClick={() => { setTests(true); setPicked(new Set()); setPage(0); }} testId="firms-tests-tab">Test firms</Btn>
+          <Btn kind={tests ? undefined : "primary"} onClick={() => switchTab(false)}>Real firms</Btn>
+          <Btn kind={tests ? "primary" : undefined} onClick={() => switchTab(true)} testId="firms-tests-tab">Test firms</Btn>
         </div>
-        {can("firms.update") && picked.size > 0 && (
-          <div className="flex flex-wrap items-center gap-2 mb-3 rounded-xl px-3 py-2" style={{ background: "rgba(138,30,24,.06)" }} data-testid="firm-bulk-bar">
-            <span className="text-sm font-medium">{picked.size} selected</span>
-            {!tests ? (
-              <Btn disabled={bulkBusy} onClick={() => void bulkMark(true)} testId="firm-bulk-test">Mark as test</Btn>
-            ) : (
-              <Btn disabled={bulkBusy} onClick={() => void bulkMark(false)}>Mark as real</Btn>
-            )}
-            <Btn onClick={() => setPicked(new Set())}>Clear</Btn>
-            <span className="text-xs" style={{ color: muted }}>{tests ? "Real firms count in reports and revenue." : "Test firms are left out of every report and the revenue figures. You can undo this."}</span>
+        <AnimatePresence initial={false}>
+          {can("firms.update") && picked.size > 0 && (
+            <motion.div
+              key="bulk"
+              initial={reduce ? false : { opacity: 0, y: -8, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: "auto" }}
+              exit={reduce ? { opacity: 0 } : { opacity: 0, y: -8, height: 0 }}
+              transition={{ type: "spring", stiffness: 420, damping: 36 }}
+              style={{ overflow: "hidden" }}
+            >
+              <div className="flex flex-wrap items-center gap-2 mb-3 rounded-xl px-3 py-2" style={{ background: "rgba(138,30,24,.06)" }} data-testid="firm-bulk-bar" role="region" aria-live="polite" aria-label="Bulk actions">
+                <span className="text-sm font-medium tabular-nums">{picked.size} selected</span>
+                {!allShown && rows.length > picked.size && <Btn onClick={() => setPicked(new Set(rows.map((r) => r.id)))}>Select all {rows.length} shown</Btn>}
+                {!tests ? (
+                  <Btn kind={confirmPaid ? "danger" : "ghost"} disabled={bulkBusy} onClick={startBulk} testId="firm-bulk-test">
+                    {bulkBusy ? "Working…" : confirmPaid ? `Yes, ${plural(paidPicked.length)} paying: mark as test` : "Mark as test"}
+                  </Btn>
+                ) : (
+                  <Btn disabled={bulkBusy} onClick={startBulk} testId="firm-bulk-real">{bulkBusy ? "Working…" : "Mark as real"}</Btn>
+                )}
+                <Btn disabled={bulkBusy} onClick={clear}>Clear</Btn>
+                <span className="text-xs" style={{ color: confirmPaid ? maroon : muted }} data-testid="firm-bulk-note">
+                  {confirmPaid
+                    ? `${plural(paidPicked.length)} in your selection ${paidPicked.length === 1 ? "is" : "are"} paying. Marking as test removes ${paidPicked.length === 1 ? "it" : "them"} from revenue. Confirm to go on.`
+                    : tests ? "Real firms count in reports and revenue." : "Test firms are left out of every report and the revenue figures. Undo is offered right after."}
+                </span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        {can("firms.update") && !tests && lookalikes.length > 0 && picked.size === 0 && (
+          <div className="flex flex-wrap items-center gap-2 mb-3 rounded-xl px-3 py-2" style={{ background: "rgba(180,83,9,.08)" }} data-testid="firm-lookalikes">
+            <span className="text-sm">{plural(lookalikes.length)} on this page {lookalikes.length === 1 ? "looks" : "look"} like {lookalikes.length === 1 ? "a test" : "tests"}.</span>
+            <Btn onClick={() => setPicked(new Set(lookalikes.map((r) => r.id)))} testId="firm-select-lookalikes">Select {lookalikes.length === 1 ? "it" : "them"}</Btn>
           </div>
         )}
         <div className="flex flex-wrap gap-2 mb-4">
@@ -83,34 +143,45 @@ export default function FirmsPage() {
           </select>
         </div>
         <ErrorNote error={list.error} />
-        {list.data && list.data.rows.length === 0 && <Empty>No firms match.</Empty>}
-        {list.data && list.data.rows.length > 0 && (
+        {list.data && rows.length === 0 && <Empty>{tests ? "No test firms yet. Mark a sign-up as test and it appears here." : "No firms match."}</Empty>}
+        {list.data && rows.length > 0 && (
           <Table head={["", "Firm", "Plan", "Clients", "Signed up", "Came from", "Last sign-in", "Account"]} testId="firms-table">
-            {list.data.rows.map((f) => (
-              <tr key={f.id} className="cursor-pointer hover:bg-black/[.02]" onClick={() => setOpen(f.id)}>
-                <Td>
-                  {can("firms.update") && (
-                    <input type="checkbox" aria-label={`Select ${f.name}`} checked={picked.has(f.id)} onClick={(e) => e.stopPropagation()} onChange={() => toggle(f.id)} />
-                  )}
-                </Td>
-                <Td>
-                  <div className="font-semibold">{f.name} {f.looksLikeTest && <Pill tone="warn">looks like a test</Pill>}</div>
-                  <div className="text-xs" style={{ color: muted }}>{f.email}{f.city ? ` · ${f.city}` : ""}</div>
-                </Td>
-                <Td>
-                  <div>{f.plan}</div>
-                  <Pill tone={STATE_TONE[f.planState]}>{f.planState === "trial" && f.trialEnds ? `trial to ${day(f.trialEnds)}` : f.planState}</Pill>
-                </Td>
-                <Td className="tabular-nums">{f.clients}</Td>
-                <Td>{day(f.createdAt)}</Td>
-                <Td>
-                  <div className="capitalize">{f.channel ? f.channel.replace("-", " ") : <span style={{ color: muted }}>not tracked</span>}</div>
-                  {f.from && <div className="text-xs" style={{ color: muted }}>{f.from}</div>}
-                </Td>
-                <Td>{when(f.lastSignIn)}</Td>
-                <Td><Pill tone={STATUS_TONE[f.status]}>{f.status}</Pill></Td>
-              </tr>
-            ))}
+            <AnimatePresence initial={false}>
+              {rows.map((f) => (
+                <motion.tr
+                  key={f.id}
+                  layout={reduce ? false : "position"}
+                  initial={false}
+                  animate={{ opacity: leaving.has(f.id) ? 0.35 : 1, backgroundColor: picked.has(f.id) ? "rgba(138,30,24,.05)" : "rgba(0,0,0,0)" }}
+                  exit={reduce ? { opacity: 0 } : { opacity: 0, x: tests ? -24 : 24 }}
+                  transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                  className="cursor-pointer hover:bg-black/[.02]"
+                  onClick={() => setOpen(f.id)}
+                >
+                  <Td>
+                    {can("firms.update") && (
+                      <input type="checkbox" aria-label={`Select ${f.name}`} checked={picked.has(f.id)} onClick={(e) => e.stopPropagation()} onChange={() => toggle(f.id)} />
+                    )}
+                  </Td>
+                  <Td>
+                    <div className="font-semibold">{f.name} {f.looksLikeTest && <Pill tone="warn">looks like a test</Pill>}</div>
+                    <div className="text-xs" style={{ color: muted }}>{f.email}{f.city ? ` · ${f.city}` : ""}</div>
+                  </Td>
+                  <Td>
+                    <div>{f.plan}</div>
+                    <Pill tone={STATE_TONE[f.planState]}>{f.planState === "trial" && f.trialEnds ? `trial to ${day(f.trialEnds)}` : f.planState}</Pill>
+                  </Td>
+                  <Td className="tabular-nums">{f.clients}</Td>
+                  <Td>{day(f.createdAt)}</Td>
+                  <Td>
+                    <div className="capitalize">{f.channel ? f.channel.replace("-", " ") : <span style={{ color: muted }}>not tracked</span>}</div>
+                    {f.from && <div className="text-xs" style={{ color: muted }}>{f.from}</div>}
+                  </Td>
+                  <Td>{when(f.lastSignIn)}</Td>
+                  <Td><Pill tone={STATUS_TONE[f.status]}>{f.status}</Pill></Td>
+                </motion.tr>
+              ))}
+            </AnimatePresence>
           </Table>
         )}
         {list.data && list.data.total > 50 && (
@@ -136,6 +207,7 @@ function FirmDrawer({ firmId, onClose, canUpdate, canDelete }: { firmId: string;
   const [busy, setBusy] = useState(false);
   const [confirmName, setConfirmName] = useState("");
   const [alsoLogin, setAlsoLogin] = useState(false);
+  const marking = useMarkFirms();
 
   const act = async (fn: () => Promise<unknown>, ok: string) => {
     setBusy(true);
@@ -245,7 +317,7 @@ function FirmDrawer({ firmId, onClose, canUpdate, canDelete }: { firmId: string;
               <div className="rounded-xl p-3" style={{ border: `1px solid ${line}` }}>
                 <div className="font-semibold mb-1">Test or real</div>
                 <p className="text-xs mb-2" style={{ color: muted }}>{f.is_test ? "This is a test firm: it is left out of every report and the revenue figures." : "Fake or test sign-ups should be marked as test, so they stop counting as customers. You can undo it."}</p>
-                <Btn disabled={busy} testId="firm-mark-test" onClick={() => void act(() => adminSetFirmsTest({ data: { firmIds: [firmId], isTest: !f.is_test } }), f.is_test ? "Marked as a real firm." : "Marked as a test firm.")}>{f.is_test ? "Mark as real" : "Mark as test"}</Btn>
+                <Btn disabled={busy || marking.busy} testId="firm-mark-test" onClick={() => void marking.mark([firmId], !f.is_test)}>{marking.busy ? "Working…" : f.is_test ? "Mark as real" : "Mark as test"}</Btn>
               </div>
             )}
             {canDelete && (

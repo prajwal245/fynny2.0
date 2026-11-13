@@ -245,7 +245,7 @@ export function CreditsPanel() {
           <div style={{ display: "grid", gap: 4 }}>
             {c.recent.map((r, i) => (
               <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12.5, color: V.body }}>
-                <span>{reason[r.reason] ?? r.reason}{r.note ? `: ${r.note}` : ""}</span>
+                <span>{/^(Taken back|Added) by FynHelp/.test(r.note ?? "") ? r.note : `${reason[r.reason] ?? r.reason}${r.note ? `: ${r.note}` : ""}`}</span>
                 <span style={{ fontVariantNumeric: "tabular-nums", color: r.delta > 0 ? V.green : V.body }}>{r.delta > 0 ? "+" : ""}{r.delta} · {formatDate(r.at)}</span>
               </div>
             ))}

@@ -6,6 +6,7 @@ import { adminDeleteFirm, adminExtendTrial, adminFirm, adminFirms, adminSetFirmS
 import { adminCall, adminError } from "@/components/admin/adminClient";
 import { useAdminSession } from "@/components/admin/AdminSessionGate";
 import { FirmActivityPanel } from "./FirmActivityPanel";
+import { FirmBillingPanel } from "./FirmBillingPanel";
 import { Btn, Empty, ErrorNote, PageHead, Panel, Pill, Table, Td, day, line, maroon, muted, when } from "./ui";
 
 type Status = "" | "active" | "suspended" | "flagged";
@@ -194,12 +195,12 @@ export default function FirmsPage() {
           </div>
         )}
       </Panel>
-      {open && <FirmDrawer firmId={open} onClose={() => setOpen(null)} canUpdate={can("firms.update")} canDelete={can("firms.delete")} />}
+      {open && <FirmDrawer firmId={open} onClose={() => setOpen(null)} canUpdate={can("firms.update")} canDelete={can("firms.delete")} canSeeBilling={can("billing.view")} canAdjustBilling={can("billing.adjust")} />}
     </div>
   );
 }
 
-function FirmDrawer({ firmId, onClose, canUpdate, canDelete }: { firmId: string; onClose: () => void; canUpdate: boolean; canDelete: boolean }) {
+function FirmDrawer({ firmId, onClose, canUpdate, canDelete, canSeeBilling, canAdjustBilling }: { firmId: string; onClose: () => void; canUpdate: boolean; canDelete: boolean; canSeeBilling: boolean; canAdjustBilling: boolean }) {
   const qc = useQueryClient();
   const d = useQuery({ queryKey: ["admin", "firm", firmId], queryFn: () => adminCall(() => adminFirm({ data: { firmId } })) });
   const [note, setNote] = useState("");
@@ -289,6 +290,7 @@ function FirmDrawer({ firmId, onClose, canUpdate, canDelete }: { firmId: string;
                 </div>
               )}
             </div>
+            {canSeeBilling && <FirmBillingPanel firmId={firmId} canAdjust={canAdjustBilling} />}
             <div className="rounded-xl p-3" style={{ border: `1px solid ${line}` }} data-testid="firm-source">
               <div className="font-semibold mb-1">Where they came from</div>
               {d.data.attribution?.signup_channel ? (

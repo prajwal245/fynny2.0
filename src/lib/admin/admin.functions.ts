@@ -119,6 +119,38 @@ export const adminSetFirmsTest = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ firmIds: z.array(z.string().uuid()).min(1).max(100), isTest: z.boolean(), note: z.string().max(300).optional() }).parse(d))
   .handler(async ({ data, context }) => (await import("./admin.server")).setFirmsTest(await gate(context, "firms.update"), data.firmIds, data.isTest, data.note ?? ""));
 
+const FIRM = z.string().uuid();
+const REASON = z.string().max(300);
+
+/** Plan, credits and this month's usage for one firm. */
+export const adminFirmBilling = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ firmId: FIRM }).parse(d))
+  .handler(async ({ data, context }) => (await import("./adminBilling.server")).firmBillingView(await gate(context, "billing.view"), data.firmId));
+
+export const adminSetFirmPlan = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z.object({ firmId: FIRM, plan: z.enum(["starter", "professional", "scale"]), cycle: z.enum(["monthly", "annual"]), endsOn: z.string().max(10).nullable(), reason: REASON }).parse(d),
+  )
+  .handler(async ({ data, context }) =>
+    (await import("./adminBilling.server")).setFirmPlan(await gate(context, "billing.adjust"), data.firmId, data.plan, data.cycle, data.endsOn, data.reason),
+  );
+
+export const adminAdjustCredits = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ firmId: FIRM, delta: z.number().int().min(-10000).max(10000), reason: REASON }).parse(d))
+  .handler(async ({ data, context }) =>
+    (await import("./adminBilling.server")).adjustFirmCredits(await gate(context, "billing.adjust"), data.firmId, data.delta, data.reason),
+  );
+
+export const adminWaiveCharge = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ firmId: FIRM, month: z.string().regex(/^\d{4}-\d{2}$/), reason: REASON }).parse(d))
+  .handler(async ({ data, context }) =>
+    (await import("./adminBilling.server")).waiveUsageCharge(await gate(context, "billing.adjust"), data.firmId, data.month, data.reason),
+  );
+
 export const adminDeleteFirm = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ firmId: z.string().uuid(), confirmName: z.string().max(300), alsoDeleteLogin: z.boolean() }).parse(d))

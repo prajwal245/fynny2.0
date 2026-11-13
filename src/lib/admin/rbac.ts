@@ -36,13 +36,14 @@ export type Permission =
   | "billing.refund"
   | "billing.refund.unlimited"
   | "billing.export"
+  | "billing.adjust"
   | "coupons.manage"
   | "support.manage"
   | "audit.view";
 
 const ALL: Permission[] = [
   "dashboard.view", "team.manage", "firms.view", "firms.update", "firms.delete", "press.manage", "kyc.review", "ops.view", "ops.retry",
-  "billing.view", "billing.refund", "billing.refund.unlimited", "billing.export", "coupons.manage", "support.manage", "audit.view",
+  "billing.view", "billing.refund", "billing.refund.unlimited", "billing.export", "billing.adjust", "coupons.manage", "support.manage", "audit.view",
 ];
 
 export const PERMISSIONS: Record<AdminRole, Permission[]> = {
@@ -50,7 +51,7 @@ export const PERMISSIONS: Record<AdminRole, Permission[]> = {
   admin: ALL,
   ops_admin: ["dashboard.view", "firms.view", "firms.update", "press.manage", "kyc.review", "ops.view", "ops.retry", "support.manage"],
   support_agent: ["dashboard.view", "firms.view", "ops.view", "billing.view", "billing.refund", "support.manage"],
-  finance_manager: ["dashboard.view", "billing.view", "billing.refund", "billing.refund.unlimited", "billing.export", "coupons.manage"],
+  finance_manager: ["dashboard.view", "billing.view", "billing.refund", "billing.refund.unlimited", "billing.export", "billing.adjust", "coupons.manage"],
   analyst: ["dashboard.view"],
   // Writes the blog, press and resources. No customers, billing, firms or support data.
   content_collaborator: ["press.manage"],

@@ -1,3 +1,4 @@
+import { txnType, txnDirection } from "@/lib/practice/txnType";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { confirmStatementOwner } from "@/lib/practice/practice.functions";
@@ -252,11 +253,13 @@ export default function DocumentsPage({
     rows: (d) => d.register ? d.register.entries : (d.txnCount ?? d.rows.length),
     date: (d) => d.date,
   });
-  const lineSort = useSort<Txn, "date" | "particulars" | "amount" | "status">(
+  const lineSort = useSort<Txn, "date" | "particulars" | "type" | "direction" | "amount" | "status">(
     active?.rows ?? [],
     {
       date: (r) => r.date,
       particulars: (r) => r.particulars,
+      type: (r) => txnType(r.particulars),
+      direction: (r) => txnDirection(r.amount),
       amount: (r) => r.amount,
       status: (r) => r.matchStatus ?? "",
     },
@@ -831,6 +834,8 @@ export default function DocumentsPage({
                     <SelectAllHeader sel={sel} total={active.rows.length} />
                     <SortTh label="Date" k="date" sort={lineSort.sort} toggle={lineSort.toggle} />
                     <SortTh label="Particulars" k="particulars" sort={lineSort.sort} toggle={lineSort.toggle} />
+                    <SortTh label="Type" k="type" sort={lineSort.sort} toggle={lineSort.toggle} />
+                    <SortTh label="In / out" k="direction" sort={lineSort.sort} toggle={lineSort.toggle} />
                     <SortTh label="Amount" k="amount" sort={lineSort.sort} toggle={lineSort.toggle} align="right" />
                     <SortTh label="Recon" k="status" sort={lineSort.sort} toggle={lineSort.toggle} />
                   </tr>
@@ -841,6 +846,8 @@ export default function DocumentsPage({
                       <SelectCell sel={sel} id={rowKey(r, i)} label={`${r.particulars.slice(0, 40)}, ${formatINR(r.amount)}`} />
                       <td className="num">{formatDate(r.date)}</td>
                       <td>{r.particulars}</td>
+                      <td>{txnType(r.particulars)}</td>
+                      <td style={{ color: r.amount < 0 ? V.maroon : V.green }}>{txnDirection(r.amount)}</td>
                       <td
                         className="num"
                         style={{

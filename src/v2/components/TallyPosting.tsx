@@ -530,7 +530,13 @@ export function TallyPosting({ clientId, documentId }: { clientId: string; docum
                 <>
                   {l.posting?.status === "failed" && (
                     <div role="alert" style={{ background: "rgba(169,56,56,.07)", borderRadius: 10, padding: "8px 12px", fontSize: 12.5, color: V.maroon }}>
-                      {l.posting.last_error || "This entry did not reach Tally."} Check Tally for this entry before approving again.
+                      {l.posting.last_error || "This entry did not reach Tally."} {/already has/i.test(l.posting.last_error ?? "") ? "" : "Check Tally for this entry before approving again."}
+                      {/already has/i.test(l.posting.last_error ?? "") && (
+                        <label style={{ display: "flex", gap: 8, alignItems: "flex-start", marginTop: 6, color: V.ink }}>
+                          <input type="checkbox" checked={Boolean(notDup[l.txn_id])} onChange={(e) => setNotDup((cur) => ({ ...cur, [l.txn_id]: e.target.checked }))} style={{ marginTop: 3 }} />
+                          <span>This is a different transaction from the one in Tally. Write it anyway when I approve again.</span>
+                        </label>
+                      )}
                       <div style={{ marginTop: 6 }}>
                         <button className="v2-btn v2-btn-ghost" disabled={busy === l.posting.id} onClick={() => void markPosted(l.posting!.id)}><CheckCircle2 size={14} /> It is in Tally: mark as posted</button>
                       </div>
@@ -630,6 +636,13 @@ export function TallyPosting({ clientId, documentId }: { clientId: string; docum
       {stale && (
         <div role="status" style={{ background: V.gray, borderRadius: 12, padding: "10px 14px", fontSize: 13, color: V.body }}>
           The Tally data here is more than 6 hours old, so a very recent entry may not show. Check the line in Tally if you are unsure.
+        </div>
+      )}
+
+      {linked.connectorProblem && (
+        <div role="alert" style={{ display: "flex", gap: 10, padding: "10px 12px", borderRadius: 12, background: "rgba(176,122,26,.12)", color: "#6d4a08", fontSize: 13 }}>
+          <TriangleAlert size={16} style={{ flexShrink: 0, marginTop: 2 }} />
+          <span><b>Waiting for Tally.</b> {linked.connectorProblem} Lines you approve now are written as soon as this is fixed.</span>
         </div>
       )}
 

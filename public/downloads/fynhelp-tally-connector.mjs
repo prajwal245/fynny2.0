@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * FynHelp Connector for TallyPrime (version 1.4.0)
+ * FynHelp Connector for TallyPrime (version 1.5.1)
  *
  * Runs on the PC where TallyPrime is open. It asks Tally (on this PC) for each linked company's
  * Day Book and sends it to FynHelp over HTTPS. It only makes outbound connections, never opens a
@@ -32,7 +32,7 @@ import { dirname, join, resolve } from "node:path";
 import { hostname } from "node:os";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-export const VERSION = "1.5.0";
+export const VERSION = "1.5.1";
 
 /* ── Tally XML helpers (pure; tested) ───────────────────────── */
 
@@ -368,6 +368,50 @@ export async function verifyWritten(ask, company, xml) {
   return last;
 }
 
+/**
+ * Is there already an entry in Tally for this very payment or receipt? Looks, in a Day Book reply, for another voucher (not the one
+ * FynHelp is about to write) within a few days that moves exactly the same amount on the same bank ledger. Entries typed in Tally
+ * but not yet synced to FynHelp are caught here, so approving the same bank line never writes a second voucher.
+ */
+export function findExistingEntry(reply, expected, bankLedger, windowDays = 3) {
+  const want = Math.abs(expected.ledgers.get(String(bankLedger).toLowerCase()) ?? 0);
+  const sign = Math.sign(expected.ledgers.get(String(bankLedger).toLowerCase()) ?? 0);
+  if (!want || !/^\d{8}$/.test(expected.date)) return null;
+  const day = (d) => Date.UTC(+d.slice(0, 4), +d.slice(4, 6) - 1, +d.slice(6, 8)) / 86_400_000;
+  for (const block of voucherBlocks(reply)) {
+    const head = /<VOUCHER\b([^>]*)>/i.exec(block)?.[1] ?? "";
+    const rid = unesc(/\bREMOTEID="([^"]*)"/i.exec(head)?.[1] ?? "");
+    if (rid && rid === expected.remoteId) continue;
+    const date = tagText(block, "DATE");
+    if (!/^\d{8}$/.test(date) || Math.abs(day(date) - day(expected.date)) > windowDays) continue;
+    const paise = ledgerPaise(block).get(String(bankLedger).toLowerCase());
+    if (paise !== undefined && Math.abs(paise) === want && Math.sign(paise) === sign) {
+      return { date, type: (/\bVCHTYPE="([^"]*)"/i.exec(head)?.[1] ?? tagText(block, "VOUCHERTYPENAME")) || "voucher", number: tagText(block, "VOUCHERNUMBER") || null, narration: tagText(block, "NARRATION").slice(0, 60), amount: want / 100 };
+    }
+  }
+  return null;
+}
+
+/** Asks Tally for the days around the entry and looks for one that already holds it. Null when none, or when Tally cannot be asked. */
+export async function checkTallyHasIt(ask, company, xml, bankLedger, windowDays = 3) {
+  const expected = expectedVoucher(xml);
+  if (!/^\d{8}$/.test(expected.date)) return null;
+  const toIso = (ms) => new Date(ms).toISOString().slice(0, 10);
+  const base = Date.UTC(+expected.date.slice(0, 4), +expected.date.slice(4, 6) - 1, +expected.date.slice(6, 8));
+  const months = [...new Set([toIso(base - windowDays * 86_400_000), toIso(base + windowDays * 86_400_000)].map((d) => d.slice(0, 7)))];
+  for (const month of months) {
+    let reply;
+    try {
+      reply = await fetchDayBook(ask, company, month);
+    } catch {
+      continue;
+    }
+    const hit = findExistingEntry(reply, expected, bankLedger, windowDays);
+    if (hit) return hit;
+  }
+  return null;
+}
+
 export function ledgerListRequest(company) {
   return `<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>FynHelpLedgers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>${esc(company)}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="FynHelpLedgers" ISMODIFY="No"><TYPE>Ledger</TYPE><NATIVEMETHOD>Name</NATIVEMETHOD><NATIVEMETHOD>Parent</NATIVEMETHOD></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`;
 }
@@ -578,6 +622,22 @@ async function writeApproved(cfg, companies, linked) {
       await fynhelp(cfg, "/api/public/tally-result", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: p.id, error: `The connector refused this entry: ${refused}` }) });
       continue;
     }
+    // Before writing, look in Tally for the same payment or receipt on the same bank ledger within three days: a person may have
+    // typed it in Tally already. A person who has checked that it is a different transaction says so in FynHelp and this is skipped.
+    if (!p.skipCheck && p.bankLedger) {
+      let hit = null;
+      try {
+        hit = await checkTallyHasIt((b) => askTally(cfg.tallyUrl, b, 10 * 60_000), p.company, p.xml, p.bankLedger);
+      } catch (e) {
+        log(`  could not look for an existing entry (${e.message}); writing anyway`);
+      }
+      if (hit) {
+        const msg = `Tally already has a ${hit.type} of ₹${hit.amount.toFixed(2)} on ${hit.date.slice(6)}-${hit.date.slice(4, 6)}-${hit.date.slice(0, 4)} on ${p.bankLedger}${hit.number ? ` (voucher ${hit.number})` : ""}. Nothing was written. If this is a different transaction, approve it again and tick "different transaction".`;
+        log(`✗ not written ${p.id.slice(0, 8)}: ${msg}`);
+        await report({ id: p.id, error: msg });
+        continue;
+      }
+    }
     let body;
     try {
       const reply = await askTally(cfg.tallyUrl, p.xml, 60_000);
@@ -642,7 +702,7 @@ async function round(cfg, state, forceSync) {
         const xml = await fetchDayBook((body) => askTally(cfg.tallyUrl, body, 10 * 60_000), co.name, month, (a) => log(`  ${co.name} ${month}: period honoured by Tally via "${a.id}" (${a.style})`));
         const err = tallyError(xml);
         if (err) throw new Error(`Tally said: ${err}`);
-        const r = await fynhelp(cfg, `/api/public/tally-ledger?company=${encodeURIComponent(co.name)}&month=${month}`, {
+        const r = await fynhelp(cfg, `/api/public/tally-ledger?company=${encodeURIComponent(co.name)}&month=${month}${(co.force ?? []).includes(month) ? "&force=1" : ""}`, {
           method: "POST",
           headers: { "Content-Type": "application/xml" },
           body: xml,

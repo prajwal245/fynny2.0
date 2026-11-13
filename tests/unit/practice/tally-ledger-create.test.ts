@@ -312,8 +312,8 @@ describe("the connector reads the ledger back from Tally", () => {
       ).verified,
     ).toBe(false);
   });
-  it("the connector is version 1.5.0, the first that can create ledgers", () => {
-    expect(connector.VERSION).toBe("1.5.0");
+  it("the connector is at least version 1.5.0, the first that can create ledgers", () => {
+    expect(Number(connector.VERSION.split(".")[1])).toBeGreaterThanOrEqual(5);
   });
 });
 

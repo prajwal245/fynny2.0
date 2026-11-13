@@ -48,6 +48,14 @@ try {
   & $nodePath $js --check --config $cfg
   if ($LASTEXITCODE -ne 0) { throw "FynHelp did not accept the token. Copy it again from FynHelp and run this setup again." }
 
+  # An older connector wrote its log as UTF-16, which Notepad shows as garbled symbols. Keep it aside so the new log starts clean.
+  if (Test-Path $log) {
+    $head = [System.IO.File]::ReadAllBytes($log) | Select-Object -First 2
+    if ($head.Count -ge 2 -and $head[0] -eq 255 -and $head[1] -eq 254) {
+      Move-Item -Force $log (Join-Path $dir "connector.old-utf16.log")
+    }
+  }
+
   Step 5 "Making it start by itself"
   # The connector writes its own UTF-8 log (--log). It also restarts itself if it ever exits, and the task is started again
   # every 10 minutes if the whole process has gone, so a stopped connector never stays stopped.

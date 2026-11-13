@@ -109,8 +109,8 @@ export function TallyConnector({ onChange }: { onChange?: (state: TallyLink) => 
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "space-between" }}>
               <div style={{ fontSize: 13.5 }}>
                 <b>{c.name}</b>{" "}
-                <span style={{ color: c.online ? V.green : V.muted }}>
-                  · {c.online ? "Online" : c.last_seen_at ? `Offline since ${formatDate(c.last_seen_at)}` : "Waiting for the first check-in"}
+                <span style={{ color: c.online ? (c.last_error ? V.maroon : V.green) : V.muted }}>
+                  · {c.online ? (c.last_error ? "Online, but Tally is not ready" : "Online") : c.last_seen_at ? `Offline since ${formatDate(c.last_seen_at)}` : "Waiting for the first check-in"}
                 </span>
                 {c.host_name && <span style={{ color: V.muted }}> · {c.host_name}</span>}
                 {c.agent_version && <span style={{ color: V.muted }}> · v{c.agent_version}</span>}

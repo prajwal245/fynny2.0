@@ -297,3 +297,37 @@ describe("13 Nov bug 4: the bank ledger follows the statement", () => {
     expect(pickBankLedger({ accountNo: null, bank: "ICICI" }, ["ICICI Bank CA 5426", "ICICI Bank CA 7731"])).toBeNull();
   });
 });
+
+describe("13 Nov bug 8: the connector looks in Tally before it writes", () => {
+  // @ts-expect-error plain JavaScript module shipped to customers
+  const load = () => import("../../../public/downloads/fynhelp-tally-connector.mjs");
+  const mine = importVoucherXmlFor();
+  function importVoucherXmlFor() {
+    return `<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME><STATICVARIABLES><SVCURRENTCOMPANY>Konkan Test Foods Pvt Ltd</SVCURRENTCOMPANY></STATICVARIABLES></REQUESTDESC><REQUESTDATA><TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER REMOTEID="fh-abc" VCHTYPE="Payment" ACTION="Create"><DATE>20261003</DATE><VOUCHERTYPENAME>Payment</VOUCHERTYPENAME><NARRATION>SMS ALERT CHARGES</NARRATION><ALLLEDGERENTRIES.LIST><LEDGERNAME>ICICI Bank CA 7731</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>590.00</AMOUNT></ALLLEDGERENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>Bank Charges</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-590.00</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE></REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>`;
+  }
+  const typed = (date: string, amount: string, rid = "") => `<ENVELOPE><BODY><DATA><TALLYMESSAGE><VOUCHER ${rid ? `REMOTEID="${rid}" ` : ""}VCHTYPE="Payment"><DATE>${date}</DATE><VOUCHERTYPENAME>Payment</VOUCHERTYPENAME><VOUCHERNUMBER>12</VOUCHERNUMBER><NARRATION>typed by hand</NARRATION><ALLLEDGERENTRIES.LIST><LEDGERNAME>Bank Charges</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-${amount}</AMOUNT><BANKALLOCATIONS.LIST> </BANKALLOCATIONS.LIST></ALLLEDGERENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>ICICI Bank CA 7731</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>${amount}</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE></DATA></BODY></ENVELOPE>`;
+
+  it("finds an entry typed in Tally with the same amount on the same bank within three days", async () => {
+    const c = await load();
+    const exp = c.expectedVoucher(mine);
+    const hit = c.findExistingEntry(typed("20261002", "590.00"), exp, "ICICI Bank CA 7731");
+    expect(hit).toMatchObject({ amount: 590, number: "12", date: "20261002" });
+  });
+  it("does not mistake another amount, a date too far away, the same entry it wrote, or another bank", async () => {
+    const c = await load();
+    const exp = c.expectedVoucher(mine);
+    expect(c.findExistingEntry(typed("20261002", "591.00"), exp, "ICICI Bank CA 7731")).toBeNull();
+    expect(c.findExistingEntry(typed("20261010", "590.00"), exp, "ICICI Bank CA 7731")).toBeNull();
+    expect(c.findExistingEntry(typed("20261003", "590.00", "fh-abc"), exp, "ICICI Bank CA 7731")).toBeNull();
+    expect(c.findExistingEntry(typed("20261003", "590.00"), exp, "Axis Bank A/c 5426")).toBeNull();
+  });
+  it("asks Tally for the right months and reports the hit; says nothing when Tally cannot be read", async () => {
+    const c = await load();
+    const asked: string[] = [];
+    const hit = await c.checkTallyHasIt(async (b: string) => (asked.push(b), typed("20261002", "590.00")), "Konkan Test Foods Pvt Ltd", mine, "ICICI Bank CA 7731");
+    expect(hit).toMatchObject({ amount: 590 });
+    expect(asked.length).toBeGreaterThan(0);
+    const none = await c.checkTallyHasIt(async () => { throw new Error("down"); }, "Konkan Test Foods Pvt Ltd", mine, "ICICI Bank CA 7731");
+    expect(none).toBeNull();
+  });
+});

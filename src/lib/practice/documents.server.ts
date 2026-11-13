@@ -28,7 +28,7 @@ import {
   runExtract,
   type AiCallRecord,
 } from "./extract/pipeline";
-import { loadSheetReader, loadSheetsReader, pdfText, unlockWorkbook } from "./files.server";
+import { loadSheetReader, loadSheetsReader, pdfItems, pdfText, unlockWorkbook } from "./files.server";
 import { PdfPasswordError } from "./extract/pipeline";
 import { reconStatusFor } from "./reconScope";
 import { passwordNeededMessage, passwordWrongMessage } from "./passwordFile";
@@ -361,11 +361,23 @@ export async function processExtraction(
       throw e;
     }
   }
+  // An Excel file with several sheets: remember their names so a person can pick another one, and honour an earlier pick.
+  let sheetNames: string[] | undefined;
+  if (kind === "xlsx") {
+    try {
+      const all = (await loadSheetsReader())(readBytes);
+      if (all.length > 1) sheetNames = all.map((x) => x.name);
+    } catch {
+      /* the read below reports an unreadable file */
+    }
+  }
+  const sheetInfo = sheetNames ? { sheet_names: sheetNames } : {};
   const outcome = await runExtract(
     {
       bytes: readBytes,
       filename,
       mime: null,
+      sheetName: (doc.extracted as { sheet_name?: string } | null)?.sheet_name ?? null,
       side,
       businessId: doc.business_id,
       clientName: clientRow?.client_name ?? null,
@@ -375,6 +387,7 @@ export async function processExtraction(
       llm: (await withinAiCap(db, doc.ca_firm_id)) ? practiceLlm() : null,
       ocr: practiceOcr(),
       pdfText: (b) => pdfText(b, opts.password),
+      pdfItems: (b) => pdfItems(b, opts.password),
       sheetRows: kind === "xlsx" ? await loadSheetReader() : undefined,
       sheetsAll: kind === "xlsx" ? await loadSheetsReader() : undefined,
     },
@@ -413,6 +426,7 @@ export async function processExtraction(
           kind: outcome.kind,
           register: reg,
           text_preview: outcome.sourceText.slice(0, 20_000),
+          ...sheetInfo,
         },
         extract_finished_at: new Date().toISOString(),
       })
@@ -438,9 +452,10 @@ export async function processExtraction(
   const remembered = applyMemory(outcome.rows, memories);
   const rows = remembered.rows;
 
-  // A Tally sync is the books as they stand in Tally today. An entry deleted or changed in Tally must disappear here too,
-  // matched or not, so the next Recon sees what Tally really holds.
-  if (side === "books" && /tally/i.test(String((doc.extracted as { source?: string } | null)?.source ?? ""))) await dropSyncedBooks(db, doc.id);
+  // A Tally or Zoho sync is the books as they stand in that system today. An entry deleted or changed there must disappear here too,
+  // matched or not, so the next Recon sees what the books really hold.
+  const syncSource = /tally/i.test(String((doc.extracted as { source?: string } | null)?.source ?? "")) ? "Tally" : /zoho/i.test(String((doc.extracted as { source?: string } | null)?.source ?? "")) ? "Zoho Books" : null;
+  if (side === "books" && syncSource) await dropSyncedBooks(db, doc.id, syncSource);
 
   // Is the statement correct and complete? Checked from its own running balance, and against earlier statements of the account.
   let statementReport: (StatementCheck & { overlap: Overlap | null; hold?: { reason: string; suggested: { id: string; name: string } | null } }) | null = null;
@@ -477,8 +492,9 @@ export async function processExtraction(
     // is compared with the client's Tally bank ledgers. A statement for another client is held, not filed.
     try {
       const text = outcome.sourceText ?? "";
-      const { data: cl } = await db.from("ca_clients").select("id, client_name").eq("ca_firm_id", doc.ca_firm_id).limit(2000);
-      const clients = ((cl ?? []) as { id: string; client_name: string }[]).map((c) => ({ id: c.id, name: c.client_name }));
+      // A document carries the client's business id, which is not the id of the ca_clients row: compare on the same key.
+      const { data: cl } = await db.from("ca_clients").select("id, business_id, client_name").eq("ca_firm_id", doc.ca_firm_id).limit(2000);
+      const clients = ((cl ?? []) as { id: string; business_id: string | null; client_name: string }[]).map((c) => ({ id: c.business_id ?? c.id, name: c.client_name }));
       const mine = clients.find((c) => c.id === doc.business_id);
       const { data: co } = await db.from("ca_tally_companies").select("id").eq("ca_firm_id", doc.ca_firm_id).eq("business_id", doc.business_id).limit(1);
       let banks: string[] | null = null;
@@ -524,7 +540,7 @@ export async function processExtraction(
         review_count: 0,
         duplicate_count: 0,
         error_message: "This statement looks like it belongs to another client. Its lines are held.",
-        extracted: { ...(doc.extracted ?? {}), source: (doc.extracted as { source?: string } | null)?.source ?? "Manual", kind: outcome.kind, text_preview: outcome.sourceText.slice(0, 20_000), statement_check: statementReport },
+        extracted: { ...(doc.extracted ?? {}), source: (doc.extracted as { source?: string } | null)?.source ?? "Manual", kind: outcome.kind, text_preview: outcome.sourceText.slice(0, 20_000), statement_check: statementReport, ...sheetInfo },
         extract_finished_at: new Date().toISOString(),
       })
       .eq("id", doc.id);
@@ -547,6 +563,9 @@ export async function processExtraction(
     .eq("extraction_id", doc.id)
     .eq("status", "open");
 
+  // Two lines of one file with the same date, direction, amount and narration but different running balances are two real
+  // transactions: the second gets a key of its own (the first keeps the plain key, so existing data is unaffected).
+  const keyCount = new Map<string, number>();
   const txnRows = rows
     .filter(
       (r) => r.route === "transaction" && r.date && r.amount && r.direction,
@@ -568,15 +587,20 @@ export async function processExtraction(
       confidence: r.confidence,
       raw_text: r.raw_text.slice(0, 4000),
       row_index: r.row_index,
-      dedupe_key: dedupeKey({
-        business_id: doc.business_id,
-        side,
-        date: r.date!,
-        direction: r.direction!,
-        amount: r.amount!,
-        reference: r.reference,
-        description: r.description,
-      }),
+      dedupe_key: (() => {
+        const base = dedupeKey({
+          business_id: doc.business_id,
+          side,
+          date: r.date!,
+          direction: r.direction!,
+          amount: r.amount!,
+          reference: r.reference,
+          description: r.description,
+        });
+        const n = keyCount.get(base) ?? 0;
+        keyCount.set(base, n + 1);
+        return n > 0 && r.balance != null ? `${base}~${Math.round(r.balance * 100)}` : base;
+      })(),
       created_via: "extract",
       created_by: doc.uploaded_by,
       ...reconStatusFor(outcome.documentKind),
@@ -667,6 +691,7 @@ export async function processExtraction(
         kind: outcome.kind,
         text_preview: outcome.sourceText.slice(0, 20_000),
         ...(statementReport ? { statement_check: statementReport } : {}),
+        ...sheetInfo,
       },
       extract_finished_at: new Date().toISOString(),
     })
@@ -733,7 +758,7 @@ export async function processExtraction(
  * to one of them is un-matched again (the match is kept in the history as reversed), and the exceptions of the removed
  * lines go with them, so a deleted voucher leaves no stale book line and no false exception behind.
  */
-export async function dropSyncedBooks(db: Db, extractionId: string): Promise<{ removed: number; reopened: number }> {
+export async function dropSyncedBooks(db: Db, extractionId: string, system = "Tally"): Promise<{ removed: number; reopened: number }> {
   const { data: lines } = await db.from("ca_txns").select("id").eq("extraction_id", extractionId).eq("side", "books").limit(50_000);
   const ids = ((lines ?? []) as { id: string }[]).map((l) => l.id);
   if (!ids.length) return { removed: 0, reopened: 0 };
@@ -744,7 +769,7 @@ export async function dropSyncedBooks(db: Db, extractionId: string): Promise<{ r
     const { data: ms } = await db.from("ca_recon_matches").select("id, bank_txn_id").eq("status", "active").overlaps("book_txn_ids", chunk);
     for (const m of (ms ?? []) as { id: string; bank_txn_id: string }[]) {
       banks.add(m.bank_txn_id);
-      await db.from("ca_recon_matches").update({ status: "reversed", reversed_at: now, notes: "The book entry is no longer in Tally." }).eq("id", m.id).eq("status", "active");
+      await db.from("ca_recon_matches").update({ status: "reversed", reversed_at: now, notes: `The book entry is no longer in ${system}.` }).eq("id", m.id).eq("status", "active");
     }
   }
   const bankIds = [...banks];

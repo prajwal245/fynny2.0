@@ -235,7 +235,8 @@ describe("pipeline", () => {
   });
 
   it("routes rows by confidence and sends in-file duplicates to review without an AI", async () => {
-    const dup = `${HDFC.split("\nTotal")[0]}\n05/09/26,SMS CHGS FOR QTR,,05/09/26,17.70,,"5,07,465.60"`;
+    // The same line printed twice with the same running balance: a repeated line, not a second charge.
+    const dup = `${HDFC.split("\nTotal")[0]}\n05/09/26,SMS CHGS FOR QTR,,05/09/26,17.70,,"5,07,483.30"`;
     const out = await runExtract(
       {
         bytes: enc(dup),
@@ -253,6 +254,17 @@ describe("pipeline", () => {
     expect(review).toHaveLength(1);
     expect(review[0].reason).toMatch(/Identical to row/);
     expect(out.rows[3].category).toBe("bank_charge");
+  });
+
+  it("keeps a second identical line when the running balance moved again (a real second charge)", async () => {
+    const twice = `${HDFC.split("\nTotal")[0]}\n05/09/26,SMS CHGS FOR QTR,,05/09/26,17.70,,"5,07,465.60"`;
+    const out = await runExtract(
+      { bytes: enc(twice), filename: "hdfc.csv", mime: "text/csv", side: "bank", businessId: "b1" },
+      { llm: null },
+    );
+    expect(out.error).toBeNull();
+    expect(out.duplicateRows).toBe(0);
+    expect(out.rows.filter((r) => r.route === "transaction")).toHaveLength(5);
   });
 
   it("uses AI verdicts but keeps going when the AI fails", async () => {

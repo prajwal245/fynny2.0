@@ -41,7 +41,8 @@ import {
   readTallyMasters,
 } from "./tallyMasters";
 import { TALLY_XML_NO_VOUCHERS, unsupportedReport } from "./unsupported";
-import { selectSheet } from "./sheets";
+import { chooseSheet } from "./sheets";
+import { rowsFromPositioned, type PosItem } from "./pdfTable";
 import {
   passwordNeededMessage,
   passwordWrongMessage,
@@ -108,6 +109,8 @@ export interface ExtractDeps {
   sheetRows?: (bytes: Uint8Array) => string[][];
   /** Every sheet with data. When given, the right sheet for this client is chosen instead of always the first. */
   sheetsAll?: (bytes: Uint8Array) => { name: string; rows: string[][] }[];
+  /** Every text piece of a PDF with its position on the page (for reading a statement table by its columns). */
+  pdfItems?: (bytes: Uint8Array) => Promise<PosItem[][]>;
   /** Text of a scanned PDF or photo (OCR.space). Null when OCR is not configured. */
   ocr?: ((bytes: Uint8Array, mime: string) => Promise<string>) | null;
   threshold?: number;
@@ -125,6 +128,8 @@ export interface ExtractInput {
   clientName?: string | null;
   /** The client's GSTIN: its state code tells the AI whether GST should be IGST or CGST/SGST. */
   clientGstin?: string | null;
+  /** The sheet a person chose for an Excel file with several sheets; wins over the automatic choice. */
+  sheetName?: string | null;
 }
 
 export interface ExtractOutcome {
@@ -573,7 +578,7 @@ export async function runExtract(
     let rows: string[][];
     try {
       const chosen = deps.sheetsAll
-        ? selectSheet(deps.sheetsAll(input.bytes), input.clientName)
+        ? chooseSheet(deps.sheetsAll(input.bytes), input.clientName, input.side, input.sheetName)
         : null;
       if (chosen) {
         rows = chosen.sheet.rows;
@@ -721,8 +726,22 @@ export async function runExtract(
       : false;
     if (textRich) {
       sourceText = text.slice(0, MAX_TEXT_CHARS);
-      const statement = rowsFromStatementText(sourceText);
-      if (statement.rows.length >= 3 && statement.verifiedShare >= 0.7) {
+      // First choice: read the table by where the text sits. It keeps wrapped narrations whole, takes each amount from its own
+      // column, and lets the running balance prove the direction of every line.
+      let positioned: ReturnType<typeof rowsFromPositioned> = null;
+      if (deps.pdfItems) {
+        try {
+          positioned = rowsFromPositioned(await deps.pdfItems(input.bytes));
+        } catch {
+          positioned = null; // fall back to the text readers below
+        }
+      }
+      const statement = positioned && positioned.rows.length >= 3 && positioned.verifiedShare >= 0.7 ? positioned : rowsFromStatementText(sourceText);
+      if (statement === positioned && positioned) {
+        parsed = positioned.rows;
+        documentKind = "bank_statement";
+        if (positioned.notes.length) note = positioned.notes.join(" ");
+      } else if (statement.rows.length >= 3 && statement.verifiedShare >= 0.7) {
         parsed = statement.rows;
         documentKind = "bank_statement";
       } else {
@@ -862,7 +881,7 @@ export async function runExtract(
   );
 
   // Identical rows inside one file: keep the first, send the rest to a person.
-  const seen = new Map<string, number>();
+  const seen = new Map<string, { index: number; balance: number | null }>();
   let duplicateRows = 0;
   const rows = scored
     .map((r) => {
@@ -878,15 +897,18 @@ export async function runExtract(
       });
       const first = seen.get(key);
       if (first === undefined) {
-        seen.set(key, r.row_index);
+        seen.set(key, { index: r.row_index, balance: r.balance ?? null });
         return r;
       }
+      // On a statement with a running balance, a line that looks the same but leaves a different balance is a real second
+      // transaction (two identical bank charges, two equal UPI payments), not a repeated import.
+      if (first.balance !== null && r.balance != null && Math.round(first.balance * 100) !== Math.round(r.balance * 100)) return r;
       duplicateRows++;
       return {
         ...r,
         route: "review" as const,
         confidence: Math.min(r.confidence, 0.5),
-        reason: `Identical to row ${first + 1} in the same file. Confirm only if it is a genuine second transaction.`,
+        reason: `Identical to row ${first.index + 1} in the same file. Confirm only if it is a genuine second transaction.`,
       };
     })
     .map((r) => {

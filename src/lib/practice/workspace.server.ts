@@ -276,6 +276,8 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       source?: string;
       rows?: { date: string; particulars: string; amount: number }[];
       register?: { kind: string; label: string; entries: number; totals: { label: string; amount: number }[]; groups?: { key: string; amount: number; count: number }[]; note: string };
+      sheet_names?: string[];
+      sheet_name?: string;
       statement_check?: import("./extract/statementCheck").StatementCheck & { overlap: import("./extract/statementCheck").Overlap | null; hold?: { reason: string; suggested: { id: string; name: string } | null } };
     };
     docName.set(r.id, r.original_filename ?? "Document");
@@ -315,6 +317,8 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       subject: r.gmail_subject ?? undefined,
       register: ex.register ?? undefined,
       statementCheck: ex.statement_check ?? undefined,
+      sheetNames: ex.sheet_names,
+      sheetChoice: ex.sheet_name,
     };
   });
 

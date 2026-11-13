@@ -26,7 +26,8 @@ export async function pdfText(
     }
     throw e;
   }
-  const pages = Math.min(doc.numPages, 40);
+  // Bank statements run to hundreds of pages (a quarterly current-account statement can be 180): read them all.
+  const pages = Math.min(doc.numPages, 600);
   // Keep line structure: statement parsing relies on one transaction per line.
   const out: string[] = [];
   let columns: StatementColumns | null = null;
@@ -67,6 +68,25 @@ export async function pdfText(
     return { text: String(text ?? ""), pages };
   }
   return { text: out.join("\n"), pages };
+}
+
+/** Every text piece of every page with its position, for the table reader (`extract/pdfTable.ts`). */
+export async function pdfItems(
+  bytes: Uint8Array,
+  password?: string,
+): Promise<import("./extract/pdfTable").PosItem[][]> {
+  const { getDocumentProxy } = await import("unpdf");
+  const doc = await getDocumentProxy(new Uint8Array(bytes), password ? { password } : {});
+  const out: import("./extract/pdfTable").PosItem[][] = [];
+  for (let i = 1; i <= Math.min(doc.numPages, 600); i++) {
+    const content = await (await doc.getPage(i)).getTextContent();
+    out.push(
+      (content.items as { str?: string; transform?: number[]; width?: number }[])
+        .filter((it) => typeof it.str === "string")
+        .map((it) => ({ str: it.str as string, x: it.transform?.[4] ?? 0, y: it.transform?.[5] ?? 0, width: it.width ?? 0 })),
+    );
+  }
+  return out;
 }
 
 const iso = (d: Date) =>

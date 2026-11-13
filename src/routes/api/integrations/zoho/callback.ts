@@ -7,6 +7,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 const back = (request: Request, outcome: string, message?: string) => {
   const url = new URL("/app/settings", request.url);
+  url.searchParams.set("tab", "integrations");
   url.searchParams.set("zoho", outcome);
   if (message) url.searchParams.set("zoho_msg", message.slice(0, 200));
   return new Response(null, {

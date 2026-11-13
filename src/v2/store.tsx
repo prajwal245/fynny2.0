@@ -103,6 +103,9 @@ export type Doc = {
   duplicateCount?: number;
   sender?: string;
   subject?: string;
+  /** Excel file with several sheets: their names, and the one a person chose (none = chosen automatically). */
+  sheetNames?: string[];
+  sheetChoice?: string;
   /** GST/TDS/payroll/gateway files: summarised, not reconciled. */
   /** Is the bank statement correct and complete: balance chain, opening and closing, quiet stretches, overlap with earlier statements. */
   statementCheck?: import("@/lib/practice/extract/statementCheck").StatementCheck & { overlap: import("@/lib/practice/extract/statementCheck").Overlap | null; hold?: { reason: string; suggested: { id: string; name: string } | null } };

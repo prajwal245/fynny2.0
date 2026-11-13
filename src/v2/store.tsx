@@ -147,6 +147,8 @@ export type Exception = {
   candidateAmounts?: number[];
   /** The bank line or book entry this exception is about. */
   txnId?: string;
+  /** Approved in FynHelp and already sent to Tally by the connector. */
+  sentToTally?: boolean;
   /** Learned from an earlier decision on the same kind of line: proposed, never applied by itself. */
   precedent?: { action: string; note: string; times: number; at: string; by: string | null };
   status: "open" | "resolved" | "ignored";

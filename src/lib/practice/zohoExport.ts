@@ -12,6 +12,8 @@ export interface ExportException {
   narration: string;
   side?: "bank" | "books";
   status: "open" | "resolved" | "ignored";
+  /** Already approved in FynHelp and sent to Tally by the connector: it must not be in a manual file as well. */
+  sentToTally?: boolean;
 }
 
 export type ExportKind = "expenses" | "receipts" | "bank";
@@ -162,6 +164,9 @@ export function detectBooks(docs: { clientId: string; side?: string; source?: st
 
 const xml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "");
 const tallyDate = (iso: string) => iso.slice(0, 10).replace(/-/g, "");
+const CASH_MOVE = /\b(atm\s*(wdl|withdrawal|cash)|self\s*(wdl|withdrawal)|cash\s*(wdl|withdrawal|deposit|dep)|cdm\b)/i;
+/** A payee printed in capitals on the statement, as a name a person would write ("RAJ TRADERS" to "Raj Traders"). */
+const titleCase = (s: string) => (s === s.toUpperCase() ? s.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase()) : s);
 const TALLY_NAMES: Record<string, string> = {
   "Bank Fees and Charges": "Bank Charges",
   "Rent Expense": "Rent",
@@ -189,7 +194,8 @@ export function buildTallyExport(
   list: ExportException[],
   opts: { clientId: string; clientName: string; period: string | null; stamp?: string; bankLedger: string; /** The Tally company the file is for. Without it Tally imports into whichever company is open. */ company?: string | null },
 ): TallyExport {
-  const lines = openBank(list, opts.clientId, opts.period);
+  // Lines the connector has already written (or has been asked to write) are left out, so the file never repeats them.
+  const lines = openBank(list, opts.clientId, opts.period).filter((e) => !e.sentToTally);
   const slug = opts.clientName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "client";
   const stamp = (opts.stamp ?? opts.period ?? "all-periods").toLowerCase().replace(/[^a-z0-9]+/g, "-");
   const bank = clean(opts.bankLedger) || "Bank Account";
@@ -197,26 +203,27 @@ export function buildTallyExport(
   const vouchers: string[] = [];
   for (const e of lines) {
     const out = e.amount < 0;
-    const other = out
-      ? (TALLY_NAMES[expenseAccount(e.narration)] ?? expenseAccount(e.narration))
-      : partyOf(e.narration) || "Unidentified Receipts (Suspense)";
-    if (!masters.has(other)) masters.set(other, out ? "Indirect Expenses" : /suspense/i.test(other) ? "Suspense A/c" : "Sundry Debtors");
+    // Cash taken from or put into the bank is a Contra with the Cash ledger, never a payment to an expense or a party.
+    const contra = CASH_MOVE.test(e.narration);
+    const other = contra ? "Cash" : out ? (TALLY_NAMES[expenseAccount(e.narration)] ?? expenseAccount(e.narration)) : titleCase(partyOf(e.narration)) || "Unidentified Receipts (Suspense)";
+    if (!contra && !masters.has(other)) masters.set(other, out ? "Indirect Expenses" : /suspense/i.test(other) ? "Suspense A/c" : "Sundry Debtors");
     const amt = money(e.amount);
     const narr = xml(clean(e.narration).slice(0, 200));
-    const type = out ? "Payment" : "Receipt";
+    const type = contra ? "Contra" : out ? "Payment" : "Receipt";
     const entry = (name: string, debit: boolean) =>
       `<ALLLEDGERENTRIES.LIST><LEDGERNAME>${xml(name)}</LEDGERNAME><ISDEEMEDPOSITIVE>${debit ? "Yes" : "No"}</ISDEEMEDPOSITIVE><AMOUNT>${debit ? "-" : ""}${amt}</AMOUNT></ALLLEDGERENTRIES.LIST>`;
     // The bank line comes first, with its own sign: the amount and the side of a voucher are read from the bank, never from
-    // whichever ledger happens to be listed first.
+    // whichever ledger happens to be listed first. Each voucher carries an id of its own, so importing the file twice does not
+    // create the entries twice.
     vouchers.push(
-      `<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER VCHTYPE="${type}" ACTION="Create"><DATE>${tallyDate(e.date)}</DATE><VOUCHERTYPENAME>${type}</VOUCHERTYPENAME><NARRATION>${narr}</NARRATION>${out ? entry(bank, false) + entry(other, true) : entry(bank, true) + entry(other, false)}</VOUCHER></TALLYMESSAGE>`,
+      `<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER REMOTEID="fh-${xml(e.id)}" VCHTYPE="${type}" ACTION="Create"><DATE>${tallyDate(e.date)}</DATE><VOUCHERTYPENAME>${type}</VOUCHERTYPENAME><NARRATION>${narr}</NARRATION>${out ? entry(bank, false) + entry(other, true) : entry(bank, true) + entry(other, false)}</VOUCHER></TALLYMESSAGE>`,
     );
   }
   const ledgers = [...masters].map(
     ([name, parent]) => `<TALLYMESSAGE xmlns:UDF="TallyUDF"><LEDGER NAME="${xml(name)}" ACTION="Create"><NAME.LIST><NAME>${xml(name)}</NAME></NAME.LIST><PARENT>${xml(parent)}</PARENT></LEDGER></TALLYMESSAGE>`,
   );
   const body = [`<?xml version="1.0" encoding="UTF-8"?>`, `<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>All Masters</REPORTNAME>${opts.company ? `<STATICVARIABLES><SVCURRENTCOMPANY>${xml(clean(opts.company))}</SVCURRENTCOMPANY></STATICVARIABLES>` : ""}</REQUESTDESC><REQUESTDATA>`, ...ledgers, ...vouchers, `</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>`].join("\n");
-  return { filename: `tally-vouchers_${slug}_${stamp}.xml`, count: lines.length, total: lines.reduce((s, e) => s + Math.abs(e.amount), 0), xml: body };
+  return { filename: `tally-vouchers_${slug}${opts.company ? `_for-${opts.company.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}` : ""}_${stamp}.xml`, count: lines.length, total: lines.reduce((s, e) => s + Math.abs(e.amount), 0), xml: body };
 }
 
 /**

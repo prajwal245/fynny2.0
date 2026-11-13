@@ -329,6 +329,12 @@ function ReconView(props: {
 const splitDr = (b: { direction: "in" | "out"; amount: number }) => (b.direction === "in" ? b.amount : null);
 const splitCr = (b: { direction: "in" | "out"; amount: number }) => (b.direction === "out" ? b.amount : null);
 
+/** Where the bank ledger chosen for one bank account is remembered, so it is asked once per account and never defaults to another bank. */
+const bankKey = (clientId: string, st: { accountNo: string | null; bank: string | null } | null) => {
+  const acc = st?.accountNo ? st.accountNo.replace(/\D/g, "").slice(-4) : st?.bank ?? "";
+  return acc ? `fh.tallyBankFor.${clientId}.${acc}` : "";
+};
+
 export function TallyPosting({ clientId, documentId }: { clientId: string; documentId?: string }) {
   const [bench, setBench] = useState<Bench | null>(null);
   const [loading, setLoading] = useState(true);
@@ -350,13 +356,32 @@ export function TallyPosting({ clientId, documentId }: { clientId: string; docum
       const b = await tallyWorkbench({ data: { business_id: clientId, document_id: documentId } });
       setUnavailable(false);
       setBench(b);
-      if (b.linked) setBank((cur) => cur || b.bankLedgers[0] || "");
+      // The bank ledger comes from the statement (its account number and bank), or from what was chosen for this account before.
+      // Only when neither is known does it fall back to the first ledger, and the person is asked to check it.
+      if (b.linked)
+        setBank((cur) => {
+          if (cur && b.bankLedgers.includes(cur)) return cur;
+          const key = bankKey(clientId, b.view.statement);
+          let remembered = "";
+          try {
+            remembered = key ? (window.localStorage.getItem(key) ?? "") : "";
+          } catch {
+            /* no storage */
+          }
+          if (remembered && b.bankLedgers.includes(remembered)) return remembered;
+          return b.view.suggestedBank ?? b.bankLedgers[0] ?? "";
+        });
     } catch {
       // Quiet on purpose: if posting is not available yet the panel explains it instead of a red error on every visit.
       setUnavailable(true);
     } finally {
       setLoading(false);
     }
+  }, [clientId, documentId]);
+
+  useEffect(() => {
+    setBank("");
+    setConfirmBank(false);
   }, [clientId, documentId]);
 
   useEffect(() => {
@@ -610,7 +635,7 @@ export function TallyPosting({ clientId, documentId }: { clientId: string; docum
 
       <label style={{ display: "grid", gap: 6, maxWidth: 360 }}>
         <span className="v2-label">Bank ledger in Tally for this statement</span>
-        <select className="v2-input" value={bank} onChange={(e) => setBank(e.target.value)} aria-label="Bank ledger in Tally">
+        <select className="v2-input" value={bank} onChange={(e) => { setBank(e.target.value); const k = bankKey(clientId, linked.view.statement); try { if (k) window.localStorage.setItem(k, e.target.value); } catch { /* no storage */ } }} aria-label="Bank ledger in Tally">
           {linked.bankLedgers.length === 0 && <option value="">No bank ledger found</option>}
           {linked.bankLedgers.map((b) => <option key={b} value={b}>{b}</option>)}
         </select>

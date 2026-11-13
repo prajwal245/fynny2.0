@@ -74,6 +74,8 @@ export interface ClassifyInput {
   exception?: ExceptionInfo | null;
   /** Already approved and sent to Tally, waiting for the next sync to show it as matched. */
   posted?: boolean;
+  /** Where an approved line is: waiting for the connector, being written, or written. */
+  postedState?: "queued" | "sent" | "posted";
   /** Entries of the books by id, so a candidate can be shown. */
   booksById?: Map<string, BookEntry>;
 }
@@ -104,11 +106,18 @@ export function classifyLine(i: ClassifyInput): ReconRow {
       difference: null,
     };
   }
-  if (i.posted) {
+  if (i.posted || i.postedState) {
+    const st = i.postedState ?? "posted";
+    const why =
+      st === "queued"
+        ? "Approved. It is written to Tally the next time the connector checks in."
+        : st === "sent"
+          ? "Being written to Tally now."
+          : "Approved and written to Tally. It shows as matched after the next sync.";
     return {
       status: "pushed",
-      label: STATUS_LABEL.pushed,
-      why: "Approved and written to Tally. It shows as matched after the next sync.",
+      label: st === "posted" ? STATUS_LABEL.pushed : st === "sent" ? "Writing to Tally" : "Approved, waiting for Tally",
+      why,
       tally: [],
       nearest: null,
       difference: null,
@@ -312,4 +321,25 @@ export function compareAccount(
     state: "unknown",
     message: `${label}. The Tally ledger "${ledgerName}" has no bank name or account number in its name, so the two could not be compared.`,
   };
+}
+
+/**
+ * The bank ledger a statement belongs to, so nobody has to pick it by hand and a wrong default can never be one click from posting
+ * money into the wrong bank. A ledger whose name carries the statement's account digits wins; failing that, the only ledger of the
+ * same bank. When it is not clear, nothing is chosen and the person picks.
+ */
+export function pickBankLedger(stmt: StatementAccount | null, ledgers: string[]): string | null {
+  if (!stmt || (!stmt.accountNo && !stmt.bank) || !ledgers.length) return null;
+  const digits = (stmt.accountNo ?? "").replace(/\D/g, "");
+  const last4 = digits.slice(-4);
+  if (last4) {
+    const byDigits = ledgers.filter((l) => [...l.matchAll(/\d{4,}/g)].some((m) => m[0].includes(last4) || digits.includes(m[0])));
+    if (byDigits.length === 1) return byDigits[0]!;
+    if (byDigits.length > 1) return byDigits.find((l) => compareAccount(stmt, l).state === "match") ?? null;
+  }
+  if (stmt.bank) {
+    const sameBank = ledgers.filter((l) => BANKS.find(([, re]) => re.test(l))?.[0] === stmt.bank);
+    if (sameBank.length === 1) return sameBank[0]!;
+  }
+  return null;
 }

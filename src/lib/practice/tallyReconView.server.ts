@@ -10,6 +10,7 @@ import {
   compareAccount,
   duplicateWarning,
   matchReason,
+  pickBankLedger,
   splitDrCr,
   statementAccount,
   type AccountCheck,
@@ -50,6 +51,8 @@ export interface ReconView {
   statement: StatementAccount | null;
   /** The statement's account compared with each bank ledger of the company, by ledger name. */
   accountChecks: Record<string, AccountCheck>;
+  /** The Tally bank ledger that fits the statement (its account digits, or the only ledger of that bank). Null when unclear. */
+  suggestedBank: string | null;
 }
 
 /** The account number and bank of the statement a bank line came from, read from the document's own text. */
@@ -215,7 +218,7 @@ export async function reconView(
             candidates: (e.candidates as never) ?? [],
           }
         : null,
-      posted: opts.postedByTxn.get(id) === "posted",
+      postedState: ["queued", "sent", "posted"].includes(opts.postedByTxn.get(id) ?? "") ? (opts.postedByTxn.get(id) as "queued" | "sent" | "posted") : undefined,
       booksById,
     });
     counts[cls.status]++;
@@ -251,7 +254,7 @@ export async function reconView(
   const accountChecks: Record<string, AccountCheck> = {};
   for (const l of opts.bankLedgers)
     accountChecks[l] = compareAccount(statement, l);
-  return { rows, counts, statement, accountChecks };
+  return { rows, counts, statement, accountChecks, suggestedBank: pickBankLedger(statement, opts.bankLedgers) };
 }
 
 /** What stops an approval until a person confirms it: a statement that seems to belong to another bank account, or a line Tally seems to hold already. */

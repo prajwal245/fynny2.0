@@ -254,3 +254,46 @@ describe("13 Nov bug 3: another client's statement is held, and its owner is fou
     expect(j.owner.state).toBe("unknown");
   });
 });
+
+describe("13 Nov bug 5 and 9: the manual Tally file does not repeat, mislabel or invent", () => {
+  const line = (id: string, amount: number, narration: string, sent = false): ExportException => ({ id, clientId: "c1", date: "2026-10-03", amount, narration, side: "bank", status: "open", sentToTally: sent });
+  const opts = { clientId: "c1", clientName: "Konkan Test Foods", period: null, bankLedger: "ICICI Bank CA 7731", company: "Konkan Test Foods Pvt Ltd" };
+  it("leaves out lines the connector already wrote", () => {
+    const x = buildTallyExport([line("a", -590, "SMS ALERT CHARGES", true), line("b", -4000, "ATM WDL SELF", true), line("c", 19090, "NEFT RAJ TRADERS")], opts);
+    expect(x.count).toBe(1);
+    expect(x.xml).not.toContain("fh-a");
+    expect(x.xml).toContain("fh-c");
+  });
+  it("a cash withdrawal is a Contra with Cash, not a payment to Miscellaneous Expenses, and creates no ledger", () => {
+    const x = buildTallyExport([line("w", -20000, "ATM WDL SELF 00231")], opts).xml;
+    expect(x).toContain('VCHTYPE="Contra"');
+    expect(x).toMatch(/<LEDGERNAME>Cash<\/LEDGERNAME>/);
+    expect(x).not.toContain("Miscellaneous Expenses");
+    expect(x).not.toContain('<LEDGER NAME="Cash"');
+  });
+  it("every voucher has an id of its own, so importing the file twice cannot double the entries", () => {
+    const x = buildTallyExport([line("p1", -590, "SMS CHGS"), line("p2", 1000, "NEFT RAJ")], opts).xml;
+    expect(x).toMatch(/<VOUCHER REMOTEID="fh-p1" VCHTYPE="Payment"/);
+    expect(x).toMatch(/<VOUCHER REMOTEID="fh-p2" VCHTYPE="Receipt"/);
+  });
+  it("a payee printed in capitals becomes a name a person would write, and the file name carries the company", () => {
+    const r = buildTallyExport([line("r", 19090, "NEFT-RAJ TRADERS-INV 12")], opts);
+    expect(r.xml).toMatch(/LEDGERNAME>Raj Traders</);
+    expect(r.filename).toContain("for-konkan-test-foods-pvt-ltd");
+  });
+});
+
+describe("13 Nov bug 4: the bank ledger follows the statement", () => {
+  it("picks the ledger carrying the account digits, else the only ledger of that bank, else nothing", async () => {
+    const { pickBankLedger } = await import("@/lib/practice/tallyReconView");
+    const ledgers = ["Axis Bank A/c 5426", "ICICI Bank CA 7731"];
+    expect(pickBankLedger({ accountNo: "000405017731", bank: "ICICI" }, ledgers)).toBe("ICICI Bank CA 7731");
+    expect(pickBankLedger({ accountNo: null, bank: "Axis" }, ledgers)).toBe("Axis Bank A/c 5426");
+    expect(pickBankLedger({ accountNo: null, bank: "HDFC" }, ledgers)).toBeNull();
+    expect(pickBankLedger({ accountNo: "9999", bank: null }, ledgers)).toBeNull();
+    expect(pickBankLedger(null, ledgers)).toBeNull();
+    // Two ICICI ledgers: the digits decide.
+    expect(pickBankLedger({ accountNo: "5426", bank: "ICICI" }, ["ICICI Bank CA 5426", "ICICI Bank CA 7731"])).toBe("ICICI Bank CA 5426");
+    expect(pickBankLedger({ accountNo: null, bank: "ICICI" }, ["ICICI Bank CA 5426", "ICICI Bank CA 7731"])).toBeNull();
+  });
+});

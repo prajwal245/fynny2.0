@@ -171,3 +171,86 @@ describe("bug 7: a book line names the party, not the bank", () => {
     expect(r.rows[0]).toMatchObject({ counterparty: "Anand Retail", direction: "in", amount: 31200 });
   });
 });
+
+describe("13 Nov bug 2 and bug 11: TallyPrime writes empty bank allocation lists on every leg", () => {
+  // The shape TallyPrime really exports: an empty <BANKALLOCATIONS.LIST> on legs that have no bank detail.
+  const blank = "<BANKALLOCATIONS.LIST> </BANKALLOCATIONS.LIST>";
+  const wrap = (v: string) => `<ENVELOPE><BODY><IMPORTDATA><REQUESTDATA><TALLYMESSAGE>${v}</TALLYMESSAGE></REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>`;
+  const leg = (name: string, deemed: "Yes" | "No", amount: string, extra = blank) => `<ALLLEDGERENTRIES.LIST><LEDGERNAME>${name}</LEDGERNAME><ISDEEMEDPOSITIVE>${deemed}</ISDEEMEDPOSITIVE><AMOUNT>${amount}</AMOUNT>${extra}</ALLLEDGERENTRIES.LIST>`;
+
+  it("a payment written by FynHelp reads back as money out, not in", async () => {
+    const { readTally } = await import("@/lib/practice/extract/tally");
+    // The expense leg is listed first and every leg carries an empty allocation list: the old reader took the first leg as the bank.
+    const x = wrap(`<VOUCHER VCHTYPE="Payment" ACTION="Create"><DATE>20261105</DATE><VOUCHERTYPENAME>Payment</VOUCHERTYPENAME><VOUCHERNUMBER>31</VOUCHERNUMBER><NARRATION>GST payment</NARRATION>${leg("GST Payable", "Yes", "-6320.00")}${leg("Axis Bank A/c 5426", "No", "6320.00")}</VOUCHER>`);
+    const r = readTally(x);
+    expect(r.rows).toHaveLength(1);
+    expect(r.rows[0]).toMatchObject({ amount: 6320, direction: "out", counterparty: "GST Payable" });
+    expect(r.rows[0]!.parse_issues).toEqual([]);
+  });
+
+  it("a receipt keeps its party, and a bank leg with a real allocation is still the bank", async () => {
+    const { readTally } = await import("@/lib/practice/extract/tally");
+    const real = "<BANKALLOCATIONS.LIST><TRANSACTIONTYPE>e-Fund Transfer</TRANSACTIONTYPE><INSTRUMENTNUMBER>UTR123</INSTRUMENTNUMBER><AMOUNT>-31200.00</AMOUNT></BANKALLOCATIONS.LIST>";
+    const x = wrap(`<VOUCHER VCHTYPE="Receipt" ACTION="Create"><DATE>20261108</DATE><VOUCHERTYPENAME>Receipt</VOUCHERTYPENAME><VOUCHERNUMBER>7</VOUCHERNUMBER><PARTYLEDGERNAME>Anand Retail</PARTYLEDGERNAME>${leg("Anand Retail", "No", "31200.00")}${leg("ICICI Bank CA 7731", "Yes", "-31200.00", real)}</VOUCHER>`);
+    const r = readTally(x);
+    expect(r.rows[0]).toMatchObject({ amount: 31200, direction: "in", counterparty: "Anand Retail", reference: "UTR123" });
+  });
+
+  it("a sales voucher with blank allocations is left out of bank reconciliation, and a payment by voucher type wins over a misread leg", async () => {
+    const { readTally } = await import("@/lib/practice/extract/tally");
+    const sale = wrap(`<VOUCHER VCHTYPE="Sales" ACTION="Create"><DATE>20261108</DATE><VOUCHERTYPENAME>Sales</VOUCHERTYPENAME><VOUCHERNUMBER>INV 1182</VOUCHERNUMBER><PARTYLEDGERNAME>Anand Retail</PARTYLEDGERNAME>${leg("Anand Retail", "Yes", "-18400.00")}${leg("Sales", "No", "18400.00")}</VOUCHER>`);
+    const r = readTally(sale);
+    expect(r.rows).toHaveLength(0);
+    expect(r.skippedNonBank).toBe(1);
+    // A Payment whose only bank-looking leg says money in is read as a payment, with a note.
+    const odd = wrap(`<VOUCHER VCHTYPE="Payment" ACTION="Create"><DATE>20261105</DATE><VOUCHERTYPENAME>Payment</VOUCHERTYPENAME><VOUCHERNUMBER>32</VOUCHERNUMBER>${leg("Office Rent", "No", "5000.00")}${leg("HDFC Bank A/c 4417", "Yes", "-5000.00")}</VOUCHER>`);
+    const o = readTally(odd).rows[0]!;
+    expect(o.direction).toBe("out");
+    expect(o.parse_issues[0]).toMatch(/disagrees with the voucher type/);
+  });
+});
+
+describe("13 Nov bug 3: another client's statement is held, and its owner is found", () => {
+  const clients = [
+    { id: "c-konkan", name: "Konkan Test Foods Pvt Ltd" },
+    { id: "c-sahyadri", name: "Sahyadri Test Traders Pvt Ltd" },
+    { id: "c-godavari", name: "Godavari Spices & Foods Pvt Ltd" },
+  ];
+  it("finds the client whose name is on the statement, however the header is laid out", async () => {
+    const { clientFromHeader } = await import("@/lib/practice/extract/statementOwner");
+    expect(clientFromHeader("HDFC BANK LTD\nGODAVARI SPICES AND FOODS PVT LTD\nPlot 4, Vizag\nAccount No 50200071009921", clients)?.id).toBe("c-godavari");
+    expect(clientFromHeader("Statement of account\nM/S SAHYADRI TEST TRADERS\nBranch Pune", clients)?.id).toBe("c-sahyadri");
+    // A single shared word is not enough.
+    expect(clientFromHeader("Konkan Railway Corporation", clients)).toBeNull();
+    expect(clientFromHeader("no names here", clients)).toBeNull();
+  });
+  it("holds a statement printed for another client and offers the right one", async () => {
+    const { judgeOwnership } = await import("@/lib/practice/extract/statementOwner");
+    const text = "HDFC BANK LTD\nGODAVARI SPICES AND FOODS PVT LTD\nAccount No : 50200099009921";
+    const j = judgeOwnership({ text, filename: "Acct.pdf", clientId: "c-sahyadri", clientName: "Sahyadri Test Traders Pvt Ltd", clients, bankLedgers: ["HDFC Bank A/c 4417"] });
+    expect(j.hold).toBe(true);
+    expect(j.suggested).toEqual({ id: "c-godavari", name: "Godavari Spices & Foods Pvt Ltd" });
+    expect(j.owner.state).toBe("mismatch");
+    expect(j.owner.message).toMatch(/for Godavari Spices & Foods Pvt Ltd, not Sahyadri/);
+  });
+  it("does not hold the client's own statement, even when the account cannot be compared", async () => {
+    const { judgeOwnership } = await import("@/lib/practice/extract/statementOwner");
+    const text = "ICICI BANK\nSahyadri Test Traders Pvt Ltd\nAccount No 000405017731";
+    const j = judgeOwnership({ text, filename: "icici.csv", clientId: "c-sahyadri", clientName: "Sahyadri Test Traders Pvt Ltd", clients, bankLedgers: [] });
+    expect(j.hold).toBe(false);
+    expect(j.owner.state).toBe("match");
+  });
+  it("holds when the holder and the account both disagree, though the holder is nobody the firm knows", async () => {
+    const { judgeOwnership } = await import("@/lib/practice/extract/statementOwner");
+    const text = "Account Name : MEHTA TRADING CO\nAccount No : 50200071184402\nHDFC BANK";
+    const j = judgeOwnership({ text, filename: "x.pdf", clientId: "c-konkan", clientName: "Konkan Test Foods Pvt Ltd", clients, bankLedgers: ["ICICI Bank CA 7731"] });
+    expect(j.hold).toBe(true);
+    expect(j.suggested).toBeNull();
+  });
+  it("never holds on an unreadable header: it says it could not compare", async () => {
+    const { judgeOwnership } = await import("@/lib/practice/extract/statementOwner");
+    const j = judgeOwnership({ text: "01/04/26 UPI 500 ...", filename: "s.csv", clientId: "c-konkan", clientName: "Konkan Test Foods Pvt Ltd", clients, bankLedgers: ["HDFC Bank A/c 4417"] });
+    expect(j.hold).toBe(false);
+    expect(j.owner.state).toBe("unknown");
+  });
+});

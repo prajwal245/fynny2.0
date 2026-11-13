@@ -4,7 +4,7 @@
  * queue decisions. Every document, whatever its channel, goes through
  * `processExtraction`.
  */
-import { compareOwner, compareWithBankLedgers, holderName, statementAccount } from "./extract/statementOwner";
+import { judgeOwnership } from "./extract/statementOwner";
 import { checkStatement, findOverlap, overlapSentence, type Overlap, type StatementCheck } from "./extract/statementCheck";
 import {
   PracticeError,
@@ -442,6 +442,97 @@ export async function processExtraction(
   // matched or not, so the next Recon sees what Tally really holds.
   if (side === "books" && /tally/i.test(String((doc.extracted as { source?: string } | null)?.source ?? ""))) await dropSyncedBooks(db, doc.id);
 
+  // Is the statement correct and complete? Checked from its own running balance, and against earlier statements of the account.
+  let statementReport: (StatementCheck & { overlap: Overlap | null; hold?: { reason: string; suggested: { id: string; name: string } | null } }) | null = null;
+  if (side === "bank" && outcome.documentKind !== "invoice" && rows.length) {
+    const usable = rows.filter((r) => r.date && r.amount && r.direction);
+    const check = checkStatement(
+      usable.map((r) => ({ index: r.row_index, date: r.date!, amount: r.amount!, direction: r.direction!, balance: r.balance ?? null })),
+    );
+    let overlap: Overlap | null = null;
+    if (check.first && check.last) {
+      const { data: earlier } = await db
+        .from("ca_txns")
+        .select("txn_date, amount, direction, balance")
+        .eq("ca_firm_id", doc.ca_firm_id)
+        .eq("business_id", doc.business_id)
+        .eq("side", "bank")
+        .neq("extraction_id", doc.id)
+        .gte("txn_date", check.first)
+        .lte("txn_date", check.last)
+        .limit(20000);
+      overlap = findOverlap(
+        usable.map((r) => ({ date: r.date!, amount: r.amount!, direction: r.direction!, balance: r.balance ?? null })),
+        ((earlier ?? []) as { txn_date: string; amount: number | string; direction: "in" | "out"; balance: number | string | null }[]).map((e) => ({
+          date: String(e.txn_date),
+          amount: Number(e.amount),
+          direction: e.direction,
+          balance: e.balance === null || e.balance === undefined ? null : Number(e.balance),
+        })),
+      );
+    }
+    statementReport = { ...check, overlap };
+
+    // Does the statement belong to this client? The name printed on it is looked for among the firm's clients, and its account number
+    // is compared with the client's Tally bank ledgers. A statement for another client is held, not filed.
+    try {
+      const text = outcome.sourceText ?? "";
+      const { data: cl } = await db.from("ca_clients").select("id, client_name").eq("ca_firm_id", doc.ca_firm_id).limit(2000);
+      const clients = ((cl ?? []) as { id: string; client_name: string }[]).map((c) => ({ id: c.id, name: c.client_name }));
+      const mine = clients.find((c) => c.id === doc.business_id);
+      const { data: co } = await db.from("ca_tally_companies").select("id").eq("ca_firm_id", doc.ca_firm_id).eq("business_id", doc.business_id).limit(1);
+      let banks: string[] | null = null;
+      if ((co ?? [])[0]) {
+        const { data: lg } = await db.from("ca_tally_ledgers").select("name, parent").eq("company_id", (co as { id: string }[])[0]!.id);
+        banks = ((lg ?? []) as { name: string; parent: string | null }[]).filter((l) => /bank/i.test(l.parent ?? "")).map((l) => l.name);
+      }
+      const j = judgeOwnership({ text, filename, clientId: doc.business_id ?? "", clientName: mine?.name ?? "", clients, bankLedgers: banks });
+      const extra = [
+        { ok: j.owner.state === "match" ? true : j.owner.state === "mismatch" ? false : null, label: "Account holder", detail: j.owner.message },
+        ...(j.account ? [{ ok: j.account.state === "match" ? true : j.account.state === "mismatch" ? false : null, label: "Account number", detail: j.account.message }] : []),
+      ];
+      statementReport.checks.push(...extra);
+      const confirmed = Boolean((doc.extracted as { owner_confirmed?: boolean } | null)?.owner_confirmed);
+      if (extra.some((c) => c.ok === false)) {
+        statementReport.status = "fail";
+        statementReport.headline = `This statement may belong to another client or account. ${extra.find((c) => c.ok === false)!.detail}`;
+      }
+      if (j.hold && !confirmed) {
+        statementReport.hold = { reason: j.owner.message, suggested: j.suggested };
+      }
+    } catch (e) {
+      console.error(`[practice] owner check for ${doc.id} failed: ${(e as Error).message}`);
+    }
+  }
+
+
+  // Another client's statement: nothing is filed. A person moves it to the right client or says it is right. Until then no line of it
+  // can reach this client's reconciliation or an approval.
+  if (statementReport?.hold) {
+    await db.from("ca_txns").delete().eq("extraction_id", doc.id).eq("match_status", "unmatched").eq("created_via", "extract");
+    await db.from("ca_review_items").delete().eq("extraction_id", doc.id).eq("status", "open");
+    await db
+      .from("ca_document_extractions")
+      .update({
+        extract_status: "needs_review",
+        review_state: "needs_review",
+        classification: outcome.documentKind ?? "bank_statement",
+        file_kind: outcome.kind,
+        side,
+        row_count: rows.length,
+        txn_count: 0,
+        review_count: 0,
+        duplicate_count: 0,
+        error_message: "This statement looks like it belongs to another client. Its lines are held.",
+        extracted: { ...(doc.extracted ?? {}), source: (doc.extracted as { source?: string } | null)?.source ?? "Manual", kind: outcome.kind, text_preview: outcome.sourceText.slice(0, 20_000), statement_check: statementReport },
+        extract_finished_at: new Date().toISOString(),
+      })
+      .eq("id", doc.id);
+    await logActivity(db, doc.ca_firm_id, doc.business_id, "extract", `${filename} was held: ${statementReport.hold.reason} Nothing was filed. Move it to the right client or confirm it belongs here.`.slice(0, 1900));
+    await finishRun(db, runId, runStarted, { summary: `${filename}: held, may belong to another client.`, detail: { held: true } });
+    return { status: "needs_review", txns: 0, review: 0, duplicates: 0, pipeline: [] as { period: string; status: string }[] };
+  }
+
   // Replace the previous run's unconfirmed output.
   await db
     .from("ca_txns")
@@ -489,6 +580,9 @@ export async function processExtraction(
       created_via: "extract",
       created_by: doc.uploaded_by,
       ...reconStatusFor(outcome.documentKind),
+      // A sales invoice or a purchase bill is not a bank movement: its receipt or payment is a separate voucher. Keeping the invoice
+      // out of bank reconciliation stops a bank receipt being "matched" to the invoice it settles.
+      ...(side === "books" && (r.category === "sales_invoice" || r.category === "purchase_invoice") ? { match_status: "ignored" as const, recon_tag: "invoice" as const } : {}),
     }));
 
   let inserted = 0;
@@ -505,63 +599,6 @@ export async function processExtraction(
     inserted += data?.length ?? 0;
   }
   const crossDocDuplicates = txnRows.length - inserted;
-
-  // Is the statement correct and complete? Checked from its own running balance, and against earlier statements of the account.
-  let statementReport: (StatementCheck & { overlap: Overlap | null }) | null = null;
-  if (side === "bank" && outcome.documentKind !== "invoice" && rows.length) {
-    const usable = rows.filter((r) => r.date && r.amount && r.direction);
-    const check = checkStatement(
-      usable.map((r) => ({ index: r.row_index, date: r.date!, amount: r.amount!, direction: r.direction!, balance: r.balance ?? null })),
-    );
-    let overlap: Overlap | null = null;
-    if (check.first && check.last) {
-      const { data: earlier } = await db
-        .from("ca_txns")
-        .select("txn_date, amount, direction, balance")
-        .eq("ca_firm_id", doc.ca_firm_id)
-        .eq("business_id", doc.business_id)
-        .eq("side", "bank")
-        .neq("extraction_id", doc.id)
-        .gte("txn_date", check.first)
-        .lte("txn_date", check.last)
-        .limit(20000);
-      overlap = findOverlap(
-        usable.map((r) => ({ date: r.date!, amount: r.amount!, direction: r.direction!, balance: r.balance ?? null })),
-        ((earlier ?? []) as { txn_date: string; amount: number | string; direction: "in" | "out"; balance: number | string | null }[]).map((e) => ({
-          date: String(e.txn_date),
-          amount: Number(e.amount),
-          direction: e.direction,
-          balance: e.balance === null || e.balance === undefined ? null : Number(e.balance),
-        })),
-      );
-    }
-    statementReport = { ...check, overlap };
-
-    // Does the statement belong to this client? The holder named on it and its account number are compared with the client.
-    try {
-      const text = outcome.sourceText ?? "";
-      const { data: cl } = await db.from("ca_clients").select("client_name").eq("id", doc.business_id).maybeSingle();
-      const owner = compareOwner(holderName(text), String((cl as { client_name?: string } | null)?.client_name ?? ""));
-      const { data: co } = await db.from("ca_tally_companies").select("id").eq("ca_firm_id", doc.ca_firm_id).eq("business_id", doc.business_id).maybeSingle();
-      let account: ReturnType<typeof compareWithBankLedgers> | null = null;
-      if (co) {
-        const { data: lg } = await db.from("ca_tally_ledgers").select("name, parent").eq("company_id", (co as { id: string }).id);
-        const banks = ((lg ?? []) as { name: string; parent: string | null }[]).filter((l) => /bank/i.test(l.parent ?? "")).map((l) => l.name);
-        account = compareWithBankLedgers(statementAccount(text, filename), banks);
-      }
-      const extra = [
-        { ok: owner.state === "match" ? true : owner.state === "mismatch" ? false : null, label: "Account holder", detail: owner.message },
-        ...(account ? [{ ok: account.state === "match" ? true : account.state === "mismatch" ? false : null, label: "Account number", detail: account.message }] : []),
-      ];
-      statementReport.checks.push(...extra);
-      if (extra.some((c) => c.ok === false)) {
-        statementReport.status = "fail";
-        statementReport.headline = `This statement may belong to another client or account. ${extra.find((c) => c.ok === false)!.detail}`;
-      }
-    } catch (e) {
-      console.error(`[practice] owner check for ${doc.id} failed: ${(e as Error).message}`);
-    }
-  }
 
   const reviewRows = rows
     .filter((r) => r.route === "review")

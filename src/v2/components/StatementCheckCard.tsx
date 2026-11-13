@@ -6,7 +6,7 @@ import { AlertTriangle, CheckCircle2, CircleHelp, Layers } from "lucide-react";
 import { overlapSentence, type Overlap, type StatementCheck } from "@/lib/practice/extract/statementCheck";
 import { V, formatDate, formatINR } from "../ui";
 
-type Report = StatementCheck & { overlap: Overlap | null };
+type Report = StatementCheck & { overlap: Overlap | null; hold?: { reason: string; suggested: { id: string; name: string } | null } };
 
 const TONE = {
   pass: { bg: "rgba(47,107,79,.08)", fg: "#2f6b4f", title: "Correct and complete" },
@@ -18,17 +18,18 @@ const TONE = {
 /** "2026-09" to "Sep 2026". */
 const monthName = (m: string) => new Date(`${m}-01T00:00:00Z`).toLocaleString("en-IN", { month: "short", year: "numeric", timeZone: "UTC" });
 
-export function StatementCheckCard({ report, lineCount, period }: { report: Report; lineCount: number; period?: string | null }) {
+export function StatementCheckCard({ report, lineCount, period, onMove, onConfirm, busy }: { report: Report; lineCount: number; period?: string | null; onMove?: (clientId: string) => void; onConfirm?: () => void; busy?: boolean }) {
   // The statement is filed by the dates of its own lines. Say so when the page is set to another month.
   const from = report.first?.slice(0, 7);
   const to = report.last?.slice(0, 7);
   const covers = from && to ? (from === to ? monthName(from) : `${monthName(from)} to ${monthName(to)}`) : null;
   const outside = Boolean(period && /^\d{4}-\d{2}$/.test(period) && from && to && (period < from || period > to));
   const t = TONE[report.status];
-  const overlap = report.overlap ? overlapSentence(report.overlap, lineCount) : null;
+  // The count in the sentence is the statement's own number of lines, not how many rows happen to be loaded on screen.
+  const overlap = report.overlap ? overlapSentence(report.overlap, report.lines || lineCount) : null;
   const Icon = report.status === "pass" ? CheckCircle2 : report.status === "unknown" ? CircleHelp : AlertTriangle;
   return (
-    <section aria-label="Statement check" data-testid="statement-check" style={{ background: t.bg, borderRadius: 14, padding: 14, display: "grid", gap: 10 }}>
+    <section aria-label="Statement check" data-testid="statement-check" style={{ background: t.bg, borderRadius: 14, padding: 14, display: "grid", gap: 10, minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere" }}>
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
         <Icon size={18} style={{ color: t.fg, flexShrink: 0, marginTop: 2 }} />
         <div style={{ display: "grid", gap: 4 }}>
@@ -36,6 +37,25 @@ export function StatementCheckCard({ report, lineCount, period }: { report: Repo
           <div style={{ fontSize: 13.5 }}>{report.headline}</div>
         </div>
       </div>
+
+      {report.hold && (
+        <div role="alert" style={{ border: "1px solid rgba(169,56,56,.45)", background: "rgba(255,255,255,.6)", borderRadius: 12, padding: 12, display: "grid", gap: 8 }}>
+          <b style={{ color: "#a93838" }}>Held: not filed under this client.</b>
+          <span style={{ fontSize: 13 }}>{report.hold.reason} None of its lines reach this client's reconciliation or approvals until you decide.</span>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {report.hold.suggested && onMove && (
+              <button type="button" className="v2-btn v2-btn-primary" disabled={busy} onClick={() => onMove(report.hold!.suggested!.id)}>
+                Move to {report.hold.suggested.name}
+              </button>
+            )}
+            {onConfirm && (
+              <button type="button" className="v2-btn v2-btn-ghost" disabled={busy} onClick={onConfirm}>
+                It does belong to this client: use it
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       <div style={{ display: "grid", gap: 6 }}>
         {report.checks.map((c) => (

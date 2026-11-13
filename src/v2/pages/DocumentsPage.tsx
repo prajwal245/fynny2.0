@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { confirmStatementOwner } from "@/lib/practice/practice.functions";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertTriangle,
@@ -174,6 +175,7 @@ export default function DocumentsPage({
     period,
   } = useV2();
   const [tab, setTab] = useState("All");
+  const [holdBusy, setHoldBusy] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   const [rowQuery, setRowQuery] = useState("");
   const [uploadClient, setUploadClient] = useState(
@@ -738,7 +740,14 @@ export default function DocumentsPage({
               </div>
             </div>
 
-            {active.statementCheck && active.side === "bank" && active.status !== "Processing" && active.status !== "Uploading" && <StatementCheckCard report={active.statementCheck} lineCount={active.rows.length || active.txnCount || 0} period={period} />}
+            {active.statementCheck && active.side === "bank" && active.status !== "Processing" && active.status !== "Uploading" && <StatementCheckCard
+                report={active.statementCheck}
+                lineCount={active.rows.length || active.txnCount || 0}
+                period={period}
+                busy={holdBusy}
+                onMove={(cid) => { setHoldBusy(true); void assignDoc(active.id, cid, "bank").finally(() => setHoldBusy(false)); }}
+                onConfirm={() => { setHoldBusy(true); void confirmStatementOwner({ data: { id: active.id } }).then(() => reprocessDoc(active.id)).catch((e: unknown) => toast.error(e instanceof Error ? e.message : "Could not confirm.")).finally(() => setHoldBusy(false)); }}
+              />}
             {active.status === "Processing" || active.status === "Uploading" ? (
               <RowSkeleton rows={4} />
             ) : active.register ? (

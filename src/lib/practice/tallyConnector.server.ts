@@ -108,6 +108,8 @@ export async function hello(
       name: r.company_name as string,
       mapped: Boolean(r.business_id),
       months: r.business_id ? [...new Set([...monthsToPull(r.last_synced_at as string | null, now), ...extra])].sort() : [],
+      // Months a person asked for by hand: the connector sends them even if FynHelp believes it already has them.
+      force: r.business_id ? extra : [],
     })),
   };
 }
@@ -127,7 +129,7 @@ export type LedgerResult =
   | { status: "unmapped" | "paused" | "rejected"; note: string };
 
 /** One company's Day Book for one month, filed as a books-side document for the mapped client. */
-export async function ingestLedger(db: Db, c: ConnectorRow, company: string, month: string, bytes: Uint8Array): Promise<LedgerResult> {
+export async function ingestLedger(db: Db, c: ConnectorRow, company: string, month: string, bytes: Uint8Array, opts: { force?: boolean } = {}): Promise<LedgerResult> {
   if (!validMonth(month)) throw new PracticeError("bad_month", "The month must look like 2026-04.");
   if (bytes.length === 0) throw new PracticeError("empty", "The file is empty.");
   if (bytes.length > MAX_LEDGER_BYTES) throw new PracticeError("too_large", "Files larger than 25 MB cannot be processed.");
@@ -170,7 +172,8 @@ export async function ingestLedger(db: Db, c: ConnectorRow, company: string, mon
   const filename = `Tally - ${company.replace(/[\\/]/g, "-")} - ${label}.xml`.replace(/[:*?"<>|]/g, " ");
   const note = `${label}: ${vouchers} voucher${vouchers === 1 ? "" : "s"}`;
   const { data: prev } = await db.from("ca_document_extractions").select("id, content_hash").eq("ca_firm_id", c.ca_firm_id).eq("storage_path", path).maybeSingle();
-  if (prev?.content_hash === hash) {
+  // A month a person asked for by hand is always read again, whatever FynHelp thinks it already has.
+  if (prev?.content_hash === hash && !opts.force) {
     await touch(`${note} (no change)`);
     return { status: "unchanged", note: `No changes in Tally since the last sync of ${label}.`, extractionId: prev.id as string };
   }
@@ -181,8 +184,15 @@ export async function ingestLedger(db: Db, c: ConnectorRow, company: string, mon
 
   let extractionId: string;
   if (prev) {
-    await db.from("ca_document_extractions").update({ content_hash: hash, original_filename: filename, extract_status: "queued", error_message: null }).eq("id", prev.id);
-    await processExtraction(db, prev.id as string, { trigger: "channel", userId: null });
+    // The new version counts as "received" only once it has really been read. If the document is busy or the read fails, the old
+    // fingerprint stays, so the next sync sends this month again instead of answering "no changes" about data FynHelp never took in.
+    await db.from("ca_document_extractions").update({ original_filename: filename, extract_status: "queued", error_message: null }).eq("id", prev.id);
+    const done = await processExtraction(db, prev.id as string, { trigger: "channel", userId: null });
+    if (done.status !== "parsed" && done.status !== "needs_review") {
+      await touch(`${label}: not read yet (${done.status}), will be sent again`);
+      return { status: "rejected", note: `${label} could not be read yet (${done.error ?? done.status}). It will be sent again at the next check-in.` };
+    }
+    await db.from("ca_document_extractions").update({ content_hash: hash }).eq("id", prev.id);
     extractionId = prev.id as string;
   } else {
     const reg = await registerDocument(db, { firmId: c.ca_firm_id, userId: null }, {

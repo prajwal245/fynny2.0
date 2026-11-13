@@ -23,12 +23,16 @@ const canApprove = (ctx: FirmContext) =>
   ["owner", "admin", "partner", "manager"].includes(ctx.role);
 
 async function companyFor(db: Db, ctx: FirmContext, businessId: string) {
-  const { data } = await db
+  // A client can be linked to more than one row (the same company reported by an old and a new connector, or two companies).
+  // "Exactly one row" would then fail and the client would wrongly show as not linked, so take the most recently synced one.
+  const { data: rows } = await db
     .from("ca_tally_companies")
     .select("id, company_name, connector_id")
     .eq("ca_firm_id", ctx.firmId)
     .eq("business_id", businessId)
-    .maybeSingle();
+    .order("last_synced_at", { ascending: false, nullsFirst: false })
+    .limit(1);
+  const data = (rows ?? [])[0] ?? null;
   return data as {
     id: string;
     company_name: string;

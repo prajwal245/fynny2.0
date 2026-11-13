@@ -96,12 +96,16 @@ export async function ingestLedgers(
 }
 
 async function companyFor(db: Db, ctx: FirmContext, businessId: string) {
-  const { data } = await db
+  // A client can be linked to more than one row (the same company reported by an old and a new connector, or two companies).
+  // "Exactly one row" would then fail and the client would wrongly show as not linked, so take the most recently synced one.
+  const { data: rows } = await db
     .from("ca_tally_companies")
     .select("id, company_name, last_synced_at, connector_id")
     .eq("ca_firm_id", ctx.firmId)
     .eq("business_id", businessId)
-    .maybeSingle();
+    .order("last_synced_at", { ascending: false, nullsFirst: false })
+    .limit(1);
+  const data = (rows ?? [])[0] ?? null;
   return data as {
     id: string;
     company_name: string;
@@ -140,7 +144,7 @@ export async function workbench(db: Db, ctx: FirmContext, businessId: string, do
   const ledgers = (lg ?? []) as { name: string; parent: string | null }[];
   const { data: con } = await db
     .from("ca_tally_connectors")
-    .select("last_seen_at, agent_version")
+    .select("last_seen_at, agent_version, last_error")
     .eq("id", co.connector_id)
     .maybeSingle();
   const { data: txns } = await db
@@ -209,6 +213,8 @@ export async function workbench(db: Db, ctx: FirmContext, businessId: string, do
     linked: true as const,
     company: co.company_name,
     connectorSeenAt: (con?.last_seen_at as string | null) ?? null,
+    // What the connector last said was wrong with Tally itself (company closed, not reachable): shown instead of a silent wait.
+    connectorProblem: (con?.last_error as string | null) ?? null,
     lastSyncedAt: co.last_synced_at,
     ledgers,
     bankLedgers: bankNames,
@@ -344,6 +350,7 @@ export async function approvePosting(
       txn_date: line.date,
       bank_ledger: exact(line.bankLedger),
       party_ledger: exact(line.splits?.[0]?.ledger ?? line.partyLedger),
+      confirmed_not_duplicate: Boolean(input.confirmNotDuplicate),
       voucher_kind: line.kind ?? null,
       splits: line.splits
         ? line.splits.map((x) => ({
@@ -440,14 +447,14 @@ export async function claimPostings(db: Db, c: ConnectorRow) {
   const { data: rows } = await db
     .from("ca_tally_postings")
     .select(
-      "id, company_id, line_key, direction, amount, txn_date, bank_ledger, party_ledger, narration, reference, voucher_kind, splits",
+      "id, company_id, line_key, direction, amount, txn_date, bank_ledger, party_ledger, narration, reference, voucher_kind, splits, confirmed_not_duplicate",
     )
     .eq("ca_firm_id", c.ca_firm_id)
     .eq("status", "queued")
     .in("company_id", [...byId.keys()])
     .order("approved_at")
     .limit(MAX_CLAIM);
-  const out: { id: string; company: string; xml: string }[] = [];
+  const out: { id: string; company: string; xml: string; bankLedger: string; skipCheck: boolean }[] = [];
   // Connectors from 1.4.0 read TallyPrime's own Import Data shape and read every entry back; older ones get the older shape.
   const { data: me } = await db
     .from("ca_tally_connectors")
@@ -524,6 +531,8 @@ export async function claimPostings(db: Db, c: ConnectorRow) {
         id: r.id as string,
         company: line.company,
         xml: importVoucherXml(line, format),
+        bankLedger: line.bankLedger,
+        skipCheck: Boolean(r.confirmed_not_duplicate),
       });
   }
   return out;

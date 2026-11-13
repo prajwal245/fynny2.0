@@ -211,6 +211,26 @@ export const reprocessPracticeDocument = createServerFn({ method: "POST" })
   );
 
 /**
+ * A statement was held because it looks like another client's. A partner or manager says it does belong to this client: the
+ * statement is read again and filed.
+ */
+export const confirmStatementOwner = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: uuid }).parse(d))
+  .handler(async ({ data, context }) =>
+    withWork(context.userId, async (db, ctx) => {
+      if (!["owner", "admin", "partner", "manager"].includes(ctx.role)) throw new Error("Only a partner or manager can confirm a statement belongs to this client.");
+      const { data: doc } = await db.from("ca_document_extractions").select("id, extracted").eq("id", data.id).eq("ca_firm_id", ctx.firmId).maybeSingle();
+      if (!doc) throw new Error("Document not found.");
+      await db
+        .from("ca_document_extractions")
+        .update({ extracted: { ...((doc.extracted as Record<string, unknown> | null) ?? {}), owner_confirmed: true }, extract_status: "queued", extract_attempts: 0, extract_next_attempt_at: null })
+        .eq("id", data.id);
+      return (await import("./documents.server")).processExtraction(db, data.id, { trigger: "user", userId: ctx.userId });
+    }),
+  );
+
+/**
  * Opens a password-protected PDF or Excel file with the password the person typed, and reads it. The password is used for this
  * one read in memory: it is not saved, not logged, and not sent to the AI. Tries are limited per document.
  */

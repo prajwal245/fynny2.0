@@ -10,9 +10,11 @@ import {
   EmptyState,
   Modal,
   PageHeader,
+  SortTh,
   V,
   formatDate,
   formatINR,
+  useSort,
 } from "../ui";
 import { AgentStatusBadge } from "../agents";
 import { EXCEPTION_REASONS, Exception, monthOf, useV2 } from "../store";
@@ -51,6 +53,18 @@ export default function ExceptionsPage({
   const allOpen = openExceptions(exceptions).filter((e) => client === "all" || e.clientId === client);
   const openInScope = allOpen.filter(inScope);
   const list = openInScope.filter((e) => reason === "all" || e.reason === reason);
+  const exSort = useSort(
+    list,
+    {
+      client: (e) => clientName(e.clientId),
+      reason: (e) => e.reason,
+      side: (e) => e.side ?? "",
+      narration: (e) => e.narration,
+      amount: (e) => e.amount,
+      date: (e) => e.date,
+    },
+    null,
+  );
   const decided = exceptions.filter((e) => e.status !== "open" && inScope(e));
   const active = exceptions.find((e) => e.id === openId) ?? null;
   // Entries already matched elsewhere are never offered again.
@@ -298,19 +312,19 @@ export default function ExceptionsPage({
             <thead>
               <tr>
                 <SelectAllHeader sel={sel} total={list.length} />
-                {!scopedClient && <th>Client</th>}
-                <th>Reason</th>
-                <th>Side</th>
-                <th>Narration</th>
-                <th style={{ textAlign: "right" }}>Amount</th>
-                <th>Date</th>
+                {!scopedClient && <SortTh label="Client" k="client" sort={exSort.sort} toggle={exSort.toggle} />}
+                <SortTh label="Reason" k="reason" sort={exSort.sort} toggle={exSort.toggle} />
+                <SortTh label="Side" k="side" sort={exSort.sort} toggle={exSort.toggle} />
+                <SortTh label="Narration" k="narration" sort={exSort.sort} toggle={exSort.toggle} />
+                <SortTh label="Amount" k="amount" sort={exSort.sort} toggle={exSort.toggle} align="right" />
+                <SortTh label="Date" k="date" sort={exSort.sort} toggle={exSort.toggle} />
                 <th>Best candidate</th>
                 <th className="v2-sticky-end" />
               </tr>
             </thead>
             <tbody>
               <AnimatePresence initial={false}>
-                {list.map((e) => (
+                {exSort.sorted.map((e) => (
                   <motion.tr
                     key={e.id}
                     layout

@@ -65,13 +65,31 @@ export const CAAuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
       return;
     }
-    const { data } = await supabase
-      .from("ca_firms")
-      .select("id, firm_name, membership_number, email, city, state, is_verified, plan_type, max_clients, logo_url")
-      .eq("user_id", uid)
-      .maybeSingle();
-    setCAFirm(data as CAFirm | null);
-    setLoading(false);
+    // Never let a slow or stuck lookup keep the portal on "Loading" forever:
+    // give it 8 seconds, try once more, then stop waiting.
+    const lookup = async () => {
+      const { data } = await supabase
+        .from("ca_firms")
+        .select("id, firm_name, membership_number, email, city, state, is_verified, plan_type, max_clients, logo_url")
+        .eq("user_id", uid)
+        .maybeSingle();
+      return data as CAFirm | null;
+    };
+    const withLimit = <T,>(p: Promise<T>) =>
+      Promise.race([p, new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 8000))]);
+    try {
+      let firm: CAFirm | null;
+      try {
+        firm = await withLimit(lookup());
+      } catch {
+        firm = await withLimit(lookup());
+      }
+      setCAFirm(firm);
+    } catch {
+      // keep whatever firm we already had (cached) rather than blocking
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -101,9 +119,11 @@ export const CAAuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(sess?.user ?? null);
       if (sess?.user) fetchFirm(sess.user.id);
       else setLoading(false);
-    });
+    }).catch(() => setLoading(false));
+    // Last resort: stop blocking after 12 seconds whatever happens.
+    const guardTimer = setTimeout(() => setLoading(false), 12000);
 
-    return () => subscription.unsubscribe();
+    return () => { clearTimeout(guardTimer); subscription.unsubscribe(); };
   }, []);
 
   const signOut = async () => {

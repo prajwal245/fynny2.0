@@ -276,7 +276,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       source?: string;
       rows?: { date: string; particulars: string; amount: number }[];
       register?: { kind: string; label: string; entries: number; totals: { label: string; amount: number }[]; groups?: { key: string; amount: number; count: number }[]; note: string };
-      statement_check?: import("./extract/statementCheck").StatementCheck & { overlap: import("./extract/statementCheck").Overlap | null };
+      statement_check?: import("./extract/statementCheck").StatementCheck & { overlap: import("./extract/statementCheck").Overlap | null; hold?: { reason: string; suggested: { id: string; name: string } | null } };
     };
     docName.set(r.id, r.original_filename ?? "Document");
     const rows =
@@ -372,6 +372,13 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       at: m.lesson.at ?? m.updated_at,
       by: m.lesson.by_name ?? (m.lesson.by ? names.get(m.lesson.by) ?? null : null),
     });
+  // Lines already approved and sent to Tally: a manual file must not offer them again.
+  const exTxnIds = (eRes.data ?? []).map((r) => r.txn_id).filter((x): x is string => Boolean(x));
+  const sentTxn = new Set<string>();
+  for (let i = 0; i < exTxnIds.length; i += 200) {
+    const { data: sent } = await db.from("ca_tally_postings").select("txn_id").in("txn_id", exTxnIds.slice(i, i + 200)).in("status", ["queued", "sent", "posted"]);
+    for (const p of (sent ?? []) as { txn_id: string }[]) sentTxn.add(p.txn_id);
+  }
   const exceptions = (eRes.data ?? []).map((r) => {
     const cands = Array.isArray(r.candidates)
       ? (r.candidates as {
@@ -420,6 +427,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       candidateIds: cands.map((c) => c.txn_id),
       candidateAmounts: cands.map((c) => Number(c.amount)),
       txnId: r.txn_id ?? undefined,
+      sentToTally: r.txn_id ? sentTxn.has(r.txn_id) : false,
       precedent,
       status: (r.status === "resolved"
         ? "resolved"

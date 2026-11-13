@@ -79,10 +79,10 @@ describe("Export for Tally", () => {
     const x = buildTallyExport(list, o);
     expect(x.count).toBe(3);
     expect(x.filename).toBe("tally-vouchers_sun-international_2026-09.xml");
-    expect(x.xml).toContain('<VOUCHER VCHTYPE="Payment" ACTION="Create"><DATE>20260905</DATE>');
+    expect(x.xml).toContain('<VOUCHER REMOTEID="fh-a" VCHTYPE="Payment" ACTION="Create"><DATE>20260905</DATE>');
     expect(x.xml).toContain("<LEDGERNAME>Bank Charges</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-590.00</AMOUNT>");
     expect(x.xml).toContain("<LEDGERNAME>Axis Bank A/c</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>590.00</AMOUNT>");
-    expect(x.xml).toContain('<VOUCHER VCHTYPE="Receipt" ACTION="Create"><DATE>20260908</DATE>');
+    expect(x.xml).toContain('<VOUCHER REMOTEID="fh-b" VCHTYPE="Receipt" ACTION="Create"><DATE>20260908</DATE>');
     expect(x.xml).toContain("<LEDGERNAME>Sundar Auto</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>12500.00</AMOUNT>");
   });
 

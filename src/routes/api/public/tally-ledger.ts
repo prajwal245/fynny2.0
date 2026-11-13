@@ -27,7 +27,7 @@ export const Route = createFileRoute("/api/public/tally-ledger")({
         if (!company) return json({ error: "company is required" }, 400);
         try {
           const bytes = new Uint8Array(await request.arrayBuffer());
-          const result = await t.ingestLedger(db, connector, company, month, bytes);
+          const result = await t.ingestLedger(db, connector, company, month, bytes, { force: url.searchParams.get("force") === "1" });
           return json(result, result.status === "paused" ? 402 : result.status === "rejected" ? 422 : 200);
         } catch (e) {
           const code = (e as { code?: string }).code;

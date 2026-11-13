@@ -59,3 +59,56 @@ export function compareWithBankLedgers(stmt: StatementAccount, ledgers: string[]
 }
 
 export { statementAccount };
+
+/**
+ * Which client's name is printed on the statement? Looks through the top of the statement for the name of every client of the
+ * firm, so it works however the bank lays the header out (a labelled "Account Name", a bare "M/S ..." line, an address block).
+ * A client counts as found when nearly all of the distinctive words of its name are in the header.
+ */
+export function clientFromHeader(text: string, clients: { id: string; name: string }[]): { id: string; name: string; share: number } | null {
+  const head = tokens(text.slice(0, 4500));
+  if (!head.length) return null;
+  let best: { id: string; name: string; share: number } | null = null;
+  for (const c of clients) {
+    const t = tokens(c.name);
+    if (!t.length) continue;
+    const found = t.filter((w) => head.some((h) => h === w || (w.length >= 5 && h.startsWith(w))));
+    const share = found.length / t.length;
+    // One distinctive word alone ("Konkan") is not enough unless the whole name is that one word.
+    if (share >= 0.75 && (found.length >= 2 || t.length === 1) && (!best || share > best.share || (share === best.share && t.length > tokens(best.name).length))) best = { id: c.id, name: c.name, share };
+  }
+  return best;
+}
+
+export interface Ownership {
+  owner: OwnerCheck;
+  account: { state: "match" | "mismatch" | "unknown"; message: string } | null;
+  /** The client whose name is on the statement, when that is not the client it was filed under. */
+  suggested: { id: string; name: string } | null;
+  /** The statement belongs to someone else: its lines are held until a person decides. */
+  hold: boolean;
+}
+
+/** Decides whether a statement belongs to the client it was filed under. */
+export function judgeOwnership(input: {
+  text: string;
+  filename: string;
+  clientId: string;
+  clientName: string;
+  clients: { id: string; name: string }[];
+  bankLedgers: string[] | null;
+}): Ownership {
+  const found = clientFromHeader(input.text, input.clients);
+  const holder = holderName(input.text);
+  let owner: OwnerCheck;
+  let suggested: Ownership["suggested"] = null;
+  if (found && found.id === input.clientId) owner = { state: "match", message: `The statement is for ${input.clientName}.`, holder: holder ?? found.name };
+  else if (found) {
+    suggested = { id: found.id, name: found.name };
+    owner = { state: "mismatch", message: `The statement is for ${found.name}, not ${input.clientName}.`, holder: holder ?? found.name };
+  } else owner = compareOwner(holder, input.clientName);
+  const account = input.bankLedgers ? compareWithBankLedgers(statementAccount(input.text, input.filename), input.bankLedgers) : null;
+  // A statement for another known client, or one whose holder and account both disagree, is not for this client.
+  const hold = Boolean(suggested) || (owner.state === "mismatch" && account?.state === "mismatch");
+  return { owner, account, suggested, hold };
+}

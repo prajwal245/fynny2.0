@@ -105,7 +105,7 @@ export type Doc = {
   subject?: string;
   /** GST/TDS/payroll/gateway files: summarised, not reconciled. */
   /** Is the bank statement correct and complete: balance chain, opening and closing, quiet stretches, overlap with earlier statements. */
-  statementCheck?: import("@/lib/practice/extract/statementCheck").StatementCheck & { overlap: import("@/lib/practice/extract/statementCheck").Overlap | null };
+  statementCheck?: import("@/lib/practice/extract/statementCheck").StatementCheck & { overlap: import("@/lib/practice/extract/statementCheck").Overlap | null; hold?: { reason: string; suggested: { id: string; name: string } | null } };
   register?: { kind: string; label: string; entries: number; totals: { label: string; amount: number }[]; groups?: { key: string; amount: number; count: number }[]; checks?: { ok: boolean; label: string; detail: string }[]; note: string };
 };
 
@@ -147,6 +147,8 @@ export type Exception = {
   candidateAmounts?: number[];
   /** The bank line or book entry this exception is about. */
   txnId?: string;
+  /** Approved in FynHelp and already sent to Tally by the connector. */
+  sentToTally?: boolean;
   /** Learned from an earlier decision on the same kind of line: proposed, never applied by itself. */
   precedent?: { action: string; note: string; times: number; at: string; by: string | null };
   status: "open" | "resolved" | "ignored";

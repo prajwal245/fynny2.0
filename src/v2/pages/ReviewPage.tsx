@@ -9,10 +9,12 @@ import {
   Drawer,
   EmptyState,
   PageHeader,
+  SortTh,
   Tone,
   V,
   formatDate,
   formatINR,
+  useSort,
 } from "../ui";
 import { AgentStatusBadge } from "../agents";
 import { BulkBar, ConfirmButton, SEL_STYLES, SelectAllHeader, SelectCell, useSelection } from "../components/Selection";
@@ -55,6 +57,18 @@ export default function ReviewPage({
     // Lowest confidence first: the riskiest rows get a human eye soonest.
     .sort((a, b) => a.confidence - b.confidence);
 
+  const rvSort = useSort(
+    list,
+    {
+      client: (r) => clientName(r.clientId),
+      date: (r) => r.suggestion.date,
+      line: (r) => r.suggestion.particulars,
+      amount: (r) => r.suggestion.amount,
+      why: (r) => r.reason ?? "",
+      confidence: (r) => r.confidence,
+    },
+    null,
+  );
   const openItem = (r: ReviewItem) => {
     setOpen(r);
     setDraft({
@@ -198,18 +212,18 @@ export default function ReviewPage({
             <thead>
               <tr>
                 <SelectAllHeader sel={sel} total={list.length} />
-                {!scopedClient && <th>Client</th>}
-                <th>Date</th>
-                <th>Line</th>
-                <th style={{ textAlign: "right" }}>Amount</th>
-                <th>Why it needs a look</th>
-                <th>Confidence</th>
+                {!scopedClient && <SortTh label="Client" k="client" sort={rvSort.sort} toggle={rvSort.toggle} />}
+                <SortTh label="Date" k="date" sort={rvSort.sort} toggle={rvSort.toggle} />
+                <SortTh label="Line" k="line" sort={rvSort.sort} toggle={rvSort.toggle} />
+                <SortTh label="Amount" k="amount" sort={rvSort.sort} toggle={rvSort.toggle} align="right" />
+                <SortTh label="Why it needs a look" k="why" sort={rvSort.sort} toggle={rvSort.toggle} />
+                <SortTh label="Confidence" k="confidence" sort={rvSort.sort} toggle={rvSort.toggle} />
                 <th aria-label="Open" />
               </tr>
             </thead>
             <tbody>
               <AnimatePresence initial={false}>
-                {list.map((r) => (
+                {rvSort.sorted.map((r) => (
                   <motion.tr
                     key={r.id}
                     layout

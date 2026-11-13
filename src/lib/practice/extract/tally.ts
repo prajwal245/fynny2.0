@@ -51,7 +51,21 @@ function ledgerEntries(v: XmlNode): LedgerEntry[] {
     ...children(v, "LEDGERENTRIES.LIST"),
   ];
   return lists.map((l) => {
-    const alloc = children(l, "BANKALLOCATIONS.LIST")[0];
+    // TallyPrime writes an EMPTY <BANKALLOCATIONS.LIST> on ledger entries that have no bank detail (every party and expense leg).
+    // Only an allocation that carries something (an amount, an instrument, a transfer type) marks the bank account; counting the
+    // empty ones made the first leg of every voucher look like the bank, which reversed payments and hid the party.
+    const rawAlloc = children(l, "BANKALLOCATIONS.LIST")[0];
+    const alloc =
+      rawAlloc &&
+      (childText(rawAlloc, "AMOUNT") ||
+        childText(rawAlloc, "INSTRUMENTNUMBER") ||
+        childText(rawAlloc, "UNIQUEREFERENCEID") ||
+        childText(rawAlloc, "TRANSACTIONID") ||
+        childText(rawAlloc, "TRANSACTIONTYPE") ||
+        childText(rawAlloc, "BANKNAME") ||
+        childText(rawAlloc, "INSTRUMENTDATE"))
+        ? rawAlloc
+        : undefined;
     const instrument = alloc
       ? childText(alloc, "INSTRUMENTNUMBER") ||
         childText(alloc, "UNIQUEREFERENCEID") ||
@@ -175,6 +189,14 @@ export function readTally(xml: string): TallyRead {
     if (bankEntry && bankEntry.amount !== 0)
       direction = bankEntry.amount < 0 ? "in" : "out";
     else if (kind?.direction) direction = kind.direction;
+    // A Receipt always brings money into the bank and a Payment always sends it out. If the bank leg's sign says the opposite, the
+    // leg was misread (for example the wrong ledger taken as the bank), so the voucher type decides and the line says so. Without
+    // this a payment written by FynHelp could come back as money in and never match its own bank line.
+    if ((vtype.toLowerCase() === "payment" || vtype.toLowerCase() === "receipt") && kind?.direction && direction && direction !== kind.direction) {
+      issues.push(`The bank leg's sign disagrees with the voucher type (${vtype}); read as ${kind.direction === "in" ? "money in" : "money out"}`);
+      direction = kind.direction;
+      confidence = Math.min(confidence, 0.8);
+    }
     if (!direction) {
       direction = "out";
       issues.push(

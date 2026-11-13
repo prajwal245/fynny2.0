@@ -141,7 +141,7 @@ export function BooksExportDrawer({ open, onClose, clientId, allPeriods, initial
     () =>
       exceptions
         .filter((e) => onlyIds || !month || monthOf(e.date) === month)
-        .map((e) => ({ id: e.id, clientId: e.clientId, date: e.date, amount: e.amount, narration: e.narration, side: e.side, status: e.status })),
+        .map((e) => ({ id: e.id, clientId: e.clientId, date: e.date, amount: e.amount, narration: e.narration, side: e.side, status: e.status, sentToTally: e.sentToTally })),
     [exceptions, month, onlyIds],
   );
   const mine = clientId ? everything.filter((e) => e.clientId === clientId && e.status === "open") : [];
@@ -254,9 +254,14 @@ export function BooksExportDrawer({ open, onClose, clientId, allPeriods, initial
         </>
       ) : (
         <>
+          <div role="alert" style={{ border: "2px solid #a93838", background: "rgba(169,56,56,.08)", borderRadius: 12, padding: 12, marginBottom: 12, color: "#7a1f1f" }}>
+            <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase" }}>Before you import</div>
+            <div style={{ fontSize: 17, fontWeight: 700, marginTop: 2 }}>{tallyCompany ? <>Open <u>{tallyCompany}</u> in Tally</> : <>Open this client's company in Tally</>}</div>
+            <div style={{ fontSize: 12.5, marginTop: 4 }}>Tally ignores the company named in the file and imports into <b>whichever company is open</b>. Check the company name at the top of Tally, in Gateway of Tally, before you press Import. A wrong company gets this client's entries and new ledgers.{tallyCompany ? "" : " This client is not linked to a Tally company in Settings, TallyPrime, so the file names none."}</div>
+          </div>
           <ol style={{ fontSize: 12.5, color: V.muted, lineHeight: 1.7, paddingLeft: 18 }}>
             <li>Type the exact name of the bank ledger in Tally, then download the file.</li>
-            <li>{tallyCompany ? <>Open the company <b>{tallyCompany}</b> in Tally (the file names it, so Tally imports into that company only).</> : <>Open the right client's company in Tally first: this client is not linked to a Tally company, so the file does not name one and Tally imports into whichever company is open.</>}</li>
+            <li>In Tally, <b>open the company first</b> (see the red box below). The import goes into whichever company is open.</li>
             <li>In Tally: Gateway of Tally → Import → Data, choose the file, and set "If data already exists" to "Ignore duplicates".</li>
             <li>Check the new vouchers (Day Book) and reclassify any ledger the guess got wrong.</li>
             <li>Sync Tally to FynHelp again and run Recon: the lines should now match.</li>

@@ -11,7 +11,7 @@ import { tallyApprove, tallyCancel, tallyCancelLedger, tallyCreateLedger, tallyM
 import { splitGstInclusive, type Split } from "@/lib/practice/tallyVoucher";
 import { PagesChip, PagesTopUpModal } from "./PagesPanel";
 import { refreshPages } from "../lib/pages";
-import { Badge, Card, V, formatDate, formatINR } from "../ui";
+import { Badge, Card, SortTh, V, formatDate, formatINR, useSort } from "../ui";
 
 type Bench = Awaited<ReturnType<typeof tallyWorkbench>>;
 type Linked = Extract<Bench, { linked: true }>;
@@ -151,6 +151,18 @@ function ReconView(props: {
     return Boolean(l && (!l.posting || l.posting.status === "failed"));
   };
   const rows = view.rows.filter((r) => (props.filter === "all" ? true : props.filter === "missing" ? r.status === "missing" || r.status === "pushed" : r.status === props.filter));
+  // Click a heading to sort the statement lines: by date, particulars, debit, credit or status.
+  const sorter = useSort(
+    rows,
+    {
+      date: (r) => r.date,
+      particulars: (r) => r.particulars,
+      debit: (r) => r.debit,
+      credit: (r) => r.credit,
+      status: (r) => r.label,
+    },
+    null,
+  );
   // A line can be ticked when it is missing, has an existing ledger, and nothing is waiting for a person's word.
   const tickable = (r: VRow) => {
     const l = props.lineFor(r.txn_id);
@@ -217,19 +229,19 @@ function ReconView(props: {
               </tr>
               <tr className="v2-head2" style={{ height: 28, color: V.muted, fontSize: 11.5 }}>
                 <th />
-                <th style={{ textAlign: "left", padding: "4px 10px" }}>Date</th>
-                <th style={{ textAlign: "left", padding: "4px 10px" }}>Particulars</th>
-                <th style={{ textAlign: "right", padding: "4px 10px" }}>Debit</th>
-                <th style={{ textAlign: "right", padding: "4px 10px" }}>Credit</th>
+                <SortTh label="Date" k="date" sort={sorter.sort} toggle={sorter.toggle} />
+                <SortTh label="Particulars" k="particulars" sort={sorter.sort} toggle={sorter.toggle} />
+                <SortTh label="Debit" k="debit" sort={sorter.sort} toggle={sorter.toggle} align="right" />
+                <SortTh label="Credit" k="credit" sort={sorter.sort} toggle={sorter.toggle} align="right" />
                 <th style={{ textAlign: "left", padding: "4px 10px", borderLeft: `1px solid ${V.line}` }}>Date</th>
                 <th style={{ textAlign: "left", padding: "4px 10px" }}>Entry</th>
                 <th style={{ textAlign: "right", padding: "4px 10px" }}>Debit</th>
                 <th style={{ textAlign: "right", padding: "4px 10px" }}>Credit</th>
-                <th style={{ borderLeft: `1px solid ${V.line}` }} />
+                <SortTh label="Sort by status" k="status" sort={sorter.sort} toggle={sorter.toggle} className="rv-statushead" />
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, i) => {
+              {sorter.sorted.map((r, i) => {
                 const t = TAG[r.status]!;
                 const l = props.lineFor(r.txn_id);
                 const showCard = Boolean(l && open(r) && (r.status === "missing" || (r.status === "partial" && props.asSeparate[r.txn_id])));
@@ -329,6 +341,12 @@ function ReconView(props: {
 const splitDr = (b: { direction: "in" | "out"; amount: number }) => (b.direction === "in" ? b.amount : null);
 const splitCr = (b: { direction: "in" | "out"; amount: number }) => (b.direction === "out" ? b.amount : null);
 
+/** Where the bank ledger chosen for one bank account is remembered, so it is asked once per account and never defaults to another bank. */
+const bankKey = (clientId: string, st: { accountNo: string | null; bank: string | null } | null) => {
+  const acc = st?.accountNo ? st.accountNo.replace(/\D/g, "").slice(-4) : st?.bank ?? "";
+  return acc ? `fh.tallyBankFor.${clientId}.${acc}` : "";
+};
+
 export function TallyPosting({ clientId, documentId }: { clientId: string; documentId?: string }) {
   const [bench, setBench] = useState<Bench | null>(null);
   const [loading, setLoading] = useState(true);
@@ -350,13 +368,32 @@ export function TallyPosting({ clientId, documentId }: { clientId: string; docum
       const b = await tallyWorkbench({ data: { business_id: clientId, document_id: documentId } });
       setUnavailable(false);
       setBench(b);
-      if (b.linked) setBank((cur) => cur || b.bankLedgers[0] || "");
+      // The bank ledger comes from the statement (its account number and bank), or from what was chosen for this account before.
+      // Only when neither is known does it fall back to the first ledger, and the person is asked to check it.
+      if (b.linked)
+        setBank((cur) => {
+          if (cur && b.bankLedgers.includes(cur)) return cur;
+          const key = bankKey(clientId, b.view.statement);
+          let remembered = "";
+          try {
+            remembered = key ? (window.localStorage.getItem(key) ?? "") : "";
+          } catch {
+            /* no storage */
+          }
+          if (remembered && b.bankLedgers.includes(remembered)) return remembered;
+          return b.view.suggestedBank ?? b.bankLedgers[0] ?? "";
+        });
     } catch {
       // Quiet on purpose: if posting is not available yet the panel explains it instead of a red error on every visit.
       setUnavailable(true);
     } finally {
       setLoading(false);
     }
+  }, [clientId, documentId]);
+
+  useEffect(() => {
+    setBank("");
+    setConfirmBank(false);
   }, [clientId, documentId]);
 
   useEffect(() => {
@@ -505,7 +542,13 @@ export function TallyPosting({ clientId, documentId }: { clientId: string; docum
                 <>
                   {l.posting?.status === "failed" && (
                     <div role="alert" style={{ background: "rgba(169,56,56,.07)", borderRadius: 10, padding: "8px 12px", fontSize: 12.5, color: V.maroon }}>
-                      {l.posting.last_error || "This entry did not reach Tally."} Check Tally for this entry before approving again.
+                      {l.posting.last_error || "This entry did not reach Tally."} {/already has/i.test(l.posting.last_error ?? "") ? "" : "Check Tally for this entry before approving again."}
+                      {/already has/i.test(l.posting.last_error ?? "") && (
+                        <label style={{ display: "flex", gap: 8, alignItems: "flex-start", marginTop: 6, color: V.ink }}>
+                          <input type="checkbox" checked={Boolean(notDup[l.txn_id])} onChange={(e) => setNotDup((cur) => ({ ...cur, [l.txn_id]: e.target.checked }))} style={{ marginTop: 3 }} />
+                          <span>This is a different transaction from the one in Tally. Write it anyway when I approve again.</span>
+                        </label>
+                      )}
                       <div style={{ marginTop: 6 }}>
                         <button className="v2-btn v2-btn-ghost" disabled={busy === l.posting.id} onClick={() => void markPosted(l.posting!.id)}><CheckCircle2 size={14} /> It is in Tally: mark as posted</button>
                       </div>
@@ -608,9 +651,16 @@ export function TallyPosting({ clientId, documentId }: { clientId: string; docum
         </div>
       )}
 
+      {linked.connectorProblem && (
+        <div role="alert" style={{ display: "flex", gap: 10, padding: "10px 12px", borderRadius: 12, background: "rgba(176,122,26,.12)", color: "#6d4a08", fontSize: 13 }}>
+          <TriangleAlert size={16} style={{ flexShrink: 0, marginTop: 2 }} />
+          <span><b>Waiting for Tally.</b> {linked.connectorProblem} Lines you approve now are written as soon as this is fixed.</span>
+        </div>
+      )}
+
       <label style={{ display: "grid", gap: 6, maxWidth: 360 }}>
         <span className="v2-label">Bank ledger in Tally for this statement</span>
-        <select className="v2-input" value={bank} onChange={(e) => setBank(e.target.value)} aria-label="Bank ledger in Tally">
+        <select className="v2-input" value={bank} onChange={(e) => { setBank(e.target.value); const k = bankKey(clientId, linked.view.statement); try { if (k) window.localStorage.setItem(k, e.target.value); } catch { /* no storage */ } }} aria-label="Bank ledger in Tally">
           {linked.bankLedgers.length === 0 && <option value="">No bank ledger found</option>}
           {linked.bankLedgers.map((b) => <option key={b} value={b}>{b}</option>)}
         </select>

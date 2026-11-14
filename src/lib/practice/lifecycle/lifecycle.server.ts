@@ -9,7 +9,7 @@ import type { Db } from "../db.server";
 import { sendEmail } from "../email.server";
 import { claimJob, istParts, recordJob } from "../jobs.server";
 import { previousMonth } from "../billing/arrears";
-import { accessFor, cheapestPlan, documentAllowance, type BillingRow, type Cycle, type PlanKey } from "../billing/plans";
+import { accessFor, cheapestPlan, documentAllowance, trialEndFrom, type BillingRow, type Cycle, type PlanKey } from "../billing/plans";
 import { monthRange, usageFor } from "../billing/usage.server";
 import { lifecycleEmail, renderEmail, type EmailContext } from "./emails";
 import { lifecycleEmailsOn, optOutUrl } from "./optout.server";
@@ -53,6 +53,33 @@ export async function runLifecycle(db: Db, now: Date = new Date(), opts: { force
   const { data, error } = await q;
   if (error) throw new Error(error.message);
   const firms = ((data ?? []) as unknown as FirmRow[]).filter((f) => f.ca_firms?.email && !f.ca_firms.is_demo && !f.ca_firms.is_test);
+  // A firm only gets its billing record when someone first opens the app. One that was created and never opened
+  // again has none, and would never hear from us: treat it as a trial that has not started.
+  {
+    const known = new Set(firms.map((f) => f.ca_firm_id));
+    const fresh = await db
+      .from("ca_firms")
+      .select("id, firm_name, email, created_at, notification_prefs, is_demo, is_test")
+      .gte("created_at", new Date(now.getTime() - 11 * 86_400_000).toISOString())
+      .limit(500);
+    for (const x of fresh.data ?? []) {
+      const id = String(x.id);
+      if (known.has(id) || !x.email || x.is_demo || x.is_test) continue;
+      if (opts.firmIds?.length && !opts.firmIds.includes(id)) continue;
+      firms.push({
+        ca_firm_id: id,
+        plan: "starter",
+        cycle: "monthly",
+        status: "trialing",
+        trial_ends_at: trialEndFrom(new Date(String(x.created_at))).toISOString(),
+        trial_started_at: null,
+        activated_at: null,
+        current_period_end: null,
+        first_paid_at: null,
+        ca_firms: { firm_name: String(x.firm_name), email: String(x.email), created_at: String(x.created_at), notification_prefs: x.notification_prefs, is_demo: false, is_test: false },
+      } as unknown as FirmRow);
+    }
+  }
   if (!firms.length) return out;
   const ids = firms.map((f) => f.ca_firm_id);
 

@@ -21,6 +21,53 @@ type Outcome = (typeof OUTCOMES)[number][0];
 const waLink = (phone: string, text: string) => `https://wa.me/${phone.replace(/\D/g, "")}?text=${encodeURIComponent(text)}`;
 const OUTCOME_LABEL = Object.fromEntries(OUTCOMES) as Record<string, string>;
 
+const ist = (iso: string) => new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" });
+
+type Delivery = {
+  emailConnected: boolean;
+  touchpoints: { at: string; opened: number | null; emailed: number | null; whatsapped: number | null } | null;
+  lifecycle: { at: string; checked: number | null; sent: number | null; errors: number | null } | null;
+  lifecycleEmails30: number;
+};
+
+/** Whether the hourly job is firing and whether email can leave the server, so "nothing was sent" has a reason. */
+function DeliveryHealth({ d }: { d: Delivery }) {
+  const hoursAgo = d.touchpoints ? (Date.now() - new Date(d.touchpoints.at).getTime()) / 3_600_000 : null;
+  const tickOk = hoursAgo != null && hoursAgo <= 3;
+  const rows: { ok: boolean | null; label: string; detail: string }[] = [
+    {
+      ok: tickOk,
+      label: "Hourly job",
+      detail: d.touchpoints
+        ? tickOk
+          ? `Last ran ${ist(d.touchpoints.at)} IST (opened ${d.touchpoints.opened ?? 0}, emailed ${d.touchpoints.emailed ?? 0}, WhatsApp ${d.touchpoints.whatsapped ?? 0}). It sends only between 9 am and 8 pm IST.`
+          : `Last ran ${ist(d.touchpoints.at)} IST, which is a long time ago. The 15-minute job in Supabase is not calling the site: check that the ca_cron_secret secret exists in Vault and the job ca-poll-gmail-15min is scheduled.`
+        : "It has never run. The 15-minute job in Supabase is not calling the site: check the ca_cron_secret secret in Vault and the job ca-poll-gmail-15min.",
+    },
+    {
+      ok: d.emailConnected,
+      label: "Email",
+      detail: d.emailConnected ? "The email provider is connected." : "No email provider is connected, so no email leaves the server at all. Add RESEND_API_KEY (and PRACTICE_FROM_EMAIL) in Vercel and redeploy.",
+    },
+    {
+      ok: d.lifecycleEmails30 > 0 ? true : null,
+      label: "Nudge emails",
+      detail: `${d.lifecycleEmails30} sent in the last 30 days (upload nudges, trial reminders, recaps). These are separate from the follow-up emails counted above, and every one is recorded.`,
+    },
+  ];
+  return (
+    <div className="grid gap-2">
+      {rows.map((r) => (
+        <div key={r.label} className="flex flex-wrap items-start gap-2 text-sm">
+          <Pill tone={r.ok === true ? "good" : r.ok === false ? "bad" : "info"}>{r.ok === true ? "OK" : r.ok === false ? "Check" : "Nothing yet"}</Pill>
+          <b>{r.label}</b>
+          <span style={{ color: muted }}>{r.detail}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function FollowUpsPage() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>("open");
@@ -75,10 +122,16 @@ export default function FollowUpsPage() {
             <Kpi label="Came back" value={d.stats.cameBack} hint="moved on after we reached out" />
             <Kpi label="Moved on alone" value={d.stats.movedOn} hint="before we reached out" />
             <Kpi label="Reached by a person" value={d.stats.reached} hint="marked reached" />
-            <Kpi label="Emails sent" value={d.stats.emailed} hint="automatic nudges" />
+            <Kpi label="Follow-up emails" value={d.stats.emailed} hint="sent for unfinished sign-ups and unpaid plans only" />
             <Kpi label="WhatsApp sent" value={d.stats.whatsapped} hint="to people who agreed" />
             <Kpi label="Asked for a call" value={d.stats.asked} hint="tapped Call me or wrote back" />
           </div>
+        </Panel>
+      )}
+
+      {d && (
+        <Panel title="Is it running?" testId="delivery-health">
+          <DeliveryHealth d={d.delivery} />
         </Panel>
       )}
 

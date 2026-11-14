@@ -814,6 +814,25 @@ export async function followUps(ctx: AdminCtx, status: "open" | "closed", refres
     asked: r.filter((x) => x.callback_requested_at).length,
   };
 
+  // Is it running? When the hourly job last ran, whether email can leave the server, and what actually went out.
+  const [{ data: runs }, lifecycleSent] = await Promise.all([
+    db.from("ca_job_runs").select("job, ran_at, result").in("job", ["touchpoints", "lifecycle"]).order("ran_at", { ascending: false }).limit(60),
+    db.from("ca_lifecycle_emails").select("id", { count: "exact", head: true }).gte("sent_at", thirty),
+  ]);
+  const lastRun = (job: string) => {
+    const r = (runs ?? []).find((x) => x.job === job);
+    if (!r) return null;
+    const res = (r.result ?? {}) as Record<string, unknown>;
+    const n = (k: string) => (typeof res[k] === "number" ? (res[k] as number) : null);
+    return { at: String(r.ran_at), opened: n("opened"), emailed: n("emailed"), whatsapped: n("whatsapped"), checked: n("checked"), sent: n("sent"), errors: n("errors") };
+  };
+  const delivery = {
+    emailConnected: Boolean(process.env["RESEND_API_KEY"]),
+    touchpoints: lastRun("touchpoints"),
+    lifecycle: lastRun("lifecycle"),
+    lifecycleEmails30: lifecycleSent.count ?? 0,
+  };
+
   // Is WhatsApp ready for follow-ups? One line per template, in words.
   const { touchSender } = await import("../practice/touchpoints/whatsapp.server");
   const { listTemplates } = await import("../practice/whatsappTemplates.server");
@@ -857,6 +876,7 @@ export async function followUps(ctx: AdminCtx, status: "open" | "closed", refres
   return {
     funnel,
     stats,
+    delivery,
     whatsapp,
     rows: rows.map((t) => ({
       id: String(t.id),

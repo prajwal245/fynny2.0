@@ -49,6 +49,10 @@ Meta sometimes reclassifies a Utility template as Marketing after approval, and 
 | `fh_setup_help_v2` | `Hello {{1}}, this is FynHelp about your account for {{2}}. Set-up is not finished yet. {{3}} The buttons below let you ask us to call, pause these messages or stop them.` |
 | `fh_trial_update_v2` | `Hello {{1}}, this is an update about the FynHelp trial for {{2}}. The trial {{3}}. Your data is saved. The buttons below let you ask us to call, pause these messages or stop them.` |
 | `fh_plan_help_v2` | `Hello {{1}}, this is an update about the FynHelp plan for {{2}}. The payment {{3}}. Your data is saved. The buttons below let you ask us to call, pause these messages or stop them.` |
+| `fh_account_update_v2` | The same wording as `fh_account_update` below. |
+| `fh_results_ready_v2` | The same wording as `fh_results_ready` below. |
+
+**Fastest way:** `WHATSAPP_ACCESS_TOKEN=<token> WHATSAPP_WABA_ID=<id> node scripts/whatsapp-templates.mjs --apply` creates all five `_v2` templates (and anything else missing) as Utility. A template Meta classed as Marketing can never become Utility under its own name, so for `fh_account_update` and `fh_results_ready` the `_v2` names are the only fix.
 
 ### Document problems: `fh_account_update` (Utility)
 Sent when a firm has a document FynHelp could not read (photo too blurred, scan unreadable, unsupported file), at most once a day, 1 hour after it fails, only inside 9 am to 8 pm IST, and only to people who ticked WhatsApp (the sign-up box is ticked by default and can be unticked). Same four buttons as above (Open FynHelp, Call me, Not now, Stop messages). Category **Utility**, language `en`:
@@ -70,7 +74,8 @@ They state only what happened on the person's own account and what the buttons d
 1. Make sure these are set in Vercel (they are the same ones the Chaser uses): `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_DEFAULT_PHONE_NUMBER_ID`, **`WHATSAPP_WABA_ID`** (needed so FynHelp can check each template is approved and Utility).
 2. Optional, only if you used other template names: `WHATSAPP_TOUCH_SETUP_TEMPLATE`, `WHATSAPP_TOUCH_TRIAL_TEMPLATE`, `WHATSAPP_TOUCH_PLAN_TEMPLATE`.
 3. Apply `supabase/migrations/20261031090000_touch_whatsapp.sql`.
-4. Open **Admin → Follow-ups**. The **WhatsApp follow-ups** panel shows each template as Ready or Not ready, with the reason.
+4. Open **Admin → Follow-ups**. The **WhatsApp follow-ups** panel shows each template as Ready or Not ready, with the reason. **Check again** reads WhatsApp right now (otherwise the list is kept for 5 minutes), and **What WhatsApp returned** lists every `fh_` template on the account with its language, status and category. If a template you created is not in that list, it is on a different WhatsApp Business Account than `WHATSAPP_WABA_ID`, or its language differs from `WHATSAPP_TEMPLATE_LANG` (default `en`).
+5. Follow-ups are sent by the tick that runs every 15 minutes from Supabase (`ca-poll-gmail-15min`, which needs the `ca_cron_secret` Vault secret). Vercel's own cron runs once a day at 7:30 am India time, which is before the 9 am start, so it never sends them.
 
 ## What happens when a person taps
 | Button | What FynHelp does |

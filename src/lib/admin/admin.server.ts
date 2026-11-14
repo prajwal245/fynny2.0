@@ -763,7 +763,7 @@ export async function systemHealth(ctx: AdminCtx) {
 
 const IST_DAY = (iso: string) => new Date(new Date(iso).getTime() + 5.5 * 3600_000).toISOString().slice(0, 10);
 
-export async function followUps(ctx: AdminCtx, status: "open" | "closed") {
+export async function followUps(ctx: AdminCtx, status: "open" | "closed", refresh = false) {
   const { db } = ctx;
   const now = new Date();
   const thirty = new Date(now.getTime() - 30 * DAY).toISOString();
@@ -819,15 +819,26 @@ export async function followUps(ctx: AdminCtx, status: "open" | "closed") {
   const { listTemplates } = await import("../practice/whatsappTemplates.server");
   const { TOUCH_TEMPLATES_UTILITY, pickTouchTemplate, marketingAllowed } = await import("../practice/touchpoints/whatsapp");
   const sender = touchSender();
-  const metaList = sender?.wabaId ? await listTemplates({ wabaId: sender.wabaId, token: sender.token }) : null;
+  const language = (process.env["WHATSAPP_TEMPLATE_LANG"] ?? "").trim() || "en";
+  // "Check again" reads Meta now instead of the list kept for a few minutes.
+  const metaList = sender?.wabaId ? await listTemplates({ wabaId: sender.wabaId, token: sender.token }, Date.now(), { fresh: refresh }) : null;
   const names = { setup: process.env["WHATSAPP_TOUCH_SETUP_TEMPLATE"], trial: process.env["WHATSAPP_TOUCH_TRIAL_TEMPLATE"], plan: process.env["WHATSAPP_TOUCH_PLAN_TEMPLATE"], issue: process.env["WHATSAPP_TOUCH_ISSUE_TEMPLATE"], ready: process.env["WHATSAPP_TOUCH_READY_TEMPLATE"] };
   const whatsapp = {
     ready: Boolean(sender?.wabaId && metaList),
     problem: !sender ? "FynHelp's WhatsApp number or token is not set up." : !sender.wabaId ? "Add WHATSAPP_WABA_ID so FynHelp can check the templates." : !metaList ? "Could not read the templates from Meta." : null,
     marketingAllowed: marketingAllowed(process.env["WHATSAPP_TOUCH_ALLOW_MARKETING"]),
+    language,
+    /** The last four characters of the account id the templates were read from, so a wrong account is easy to spot. */
+    account: sender?.wabaId ? `…${sender.wabaId.slice(-4)}` : null,
+    /** Every FynHelp template Meta returned for that account, exactly as Meta spells it. */
+    found: (metaList ?? [])
+      .filter((t) => /^fh_/i.test(t.name))
+      .map((t) => ({ name: t.name, language: t.language, status: t.status, category: t.category ?? null }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    totalTemplates: metaList?.length ?? 0,
     templates: (["setup", "trial", "plan", "issue", "ready"] as const).map((k) => {
       const pick = metaList
-        ? pickTouchTemplate(k, metaList, { envName: names[k], language: "en", allowMarketing: marketingAllowed(process.env["WHATSAPP_TOUCH_ALLOW_MARKETING"]) })
+        ? pickTouchTemplate(k, metaList, { envName: names[k], language, allowMarketing: marketingAllowed(process.env["WHATSAPP_TOUCH_ALLOW_MARKETING"]) })
         : { name: names[k] || TOUCH_TEMPLATES_UTILITY[k].name, template: undefined, marketing: false, why: "not checked" };
       return {
         key: k,

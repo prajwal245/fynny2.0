@@ -221,12 +221,19 @@ describe("sending a follow-up on WhatsApp", () => {
     const { sendTouchWhatsapps } = await import("@/lib/practice/touchpoints/whatsapp.server");
     const { forgetTemplates } = await import("@/lib/practice/whatsappTemplates.server");
     tables.ca_touchpoints = [tp(ID)];
+    // Marketing templates are allowed by default (at a higher rate); the switch-off flag is what this checks.
+    process.env["WHATSAPP_TOUCH_ALLOW_MARKETING"] = "0";
     for (const bad of [tpl("fh_setup_help", { category: "MARKETING" }), tpl("fh_setup_help", { status: "PENDING" }), tpl("fh_setup_help", { components: [{ type: "BODY" }] })]) {
       metaList = [bad];
       forgetTemplates();
       expect((await sendTouchWhatsapps(db(), [subject(ID)], now, 12)).sent).toBe(0);
     }
     expect(sent).toHaveLength(0);
+    delete process.env["WHATSAPP_TOUCH_ALLOW_MARKETING"];
+    // With the switch removed, the same approved Marketing template is used.
+    metaList = [tpl("fh_setup_help", { category: "MARKETING" })];
+    forgetTemplates();
+    expect((await sendTouchWhatsapps(db(), [subject(ID)], now, 12)).sent).toBe(1);
   });
 
   it("says why it cannot send when WhatsApp or the account id is not set", async () => {

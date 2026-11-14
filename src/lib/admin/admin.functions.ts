@@ -328,8 +328,8 @@ export const adminApiUsage = createServerFn({ method: "POST" })
 
 export const adminFollowUps = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({ status: z.enum(["open", "closed"]) }).parse(d))
-  .handler(async ({ data, context }) => (await import("./admin.server")).followUps(await gate(context, "support.manage"), data.status));
+  .inputValidator((d) => z.object({ status: z.enum(["open", "closed"]), refresh: z.boolean().optional() }).parse(d))
+  .handler(async ({ data, context }) => (await import("./admin.server")).followUps(await gate(context, "support.manage"), data.status, data.refresh ?? false));
 
 export const adminFollowUpAct = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

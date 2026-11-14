@@ -57,11 +57,11 @@ describe("Utility names for every follow-up", () => {
       expect(p.template?.name).toBe(TOUCH_TEMPLATES_UTILITY[k].name);
       expect(p.marketing).toBe(false);
     });
-    it(`${k}: when Marketing is off and only the Marketing original exists, the reason names the template to submit`, () => {
+    it(`${k}: when Marketing is off and only the Marketing original exists, the reason says it is Marketing and the template to submit is the _v2 name`, () => {
       const p = pickTouchTemplate(k, [tpl(TOUCH_TEMPLATES[k].name, "MARKETING", "APPROVED", threeButtons)], { ...o, allowMarketing: false });
       expect(p.template).toBeUndefined();
       expect(p.name).toBe(TOUCH_TEMPLATES_UTILITY[k].name);
-      expect(p.why).toMatch(/exist/);
+      expect(p.why).toBe(`${TOUCH_TEMPLATES[k].name} was classed as Marketing`);
     });
   }
   it("a template in another language code that starts with the wanted one still counts", () => {
@@ -75,5 +75,22 @@ describe("Utility names for every follow-up", () => {
       expect(t, TOUCH_TEMPLATES_UTILITY[k].name).toBeTruthy();
       expect(t!.components.find((c) => c.type === "BODY")?.text).toBe(TOUCH_TEMPLATES_UTILITY[k].body);
     }
+  });
+});
+
+describe("the reason names what is actually wrong with a template that exists", () => {
+  const o = { language: "en", allowMarketing: false };
+  it("says the original is in review, not only that the _v2 name is missing", () => {
+    const p = pickTouchTemplate("setup", [tpl("fh_setup_help", "UTILITY", "PENDING", threeButtons)], o);
+    expect(p.template).toBeUndefined();
+    expect(p.why).toBe("fh_setup_help is pending");
+  });
+  it("lists each template that exists and what is wrong with it", () => {
+    const list = [tpl("fh_setup_help", "MARKETING", "APPROVED", threeButtons), tpl("fh_setup_help_v2", "UTILITY", "REJECTED", threeButtons)];
+    const p = pickTouchTemplate("setup", list, o);
+    expect(p.why).toBe("fh_setup_help_v2 is rejected; fh_setup_help was classed as Marketing");
+  });
+  it("says it does not exist only when neither name is on the account", () => {
+    expect(pickTouchTemplate("setup", [], o).why).toMatch(/does not exist/);
   });
 });

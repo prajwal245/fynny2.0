@@ -214,5 +214,10 @@ export function pickTouchTemplate(
   if (o.allowMarketing)
     for (const n of names) if (touchTemplateUsable(find(n), { allowMarketing: true }).ok) return { name: n, template: find(n), marketing: true, why: null };
   const first = names[0];
-  return { name: first, marketing: false, why: touchTemplateUsable(find(first)).why ?? "not usable" };
+  // Say what is wrong with a template that does exist (in review, wrong buttons, Marketing), not only that the preferred name is missing.
+  const present = names.filter((n) => find(n));
+  const why = present.length
+    ? present.map((n) => `${n} ${touchTemplateUsable(find(n)).why ?? "cannot be used"}`).join("; ")
+    : touchTemplateUsable(undefined).why ?? "not usable";
+  return { name: first, marketing: false, why };
 }

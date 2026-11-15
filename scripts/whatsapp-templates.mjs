@@ -29,10 +29,10 @@ const followButtons = [
   { type: "QUICK_REPLY", text: "Stop messages" },
 ];
 
-const tpl = (name, text, example, buttons) => ({
+const tpl = (name, text, example, buttons, category = "UTILITY") => ({
   name,
   language: "en",
-  category: "UTILITY",
+  category,
   components: [{ type: "BODY", text, example: { body_text: [example] } }, { type: "BUTTONS", buttons }],
 });
 
@@ -54,6 +54,8 @@ export const TEMPLATES = [
   // Utility notices about the person's own account (see docs/WHATSAPP_FOLLOWUP_TEMPLATES.md).
   tpl("fh_account_update", "Hello {{1}}, this is FynHelp with an update on {{2}}. {{3}} The details are in your FynHelp account. The buttons below let you open it, ask us to call, pause these messages or stop them.", ["Asha", "Rao & Co", "1 document could not be read. Uploading it again as a PDF, Excel or CSV usually fixes this."], followButtons),
   tpl("fh_results_ready", "Hello {{1}}, this is FynHelp with an update on {{2}}. {{3}} You can view the results in your FynHelp account. The buttons below let you open it, ask us to call, pause these messages or stop them.", ["Asha", "Rao & Co", "3 documents were read and 1 report is ready."], followButtons),
+  // Marketing: the "get started" nudge to a firm that has gone quiet. Kept identical to TOUCH_TEMPLATES.engage in src/lib/practice/touchpoints/whatsapp.ts: a test compares them.
+  tpl("fh_get_started", "Hello {{1}}, this is FynHelp. We noticed {{2}} has been quiet on FynHelp lately. {{3}} The buttons below let you open FynHelp, ask us to call, pause these messages or stop them.", ["Asha", "Rao & Co", "A good next step is one bank statement, which FynHelp reads for you."], followButtons, "MARKETING"),
   // Sign-up verification code. Authentication templates have Meta-fixed wording: only these flags are set.
   {
     name: "fh_signup_otp",

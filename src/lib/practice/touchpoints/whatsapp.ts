@@ -8,7 +8,9 @@
  */
 import { firstName, type SubjectFacts, type TouchKind } from "./rules";
 
-export type TouchTemplateKey = "setup" | "trial" | "plan" | "issue" | "ready";
+export type TouchTemplateKey = "setup" | "trial" | "plan" | "issue" | "ready" | "engage";
+/** Templates that have no Utility wording: a nudge to use the product is Marketing by nature, and is sent as Marketing. */
+export type UtilityKey = Exclude<TouchTemplateKey, "engage">;
 
 /** The three templates to create in WhatsApp Manager (Utility). `{{1}}` name, `{{2}}` firm, `{{3}}` the one thing that happened. */
 export const TOUCH_TEMPLATES: Record<TouchTemplateKey, { name: string; body: string; example: [string, string, string] }> = {
@@ -37,6 +39,13 @@ export const TOUCH_TEMPLATES: Record<TouchTemplateKey, { name: string; body: str
     body: "Hello {{1}}, this is FynHelp with an update on {{2}}. {{3}} You can view the results in your FynHelp account. The buttons below let you open it, ask us to call, pause these messages or stop them.",
     example: ["Asha", "Rao & Co", "3 documents were read and 1 report is ready."],
   },
+  // A Marketing template: it asks the person to come back, which Meta never treats as a notice about their own account.
+  // Only sent to a person who ticked WhatsApp, at most one message per number per 3 days, 9 am to 8 pm IST, and never after "Stop messages".
+  engage: {
+    name: "fh_get_started",
+    body: "Hello {{1}}, this is FynHelp. We noticed {{2}} has been quiet on FynHelp lately. {{3}} The buttons below let you open FynHelp, ask us to call, pause these messages or stop them.",
+    example: ["Asha", "Rao & Co", "A good next step is one bank statement, which FynHelp reads for you."],
+  },
 };
 
 /** The buttons on all three: one fixed link, and three quick replies that reach a person. */
@@ -48,7 +57,7 @@ export const TOUCH_BUTTONS = { url: { text: "Open FynHelp", url: "https://fynhel
  * name: every one needs a new name, including the document-problem and results-ready messages). They say only what happened on the
  * person's own account and what the buttons do: no question, no offer. The variables mean the same as above.
  */
-export const TOUCH_TEMPLATES_UTILITY: Record<TouchTemplateKey, { name: string; body: string; example: [string, string, string] }> = {
+export const TOUCH_TEMPLATES_UTILITY: Record<UtilityKey, { name: string; body: string; example: [string, string, string] }> = {
   setup: {
     name: "fh_setup_help_v2",
     body: "Hello {{1}}, this is FynHelp about your account for {{2}}. Set-up is not finished yet. {{3}} The buttons below let you ask us to call, pause these messages or stop them.",
@@ -90,8 +99,8 @@ export const WA_PLAN: Record<TouchKind, { template: TouchTemplateKey; delayHours
   payment_failed: { template: "plan", delayHours: 0 },
   processing_issue: { template: "issue", delayHours: 1 },
   results_ready: { template: "ready", delayHours: 1 },
-  // A check-in with nothing of theirs in it: a person decides, WhatsApp does not.
-  paid_quiet: null,
+  // A paying firm that has gone quiet: the Marketing "get started" nudge (Marketing is allowed here; switch it off with WHATSAPP_TOUCH_ALLOW_MARKETING=0).
+  paid_quiet: { template: "engage", delayHours: 0 },
 };
 
 const days = (n: unknown) => `${Number(n) || 0} day${Number(n) === 1 ? "" : "s"}`;
@@ -127,8 +136,11 @@ export function touchParams(kind: TouchKind, f: Pick<SubjectFacts, "name" | "fir
       const parts = [d ? `${d} document${d === 1 ? " was" : "s were"} read` : "", rp ? `${rp} report${rp === 1 ? " is" : "s are"} ready` : ""].filter(Boolean);
       return [who, firm, `${parts.join(" and ") || "New results are ready"}.`.replace(/^./, (c) => c.toUpperCase())];
     }
-    case "paid_quiet":
-      return null;
+    case "paid_quiet": {
+      const q = Number(detail["quietDays"]) || 0;
+      const lead = q >= 2 ? `It has been quiet for ${days(q)}.` : "";
+      return [who, firm, `${lead} A good next step is one bank statement, which FynHelp reads for you.`.trim()];
+    }
   }
 }
 
@@ -208,7 +220,7 @@ export function pickTouchTemplate(
   list: MetaTemplate[],
   o: { envName?: string; language: string; allowMarketing: boolean },
 ): { name: string; template?: MetaTemplate; marketing: boolean; why: string | null } {
-  const names = [...new Set([o.envName || TOUCH_TEMPLATES_UTILITY[key].name, TOUCH_TEMPLATES[key].name])];
+  const names = [...new Set([o.envName || (key === "engage" ? TOUCH_TEMPLATES.engage.name : TOUCH_TEMPLATES_UTILITY[key].name), TOUCH_TEMPLATES[key].name])];
   const find = (n: string) => list.find((x) => x.name === n && (x.language === o.language || x.language.startsWith(o.language)));
   for (const n of names) if (touchTemplateUsable(find(n)).ok) return { name: n, template: find(n), marketing: false, why: null };
   if (o.allowMarketing)

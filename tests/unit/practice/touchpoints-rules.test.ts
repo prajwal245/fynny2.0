@@ -103,3 +103,14 @@ describe("results_ready", () => {
     expect(wanted({ ...base, readyDocs: 3, failedDocs: 1 }, now).some((w) => w.kind === "results_ready")).toBe(false);
   });
 });
+
+describe("a quiet paying firm is followed up every two weeks, not once a month", () => {
+  it("changes the follow-up key each fortnight", async () => {
+    const { wanted } = await import("@/lib/practice/touchpoints/rules");
+    const f = { type: "firm", firmName: "Rao & Co", name: "Asha", email: "a@x.in", phone: null, whatsappOk: true, createdAt: new Date("2026-06-01").toISOString(), clients: 5, documents: 50, lastActivityAt: new Date("2026-10-01").toISOString(), billing: { status: "active", plan: "professional", first_paid_at: "2026-06-05" } } as never;
+    const key = (d: string) => wanted(f, new Date(d)).find((w) => w.kind === "paid_quiet")?.key;
+    expect(key("2026-10-20")).toBeTruthy();
+    expect(key("2026-10-20")).toBe(key("2026-10-21"));
+    expect(key("2026-10-20")).not.toBe(key("2026-11-05"));
+  });
+});

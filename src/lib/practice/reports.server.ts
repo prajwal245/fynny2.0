@@ -8,7 +8,8 @@ import { sendEmail } from "./email.server";
 import { CATEGORY_LABEL, checkReport, overDailyLimit, STATUS_LABEL, type ReportInput, type ReportStatus } from "./reportRules";
 import { isTestFirm } from "./testMode.server";
 
-const SUPPORT = "support@fynhelp.com";
+/** Who is told about every report: the shared support inbox and the founder. */
+export const REPORT_RECIPIENTS = ["support@fynhelp.com", "prajwal@fynhelp.com"] as const;
 const missingTable = (m: string | undefined) => /does not exist|schema cache|relation .* not found|42P01/i.test(m ?? "");
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -51,13 +52,13 @@ export async function submitReport(db: Db, ctx: FirmContext, input: ReportInput,
     `\nDetails: ${JSON.stringify(context).slice(0, 1500)}`,
   ].filter((x) => x !== "");
   const tag = importance === "high" ? "[High] " : importance === "low" ? "[Low] " : "";
-  const mail = await sendEmail({
-    to: SUPPORT,
-    subject: `${tag}Problem report: ${r.summary}`.slice(0, 150),
-    text: lines.join("\n"),
-    html: `<pre style="font:13px/1.55 system-ui,sans-serif;white-space:pre-wrap">${esc(lines.join("\n"))}</pre>`,
-    replyTo: email,
-  }).catch(() => ({ sent: false, simulated: false }));
+  const subject = `${tag}Problem report: ${r.summary}`.slice(0, 150);
+  const html = `<pre style="font:13px/1.55 system-ui,sans-serif;white-space:pre-wrap">${esc(lines.join("\n"))}</pre>`;
+  // One email to each recipient, so a failure for one never hides the report from the other.
+  const results = await Promise.all(
+    REPORT_RECIPIENTS.map((to) => sendEmail({ to, subject, text: lines.join("\n"), html, replyTo: email }).catch(() => ({ sent: false, simulated: false }))),
+  );
+  const mail = { sent: results.some((m) => m.sent), simulated: results.some((m) => (m as { simulated?: boolean }).simulated) };
   // Neither stored nor mailed: say so, instead of pretending it arrived.
   if (!stored && !mail.sent && !(mail as { simulated?: boolean }).simulated)
     throw new PracticeError("not_sent", "We could not send your report just now. Please email it to support@fynhelp.com.");

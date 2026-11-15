@@ -8,6 +8,8 @@
  * Detection reads the header row only, so a bank statement or ledger export
  * (date, narration, debit, credit, balance) is never mistaken for one.
  */
+import { readInvoiceRows } from "../gst/invoices";
+import { LEGACY_CHECK_IDS, runValidations } from "../gst/validations";
 import { round2 } from "../core";
 import {
   checkGatewayGst,
@@ -253,6 +255,26 @@ export function summariseRegister(
           sgst: num(r, si),
         })),
       );
+    // The wider validation pack (invoice numbers, dates, duplicates, place of supply, IRN ...). Never allowed to break the upload.
+    try {
+      const read = readInvoiceRows(rows);
+      if (read.invoices.length) {
+        const side = kind === "gst_purchase_register" ? "purchase" : kind === "gstr2b" ? "portal" : "sales";
+        const run = runValidations(read.invoices, { side, period: read.period, ownGstin: read.ownGstin });
+        for (const v of run.failed) {
+          if (LEGACY_CHECK_IDS.has(v.id)) continue;
+          checks.push({
+            ok: false,
+            label: `${v.label}${v.severity === "error" ? "" : v.severity === "warn" ? " (review)" : " (for information)"}`,
+            detail: `${v.detail} ${v.examples.join("; ")}`.trim(),
+          });
+        }
+        const clean = run.passed;
+        if (clean > 0) checks.push({ ok: true, label: "GST validations", detail: `${clean} further checks passed${run.skipped ? `, ${run.skipped} skipped because the file does not carry what they need` : ""}.` });
+      }
+    } catch {
+      // The basic checks above still stand.
+    }
     if (kind === "gstr2b")
       note =
         "GSTR-2B summary kept for GST reconciliation. Not used in bank reconciliation.";

@@ -3,7 +3,7 @@ import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-route
 import {
   LayoutGrid, Users, FileText, ListChecks, AlertTriangle, Send, BarChart3, Settings, Menu, X, LogOut,
   BookOpen,
-  Search, Sun, Moon,
+  Search, Sun, Moon, LifeBuoy,
 } from "lucide-react";
 import { toast } from "sonner";
 import { V, V2_STYLES, useV2Theme } from "./ui";
@@ -194,6 +194,9 @@ function ShellBody() {
               >
                 <Search size={14} /> <span className="v2-hide-md">Search or run an agent…</span> <span className="v2-kbd">⌘K</span>
               </button>
+              <Link to="/app/settings" search={{ tab: "help" } as never} className="v2-icon-btn" aria-label="Help and report a problem" title="Help and report a problem" data-testid="help-link">
+                <LifeBuoy size={16} />
+              </Link>
               <button
                 className="v2-icon-btn"
                 onClick={toggleTheme}

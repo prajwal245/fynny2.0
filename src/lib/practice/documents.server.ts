@@ -4,7 +4,7 @@
  * queue decisions. Every document, whatever its channel, goes through
  * `processExtraction`.
  */
-import { judgeOwnership } from "./extract/statementOwner";
+import { judgeOwnership, statementAccount } from "./extract/statementOwner";
 import { checkStatement, findOverlap, overlapSentence, type Overlap, type StatementCheck } from "./extract/statementCheck";
 import {
   PracticeError,
@@ -53,6 +53,12 @@ import {
 
 export const BUCKET = "ca-client-documents";
 const MAX_BYTES = 25 * 1024 * 1024;
+
+/** The last four digits of an account number, which is what masked statements still show. Null when there are not four. */
+export const accountTail = (accountNo: string | null | undefined): string | null => {
+  const d = String(accountNo ?? "").replace(/\D/g, "");
+  return d.length >= 4 ? d.slice(-4) : null;
+};
 const STALE_PROCESSING_MS = 10 * 60 * 1000;
 
 export type Channel = "Manual" | "Gmail" | "WhatsApp" | "Upload link" | "Zoho Books" | "Tally";
@@ -563,6 +569,7 @@ export async function processExtraction(
     .eq("extraction_id", doc.id)
     .eq("status", "open");
 
+  let otherAccountKept = 0;
   // Two lines of one file with the same date, direction, amount and narration but different running balances are two real
   // transactions: the second gets a key of its own (the first keeps the plain key, so existing data is unaffected).
   const keyCount = new Map<string, number>();
@@ -610,6 +617,7 @@ export async function processExtraction(
     }));
 
   let inserted = 0;
+  const landed = new Set<string>();
   for (let i = 0; i < txnRows.length; i += 500) {
     const chunk = txnRows.slice(i, i + 500);
     const { data, error } = await db
@@ -618,11 +626,53 @@ export async function processExtraction(
         onConflict: "ca_firm_id,dedupe_key",
         ignoreDuplicates: true,
       })
-      .select("id");
+      .select("id, dedupe_key");
     if (error) return failWith(`Saving transactions failed: ${error.message}`);
     inserted += data?.length ?? 0;
+    for (const r of (data ?? []) as { dedupe_key?: string }[]) if (r.dedupe_key) landed.add(r.dedupe_key);
   }
-  const crossDocDuplicates = txnRows.length - inserted;
+  // A line that was not saved matched one already filed. That is a repeat only when both come from the same bank account
+  // (two statements that overlap). The same reference on a statement of ANOTHER account of the client is the other half of a
+  // transfer between the client's own accounts, or a coincidence: it is a real line of this account and is kept.
+  if (side === "bank" && inserted < txnRows.length) {
+    try {
+      const mine = accountTail(statementAccount(outcome.sourceText ?? "", filename).accountNo);
+      const skipped = txnRows.filter((r) => !landed.has(r.dedupe_key));
+      if (mine && skipped.length && skipped.length <= 2000) {
+        const holders = new Map<string, string>();
+        for (let i = 0; i < skipped.length; i += 25) {
+          const { data: hit } = await db
+            .from("ca_txns")
+            .select("dedupe_key, extraction_id")
+            .eq("ca_firm_id", doc.ca_firm_id)
+            .in("dedupe_key", skipped.slice(i, i + 25).map((r) => r.dedupe_key));
+          for (const h of (hit ?? []) as { dedupe_key: string; extraction_id: string | null }[]) if (h.extraction_id && h.extraction_id !== doc.id) holders.set(h.dedupe_key, h.extraction_id);
+        }
+        const otherIds = [...new Set(holders.values())];
+        const tails = new Map<string, string | null>();
+        for (let i = 0; i < otherIds.length; i += 50) {
+          const { data: docs } = await db.from("ca_document_extractions").select("id, original_filename, extracted").in("id", otherIds.slice(i, i + 50));
+          for (const d of (docs ?? []) as { id: string; original_filename: string | null; extracted: { account_no?: string | null; text_preview?: string } | null }[])
+            tails.set(d.id, accountTail(d.extracted?.account_no ?? statementAccount(d.extracted?.text_preview ?? "", d.original_filename ?? "").accountNo));
+        }
+        const keep = skipped
+          .filter((r) => {
+            const other = tails.get(holders.get(r.dedupe_key) ?? "");
+            return Boolean(other) && other !== mine;
+          })
+          .map((r) => ({ ...r, dedupe_key: `${r.dedupe_key}@${mine}` }));
+        for (let i = 0; i < keep.length; i += 500) {
+          const { data, error } = await db.from("ca_txns").upsert(keep.slice(i, i + 500), { onConflict: "ca_firm_id,dedupe_key", ignoreDuplicates: true }).select("id");
+          if (error) return failWith(`Saving transactions failed: ${error.message}`);
+          inserted += data?.length ?? 0;
+          otherAccountKept += keep.slice(i, i + 500).length;
+        }
+      }
+    } catch (e) {
+      console.error(`[practice] other-account check for ${doc.id} failed: ${(e as Error).message}`);
+    }
+  }
+  const crossDocDuplicates = Math.max(0, txnRows.length - inserted);
 
   const reviewRows = rows
     .filter((r) => r.route === "review")
@@ -690,6 +740,8 @@ export async function processExtraction(
           (doc.extracted as { source?: string } | null)?.source ?? "Manual",
         kind: outcome.kind,
         text_preview: outcome.sourceText.slice(0, 20_000),
+        // The account this statement is for, so a later statement of another account is never taken for a repeat of this one.
+        ...(side === "bank" ? { account_no: statementAccount(outcome.sourceText ?? "", filename).accountNo } : {}),
         ...(statementReport ? { statement_check: statementReport } : {}),
         ...sheetInfo,
       },
@@ -706,6 +758,8 @@ export async function processExtraction(
       `${prefilledByMemory} pre-filled from your earlier corrections, for you to confirm`,
     );
   if (openReview) parts.push(`${openReview} sent to review`);
+  if (otherAccountKept)
+    parts.push(`${otherAccountKept} kept that also appear${otherAccountKept === 1 ? "s" : ""} on a statement of another account of this client (transfers between the client's own accounts)`);
   if (outcome.duplicateRows + crossDocDuplicates)
     parts.push(
       `${outcome.duplicateRows + crossDocDuplicates} duplicate${outcome.duplicateRows + crossDocDuplicates === 1 ? "" : "s"} skipped or flagged`,

@@ -6,7 +6,7 @@ import { AlertTriangle, CheckCircle2, CircleHelp, Layers } from "lucide-react";
 import { overlapSentence, type Overlap, type StatementCheck } from "@/lib/practice/extract/statementCheck";
 import { V, formatDate, formatINR } from "../ui";
 
-type Report = StatementCheck & { overlap: Overlap | null; hold?: { reason: string; suggested: { id: string; name: string } | null } };
+type Report = StatementCheck & { overlap: Overlap | null; bankTie?: { tied: boolean | null; source: string }; hold?: { reason: string; suggested: { id: string; name: string } | null } };
 
 const TONE = {
   pass: { bg: "rgba(47,107,79,.08)", fg: "#2f6b4f", title: "Correct and complete" },
@@ -17,6 +17,35 @@ const TONE = {
 
 /** "2026-09" to "Sep 2026". */
 const monthName = (m: string) => new Date(`${m}-01T00:00:00Z`).toLocaleString("en-IN", { month: "short", year: "numeric", timeZone: "UTC" });
+
+/** The proof at a glance: balance chain, then each figure the bank itself printed, ticked or crossed. */
+function ProofStrip({ report }: { report: Report }) {
+  const items: { key: string; ok: boolean | null; text: string }[] = [];
+  const balance = report.checks.find((c) => c.label === "Running balance");
+  if (balance) items.push({ key: "bal", ok: balance.ok, text: "Balance follows" });
+  for (const c of report.checks) {
+    if (c.label === "The bank's own count") items.push({ key: c.label, ok: c.ok, text: "Count ties" });
+    else if (c.label === "The bank's own totals") items.push({ key: c.label, ok: c.ok, text: "Totals tie" });
+    else if (c.label === "The bank's own balances") items.push({ key: c.label, ok: c.ok, text: "Opening and closing tie" });
+    else if (c.label === "The bank's line numbers") items.push({ key: c.label, ok: c.ok, text: "Line numbers complete" });
+    else if (c.label === "Pages") items.push({ key: c.label, ok: c.ok, text: "All pages" });
+  }
+  if (!report.bankTie || items.length < 2) return null;
+  return (
+    <div role="list" aria-label="What was checked against the bank's own figures" data-testid="proof-strip" style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+      {items.map((i) => (
+        <span
+          key={i.key}
+          role="listitem"
+          style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 999, background: "rgba(255,255,255,.7)", color: i.ok === false ? "#a93838" : i.ok ? "#2f6b4f" : V.muted, border: `1px solid ${i.ok === false ? "rgba(169,56,56,.35)" : "rgba(47,107,79,.25)"}` }}
+        >
+          {i.ok === false ? <AlertTriangle size={12} /> : <CheckCircle2 size={12} />}
+          {i.text}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 export function StatementCheckCard({ report, lineCount, period, onMove, onConfirm, busy }: { report: Report; lineCount: number; period?: string | null; onMove?: (clientId: string) => void; onConfirm?: () => void; busy?: boolean }) {
   // The statement is filed by the dates of its own lines. Say so when the page is set to another month.
@@ -37,9 +66,10 @@ export function StatementCheckCard({ report, lineCount, period, onMove, onConfir
           <div style={{ fontSize: 13.5 }}>{report.headline}</div>
           {(report.lines || lineCount) > 0 && (
             <div style={{ fontSize: 12.5, color: V.muted }} data-testid="lines-read">
-              Lines read from the file: <b>{(report.lines || lineCount).toLocaleString("en-IN")}</b>. Compare with the bank's own count of transactions.
+              Lines read from the file: <b>{(report.lines || lineCount).toLocaleString("en-IN")}</b>.{report.bankTie ? "" : " Compare with the bank's own count of transactions."}
             </div>
           )}
+          <ProofStrip report={report} />
         </div>
       </div>
 

@@ -5,6 +5,7 @@
  * `processExtraction`.
  */
 import { judgeOwnership, statementAccount } from "./extract/statementOwner";
+import { tieOut } from "./extract/bankSummary";
 import { checkStatement, findOverlap, overlapSentence, type Overlap, type StatementCheck } from "./extract/statementCheck";
 import {
   PracticeError,
@@ -464,7 +465,7 @@ export async function processExtraction(
   if (side === "books" && syncSource) await dropSyncedBooks(db, doc.id, syncSource);
 
   // Is the statement correct and complete? Checked from its own running balance, and against earlier statements of the account.
-  let statementReport: (StatementCheck & { overlap: Overlap | null; hold?: { reason: string; suggested: { id: string; name: string } | null } }) | null = null;
+  let statementReport: (StatementCheck & { overlap: Overlap | null; bankTie?: { tied: boolean | null; source: string }; hold?: { reason: string; suggested: { id: string; name: string } | null } }) | null = null;
   if (side === "bank" && outcome.documentKind !== "invoice" && rows.length) {
     const usable = rows.filter((r) => r.date && r.amount && r.direction);
     const check = checkStatement(
@@ -493,6 +494,25 @@ export async function processExtraction(
       );
     }
     statementReport = { ...check, overlap };
+
+    // What the bank itself prints (counts, totals, line numbers, pages) against what was read. A difference is evidence for a person,
+    // never a reason to change a line. A bank that prints nothing to compare adds nothing.
+    const tie = tieOut(outcome.bankSummary ?? null, {
+      lines: usable.map((r) => ({ amount: r.amount!, direction: r.direction! })),
+      opening: check.opening,
+      closing: check.closing,
+    });
+    if (tie.checks.length) {
+      statementReport.checks.push(...tie.checks);
+      statementReport.bankTie = { tied: tie.tied, source: outcome.bankSummary?.source ?? "" };
+      if (tie.tied === false) {
+        const first = tie.checks.find((c) => c.ok === false)!;
+        statementReport.status = "fail";
+        statementReport.headline = `The bank's own figures do not match what was read. ${first.detail}`;
+      } else if (tie.tied === true && (statementReport.status === "pass" || statementReport.status === "warn")) {
+        statementReport.headline = `${statementReport.headline} Ties to the bank's own printed figures.`;
+      }
+    }
 
     // Does the statement belong to this client? The name printed on it is looked for among the firm's clients, and its account number
     // is compared with the client's Tally bank ledgers. A statement for another client is held, not filed.

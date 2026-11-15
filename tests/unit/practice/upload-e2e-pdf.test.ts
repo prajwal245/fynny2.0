@@ -218,15 +218,18 @@ describe.skipIf(!REAL || !existsSync(REAL ?? ""))(
       );
       const check = (
         doc["extracted"] as {
-          statement_check?: { status: string; hold?: unknown; lines: number };
+          statement_check?: { status: string; hold?: unknown; lines: number; bankTie?: { tied: boolean | null; source: string }; headline?: string };
         }
       ).statement_check;
       console.log(
         `${f}: ${result.status}, read ${check?.lines}, filed ${txns.length}, review ${review.length}, duplicates ${doc["duplicate_count"]}, check ${check?.status}`,
       );
+      console.log(`   bank's own figures: ${check?.bankTie ? `${check.bankTie.source}, tied=${check.bankTie.tied}` : "none printed"} | ${String(check?.headline).slice(0, 110)}`);
       expect(result.error).toBeUndefined();
       expect(txns.length).toBeGreaterThan(0);
       expect(check?.hold).toBeUndefined();
+      // Whatever the bank printed to tick against must tie; a bank that prints nothing is simply not compared.
+      expect(check?.bankTie?.tied).not.toBe(false);
     });
   },
 );

@@ -43,6 +43,7 @@ import {
 import { TALLY_XML_NO_VOUCHERS, unsupportedReport } from "./unsupported";
 import { chooseSheet } from "./sheets";
 import { rowsFromPositioned, type PosItem } from "./pdfTable";
+import { readBankSummary, type BankSummary } from "./bankSummary";
 import {
   passwordNeededMessage,
   passwordWrongMessage,
@@ -146,6 +147,8 @@ export interface ExtractOutcome {
   side?: Side;
   /** What was left out of the rows and why (non-bank vouchers, cancelled vouchers), for the activity log. */
   note?: string;
+  /** The control figures the bank printed on the statement (counts, totals, line numbers, page count), when it printed any. */
+  bankSummary?: BankSummary | null;
   error: { code: string; message: string } | null;
 }
 
@@ -523,6 +526,7 @@ export async function runExtract(
   const kind = detectKind(input.bytes, input.filename, input.mime);
   let parsed: ExtractedRow[] | null = null;
   let sourceText = "";
+  let bankSummary: BankSummary | null = null;
   let documentKind: string | null = null;
   let note = "";
   let aiReadUsed = false;
@@ -731,7 +735,14 @@ export async function runExtract(
       let positioned: ReturnType<typeof rowsFromPositioned> = null;
       if (deps.pdfItems) {
         try {
-          positioned = rowsFromPositioned(await deps.pdfItems(input.bytes));
+          const pageItems = await deps.pdfItems(input.bytes);
+          positioned = rowsFromPositioned(pageItems);
+          // What the bank itself prints to tick against: counts, totals, line numbers, page count.
+          try {
+            bankSummary = readBankSummary(pageItems);
+          } catch {
+            bankSummary = null;
+          }
         } catch {
           positioned = null; // fall back to the text readers below
         }
@@ -944,6 +955,7 @@ export async function runExtract(
     documentKind,
     side: input.side,
     ...(note ? { note } : {}),
+    ...(bankSummary ? { bankSummary } : {}),
     error: null,
   };
 }

@@ -44,6 +44,7 @@ import { Route as AppIndexRouteImport } from './routes/app/index'
 import { Route as AppChaserRouteImport } from './routes/app/chaser'
 import { Route as AppDocumentsRouteImport } from './routes/app/documents'
 import { Route as AppExceptionsRouteImport } from './routes/app/exceptions'
+import { Route as AppGstRouteImport } from './routes/app/gst'
 import { Route as AppOnboardingRouteImport } from './routes/app/onboarding'
 import { Route as AppResetPasswordRouteImport } from './routes/app/reset-password'
 import { Route as AppReviewRouteImport } from './routes/app/review'
@@ -400,6 +401,11 @@ const AppDocumentsRoute = AppDocumentsRouteImport.update({
 const AppExceptionsRoute = AppExceptionsRouteImport.update({
   id: '/exceptions',
   path: '/exceptions',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppGstRoute = AppGstRouteImport.update({
+  id: '/gst',
+  path: '/gst',
   getParentRoute: () => AppRoute,
 } as any)
 const AppOnboardingRoute = AppOnboardingRouteImport.update({
@@ -1473,6 +1479,7 @@ export interface FileRoutesByFullPath {
   '/app/chaser': typeof AppChaserRoute
   '/app/documents': typeof AppDocumentsRoute
   '/app/exceptions': typeof AppExceptionsRoute
+  '/app/gst': typeof AppGstRoute
   '/app/onboarding': typeof AppOnboardingRoute
   '/app/reset-password': typeof AppResetPasswordRoute
   '/app/review': typeof AppReviewRoute
@@ -1690,6 +1697,7 @@ export interface FileRoutesByTo {
   '/app/chaser': typeof AppChaserRoute
   '/app/documents': typeof AppDocumentsRoute
   '/app/exceptions': typeof AppExceptionsRoute
+  '/app/gst': typeof AppGstRoute
   '/app/onboarding': typeof AppOnboardingRoute
   '/app/reset-password': typeof AppResetPasswordRoute
   '/app/review': typeof AppReviewRoute
@@ -1911,6 +1919,7 @@ export interface FileRoutesById {
   '/app/chaser': typeof AppChaserRoute
   '/app/documents': typeof AppDocumentsRoute
   '/app/exceptions': typeof AppExceptionsRoute
+  '/app/gst': typeof AppGstRoute
   '/app/onboarding': typeof AppOnboardingRoute
   '/app/reset-password': typeof AppResetPasswordRoute
   '/app/review': typeof AppReviewRoute
@@ -2133,6 +2142,7 @@ export interface FileRouteTypes {
     | '/app/chaser'
     | '/app/documents'
     | '/app/exceptions'
+    | '/app/gst'
     | '/app/onboarding'
     | '/app/reset-password'
     | '/app/review'
@@ -2350,6 +2360,7 @@ export interface FileRouteTypes {
     | '/app/chaser'
     | '/app/documents'
     | '/app/exceptions'
+    | '/app/gst'
     | '/app/onboarding'
     | '/app/reset-password'
     | '/app/review'
@@ -2570,6 +2581,7 @@ export interface FileRouteTypes {
     | '/app/chaser'
     | '/app/documents'
     | '/app/exceptions'
+    | '/app/gst'
     | '/app/onboarding'
     | '/app/reset-password'
     | '/app/review'
@@ -3048,6 +3060,13 @@ declare module '@tanstack/react-router' {
       path: '/exceptions'
       fullPath: '/app/exceptions'
       preLoaderRoute: typeof AppExceptionsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/gst': {
+      id: '/app/gst'
+      path: '/gst'
+      fullPath: '/app/gst'
+      preLoaderRoute: typeof AppGstRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/onboarding': {
@@ -4822,6 +4841,7 @@ interface AppRouteChildren {
   AppChaserRoute: typeof AppChaserRoute
   AppDocumentsRoute: typeof AppDocumentsRoute
   AppExceptionsRoute: typeof AppExceptionsRoute
+  AppGstRoute: typeof AppGstRoute
   AppOnboardingRoute: typeof AppOnboardingRoute
   AppResetPasswordRoute: typeof AppResetPasswordRoute
   AppReviewRoute: typeof AppReviewRoute
@@ -4837,6 +4857,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppChaserRoute: AppChaserRoute,
   AppDocumentsRoute: AppDocumentsRoute,
   AppExceptionsRoute: AppExceptionsRoute,
+  AppGstRoute: AppGstRoute,
   AppOnboardingRoute: AppOnboardingRoute,
   AppResetPasswordRoute: AppResetPasswordRoute,
   AppReviewRoute: AppReviewRoute,

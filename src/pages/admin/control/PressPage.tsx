@@ -141,7 +141,7 @@ export default function PressAdminPage() {
 
       <Panel title={`All articles (${rows.length})`}>
         <ErrorNote error={list.error} />
-        {list.data && rows.length === 0 && <Empty>No articles yet. Add the first one above.</Empty>}
+        {Boolean(list.data) && rows.length === 0 && <Empty>No articles yet. Add the first one above.</Empty>}
         {rows.length > 0 && (
           <Table head={["Date", "Outlet", "Headline", "Type", "Status", ""]} testId="press-table">
             {rows.map((r) => (

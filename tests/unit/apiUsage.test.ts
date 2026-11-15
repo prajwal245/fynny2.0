@@ -31,7 +31,9 @@ describe("admin API usage", () => {
     const r = await apiUsage(fakeCtx({ costColumns: true }), 30);
     expect(r.costTracking).toBe(true);
     expect(r.document).toMatchObject({ calls: 2, failed: 1, tokensIn: 1000, tokensOut: 200, ocrCalls: 1 });
-    expect(r.document.costUsd).toBeCloseTo(0.0008, 6);
+    expect(r.document.costUsd).toBeCloseTo(0.0015, 6); // recomputed from tokens at the current rate, not the stored 0.0008
+    expect(r.document.loggedCostUsd).toBeCloseTo(0.0008, 6);
+    expect(r.totalInr).toBeGreaterThan(0);
     expect(r.chat.costUsd).toBeCloseTo(0.01, 6);
     expect(r.topFirms[0]).toMatchObject({ name: "Rao & Co", calls: 2 });
     expect(r.whatsapp.byTemplate["fh_account_update"]).toBe(1);

@@ -10,7 +10,7 @@
 import { PracticeError } from "./core";
 import { clientIdLooksValid, cleanEnv } from "./zohoConfig";
 import type { Db, FirmContext } from "./db.server";
-import { BUCKET, processExtraction, registerDocument } from "./documents.server";
+import { BUCKET, dropSyncedBooks, processExtraction, registerDocument } from "./documents.server";
 import {
   accountKind,
   CASH_HINT,
@@ -544,8 +544,22 @@ export async function sync(db: Db, ctx: FirmContext, linkId: string, month: stri
   const hash = await sha256Hex(bytes);
   const path = `${ctx.firmId}/${l.business_id}/zoho/${l.id}-${month}.csv`;
   const filename = `Zoho Books - ${l.account_name.replace(/[\\/]/g, "-")} - ${label}.csv`.replace(/[:*?"<>|]/g, " ");
-  const { data: prev } = await db.from("ca_document_extractions").select("id, content_hash").eq("ca_firm_id", ctx.firmId).eq("storage_path", path).maybeSingle();
-  if (prev?.content_hash === hash) {
+  // Every earlier copy of this month for this account, however it was filed: the same path, or the same account and month recorded
+  // on the document. One of them is updated in place; any others are stale copies that would keep deleted entries alive.
+  const { data: earlier } = await db
+    .from("ca_document_extractions")
+    .select("id, content_hash, storage_path, source_metadata, created_at")
+    .eq("ca_firm_id", ctx.firmId)
+    .eq("business_id", l.business_id)
+    .eq("source_type", "zoho books")
+    .limit(500);
+  const copies = ((earlier ?? []) as { id: string; content_hash: string | null; storage_path: string | null; source_metadata: Record<string, unknown> | null; created_at?: string | null }[]).filter(
+    (d) => d.storage_path === path || (String(d.source_metadata?.["month"] ?? "") === month && String(d.source_metadata?.["zoho_account"] ?? "") === l.account_name),
+  );
+  copies.sort((a, b) => Number(b.storage_path === path) - Number(a.storage_path === path) || String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
+  const prev = copies[0] ?? null;
+  const stale = copies.slice(1);
+  if (prev?.content_hash === hash && !stale.length) {
     await touch(`${note} (no change)`);
     return { status: "unchanged" as const, entries: lines.length, note: `No changes in Zoho since the last sync of ${label}.`, extractionId: prev.id };
   }
@@ -554,10 +568,16 @@ export async function sync(db: Db, ctx: FirmContext, linkId: string, month: stri
 
   let extractionId: string;
   if (prev) {
-    // Same client, account and month: read the new version in place. Lines already matched stay matched.
-    await db.from("ca_document_extractions").update({ content_hash: hash, original_filename: filename, extract_status: "queued", error_message: null }).eq("id", prev.id);
+    // Same client, account and month: read the new version in place. The books are replaced by what Zoho holds now.
+    await db.from("ca_document_extractions").update({ content_hash: hash, original_filename: filename, storage_path: path, extract_status: "queued", error_message: null }).eq("id", prev.id);
     await processExtraction(db, prev.id, { trigger: "channel", userId: ctx.userId });
     extractionId = prev.id;
+    // A stale copy of the same month goes: its lines (matched or not) leave the books and the bank lines it matched are reopened.
+    for (const old of stale) {
+      await dropSyncedBooks(db, old.id, "Zoho Books");
+      await db.from("ca_document_extractions").delete().eq("id", old.id);
+      if (old.storage_path && old.storage_path !== path) await db.storage.from(BUCKET).remove([old.storage_path]);
+    }
   } else {
     const reg = await registerDocument(db, { firmId: ctx.firmId, userId: ctx.userId }, {
       storage_path: path,

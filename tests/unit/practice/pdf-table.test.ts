@@ -210,31 +210,33 @@ describe("reading a statement table by position", () => {
   });
 
   test("left-aligned amounts, split date, id and serial left of the date, narration broken mid-number (ICICI)", () => {
+    // As the real ICICI statement prints it: the account is overdrawn, the amount sits under Withdrawal (Dr) or Deposit (Cr), and
+    // the balance's minus is a separate "-" on the line above the figure.
     const txs: Tx[] = [
       {
         d: "01-Apr-2025",
         narr: ["UPI/509121", "513847/tran", "sportTrips/8"],
-        in: 30598,
+        out: 30598,
         bal: "8718700.96",
       },
       {
         d: "01-Apr-2025",
         narr: ["UPI/RVSL50", "9121513847/t"],
-        out: 30598,
+        in: 30598,
         bal: "8688102.96",
       },
       {
         d: "02-Apr-2025",
         narr: ["NEFT-ABC", "DEF"],
         in: 20000,
-        bal: "8708102.96",
+        bal: "8668102.96",
       },
     ];
     const r = rowsFromPositioned([leftAlignedPage(txs)])!;
     expect(names(r)).toEqual([
-      "2025-04-01 in 30598 8718700.96",
-      "2025-04-01 out 30598 8688102.96",
-      "2025-04-02 in 20000 8708102.96",
+      "2025-04-01 out 30598 -8718700.96",
+      "2025-04-01 in 30598 -8688102.96",
+      "2025-04-02 in 20000 -8668102.96",
     ]);
     expect(r.rows[0]!.description).toContain("UPI/509121513847/tran");
     expect(r.rows[0]!.description).not.toContain("S610");
@@ -277,5 +279,103 @@ describe("reading a statement table by position", () => {
     expect(
       rowsFromPositioned([[it("Hello", 10, 10), it("World", 50, 10)]]),
     ).toBeNull();
+  });
+});
+
+/* ── Layouts from the 13 Nov retest (made-up figures, laid out the way the real statements are) ── */
+
+describe("what the 13 Nov retest found", () => {
+  const head = (y: number, debitX: number, creditX: number) => [it("Post", 37, y + 6), it("Date", 47, y - 5), it("Details", 213, y), it("Chq.No.", 338, y), it("Debit", debitX, y, 27), it("Credit", creditX, y, 32), it("Balance", 528, y, 37)];
+
+  test("an amount the PDF wraps onto a second line is read whole (ICICI ₹1 crore RTGS)", () => {
+    const items: PosItem[] = [it("S.no", 50, 800), it("Date", 162, 800), it("Description", 296, 800), it("Withdrawal", 363, 800), it("Deposit", 431, 800), it("Balance", 498, 800)];
+    const row = (n: number, y: number, d: string, narr: string, col: number, amt: string, bal: string, minus: boolean, wrap?: string) => {
+      items.push(it(String(n), 50, y, 5), it(d.slice(0, 7), 162, y, 30), it(d.slice(7), 162, y - 12, 19), it(narr, 296, y, 44), it(amt, col, y, 40));
+      if (wrap) items.push(it(wrap, col, y - 12, 5));
+      if (minus) items.push(it("-", 498, y, 3), it(bal, 498, y - 12, 45));
+      else items.push(it(bal, 498, y, 45));
+    };
+    row(1, 780, "16-Dec-2025", "UPI/1087", 363, "21053.00", "8048187.48", true);
+    row(2, 700, "16-Dec-2025", "RTGS-INDBR", 431, "10000000.0", "1951812.52", false, "0");
+    row(3, 620, "16-Dec-2025", "UPI/1088", 363, "54025.00", "1897787.52", false);
+    const r = rowsFromPositioned([items])!;
+    expect(names(r)).toEqual(["2025-12-16 out 21053 -8048187.48", "2025-12-16 in 10000000 1951812.52", "2025-12-16 out 54025 1897787.52"]);
+  });
+
+  test("the Withdrawal and Deposit headings decide direction when an overdrawn account is printed with no sign at all", () => {
+    // Every balance is really negative: a withdrawal makes the printed figure bigger.
+    const txs: Tx[] = [
+      { d: "02/04/25", narr: ["LOAN EMI"], out: 1000, bal: "501,000.00" },
+      { d: "03/04/25", narr: ["NEFT IN"], in: 200, bal: "500,800.00" },
+      { d: "04/04/25", narr: ["CHARGES"], out: 50, bal: "500,850.00" },
+      { d: "05/04/25", narr: ["UPI OUT"], out: 150, bal: "501,000.00" },
+    ];
+    const r = rowsFromPositioned([trailingPage(txs)])!;
+    expect(names(r)).toEqual(["2025-04-02 out 1000 -501000", "2025-04-03 in 200 -500800", "2025-04-04 out 50 -500850", "2025-04-05 out 150 -501000"]);
+    expect(r.notes.join(" ")).toMatch(/without a minus sign/);
+  });
+
+  test("Indian Bank: centred narration, a column that drifts from page to page, summary and footer rows left out", () => {
+    const page = (debitRight: number, rows: { y: number; d: string; above: string[]; below: string[]; out?: string; in?: string; bal: string }[], dCount: string) => {
+      const items: PosItem[] = [...head(521, debitRight - 40, 445)];
+      for (const t of rows) {
+        t.above.forEach((a, k) => items.push(it(a, 128, t.y + 5 + 10 * (t.above.length - k - 1) + 1)));
+        items.push(it(t.d, 37, t.y, 43), it(t.d, 82, t.y, 43));
+        if (t.out) items.push(right(t.out, debitRight, t.y));
+        if (t.in) items.push(right(t.in, 488, t.y));
+        items.push(right(t.bal, 566, t.y));
+        t.below.forEach((b, k) => items.push(it(b, 128, t.y - 5 - 10 * k)));
+      }
+      const last = rows[rows.length - 1]!.y;
+      items.push(it("Carried", 128, last - 40), it("Forward", 177, last - 40), right("999.00Cr", 566, last - 40));
+      items.push(it("Statement", 37, last - 68), it("Dr.", 120, last - 72), it("Count:", 145, last - 72), it(dCount, 182, last - 72), it("Cr.", 199, last - 72), it("Count:", 224, last - 72), it("1", 261, last - 72), right("5580655.03", 358, last - 72), right("10059760.00", 504, last - 72), it("Summary", 37, last - 77));
+      items.push(it("In Case Your Account Is Operated By A Letter Of Authority/Power Of Attorney Holder, Please Check The", 34, last - 100, 500), it("Transaction With Extra Care.", 34, last - 113, 138));
+      return items;
+    };
+    const p1 = page(432, [
+      { y: 470, d: "15/07/25", above: ["STD0000000010 /SATKAARIKA", "ENTERPRISES PVT LTD /TRAN"], below: ["SFER FROM 8014561633 BRANCH :", "VISAKHAPATNAM"], in: "5029880.00", bal: "5029880.00Cr" },
+      { y: 426, d: "15/07/25", above: ["TRANSFER TO 89634000339 Txn Amt.", "48,903.00 Charges. 5.61 /N"], below: ["EFT/HDFC/IDIBN52025071500249134", "SRINIV"], out: "48908.61", bal: "4980971.39Cr" },
+    ], "1");
+    // Page 2 prints the Debit column 21 points further right.
+    const p2 = page(453, [
+      { y: 470, d: "16/07/25", above: ["TRANSFER TO 89634000339 Txn Amt.", "4,35,120.00 Charges. 29.21"], below: ["/NEFT/KKBK/IDIBN52025071500249222", "MANG"], out: "435149.21", bal: "4545822.18Cr" },
+      { y: 426, d: "17/07/25", above: [], below: [], out: "5000.00", bal: "4540822.18Cr" },
+      { y: 400, d: "18/07/25", above: [], below: [], out: "822.18", bal: "4540000.00Cr" },
+    ], "3");
+    const r = rowsFromPositioned([p1, p2])!;
+    expect(names(r)).toEqual([
+      "2025-07-15 in 5029880 5029880",
+      "2025-07-15 out 48908.61 4980971.39",
+      "2025-07-16 out 435149.21 4545822.18",
+      "2025-07-17 out 5000 4540822.18",
+      "2025-07-18 out 822.18 4540000",
+    ]);
+    expect(r.rows[0]!.description).toContain("SFER FROM 8014561633");
+    expect(r.rows[1]!.description).toContain("Txn Amt.");
+    expect(r.rows[1]!.description).not.toContain("SFER FROM");
+    const all = r.rows.map((x) => x.description).join(" ");
+    expect(all).not.toMatch(/Statement|Summary|Count|Extra Care|Carried/);
+  });
+
+  test("a transaction id and reference code printed before the narration stay out of it, and the footer does not join the last line (Union Bank)", () => {
+    const items: PosItem[] = [it("Date", 73, 447), it("Tran", 131, 447), it("Ref", 169, 447), it("Num", 189, 447), it("Particulars", 222, 447), it("Debit", 381, 447, 24), it("Amt.", 410, 447, 19), it("Credit", 477, 447, 29), it("Amt.", 511, 447, 19), it("Balance", 578, 447, 34), it("Amt.", 616, 447, 19)];
+    const line = (y: number, d: string, id: string | null, ref: string | null, narr: string, out: string | null, inn: string | null, bal: string) => {
+      items.push(it(d, 73, y, 48));
+      if (id) items.push(it(id, 126, y, 38));
+      if (ref) items.push(it(ref, 169, y, 34));
+      items.push(it(narr, 222, y, 120));
+      if (out) items.push(right(out, 433, y));
+      if (inn) items.push(right(inn, 530, y));
+      items.push(right(bal, 635, y));
+    };
+    line(400, "17-04-2025", "Y9084760", "ICI", "IMPSAB/510711741970/SRI", null, "21,687.00", "36,910.53CR");
+    line(392, "18-04-2025", "V1004007", "259edU3", "UPIAB/108698566055/CR/SRI", null, "1.00", "36,911.53CR");
+    line(384, "19-04-2025", "X1326288", "d65f7U3", "UPIAR/681832720266/DR/SIR", "1,000.00", null, "35,911.53CR");
+    items.push(it("-".repeat(120), 73, 376, 634), it("Total(Curr.", 117, 368), it("INR)", 174, 368), right("1,000.00", 443, 368), right("21,688.00", 549, 368), right("35,911.53CR", 664, 368));
+    items.push(it("Manager/Chief", 453, 320), it("Manager", 520, 320), it("Date", 453, 312), it(":22-09-2026", 477, 312));
+    const r = rowsFromPositioned([items])!;
+    expect(r.rows.map((x) => x.description)).toEqual(["IMPSAB/510711741970/SRI", "UPIAB/108698566055/CR/SRI", "UPIAR/681832720266/DR/SIR"]);
+    expect(r.rows.map((x) => x.direction)).toEqual(["in", "in", "out"]);
+    expect(r.rows[1]!.reference).toContain("259edU3");
   });
 });

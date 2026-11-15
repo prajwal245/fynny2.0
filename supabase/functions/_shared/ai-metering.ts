@@ -2,6 +2,7 @@
 // usage logging into public.ai_usage_logs. Always called with the service role
 // so the client can neither skip nor under-report a call.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { costFromTotal } from "./ai-pricing.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -77,6 +78,8 @@ export async function logAiUsage(input: UsageLogInput): Promise<void> {
       prompt: (input.prompt || "").slice(0, 4000),
       response: input.response ? input.response.slice(0, 8000) : null,
       tokens_used: input.tokensUsed ?? null,
+      // Estimated from the token total at list price (80% input / 20% output), so Fynny chat shows in admin cost totals.
+      cost_usd: costFromTotal(input.model, input.tokensUsed ?? null),
       response_time_ms: input.responseTimeMs ?? null,
       status: input.status ?? "success",
       error_message: input.errorMessage ?? null,

@@ -13,6 +13,8 @@ import type {
   LlmJsonRequest,
   LlmJsonResult,
 } from "./extract/pipeline";
+import { billedOutputTokens } from "./aiPricing";
+import { AiUnavailableError, BilledError, billedFrom, type Billed } from "./aiBilled";
 
 interface Provider {
   name: string;
@@ -140,20 +142,22 @@ async function callProvider(
       );
     const body = (await res.json()) as {
       choices?: { message?: { content?: string } }[];
-      usage?: { prompt_tokens?: number; completion_tokens?: number };
+      usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; completion_tokens_details?: { reasoning_tokens?: number } | null };
     };
     const raw = body.choices?.[0]?.message?.content ?? "";
-    return {
-      data: parseJsonLoose(raw),
-      provider: p.name,
-      model: p.model,
-      latency_ms: Date.now() - started,
-      raw,
-      usage: {
-        input_tokens: typeof body.usage?.prompt_tokens === "number" ? body.usage.prompt_tokens : null,
-        output_tokens: typeof body.usage?.completion_tokens === "number" ? body.usage.completion_tokens : null,
-      },
+    // Output as Google bills it: the answer plus the model's thinking tokens.
+    const usage = {
+      input_tokens: typeof body.usage?.prompt_tokens === "number" ? body.usage.prompt_tokens : null,
+      output_tokens: billedOutputTokens(body.usage),
     };
+    let data: unknown;
+    try {
+      data = parseJsonLoose(raw);
+    } catch (e) {
+      // The answer was billed. Keep its tokens with the error, so the cost is logged rather than lost.
+      throw new BilledError((e as Error).message, { provider: p.name, model: p.model, latency_ms: Date.now() - started, usage });
+    }
+    return { data, provider: p.name, model: p.model, latency_ms: Date.now() - started, raw, usage };
   } catch (e) {
     if ((e as Error).name === "AbortError")
       throw new RetryableError(`${p.name} timed out`);
@@ -192,14 +196,14 @@ async function viaEdgeFunction(req: LlmJsonRequest, timeoutMs = 30_000): Promise
   };
   if (!res.ok || !body.content)
     throw new Error(body.error ?? `practice-ai ${res.status}`);
-  return {
-    data: parseJsonLoose(body.content),
-    provider: body.provider ?? "edge",
-    model: body.model ?? "unknown",
-    latency_ms: Date.now() - started,
-    raw: body.content,
-    usage: { input_tokens: body.usage?.input_tokens ?? null, output_tokens: body.usage?.output_tokens ?? null },
-  };
+  const usage = { input_tokens: body.usage?.input_tokens ?? null, output_tokens: body.usage?.output_tokens ?? null };
+  let data: unknown;
+  try {
+    data = parseJsonLoose(body.content);
+  } catch (e) {
+    throw new BilledError((e as Error).message, { provider: body.provider ?? "edge", model: body.model ?? "unknown", latency_ms: Date.now() - started, usage });
+  }
+  return { data, provider: body.provider ?? "edge", model: body.model ?? "unknown", latency_ms: Date.now() - started, raw: body.content, usage };
 }
 
 async function withRetries<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
@@ -237,12 +241,15 @@ export function practiceLlm(
       };
       const usable = list.filter((p) => !req.attachment || p.vision);
       const errors: string[] = [];
+      // Answers that were billed but unusable, across every provider tried.
+      const billed: Billed[] = [];
       for (const [i, p] of usable.entries()) {
         // Move on quickly when another provider can answer instead.
         const attempts = i < usable.length - 1 || edgeAvailable ? 2 : 3;
         try {
           return await withRetries(() => callProvider(p, req, left()), attempts);
         } catch (e) {
+          billed.push(...billedFrom(e));
           errors.push(e instanceof Error ? e.message : String(e));
         }
       }
@@ -250,10 +257,11 @@ export function practiceLlm(
         try {
           return await withRetries(() => viaEdgeFunction(req, left()), 2);
         } catch (e) {
+          billed.push(...billedFrom(e));
           errors.push(e instanceof Error ? e.message : String(e));
         }
       }
-      throw new Error(`AI unavailable: ${errors.join(" | ") || "no provider"}`);
+      throw new AiUnavailableError(`AI unavailable: ${errors.join(" | ") || "no provider"}`, billed);
     },
   };
 }

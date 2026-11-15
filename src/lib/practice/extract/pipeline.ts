@@ -44,6 +44,7 @@ import { TALLY_XML_NO_VOUCHERS, unsupportedReport } from "./unsupported";
 import { chooseSheet } from "./sheets";
 import { rowsFromPositioned, type PosItem } from "./pdfTable";
 import { readBankSummary, type BankSummary } from "./bankSummary";
+import { failureRecords } from "../aiBilled";
 import {
   passwordNeededMessage,
   passwordWrongMessage,
@@ -274,16 +275,8 @@ async function aiRead(
       kind: data.document_kind ?? null,
     };
   } catch (e) {
-    calls.push({
-      purpose: req.purpose,
-      provider: null,
-      model: null,
-      input: req.user.slice(0, 20_000),
-      output: null,
-      latency_ms: Date.now() - started,
-      status: "error",
-      error: e instanceof Error ? e.message : String(e),
-    });
+    // An answer that was billed but unusable is logged with its tokens and cost.
+    calls.push(...failureRecords(req.purpose, req.user.slice(0, 20_000), started, e));
     return null;
   }
 }
@@ -339,16 +332,7 @@ async function aiClassify(
       });
     } catch (e) {
       // Rate limited or down: rules-only for this batch, and stop asking.
-      calls.push({
-        purpose: "extract_classify",
-        provider: null,
-        model: null,
-        input: user,
-        output: null,
-        latency_ms: Date.now() - started,
-        status: "error",
-        error: e instanceof Error ? e.message : String(e),
-      });
+      calls.push(...failureRecords("extract_classify", user, started, e));
       break;
     }
   }

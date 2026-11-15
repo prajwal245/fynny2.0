@@ -1,3 +1,4 @@
+import { billedOutputTokens } from "../_shared/ai-pricing.ts";
 // Internal AI proxy for the practice agents (Extract, Narrate).
 //
 // The app server calls this with the service role key when it has no AI key of
@@ -68,6 +69,7 @@ Deno.serve(async (req) => {
   }
   const out = await res.json();
   const content = out?.choices?.[0]?.message?.content ?? "";
-  const usage = { input_tokens: out?.usage?.prompt_tokens ?? null, output_tokens: out?.usage?.completion_tokens ?? null };
+  // Billed output includes the model's thinking tokens, which `completion_tokens` leaves out.
+  const usage = { input_tokens: out?.usage?.prompt_tokens ?? null, output_tokens: billedOutputTokens(out?.usage) };
   return json({ content, provider: useGroq ? "groq" : "lovable", model, usage });
 });

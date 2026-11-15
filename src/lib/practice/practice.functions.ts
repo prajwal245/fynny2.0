@@ -1424,3 +1424,34 @@ export const confirmPracticePageTopUp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ razorpay_order_id: z.string().min(5).max(80), razorpay_payment_id: z.string().min(5).max(80), razorpay_signature: z.string().min(10).max(200) }).parse(d))
   .handler(async ({ context, data }) => withFirm(context.userId, async (db, ctx) => (await import("./billing/pageCredits.server")).confirmPageTopUp(db, ctx, data)));
+
+/* ── Help: report a problem ───────────────────────────── */
+
+/** Anyone in the firm may report a problem; the report carries the page, the file and a little about the browser. */
+export const submitPracticeProblemReport = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z
+      .object({
+        category: z.string().max(40),
+        summary: z.string().max(400),
+        whatHappened: z.string().max(5000).nullable().optional(),
+        expected: z.string().max(5000).nullable().optional(),
+        documentId: z.string().uuid().nullable().optional(),
+        documentName: z.string().max(300).nullable().optional(),
+        page: z.string().max(300).nullable().optional(),
+        context: z.record(z.string().max(60), z.union([z.string().max(300), z.number(), z.boolean(), z.null()])).default({}),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      const email = ((context.claims as { email?: string } | undefined)?.email as string | undefined) ?? null;
+      const { context: extra, ...input } = data;
+      return (await import("./reports.server")).submitReport(db, ctx, input, email, extra);
+    }),
+  );
+
+export const getPracticeProblemReports = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => withFirm(context.userId, async (db, ctx) => (await import("./reports.server")).myReports(db, ctx)));

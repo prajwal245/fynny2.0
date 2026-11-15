@@ -33,14 +33,15 @@ import { INTEGRATION_STYLES, IntegrationCard } from "../components/IntegrationCa
 import { CONTROLS_STYLES, Checkbox, Disclosure, Field, SettingRow } from "../components/Controls";
 import { StatefulButton } from "../components/MotionKit";
 import { Link } from "@tanstack/react-router";
+import { HelpPanel } from "../components/HelpPanel";
 import { UploadCloud } from "lucide-react";
 
 type Team = Awaited<ReturnType<typeof listPracticeTeam>>;
 type Integrations = Awaited<ReturnType<typeof getPracticeIntegrations>>;
 
-const TABS = ["general", "billing", "integrations", "team", "automations", "account"] as const;
+const TABS = ["general", "billing", "integrations", "team", "automations", "account", "help"] as const;
 type Tab = (typeof TABS)[number];
-const TAB_LABEL: Record<Tab, string> = { general: "General", billing: "Billing", integrations: "Integrations", team: "Team", automations: "Automations", account: "Account" };
+const TAB_LABEL: Record<Tab, string> = { general: "General", billing: "Billing", integrations: "Integrations", team: "Team", automations: "Automations", account: "Account", help: "Help" };
 
 /** Which tab to open: the address (?tab=), a link to #billing, or coming back from Google. */
 function firstTab(): Tab {
@@ -346,6 +347,7 @@ export default function SettingsPage() {
       )}
 
       {tab === "account" && <AccountSettings />}
+      {tab === "help" && <HelpPanel />}
 
       {tab === "billing" && (
         <>

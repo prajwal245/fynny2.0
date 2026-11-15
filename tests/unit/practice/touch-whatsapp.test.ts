@@ -24,11 +24,12 @@ const BUTTONS = (urlFirst: boolean) => {
 const tpl = (name: string, o: Partial<MetaTemplate> = {}, urlFirst = true): MetaTemplate => ({ name, status: "APPROVED", language: "en", category: "UTILITY", components: [{ type: "BODY" }, { type: "BUTTONS", buttons: BUTTONS(urlFirst) }], ...o });
 
 describe("follow-up messages on WhatsApp", () => {
-  it("every stall that is about the person's own account has a message, and a pure check-in does not", () => {
-    expect(WA_PLAN.paid_quiet).toBeNull();
+  it("every stall has a message, and a quiet paying firm gets the Marketing get-started nudge", () => {
+    expect(WA_PLAN.paid_quiet).toEqual({ template: "engage", delayHours: 0 });
     for (const k of ["signup_unfinished", "no_client", "no_upload", "trial_stalled", "trial_ending_unpaid", "trial_ended_unpaid", "checkout_abandoned", "payment_failed"] as const)
       expect(WA_PLAN[k]).not.toBeNull();
-    expect(touchParams("paid_quiet", { name: "Asha", firmName: "Rao & Co" })).toBeNull();
+    expect(touchParams("paid_quiet", { name: "Asha", firmName: "Rao & Co" }, { quietDays: 12 })).toEqual(["Asha", "Rao & Co", "It has been quiet for 12 days. A good next step is one bank statement, which FynHelp reads for you."]);
+    expect(touchParams("paid_quiet", { name: "Asha", firmName: "Rao & Co" })?.[2]).toBe("A good next step is one bank statement, which FynHelp reads for you.");
   });
 
   it("fills the three fields from the follow-up's own facts, and never invents a figure", () => {
@@ -39,6 +40,10 @@ describe("follow-up messages on WhatsApp", () => {
     expect(touchParams("checkout_abandoned", f)?.[2]).toBe("was not completed");
     expect(touchParams("payment_failed", f)?.[2]).toBe("did not go through");
     expect(touchParams("signup_unfinished", { name: null, firmName: null })).toEqual(["there", "your FynHelp account", expect.stringContaining("set up your firm")]);
+  });
+
+  it("the get-started nudge always fits the 120-character variable limit, even for a long quiet spell", () => {
+    expect(touchParams("paid_quiet", { name: "Asha", firmName: "Rao & Co" }, { quietDays: 365 })![2].length).toBeLessThanOrEqual(120);
   });
 
   it("the template bodies read well with their examples, and have exactly three fields", () => {
@@ -207,7 +212,7 @@ describe("sending a follow-up on WhatsApp", () => {
     expect(sent).toHaveLength(1);
   });
 
-  it("waits out the delay after an email, never sends a check-in, and skips a snoozed follow-up", async () => {
+  it("waits out the delay after an email, sends nothing for a quiet firm until its template exists, and skips a snoozed follow-up", async () => {
     const { sendTouchWhatsapps } = await import("@/lib/practice/touchpoints/whatsapp.server");
     tables.ca_touchpoints = [tp("a1", { kind: "signup_unfinished", due_at: ago(H), ca_firm_id: null, user_id: "u-a1" }), tp("c3", { kind: "paid_quiet", phone: "919811100022" }), tp("d4", { snoozed_until: new Date(now.getTime() + D).toISOString(), phone: "919811100033" })];
     const subs = [{ id: "u-a1", facts: subject("a1").facts }, subject("c3", { phone: "919811100022" }), subject("d4", { phone: "919811100033" })];
@@ -215,6 +220,24 @@ describe("sending a follow-up on WhatsApp", () => {
     tables.ca_touchpoints[0].due_at = ago(4 * H);
     expect((await sendTouchWhatsapps(db(), subs, now, 12)).sent).toBe(1);
     expect(sent[0].template.name).toBe("fh_setup_help");
+  });
+
+  it("nudges a quiet paying firm with the Marketing get-started template, and not when Marketing is off or the firm said stop", async () => {
+    const { sendTouchWhatsapps } = await import("@/lib/practice/touchpoints/whatsapp.server");
+    metaList = [tpl("fh_get_started", { category: "MARKETING" })];
+    tables.ca_touchpoints = [tp("q1", { kind: "paid_quiet", detail: { quietDays: 12 } })];
+    process.env["WHATSAPP_TOUCH_ALLOW_MARKETING"] = "0";
+    expect((await sendTouchWhatsapps(db(), [subject("q1")], now, 12)).sent).toBe(0);
+    delete process.env["WHATSAPP_TOUCH_ALLOW_MARKETING"];
+    (await import("@/lib/practice/whatsappTemplates.server")).forgetTemplates();
+    // A person who asked us to stop, or did not tick WhatsApp, is never sent it.
+    tables.ca_touch_optout = [{ phone_key: "9820011223" }];
+    expect((await sendTouchWhatsapps(db(), [subject("q1")], now, 12)).sent).toBe(0);
+    tables.ca_touch_optout = [];
+    expect((await sendTouchWhatsapps(db(), [subject("q1", { whatsappOk: false })], now, 12)).sent).toBe(0);
+    expect(await sendTouchWhatsapps(db(), [subject("q1")], now, 12)).toEqual({ sent: 1 });
+    expect(sent[0].template.name).toBe("fh_get_started");
+    expect(sent[0].template.components[0].parameters!.map((p) => p.text)).toEqual(["Asha", "Rao & Co", "It has been quiet for 12 days. A good next step is one bank statement, which FynHelp reads for you."]);
   });
 
   it("never uses a template that is Marketing, in review, or has the wrong buttons", async () => {

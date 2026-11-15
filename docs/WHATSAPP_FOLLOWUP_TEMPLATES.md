@@ -109,3 +109,12 @@ WHATSAPP_ACCESS_TOKEN=<your token> node scripts/whatsapp-templates.mjs --apply  
 ```
 
 If the API refuses too, the error text names the reason; the usual ones are Meta Business Verification not complete, an account restriction, or a partner-owned account without template rights. Only Meta (Business Settings → Security Center, or Meta support) can lift that.
+
+### Get started (quiet paying firms): `fh_get_started` (Marketing)
+Sent to a paying firm that has done nothing for 10 days, then again every two weeks while it stays quiet. It asks the person to come back, so Meta treats it as **Marketing** and it costs more per message than the Utility notices. It is sent only to people who ticked WhatsApp, at most one message per number per 3 days (across every follow-up type), 9 am to 8 pm IST, and never to a number that tapped Stop messages. The same four buttons as above. Category **Marketing**, language `en`:
+
+`Hello {{1}}, this is FynHelp. We noticed {{2}} has been quiet on FynHelp lately. {{3}} The buttons below let you open FynHelp, ask us to call, pause these messages or stop them.`
+
+Sample values: `Asha`, `Rao & Co`, `It has been quiet for 12 days. A good next step is one bank statement, which FynHelp reads for you.` Create it with `node scripts/whatsapp-templates.mjs --apply` (it is in the list as Marketing). Optional override: `WHATSAPP_TOUCH_ENGAGE_TEMPLATE`. To switch these nudges off, set `WHATSAPP_TOUCH_ALLOW_MARKETING=0` (this also stops other Marketing-classed follow-ups).
+
+Firms still in the trial are already covered by the trial and set-up messages (not added a client, not uploaded a document, trial quiet, trial ending).

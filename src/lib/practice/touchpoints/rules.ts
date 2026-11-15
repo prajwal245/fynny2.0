@@ -80,6 +80,8 @@ export interface Want {
 }
 
 const since = (iso: string | null | undefined, now: Date) => (iso ? now.getTime() - new Date(iso).getTime() : Infinity);
+/** A new follow-up every two weeks while a paying firm stays quiet ("2026-f23"); a firm that comes back stops being wanted. */
+const fortnight = (d: Date) => `${d.getUTCFullYear()}-f${Math.floor((Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - Date.UTC(d.getUTCFullYear(), 0, 1)) / (14 * DAY))}`;
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 export const firstName = (n: string | null | undefined) => (n ?? "").trim().split(/\s+/)[0] || "there";
 
@@ -146,7 +148,7 @@ export function wanted(f: SubjectFacts, now: Date = new Date()): Want[] {
     out.push({ kind: "payment_failed", key: b.status, headline: `${who}'s plan payment ${b.status === "halted" ? "failed several times and the plan is paused" : "failed and is being retried"}.`, hot: true, dueAt: now, email: null, detail: { status: b.status, plan: b.plan } });
 
   if (b && b.status === "active" && b.first_paid_at && quiet >= 10 * DAY)
-    out.push({ kind: "paid_quiet", key: now.toISOString().slice(0, 7), headline: `${who} pays for FynHelp but has done nothing for ${plural(Math.floor(quiet / DAY), "day")}.`, hot: false, dueAt: now, email: null, detail: { quietDays: Math.floor(quiet / DAY), plan: b.plan } });
+    out.push({ kind: "paid_quiet", key: fortnight(now), headline: `${who} pays for FynHelp but has done nothing for ${plural(Math.floor(quiet / DAY), "day")}.`, hot: false, dueAt: now, email: null, detail: { quietDays: Math.floor(quiet / DAY), plan: b.plan } });
 
   return out;
 }

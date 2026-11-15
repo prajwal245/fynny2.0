@@ -33,6 +33,9 @@ export async function ocrSpaceText(
 ): Promise<string> {
   const key = process.env["OCR_SPACE_API_KEY"]?.trim();
   if (!key) throw new Error("OCR is not configured");
+  // The free plan refuses files over 1 MB; do not upload what will be refused, go straight to the AI reader. A paid plan raises it.
+  const max = Number(process.env["OCR_SPACE_MAX_BYTES"]) || 1_000_000;
+  if (bytes.length > max) throw new Error(`File is over the OCR size limit (${Math.round(max / 1000)} KB); the AI reader is used instead`);
   const form = new FormData();
   form.append("base64Image", `data:${mime};base64,${toBase64(bytes)}`);
   // Engine 2 reads numbers and tables better; isTable keeps statement columns on one line.

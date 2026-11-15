@@ -40,6 +40,7 @@ import {
   insightsPayload,
   validateInsights,
 } from "./narrate/insights";
+import { failureRecords } from "./aiBilled";
 import { REASON_LABELS, type ReasonCode } from "./recon/engine";
 
 export const REPORT_TEMPLATES = [
@@ -210,6 +211,7 @@ export async function generateReport(
     error: string | null;
   } = { provider: null, model: null, rejected: [], error: null };
   let aiCall: Record<string, unknown> | null = null;
+  const extraAiCalls: Record<string, unknown>[] = [];
   // Insights are a bonus on top of figures computed in code: never let the AI
   // hold the report up. One short attempt, then the rule-based insights stand.
   const llm = matched.length >= 3 && (await withinAiCap(db, ctx.firmId)) ? practiceLlm({ timeoutMs: 9_000 }) : null;
@@ -251,16 +253,10 @@ export async function generateReport(
       };
     } catch (e) {
       aiMeta.error = (e as Error).message;
-      aiCall = {
-        purpose: "narrate_insights",
-        provider: null,
-        model: null,
-        input: user.slice(0, 20_000),
-        output: null,
-        latency_ms: Date.now() - started,
-        status: "error",
-        error: aiMeta.error,
-      };
+      // A billed-but-unusable answer keeps its tokens and cost; the log holds one row per call.
+      const failed = failureRecords("narrate_insights", user.slice(0, 20_000), started, e);
+      aiCall = failed[0] as unknown as Record<string, unknown>;
+      extraAiCalls.push(...(failed.slice(1) as unknown as Record<string, unknown>[]));
     }
   }
 
@@ -612,13 +608,12 @@ export async function generateReport(
     .select("id, created_at")
     .single();
   if (error) throw new PracticeError("db_error", error.message);
-  if (aiCall) {
-    const row = { ...aiCall, ca_firm_id: ctx.firmId, report_id: report.id };
-    const { error: logError } = await db.from("ca_ai_calls").insert(row);
+  const aiRows = [...(aiCall ? [aiCall] : []), ...extraAiCalls].map((c) => ({ ...c, ca_firm_id: ctx.firmId, report_id: report.id }));
+  if (aiRows.length) {
+    const { error: logError } = await db.from("ca_ai_calls").insert(aiRows);
     if (logError && /input_tokens|output_tokens|cost_usd|units/.test(logError.message)) {
       // Cost columns arrive with a migration; keep the log without them until it is applied.
-      const { input_tokens: _i, output_tokens: _o, cost_usd: _c, units: _u, ...rest } = row as Record<string, unknown>;
-      await db.from("ca_ai_calls").insert(rest);
+      await db.from("ca_ai_calls").insert(aiRows.map(({ input_tokens: _i, output_tokens: _o, cost_usd: _c, units: _u, ...rest }: Record<string, unknown>) => rest));
     }
   }
 

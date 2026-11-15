@@ -110,7 +110,8 @@ type Db = { from: (t: string) => any }; // eslint-disable-line @typescript-eslin
 export async function listPress(db: Db) {
   const { data, error } = await db.from("press_items").select("*").order("published_on", { ascending: false }).limit(500);
   if (error) throw new PracticeError("db_error", /press_items/.test(error.message) ? "The press table is not set up yet. Apply the latest database change." : error.message);
-  return (data ?? []) as Record<string, unknown>[];
+  // Rows leave through a server function, so they are typed as plain JSON values.
+  return (data ?? []) as Record<string, string | number | boolean | null>[];
 }
 
 export async function savePress(db: Db, input: PressInput, source: "admin" | "auto" = "admin") {

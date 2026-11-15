@@ -43,6 +43,8 @@ import {
 import { TALLY_XML_NO_VOUCHERS, unsupportedReport } from "./unsupported";
 import { chooseSheet } from "./sheets";
 import { rowsFromPositioned, type PosItem } from "./pdfTable";
+import { readBankSummary, type BankSummary } from "./bankSummary";
+import { failureRecords } from "../aiBilled";
 import {
   passwordNeededMessage,
   passwordWrongMessage,
@@ -146,6 +148,8 @@ export interface ExtractOutcome {
   side?: Side;
   /** What was left out of the rows and why (non-bank vouchers, cancelled vouchers), for the activity log. */
   note?: string;
+  /** The control figures the bank printed on the statement (counts, totals, line numbers, page count), when it printed any. */
+  bankSummary?: BankSummary | null;
   error: { code: string; message: string } | null;
 }
 
@@ -271,16 +275,8 @@ async function aiRead(
       kind: data.document_kind ?? null,
     };
   } catch (e) {
-    calls.push({
-      purpose: req.purpose,
-      provider: null,
-      model: null,
-      input: req.user.slice(0, 20_000),
-      output: null,
-      latency_ms: Date.now() - started,
-      status: "error",
-      error: e instanceof Error ? e.message : String(e),
-    });
+    // An answer that was billed but unusable is logged with its tokens and cost.
+    calls.push(...failureRecords(req.purpose, req.user.slice(0, 20_000), started, e));
     return null;
   }
 }
@@ -336,16 +332,7 @@ async function aiClassify(
       });
     } catch (e) {
       // Rate limited or down: rules-only for this batch, and stop asking.
-      calls.push({
-        purpose: "extract_classify",
-        provider: null,
-        model: null,
-        input: user,
-        output: null,
-        latency_ms: Date.now() - started,
-        status: "error",
-        error: e instanceof Error ? e.message : String(e),
-      });
+      calls.push(...failureRecords("extract_classify", user, started, e));
       break;
     }
   }
@@ -523,6 +510,7 @@ export async function runExtract(
   const kind = detectKind(input.bytes, input.filename, input.mime);
   let parsed: ExtractedRow[] | null = null;
   let sourceText = "";
+  let bankSummary: BankSummary | null = null;
   let documentKind: string | null = null;
   let note = "";
   let aiReadUsed = false;
@@ -731,7 +719,14 @@ export async function runExtract(
       let positioned: ReturnType<typeof rowsFromPositioned> = null;
       if (deps.pdfItems) {
         try {
-          positioned = rowsFromPositioned(await deps.pdfItems(input.bytes));
+          const pageItems = await deps.pdfItems(input.bytes);
+          positioned = rowsFromPositioned(pageItems);
+          // What the bank itself prints to tick against: counts, totals, line numbers, page count.
+          try {
+            bankSummary = readBankSummary(pageItems);
+          } catch {
+            bankSummary = null;
+          }
         } catch {
           positioned = null; // fall back to the text readers below
         }
@@ -944,6 +939,7 @@ export async function runExtract(
     documentKind,
     side: input.side,
     ...(note ? { note } : {}),
+    ...(bankSummary ? { bankSummary } : {}),
     error: null,
   };
 }

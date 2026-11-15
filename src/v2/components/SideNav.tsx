@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertTriangle, BarChart3, BookOpen, ChevronDown, ChevronLeft, ChevronRight, FileText, LayoutGrid, ListChecks, LogOut, Send, Settings, Users, X } from "lucide-react";
+import { AlertTriangle, BarChart3, BookOpen, ChevronDown, ChevronLeft, ChevronRight, FileText, LayoutGrid, ListChecks, LogOut, Receipt, Send, Settings, Users, X } from "lucide-react";
 import type { ComponentType } from "react";
 import { V } from "../ui";
 import { FirstCloseLauncher } from "./FirstCloseGuide";
@@ -33,6 +33,7 @@ export const NAV_GROUPS: Group[] = [
     items: [
       { to: "/app/review", label: "Review Queue", icon: ListChecks },
       { to: "/app/exceptions", label: "Exception Queue", icon: AlertTriangle },
+      { to: "/app/gst", label: "GST", icon: Receipt },
     ],
   },
   { id: "chaser", label: "Chaser", icon: Send, items: [{ to: "/app/chaser", label: "Chaser", icon: Send }] },

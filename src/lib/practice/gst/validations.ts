@@ -177,6 +177,11 @@ const RULES: Rule[] = [
     detail: (n) => `${n} invoice number${n === 1 ? " appears" : "s appear"} more than once for the same party. A repeated entry doubles the tax and the ITC.`,
   },
   {
+    id: "repeated_rows", group: "Document", label: "No line entered twice inside one invoice", severity: "warn", sides: ["sales", "purchase"],
+    find: (a) => a.filter((i) => i.repeats > 0),
+    detail: (n) => `${n} invoice${n === 1 ? " has" : "s have"} rows that are exact copies of another row of the same invoice. If a line was entered twice, the taxable value and the tax are doubled; if the items are genuinely identical, ignore this.`,
+  },
+  {
     id: "probable_duplicate", group: "Document", label: "No probable duplicate under another number", severity: "warn", sides: ["sales", "purchase"],
     find: (a) => {
       const seen = new Map<string, GstInvoice>();

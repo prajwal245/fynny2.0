@@ -39,6 +39,8 @@ export interface GstInvoice {
   row: number;
   /** How many source rows were added up into this invoice. */
   lines: number;
+  /** How many of those rows were exact copies of an earlier row of the same invoice (a line entered twice, or genuinely identical items). */
+  repeats: number;
 }
 
 export interface ReadInvoices {
@@ -197,6 +199,7 @@ export function readInvoiceRows(rowsIn: string[][], opts: { sheet?: string } = {
 
   const byKey = new Map<string, GstInvoice>();
   const totalsSeen = new Map<string, number[]>();
+  const prints = new Map<string, Set<string>>();
   const order: string[] = [];
   let sourceRows = 0;
   for (let k = head.at + 1; k < rows.length; k++) {
@@ -220,8 +223,15 @@ export function readInvoiceRows(rowsIn: string[][], opts: { sheet?: string } = {
     const amounts = { taxable: sg(taxable ?? 0), igst: sg(igst), cgst: sg(cgst), sgst: sg(sgst), cess: sg(money(cell(r, "cess")) ?? 0) };
     const total = money(cell(r, "total"));
     if (total !== null) totalsSeen.set(key, [...(totalsSeen.get(key) ?? []), sg(total)]);
+    // Rows are always added up (nothing is dropped), but an exact copy of an earlier row of the same invoice is counted, so it can be flagged.
+    const print = [amounts.taxable, amounts.igst, amounts.cgst, amounts.sgst, amounts.cess, money(cell(r, "rate")) ?? "", String(cell(r, "hsn") ?? "").trim(), String(cell(r, "date") ?? "").trim()].join("|");
+    const seenPrints = prints.get(key) ?? new Set<string>();
+    const isRepeat = seenPrints.has(print);
+    seenPrints.add(print);
+    prints.set(key, seenPrints);
     const existing = byKey.get(key);
     if (existing) {
+      if (isRepeat) existing.repeats++;
       existing.taxable = round2(existing.taxable + amounts.taxable);
       existing.igst = round2(existing.igst + amounts.igst);
       existing.cgst = round2(existing.cgst + amounts.cgst);
@@ -249,6 +259,7 @@ export function readInvoiceRows(rowsIn: string[][], opts: { sheet?: string } = {
       filedIn: periodFromFp(String(cell(r, "filed") ?? "").replace(/\D/g, "")) ?? null,
       row: k + 1,
       lines: 1,
+      repeats: 0,
     });
     order.push(key);
   }
@@ -340,6 +351,7 @@ export function readGstr2bJson(input: unknown): ReadInvoices {
       filedIn: periodFromFp(String((d["supprd"] ?? supplier["supprd"] ?? "") as string)) ?? null,
       row: ++seq,
       lines: items.length || 1,
+      repeats: 0,
     });
   };
   for (const s of (Array.isArray(b2b) ? b2b : []) as Record<string, unknown>[]) for (const inv of (Array.isArray(s["inv"]) ? s["inv"] : []) as Record<string, unknown>[]) push(s, inv, "invoice");

@@ -123,3 +123,9 @@ GRANT ALL ON public.ca_client_document_requirements TO service_role;
 
 -- 5. A statement that failed verification can be accepted by a person: the acceptance is kept with the statement's own check.
 -- (No new column: it is stored inside ca_document_extractions.extracted -> statement_check -> accepted.)
+
+-- 6. Before this change recon made whoever ran it the owner of every exception, and nothing could change that. Those are not real
+-- assignments: open exceptions with no history become unassigned, so "Unassigned" and "My exceptions" mean what they say.
+UPDATE public.ca_exceptions x SET owner_id = NULL
+ WHERE x.owner_id IS NOT NULL AND x.status = 'open'
+   AND NOT EXISTS (SELECT 1 FROM public.ca_exception_events e WHERE e.exception_id = x.id);

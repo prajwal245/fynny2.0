@@ -1552,3 +1552,17 @@ export const acceptPracticeStatement = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) =>
     withFirm(context.userId, async (db, ctx) => (await import("./close/close.server")).acceptStatement(db, ctx, data.id, data.note)),
   );
+
+export const getPracticeOwnTransfers = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ business_id: uuid.optional() }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./recon.server")).listOwnTransfers(db, ctx, data.business_id)),
+  );
+
+export const unpairPracticeOwnTransfer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ txn_id: uuid, note: z.string().max(300).optional() }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./recon.server")).unpairOwnTransfer(db, ctx, data.txn_id, data.note)),
+  );

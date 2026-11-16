@@ -31,6 +31,7 @@ const TITLES: Record<string, string> = {
   "/app/exceptions": "Exception Queue",
   "/app/chaser": "Chaser",
   "/app/gst": "GST",
+  "/app/close": "Month-end close",
   "/app/reports": "MIS and Reports",
   "/app/settings": "Settings",
 };

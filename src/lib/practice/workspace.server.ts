@@ -7,6 +7,7 @@ import { parsePeriod, signedAmount } from "./core";
 import { clientMeta, fetchAll, type Db, type FirmContext } from "./db.server";
 import { decisionPattern } from "./memory";
 import { REASON_LABELS, type ReasonCode } from "./recon/engine";
+import { kindOf } from "./exceptionKinds";
 
 const DOC_LIMIT = 300;
 /** A server call is cut off after 60 s; anything still "running" after 90 s was cut off. */
@@ -90,7 +91,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       db
         .from("ca_exceptions")
         .select(
-          "id, business_id, reason_code, description, detail, amount, status, candidates, txn_id, txn_side, stage_reached, created_at, ca_txns(txn_date, direction, description, counterparty)",
+          "id, business_id, reason_code, description, detail, amount, status, candidates, txn_id, txn_side, stage_reached, created_at, ca_txns(txn_date, direction, description, counterparty, category)",
         )
         .eq("ca_firm_id", f)
         .order("created_at", { ascending: false })
@@ -383,6 +384,17 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
     const { data: sent } = await db.from("ca_tally_postings").select("txn_id").in("txn_id", exTxnIds.slice(i, i + 200)).in("status", ["queued", "sent", "posted"]);
     for (const p of (sent ?? []) as { txn_id: string }[]) sentTxn.add(p.txn_id);
   }
+  // Who is handling each exception. Read apart from the main list, so a database that has not had the team-work change yet still loads.
+  const workById = new Map<string, { owner_id: string | null; work_status: string | null; due_date: string | null; remark: string | null; review_state: string | null; reviewer_id: string | null; updated_at: string | null }>();
+  {
+    const w = await db
+      .from("ca_exceptions")
+      .select("id, owner_id, work_status, due_date, remark, review_state, reviewer_id, updated_at")
+      .eq("ca_firm_id", f)
+      .order("created_at", { ascending: false })
+      .limit(1000);
+    if (!w.error) for (const r of (w.data ?? []) as { id: string; owner_id: string | null; work_status: string | null; due_date: string | null; remark: string | null; review_state: string | null; reviewer_id: string | null; updated_at: string | null }[]) workById.set(r.id, r);
+  }
   const exceptions = (eRes.data ?? []).map((r) => {
     const cands = Array.isArray(r.candidates)
       ? (r.candidates as {
@@ -406,7 +418,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
     } catch {
       /* plain text */
     }
-    const txn = (r as { ca_txns?: { txn_date?: string; direction?: string; description?: string | null; counterparty?: string | null } | null }).ca_txns;
+    const txn = (r as { ca_txns?: { txn_date?: string; direction?: string; description?: string | null; counterparty?: string | null; category?: string | null } | null }).ca_txns;
     const key = txn?.direction && r.txn_side ? decisionPattern({ side: r.txn_side, direction: txn.direction, description: txn.description ?? null, counterparty: txn.counterparty }) : "";
     const precedent = r.status === "open" && key ? learned.get(`${r.business_id}|${key}`) : undefined;
     return {
@@ -438,6 +450,29 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
         : r.status === "ignored"
           ? "ignored"
           : "open") as "open" | "resolved" | "ignored",
+      ...(() => {
+        const w = workById.get(r.id);
+        const k = kindOf({
+          reasonCode: r.reason_code,
+          side: (r.txn_side === "books" ? "books" : "bank") as "bank" | "books",
+          narration: `${narration} ${txn?.description ?? ""}`.trim(),
+          category: txn?.category ?? null,
+          amount: Number(r.amount ?? 0),
+          candidateAmount: cands.length ? Number(cands[0]!.amount) : null,
+        });
+        return {
+          kind: k.kind,
+          kindWhy: k.why,
+          ownerId: w?.owner_id ?? null,
+          // A line that is no longer open is resolved whatever the team-work record says (its twin may have closed it).
+          workStatus: (r.status === "open" ? (w?.work_status ?? "open") : "resolved") as string,
+          dueDate: w?.due_date ?? null,
+          remark: w?.remark ?? null,
+          reviewState: (w?.review_state ?? "none") as string,
+          reviewerId: w?.reviewer_id ?? null,
+          updatedAt: w?.updated_at ?? null,
+        };
+      })(),
     };
   });
 

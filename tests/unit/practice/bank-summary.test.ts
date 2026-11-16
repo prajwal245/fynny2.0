@@ -77,3 +77,42 @@ describe("what the bank prints to tick against", () => {
     expect(readBankSummary([odd])).toBeNull();
   });
 });
+
+describe("SBI: the Statement Summary on the last page", () => {
+  // The counts sit a few points lower than the money columns, as in the bank's own PDF.
+  const page = [
+    ...line(256, [["Statement Summary :", 19]]),
+    ...line(231.7, [["Brought Forward", 19], ["Dr Count", 149], ["Cr Count", 209], ["Total Debits", 278], ["Total Credits", 379], ["Closing Balance", 471]]),
+    ...line(216.7, [["4,61,35,890.09", 278], ["4,61,35,890.09", 379], ["0.00", 471]]),
+    ...line(213.5, [["0.00", 19], ["108", 169], ["71", 231]]),
+  ];
+  it("reads counts, totals and balances even when the figures sit at slightly different heights", () => {
+    expect(readBankSummary([page])).toMatchObject({ source: "summary_row", opening: 0, drCount: 108, crCount: 71, debits: 46135890.09, credits: 46135890.09, closing: 0 });
+  });
+  it("a closing balance printed with DR is an overdraft, and negative", () => {
+    const od = [
+      ...line(231.7, [["Brought Forward", 19], ["Dr Count", 149], ["Cr Count", 209], ["Total Debits", 278], ["Total Credits", 379], ["Closing Balance", 471]]),
+      ...line(216.7, [["7,34,10,720.76", 278], ["8,34,80,952.00", 379], ["3,93,74,006.16DR", 471]]),
+      ...line(213.5, [["0.00", 19], ["57", 169], ["53", 231]]),
+    ];
+    expect(readBankSummary([od])).toMatchObject({ drCount: 57, crCount: 53, closing: -39374006.16 });
+  });
+  it("ties a whole statement when everything the bank prints agrees", () => {
+    const s = readBankSummary([page])!;
+    expect(tieOut(s, { lines: lines(Array(108).fill(1), []), opening: 0, closing: 0 }).checks[0]!.ok).toBe(false); // wrong credit count is caught
+  });
+  it("when the bank's printed opening contradicts its own totals, it is not used, and the closing balance still has to tie", () => {
+    const s = { source: "summary_row" as const, opening: 0, drCount: 2, crCount: 2, debits: 700, credits: 1000, closing: -400 };
+    // 0 + 1000 - 700 = 300, not -400: the printed opening cannot be right. The lines say it was -700.
+    const ok = tieOut(s, { lines: lines([300, 400], [400, 600]), opening: -700, closing: -400 });
+    expect(ok.tied).toBe(true);
+    expect(ok.checks.find((c) => c.label === "The bank's own balances")!.detail).toMatch(/does not agree with the bank's own totals/);
+    // A closing balance that differs is still a failure.
+    const bad = tieOut(s, { lines: lines([300, 400], [400, 600]), opening: -700, closing: -350 });
+    expect(bad.tied).toBe(false);
+  });
+  it("a consistent summary still compares the opening balance", () => {
+    const s = { source: "summary_row" as const, opening: 190925.04, drCount: 1, crCount: 1, debits: 600, credits: 1500, closing: 191825.04 };
+    expect(tieOut(s, { lines: lines([600], [1500]), opening: 100, closing: 191825.04 }).tied).toBe(false);
+  });
+});

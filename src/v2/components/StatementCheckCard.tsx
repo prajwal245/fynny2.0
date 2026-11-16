@@ -2,7 +2,9 @@
  * Is this bank statement correct and complete? Shown first, above the lines: the balance chain, the opening and closing
  * balance, quiet stretches and months with no lines, and lines that are also in an earlier statement of the account.
  */
+import { useState } from "react";
 import { AlertTriangle, CheckCircle2, CircleHelp, Layers } from "lucide-react";
+import { verificationOf } from "@/lib/practice/statementVerification";
 import { overlapSentence, type Overlap, type StatementCheck } from "@/lib/practice/extract/statementCheck";
 import { V, formatDate, formatINR } from "../ui";
 
@@ -47,7 +49,11 @@ function ProofStrip({ report }: { report: Report }) {
   );
 }
 
-export function StatementCheckCard({ report, lineCount, period, onMove, onConfirm, busy }: { report: Report; lineCount: number; period?: string | null; onMove?: (clientId: string) => void; onConfirm?: () => void; busy?: boolean }) {
+export function StatementCheckCard({ report, lineCount, period, onMove, onConfirm, onAccept, busy }: { report: Report & { accepted?: { by: string | null; at: string; note: string } | null }; lineCount: number; period?: string | null; onMove?: (clientId: string) => void; onConfirm?: () => void; /** Accept a statement that failed verification, with a written reason. Resolves to an error message, or null when it worked. */ onAccept?: (note: string) => Promise<string | null>; busy?: boolean }) {
+  const verification = verificationOf(report);
+  const [acceptNote, setAcceptNote] = useState("");
+  const [acceptError, setAcceptError] = useState<string | null>(null);
+  const [accepting, setAccepting] = useState(false);
   // The statement is filed by the dates of its own lines. Say so when the page is set to another month.
   const from = report.first?.slice(0, 7);
   const to = report.last?.slice(0, 7);
@@ -62,7 +68,10 @@ export function StatementCheckCard({ report, lineCount, period, onMove, onConfir
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
         <Icon size={18} style={{ color: t.fg, flexShrink: 0, marginTop: 2 }} />
         <div style={{ display: "grid", gap: 4 }}>
-          <div style={{ fontWeight: 700, color: t.fg }}>Statement check: {t.title}</div>
+          <div style={{ fontWeight: 700, color: t.fg, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <span>Statement check: {t.title}</span>
+            <span data-testid="verification-result" style={{ fontSize: 11.5, fontWeight: 700, padding: "2px 9px", borderRadius: 999, background: verification.result === "passed" ? "rgba(47,107,79,.16)" : verification.result === "failed" ? "rgba(169,56,56,.16)" : "rgba(20,18,16,.08)", color: verification.result === "passed" ? "#2f6b4f" : verification.result === "failed" ? "#a93838" : V.body }}>Verification: {verification.label}</span>
+          </div>
           <div style={{ fontSize: 13.5 }}>{report.headline}</div>
           {(report.lines || lineCount) > 0 && (
             <div style={{ fontSize: 12.5, color: V.muted }} data-testid="lines-read">
@@ -72,6 +81,28 @@ export function StatementCheckCard({ report, lineCount, period, onMove, onConfir
           <ProofStrip report={report} />
         </div>
       </div>
+
+      {verification.held && !report.hold && (
+        <div role="alert" data-testid="verification-held" style={{ border: "1px solid rgba(169,56,56,.45)", background: "rgba(255,255,255,.6)", borderRadius: 12, padding: 12, display: "grid", gap: 8 }}>
+          <b style={{ color: "#a93838" }}>Held: not treated as processed.</b>
+          <span style={{ fontSize: 13 }}>This statement did not pass its checks. Its lines are exactly as read, nothing was changed or removed. A partner or manager can accept it with a reason, or upload a corrected statement.</span>
+          {verification.summary === "not_available" && <span style={{ fontSize: 12.5, color: V.muted }}>The bank prints no summary to compare, so this rests on the running balance.</span>}
+          {onAccept && (
+            <div style={{ display: "grid", gap: 6 }}>
+              <textarea className="v2-input" rows={2} value={acceptNote} onChange={(e) => setAcceptNote(e.target.value)} placeholder="Why it can be accepted, for example: page 3 is blank in the bank's PDF" aria-label="Why this statement can be accepted" />
+              {acceptError && <span style={{ fontSize: 12.5, color: V.maroon }}>{acceptError}</span>}
+              <div>
+                <button type="button" className="v2-btn v2-btn-ghost" disabled={busy || accepting || acceptNote.trim().length < 10} onClick={async () => { setAccepting(true); setAcceptError(await onAccept(acceptNote.trim())); setAccepting(false); }}>
+                  {accepting ? "Saving…" : "Accept with this reason"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {verification.acceptedBy && (
+        <div style={{ fontSize: 12.5, color: V.muted }} data-testid="verification-accepted">Failed its checks and was accepted by {verification.acceptedBy}{report.accepted?.note ? `: “${report.accepted.note}”` : ""}.</div>
+      )}
 
       {report.hold && (
         <div role="alert" style={{ border: "1px solid rgba(169,56,56,.45)", background: "rgba(255,255,255,.6)", borderRadius: 12, padding: 12, display: "grid", gap: 8 }}>

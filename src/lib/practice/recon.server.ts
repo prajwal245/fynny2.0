@@ -30,6 +30,7 @@ import { decisionCount,
   type ReconRule,
   type ReconTxn,
 } from "./recon/engine";
+import { pairOwnTransfers, type TransferPair } from "./recon/ownTransfers";
 
 interface TxnRow extends ReconTxn {
   match_status: string;
@@ -126,6 +127,8 @@ export interface ReconSummary {
   matched_by_stage: Record<string, number>;
   exceptions_by_reason: Record<string, number>;
   message: string;
+  /** Transfers between the client's own accounts that were paired and set aside this run. */
+  own_transfers?: number;
 }
 
 /** "7 already matched; this run matched 5 more of 12 (4 same amount and date, 1 part payment). 2 need a decision." */
@@ -153,7 +156,10 @@ export async function runRecon(
     "unmatched",
     "exception",
   ]);
-  const bank = scope.filter((t) => t.side === "bank");
+  // Transfers between the client's own accounts are paired first: they are neither income nor expense and need no ledger match.
+  const transfers = await pairAccountTransfers(db, ctx, businessId, period).catch(() => [] as TransferPair[]);
+  const pairedIds = new Set(transfers.flatMap((t) => [t.out.id, t.in.id]));
+  const bank = scope.filter((t) => t.side === "bank" && !pairedIds.has(t.id));
   const books = scope.filter((t) => t.side === "books");
   const { count: alreadyMatched } = await db
     .from("ca_txns")
@@ -347,7 +353,8 @@ export async function runRecon(
         status: "open",
         updated_at: new Date().toISOString(),
       });
-    else inserts.push({ ...row, status: "open", owner_id: ctx.userId });
+    // Unassigned: a person takes it, or a manager gives it out (Exception Queue). Nobody is made the owner just by running recon.
+    else inserts.push({ ...row, status: "open", owner_id: null, created_by: ctx.userId });
   }
   for (let i = 0; i < updates.length; i += 200) {
     const { error } = await db
@@ -356,9 +363,13 @@ export async function runRecon(
     if (error) throw new PracticeError("db_error", error.message);
   }
   for (let i = 0; i < inserts.length; i += 200) {
-    const { error } = await db
-      .from("ca_exceptions")
-      .insert(inserts.slice(i, i + 200));
+    let batch = inserts.slice(i, i + 200);
+    let { error } = await db.from("ca_exceptions").insert(batch);
+    // Before the team-work database change is applied there is no created_by column: record without it.
+    if (error && /created_by/.test(error.message)) {
+      batch = batch.map(({ created_by: _c, ...rest }) => rest);
+      ({ error } = await db.from("ca_exceptions").insert(batch));
+    }
     if (error && !/duplicate key/i.test(error.message))
       throw new PracticeError("db_error", error.message);
   }
@@ -382,7 +393,8 @@ export async function runRecon(
     exceptions: decisionCount(outcome.exceptions),
     matched_by_stage: outcome.stats.matched_by_stage,
     exceptions_by_reason: outcome.stats.exceptions_by_reason,
-    message: reconMessage(written, bank.length, alreadyMatched ?? 0, outcome.stats.matched_by_stage, decisionCount(outcome.exceptions)),
+    message: reconMessage(written, bank.length, alreadyMatched ?? 0, outcome.stats.matched_by_stage, decisionCount(outcome.exceptions)) + (transfers.length ? ` ${transfers.length} transfer${transfers.length === 1 ? "" : "s"} between the client's own accounts paired and set aside.` : ""),
+    own_transfers: transfers.length,
   };
   await db
     .from("ca_recon_runs")
@@ -399,6 +411,76 @@ export async function runRecon(
     `Recon for ${client.client_name}, ${period.label}: ${summary.message}`,
   );
   return summary;
+}
+
+const shiftDay = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+const OWN_TAG = "own_account:";
+
+/**
+ * Finds transfers between the client's own bank accounts and sets both legs aside (ignored, tagged with the other leg). Only a
+ * pair with clear evidence is made (see recon/ownTransfers.ts); nothing is deleted, and an open exception on either leg is closed
+ * with the evidence as its note. Undone with unpairOwnTransfer.
+ */
+export async function pairAccountTransfers(db: Db, ctx: FirmContext, businessId: string, period: Period): Promise<TransferPair[]> {
+  const wide = { ...period, start: shiftDay(period.start, -2), end: shiftDay(period.end, 2) };
+  const rows = (await loadScope(db, ctx.firmId, businessId, wide, ["unmatched", "exception"])).filter((t) => t.side === "bank" && t.extraction_id);
+  if (rows.length < 2) return [];
+  const extIds = [...new Set(rows.map((r) => r.extraction_id as string))];
+  if (extIds.length < 2) return []; // both legs are never on one statement
+  const { data: docs } = await db.from("ca_document_extractions").select("id, acct:extracted->>account_no").in("id", extIds);
+  const tails = new Map((docs ?? []).map((d: { id: string; acct: string | null }) => [d.id, String(d.acct ?? "").replace(/\D/g, "").slice(-4) || null]));
+  const pairs = pairOwnTransfers(
+    rows.map((t) => ({ id: t.id, extractionId: t.extraction_id, direction: t.direction as "in" | "out", amount: t.amount, date: String(t.txn_date), reference: t.reference, description: t.description, accountTail: tails.get(t.extraction_id as string) ?? null })),
+  ).filter((p) => p.out.date >= period.start && p.out.date <= period.end || p.in.date >= period.start && p.in.date <= period.end);
+  const done: TransferPair[] = [];
+  for (const p of pairs) {
+    const a = await db.from("ca_txns").update({ match_status: "ignored", recon_tag: `${OWN_TAG}${p.in.id}` }).eq("id", p.out.id).in("match_status", ["unmatched", "exception"]).select("id");
+    const b = await db.from("ca_txns").update({ match_status: "ignored", recon_tag: `${OWN_TAG}${p.out.id}` }).eq("id", p.in.id).in("match_status", ["unmatched", "exception"]).select("id");
+    if (!a.data?.length || !b.data?.length) {
+      // One leg was taken meanwhile: put back whichever we changed.
+      if (a.data?.length) await db.from("ca_txns").update({ match_status: "unmatched", recon_tag: null }).eq("id", p.out.id);
+      if (b.data?.length) await db.from("ca_txns").update({ match_status: "unmatched", recon_tag: null }).eq("id", p.in.id);
+      continue;
+    }
+    await db
+      .from("ca_exceptions")
+      .update({ status: "resolved", resolution_action: "own_account_transfer", resolution_note: p.evidence, resolved_at: new Date().toISOString() })
+      .in("txn_id", [p.out.id, p.in.id])
+      .eq("status", "open");
+    done.push(p);
+  }
+  if (done.length)
+    await logActivity(db, ctx.firmId, businessId, "recon", `Paired ${done.length} transfer${done.length === 1 ? "" : "s"} between the client's own accounts: ${done.slice(0, 5).map((p) => `₹${p.out.amount.toLocaleString("en-IN")} on ${p.out.date}`).join("; ")}${done.length > 5 ? "; and more" : ""}. Each pair has the same amount, opposite directions, dates within two days and a shared reference or an account named.`.slice(0, 1900));
+  return done;
+}
+
+/** The transfers set aside as own-account, newest first, so a person can check and undo them. */
+export async function listOwnTransfers(db: Db, ctx: FirmContext, businessId?: string) {
+  let q = db.from("ca_txns").select("id, business_id, direction, amount, txn_date, description, reference, recon_tag").eq("ca_firm_id", ctx.firmId).like("recon_tag", `${OWN_TAG}%`).order("txn_date", { ascending: false }).limit(400);
+  if (businessId) q = q.eq("business_id", businessId);
+  const { data } = await q;
+  const rows = (data ?? []) as { id: string; business_id: string; direction: string; amount: number | string; txn_date: string; description: string | null; reference: string | null; recon_tag: string }[];
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const seen = new Set<string>();
+  const out: { outId: string; inId: string; businessId: string; amount: number; date: string; outNarration: string; inNarration: string }[] = [];
+  for (const r of rows) {
+    if (r.direction !== "out" || seen.has(r.id)) continue;
+    const other = byId.get(r.recon_tag.slice(OWN_TAG.length));
+    if (!other) continue;
+    seen.add(r.id);
+    out.push({ outId: r.id, inId: other.id, businessId: r.business_id, amount: Number(r.amount), date: String(r.txn_date), outNarration: r.description ?? "", inNarration: other.description ?? "" });
+  }
+  return out;
+}
+
+/** Puts both legs back as ordinary unmatched lines, for the next recon run to treat on their own. */
+export async function unpairOwnTransfer(db: Db, ctx: FirmContext, txnId: string, note?: string) {
+  const { data: t } = await db.from("ca_txns").select("id, business_id, recon_tag").eq("id", txnId).eq("ca_firm_id", ctx.firmId).maybeSingle();
+  if (!t || !String(t.recon_tag ?? "").startsWith(OWN_TAG)) throw new PracticeError("not_found", "That line is not a paired transfer.");
+  const other = String(t.recon_tag).slice(OWN_TAG.length);
+  await db.from("ca_txns").update({ match_status: "unmatched", recon_tag: null }).in("id", [t.id, other]).eq("ca_firm_id", ctx.firmId).like("recon_tag", `${OWN_TAG}%`);
+  await logActivity(db, ctx.firmId, t.business_id, "recon", `Un-paired a transfer between the client's own accounts${note ? `: ${note.slice(0, 200)}` : ""}. Both lines are open again; run recon to treat them.`);
+  return { ok: true };
 }
 
 function exceptionRow(

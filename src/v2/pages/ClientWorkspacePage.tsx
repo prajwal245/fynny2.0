@@ -1,3 +1,4 @@
+import { CloseChecklist } from "../components/CloseChecklist";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
@@ -39,7 +40,7 @@ export default function ClientWorkspacePage() {
   const [tab, setTab] = useState(() => {
     if (typeof window === "undefined") return "overview";
     const t = new URLSearchParams(window.location.search).get("tab");
-    return t && ["overview", "documents", "review", "exceptions", "recon", "mis", "chaser", "activity"].includes(t) ? t : "overview";
+    return t && ["overview", "documents", "review", "exceptions", "recon", "close", "mis", "chaser", "activity"].includes(t) ? t : "overview";
   });
 
   // "Fix" in Needs you names the failed file: /v2/clients/:id?tab=documents&doc=<id>
@@ -159,6 +160,7 @@ export default function ClientWorkspacePage() {
           { value: "review", label: "Review Queue", count: cReview.length },
           { value: "exceptions", label: "Exception Queue", count: cEx.length },
           { value: "recon", label: "Recon" },
+          { value: "close", label: "Month-end close" },
           { value: "mis", label: "MIS", count: cReports.filter((r) => r.period === period).length },
           { value: "chaser", label: "Chaser", count: cChases.length },
           { value: "activity", label: "Activity", count: timeline.length + agentRunsFor(client.id).length },
@@ -289,6 +291,8 @@ export default function ClientWorkspacePage() {
       )}
 
       <MatchDrawer txnId={viewMatch} onClose={() => setViewMatch(null)} />
+
+      {tab === "close" && <CloseChecklist clientId={client.id} onTab={setTab} />}
 
       {tab === "mis" && <ReportsPage clientId={client.id} />}
 

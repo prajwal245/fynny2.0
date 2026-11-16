@@ -734,7 +734,10 @@ export async function processExtraction(
   const avg = confidences.length
     ? round2(confidences.reduce((s, c) => s + c, 0) / confidences.length)
     : 0;
-  const status = (openReview ?? 0) > 0 ? "needs_review" : "parsed";
+  // A statement whose own checks failed is held for a person, not called processed. Its lines stay exactly as read; a partner or
+  // manager accepts it (with a reason) or the file is corrected and uploaded again.
+  const verificationFailed = statementReport?.status === "fail" && !statementReport?.hold;
+  const status = (openReview ?? 0) > 0 || verificationFailed ? "needs_review" : "parsed";
   await db
     .from("ca_document_extractions")
     .update({
@@ -753,7 +756,9 @@ export async function processExtraction(
       error_message:
         rows.length === 0
           ? "No transactions were found in this file."
-          : null,
+          : verificationFailed
+            ? `Held: verification failed. ${statementReport?.headline ?? ""}`.trim().slice(0, 500)
+            : null,
       extracted: {
         ...(doc.extracted ?? {}),
         source:

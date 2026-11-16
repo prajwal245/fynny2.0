@@ -1,7 +1,7 @@
 /**
  * The bank's own control figures, read from the statement itself and compared with what FynHelp read.
  *
- * Most banks print something a person can tick against: HDFC a summary row (opening, debit and credit counts and totals, closing),
+ * Most banks print something a person can tick against: HDFC and SBI a summary row (opening, debit and credit counts and totals, closing),
  * Indian Bank a "Dr. Count / Cr. Count" row on every page, Union Bank a "Total" row, ICICI a serial number on every line and
  * "Page n of N" on every page. These used to be thrown away as page furniture. They are free ground truth: "we read 161 of the
  * bank's 161 and both totals tie" is a stronger statement than "the balance follows".
@@ -99,6 +99,32 @@ export function readBankSummary(pagesIn: PosItem[][]): BankSummary | null {
       });
       source = "summary_row";
     });
+  }
+
+  // 1b. SBI: a "Statement Summary" on the last page. A heading row (Brought Forward, Dr Count, Cr Count, Total Debits, Total Credits,
+  // Closing Balance) and one row of six figures under it. A closing balance printed with DR is an overdraft and is negative.
+  if (!source) {
+    for (const ls of pages) {
+      ls.forEach((l, k) => {
+        if (source) return;
+        if (!/Brought\s*Forward.*Dr\s*Count.*Cr\s*Count.*Total\s*Debits.*Total\s*Credits.*Closing\s*Balance/i.test(l.text)) return;
+        // The figures sit just under the heading, but the PDF may print the counts a point or two lower than the money columns, so
+        // the rows within 20 units under the heading are read together, left to right.
+        const under = ls.slice(k + 1).filter((o) => l.y - o.y > 0 && l.y - o.y <= 20);
+        if (!under.length) return;
+        const t = under.flatMap((o) => o.items).sort((a, b) => a.x - b.x).map((i) => i.str.trim()).filter(Boolean);
+        if (t.length !== 6) return;
+        const [bf, dr, cr, debits, credits, closing] = t as [string, string, string, string, string, string];
+        const signed = (v: string) => {
+          const n = money(v);
+          return n === null ? null : /DR$/i.test(v.trim()) && n !== 0 ? -Math.abs(n) : n;
+        };
+        const nums = { opening: signed(bf), drCount: /^\d+$/.test(dr) ? Number(dr) : null, crCount: /^\d+$/.test(cr) ? Number(cr) : null, debits: money(debits), credits: money(credits), closing: signed(closing) };
+        if (Object.values(nums).some((v) => v === null)) return;
+        Object.assign(found, nums);
+        source = "summary_row";
+      });
+    }
   }
 
   // 2. Indian Bank: every page prints "Dr. Count: n  Cr. Count: m  <debits so far>  <credits so far>", the counts being that page's own.
@@ -230,8 +256,24 @@ export function tieOut(s: BankSummary | null, read: ReadFigures): TieOut {
   }
 
   if (s.source === "summary_row" && s.opening !== undefined && s.closing !== undefined && read.opening !== null && read.closing !== null) {
-    const ok = near(s.opening, read.opening) && near(s.closing, read.closing);
-    checks.push({ ok, label: "The bank's own balances", detail: ok ? `Opening ${inr(s.opening)} and closing ${inr(s.closing)} tie.` : `The bank prints opening ${inr(s.opening)} and closing ${inr(s.closing)}; the lines give ${inr(read.opening)} and ${inr(read.closing)}.` });
+    const closingOk = near(s.closing, read.closing);
+    // A bank's own summary must add up: opening + credits - debits = closing. SBI prints "Brought Forward 0.00" on an overdraft that
+    // began the year overdrawn, which does not. When the printed figures contradict each other the printed opening cannot be relied on,
+    // so only the closing balance (and the counts and totals, checked above) are compared, and the check says so.
+    const selfConsistent = s.debits === undefined || s.credits === undefined || near(s.opening + s.credits - s.debits, s.closing);
+    const openingOk = near(s.opening, read.opening);
+    if (selfConsistent) {
+      const ok = openingOk && closingOk;
+      checks.push({ ok, label: "The bank's own balances", detail: ok ? `Opening ${inr(s.opening)} and closing ${inr(s.closing)} tie.` : `The bank prints opening ${inr(s.opening)} and closing ${inr(s.closing)}; the lines give ${inr(read.opening)} and ${inr(read.closing)}.` });
+    } else {
+      checks.push({
+        ok: closingOk,
+        label: "The bank's own balances",
+        detail: closingOk
+          ? `Closing ${inr(s.closing)} ties. The opening the bank prints (${inr(s.opening)}) does not agree with the bank's own totals, so it was not used; the lines give ${inr(read.opening)}, which is what the totals require.`
+          : `The bank prints closing ${inr(s.closing)}; the lines give ${inr(read.closing)}. (Its printed opening, ${inr(s.opening)}, also disagrees with its own totals and was not used.)`,
+      });
+    }
   }
 
   if (s.serialMax !== undefined) {

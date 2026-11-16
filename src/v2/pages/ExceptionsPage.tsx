@@ -10,6 +10,7 @@ import {
   EmptyState,
   Modal,
   PageHeader,
+  Segmented,
   SortTh,
   V,
   formatDate,
@@ -19,6 +20,9 @@ import {
 import { AgentStatusBadge } from "../agents";
 import { EXCEPTION_REASONS, Exception, monthOf, useV2 } from "../store";
 import { openExceptions } from "../lib/exceptions";
+import { AssignControl, DueText, HandlingPanel, KindBadge, OwnTransfersPanel, OwnerChip, WorkBadge } from "../components/ExceptionHandling";
+import { useExceptionWork } from "../lib/exceptionWork";
+import { EXCEPTION_KINDS, KIND_LABEL, WORK_LABEL, WORK_STATUSES, belongsTo } from "@/lib/practice/exceptionKinds";
 import { ZohoPostPanel } from "../components/ZohoPost";
 import { BooksExportButton, BooksExportDrawer, BX_STYLES, SYSTEM_LABEL, SystemLogo, useBooksFor } from "../components/BooksExport";
 import type { BooksSystem } from "@/lib/practice/zohoExport";
@@ -33,8 +37,14 @@ export default function ExceptionsPage({
   focusTxnId,
   onFocused,
 }: { clientId?: string; focusTxnId?: string; onFocused?: () => void } = {}) {
-  const { exceptions, clients, clientName, setExceptionStatus, reopenException, runs, docs, period } =
+  const { exceptions, clients, clientName, setExceptionStatus, reopenException, runs, docs, period, refresh } =
     useV2();
+  const work = useExceptionWork(refresh);
+  // My exceptions, the unassigned ones awaiting an owner, or all; then narrowed by kind, status and owner.
+  const [tab, setTab] = useState<"mine" | "unassigned" | "all">("all");
+  const [kindF, setKindF] = useState("all");
+  const [statusF, setStatusF] = useState("all");
+  const [ownerF, setOwnerF] = useState("all");
   // The queue follows the period in the top bar; "All periods" shows everything.
   const [scope, setScope] = useState<"period" | "all">("period");
   const [confirmAction, setConfirmAction] = useState<null | "ignore" | "reconciled_external">(null);
@@ -52,12 +62,23 @@ export default function ExceptionsPage({
   // Same rule as the sidebar badge: a failed bank line and its book twin are one decision.
   const allOpen = openExceptions(exceptions).filter((e) => client === "all" || e.clientId === client);
   const openInScope = allOpen.filter(inScope);
-  const list = openInScope.filter((e) => reason === "all" || e.reason === reason);
+  const myId = work.me?.userId ?? "";
+  const narrowed = openInScope
+    .filter((e) => reason === "all" || e.reason === reason)
+    .filter((e) => kindF === "all" || e.kind === kindF)
+    .filter((e) => statusF === "all" || (e.workStatus ?? "open") === statusF)
+    .filter((e) => ownerF === "all" || (ownerF === "none" ? !e.ownerId : e.ownerId === ownerF));
+  const tabCount = (t: "mine" | "unassigned" | "all") => narrowed.filter((e) => belongsTo({ ownerId: e.ownerId ?? null }, myId, t)).length;
+  const list = narrowed.filter((e) => belongsTo({ ownerId: e.ownerId ?? null }, myId, tab));
   const exSort = useSort(
     list,
     {
       client: (e) => clientName(e.clientId),
       reason: (e) => e.reason,
+      kind: (e) => (e.kind ? KIND_LABEL[e.kind] : ""),
+      owner: (e) => work.nameOf(e.ownerId) ?? "~",
+      status: (e) => e.workStatus ?? "open",
+      due: (e) => e.dueDate ?? "9999",
       side: (e) => e.side ?? "",
       narration: (e) => e.narration,
       amount: (e) => e.amount,
@@ -237,6 +258,21 @@ export default function ExceptionsPage({
         />
       )}
 
+      <OwnTransfersPanel clientId={scopedClient} refresh={refresh} />
+
+      <div style={{ marginBottom: 12 }}>
+        <Segmented
+          label="Whose exceptions"
+          value={tab}
+          onChange={(v) => setTab(v)}
+          options={[
+            { value: "mine", label: "My exceptions", count: tabCount("mine") },
+            { value: "unassigned", label: "Unassigned", count: tabCount("unassigned") },
+            { value: "all", label: "All", count: tabCount("all") },
+          ]}
+        />
+      </div>
+
       <div
         style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}
       >
@@ -278,6 +314,19 @@ export default function ExceptionsPage({
             </option>
           ))}
         </select>
+        <select className="v2-input" style={{ width: "auto", minWidth: 190 }} value={kindF} onChange={(e) => setKindF(e.target.value)} aria-label="Type of exception">
+          <option value="all">All types</option>
+          {EXCEPTION_KINDS.map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
+        </select>
+        <select className="v2-input" style={{ width: "auto", minWidth: 150 }} value={statusF} onChange={(e) => setStatusF(e.target.value)} aria-label="Status">
+          <option value="all">Any status</option>
+          {WORK_STATUSES.filter((x) => x !== "resolved").map((x) => <option key={x} value={x}>{WORK_LABEL[x]}</option>)}
+        </select>
+        <select className="v2-input" style={{ width: "auto", minWidth: 160 }} value={ownerF} onChange={(e) => setOwnerF(e.target.value)} aria-label="Owner">
+          <option value="all">Any owner</option>
+          <option value="none">Unassigned</option>
+          {work.members.map((m) => <option key={m.userId} value={m.userId}>{m.isYou ? `${m.name} (you)` : m.name}</option>)}
+        </select>
         <span style={{ marginLeft: "auto" }}>
           <BooksExportButton clientId={client} allPeriods={scope === "all"} />
         </span>
@@ -286,7 +335,7 @@ export default function ExceptionsPage({
       {list.length === 0 ? (
         <EmptyState
           icon={<ShieldCheck size={22} />}
-          title={scope === "period" ? `No open exceptions in ${period}` : "No open exceptions"}
+          title={tab === "mine" ? "Nothing is assigned to you" : tab === "unassigned" ? "Every open exception has an owner" : scope === "period" ? `No open exceptions in ${period}` : "No open exceptions"}
           description={
             reason !== "all"
               ? "Nothing open with this reason code."
@@ -297,28 +346,34 @@ export default function ExceptionsPage({
         />
       ) : (
         <Card style={{ padding: 0 }} className="v2-scroll">
-          <table className="v2-table v2-table-stack v2-review-table" style={{ width: scopedClient ? 1426 : 1606 }}>
+          <table className="v2-table v2-table-stack v2-review-table" style={{ width: scopedClient ? 1856 : 2036 }}>
             <colgroup>
               <col style={{ width: 48 }} />
               {!scopedClient && <col style={{ width: 180 }} />}
-              <col style={{ width: 200 }} />
+              <col style={{ width: 230 }} />
               <col style={{ width: 80 }} />
               <col style={{ width: 420 }} />
               <col style={{ width: 140 }} />
               <col style={{ width: 118 }} />
               <col style={{ width: 260 }} />
+              <col style={{ width: 150 }} />
+              <col style={{ width: 150 }} />
+              <col style={{ width: 130 }} />
               <col style={{ width: 160 }} />
             </colgroup>
             <thead>
               <tr>
                 <SelectAllHeader sel={sel} total={list.length} />
                 {!scopedClient && <SortTh label="Client" k="client" sort={exSort.sort} toggle={exSort.toggle} />}
-                <SortTh label="Reason" k="reason" sort={exSort.sort} toggle={exSort.toggle} />
+                <SortTh label="Type" k="kind" sort={exSort.sort} toggle={exSort.toggle} />
                 <SortTh label="Side" k="side" sort={exSort.sort} toggle={exSort.toggle} />
                 <SortTh label="Narration" k="narration" sort={exSort.sort} toggle={exSort.toggle} />
                 <SortTh label="Amount" k="amount" sort={exSort.sort} toggle={exSort.toggle} align="right" />
                 <SortTh label="Date" k="date" sort={exSort.sort} toggle={exSort.toggle} />
                 <th>Best candidate</th>
+                <SortTh label="Owner" k="owner" sort={exSort.sort} toggle={exSort.toggle} />
+                <SortTh label="Status" k="status" sort={exSort.sort} toggle={exSort.toggle} />
+                <SortTh label="Due" k="due" sort={exSort.sort} toggle={exSort.toggle} />
                 <th className="v2-sticky-end" />
               </tr>
             </thead>
@@ -342,7 +397,8 @@ export default function ExceptionsPage({
                       </td>
                     )}
                     <td className="rv-nowrap">
-                      <Badge tone="warn">{e.reason}</Badge>{e.precedent && <span title="The Recon agent learned a decision for this line" style={{ marginLeft: 6 }}><Badge tone="info">Learned</Badge></span>}
+                      {e.kind ? <KindBadge e={e} /> : <Badge tone="warn">{e.reason}</Badge>}{e.precedent && <span title="The Recon agent learned a decision for this line" style={{ marginLeft: 6 }}><Badge tone="info">Learned</Badge></span>}
+                      <div style={{ fontSize: 11.5, color: V.muted, marginTop: 3 }}>{e.reason}</div>
                     </td>
                     <td style={{ color: V.body }}>
                       {e.side === "books" ? "Books" : "Bank"}
@@ -363,6 +419,9 @@ export default function ExceptionsPage({
                     <td style={{ color: V.body, fontSize: 12.5 }} title={liveCandidates(e)[0]?.label ?? ""}>
                       <div className="rv-cut2">{liveCandidates(e)[0]?.label ?? "No candidate found"}</div>
                     </td>
+                    <td><OwnerChip name={work.nameOf(e.ownerId)} you={Boolean(e.ownerId) && e.ownerId === myId} /></td>
+                    <td><WorkBadge e={e} /></td>
+                    <td><DueText date={e.dueDate} /></td>
                     <td className="v2-sticky-end">
                       <div
                         style={{
@@ -426,6 +485,8 @@ export default function ExceptionsPage({
               )}
             </div>
 
+            <HandlingPanel ex={active} work={work} role={work.me?.role ?? "junior"} />
+
             {active.status === "open" && active.side !== "books" && <ExportHint clientId={active.clientId} onOpen={(sys) => setExportFor(sys)} />}
             {active.status === "open" && <ZohoPostPanel clientId={active.clientId} txnId={active.txnId} side={active.side} open={!!active} />}
 
@@ -437,7 +498,7 @@ export default function ExceptionsPage({
                 </div>
               ) : (
                 <div style={{ display: "grid", gap: 8 }}>
-                  {liveCandidates(active).map(({ label: c, id }) => {
+                  {liveCandidates(active).slice(0, 3).map(({ label: c, id }) => {
                     return (
                       <label
                         key={c}
@@ -608,6 +669,7 @@ export default function ExceptionsPage({
         )}
       </Drawer>
       <BulkBar sel={sel} total={list.length} noun={selected.length === 1 ? "line" : "lines"}>
+        <AssignControl ids={selected.map((e) => e.id)} work={work} onDone={() => sel.clear()} />
         <button
           className="bx-btn bx-sm bx-primary"
           disabled={bulkBusy || matchable.length === 0}

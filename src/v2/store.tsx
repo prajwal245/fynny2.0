@@ -155,6 +155,17 @@ export type Exception = {
   /** Learned from an earlier decision on the same kind of line: proposed, never applied by itself. */
   precedent?: { action: string; note: string; times: number; at: string; by: string | null };
   status: "open" | "resolved" | "ignored";
+  /** One of the seven kinds (see exceptionKinds.ts) and the plain reason it was given that kind. */
+  kind?: import("@/lib/practice/exceptionKinds").ExceptionKind;
+  kindWhy?: string;
+  /** Team handling: who has it, where it stands, when it is due, the internal remark, and any senior review. */
+  ownerId?: string | null;
+  workStatus?: import("@/lib/practice/exceptionKinds").WorkStatus;
+  dueDate?: string | null;
+  remark?: string | null;
+  reviewState?: import("@/lib/practice/exceptionKinds").ReviewState;
+  reviewerId?: string | null;
+  updatedAt?: string | null;
 };
 
 export type Report = {

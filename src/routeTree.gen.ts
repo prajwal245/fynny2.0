@@ -42,6 +42,7 @@ import { Route as MainUseCasesRouteImport } from './routes/_main/use-cases'
 import { Route as MainWaitlistRouteImport } from './routes/_main/waitlist'
 import { Route as AppIndexRouteImport } from './routes/app/index'
 import { Route as AppChaserRouteImport } from './routes/app/chaser'
+import { Route as AppCloseRouteImport } from './routes/app/close'
 import { Route as AppDocumentsRouteImport } from './routes/app/documents'
 import { Route as AppExceptionsRouteImport } from './routes/app/exceptions'
 import { Route as AppGstRouteImport } from './routes/app/gst'
@@ -391,6 +392,11 @@ const AppIndexRoute = AppIndexRouteImport.update({
 const AppChaserRoute = AppChaserRouteImport.update({
   id: '/chaser',
   path: '/chaser',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCloseRoute = AppCloseRouteImport.update({
+  id: '/close',
+  path: '/close',
   getParentRoute: () => AppRoute,
 } as any)
 const AppDocumentsRoute = AppDocumentsRouteImport.update({
@@ -1477,6 +1483,7 @@ export interface FileRoutesByFullPath {
   '/use-cases': typeof MainUseCasesRoute
   '/waitlist': typeof MainWaitlistRoute
   '/app/chaser': typeof AppChaserRoute
+  '/app/close': typeof AppCloseRoute
   '/app/documents': typeof AppDocumentsRoute
   '/app/exceptions': typeof AppExceptionsRoute
   '/app/gst': typeof AppGstRoute
@@ -1695,6 +1702,7 @@ export interface FileRoutesByTo {
   '/use-cases': typeof MainUseCasesRoute
   '/waitlist': typeof MainWaitlistRoute
   '/app/chaser': typeof AppChaserRoute
+  '/app/close': typeof AppCloseRoute
   '/app/documents': typeof AppDocumentsRoute
   '/app/exceptions': typeof AppExceptionsRoute
   '/app/gst': typeof AppGstRoute
@@ -1917,6 +1925,7 @@ export interface FileRoutesById {
   '/_main/use-cases': typeof MainUseCasesRoute
   '/_main/waitlist': typeof MainWaitlistRoute
   '/app/chaser': typeof AppChaserRoute
+  '/app/close': typeof AppCloseRoute
   '/app/documents': typeof AppDocumentsRoute
   '/app/exceptions': typeof AppExceptionsRoute
   '/app/gst': typeof AppGstRoute
@@ -2140,6 +2149,7 @@ export interface FileRouteTypes {
     | '/use-cases'
     | '/waitlist'
     | '/app/chaser'
+    | '/app/close'
     | '/app/documents'
     | '/app/exceptions'
     | '/app/gst'
@@ -2358,6 +2368,7 @@ export interface FileRouteTypes {
     | '/use-cases'
     | '/waitlist'
     | '/app/chaser'
+    | '/app/close'
     | '/app/documents'
     | '/app/exceptions'
     | '/app/gst'
@@ -2579,6 +2590,7 @@ export interface FileRouteTypes {
     | '/_main/use-cases'
     | '/_main/waitlist'
     | '/app/chaser'
+    | '/app/close'
     | '/app/documents'
     | '/app/exceptions'
     | '/app/gst'
@@ -3046,6 +3058,13 @@ declare module '@tanstack/react-router' {
       path: '/chaser'
       fullPath: '/app/chaser'
       preLoaderRoute: typeof AppChaserRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/close': {
+      id: '/app/close'
+      path: '/close'
+      fullPath: '/app/close'
+      preLoaderRoute: typeof AppCloseRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/documents': {
@@ -4839,6 +4858,7 @@ const MainRouteWithChildren = MainRoute._addFileChildren(MainRouteChildren)
 
 interface AppRouteChildren {
   AppChaserRoute: typeof AppChaserRoute
+  AppCloseRoute: typeof AppCloseRoute
   AppDocumentsRoute: typeof AppDocumentsRoute
   AppExceptionsRoute: typeof AppExceptionsRoute
   AppGstRoute: typeof AppGstRoute
@@ -4855,6 +4875,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppChaserRoute: AppChaserRoute,
+  AppCloseRoute: AppCloseRoute,
   AppDocumentsRoute: AppDocumentsRoute,
   AppExceptionsRoute: AppExceptionsRoute,
   AppGstRoute: AppGstRoute,

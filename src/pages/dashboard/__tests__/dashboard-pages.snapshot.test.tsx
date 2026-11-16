@@ -13,7 +13,7 @@
  * To accept intentional changes:
  *   bunx vitest run --update src/pages/dashboard/__tests__/dashboard-pages.snapshot.test.tsx
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -85,6 +85,9 @@ const renderPage = (ui: ReactNode) => {
 };
 
 beforeEach(() => {
+    // Pages show dates relative to today ("92 days ago"): pin the clock so the stored snapshot does not drift daily.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-15T10:00:00Z"));
   fromMock.mockReset();
   // Default: every table returns empty so pages render their empty/disconnected
   // states, these are the most stable snapshots and exercise the shared
@@ -115,4 +118,8 @@ describe("Dashboard page snapshots, shared-primitive layout regression", () => {
     await findByText(/No Compliance Data/i);
     expect(container.firstChild).toMatchSnapshot();
   });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });

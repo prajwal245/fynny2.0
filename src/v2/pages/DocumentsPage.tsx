@@ -1,7 +1,7 @@
 import { txnType, txnDirection } from "@/lib/practice/txnType";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { chooseDocumentSheet, confirmStatementOwner } from "@/lib/practice/practice.functions";
+import { acceptPracticeStatement, chooseDocumentSheet, confirmStatementOwner } from "@/lib/practice/practice.functions";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertTriangle,
@@ -176,6 +176,7 @@ export default function DocumentsPage({
     assignDoc,
     openDocument,
     period,
+    refresh,
   } = useV2();
   const [tab, setTab] = useState("All");
   const [holdBusy, setHoldBusy] = useState(false);
@@ -794,6 +795,16 @@ export default function DocumentsPage({
                 period={period}
                 busy={holdBusy}
                 onMove={(cid) => { setHoldBusy(true); void assignDoc(active.id, cid, "bank").finally(() => setHoldBusy(false)); }}
+                onAccept={async (note) => {
+                  try {
+                    await acceptPracticeStatement({ data: { id: active.id, note } });
+                    toast.success("Accepted. Every line stays exactly as read.");
+                    await refresh();
+                    return null;
+                  } catch (e) {
+                    return e instanceof Error ? e.message : "Could not accept it.";
+                  }
+                }}
                 onConfirm={() => { setHoldBusy(true); void confirmStatementOwner({ data: { id: active.id } }).then(() => reprocessDoc(active.id)).catch((e: unknown) => toast.error(e instanceof Error ? e.message : "Could not confirm.")).finally(() => setHoldBusy(false)); }}
               />}
             {active.status === "Processing" || active.status === "Uploading" ? (

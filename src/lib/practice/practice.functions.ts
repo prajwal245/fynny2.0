@@ -1502,3 +1502,53 @@ export const getPracticeExceptionTimeline = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) =>
     withFirm(context.userId, async (db, ctx) => (await import("./exceptionWork.server")).exceptionTimeline(db, ctx, data.id)),
   );
+
+/* ── month-end close ─────────────────────────────────────── */
+
+const closePeriod = z.string().regex(/^\d{4}-\d{2}$/);
+
+export const getPracticePortfolioClose = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ period: closePeriod }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./close/close.server")).portfolioClose(db, ctx, data.period)),
+  );
+
+export const getPracticeClientClose = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ business_id: uuid, period: closePeriod }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      const close = await import("./close/close.server");
+      const [summary, history] = await Promise.all([close.clientClose(db, ctx, data.business_id, data.period), close.closeHistory(db, ctx, data.business_id, data.period)]);
+      return { summary, history, role: ctx.role };
+    }),
+  );
+
+export const confirmPracticeCloseStep = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ business_id: uuid, period: closePeriod, step: z.string().max(40), confirm: z.boolean(), note: z.string().max(500).optional() }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./close/close.server")).confirmStep(db, ctx, data.business_id, data.period, data.step, data.confirm, data.note)),
+  );
+
+export const addPracticeExpectedStatement = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ business_id: uuid, label: z.string().min(1).max(80), account_tail: z.string().max(20).nullable().optional() }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./close/close.server")).addRequirement(db, ctx, data.business_id, data.label, data.account_tail)),
+  );
+
+export const removePracticeExpectedStatement = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: uuid }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./close/close.server")).removeRequirement(db, ctx, data.id)),
+  );
+
+export const acceptPracticeStatement = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: uuid, note: z.string().min(1).max(500) }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./close/close.server")).acceptStatement(db, ctx, data.id, data.note)),
+  );

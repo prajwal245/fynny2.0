@@ -33,6 +33,35 @@ describe("own-account transfer pairing", () => {
     const ins = [leg({ id: "i1", extractionId: "B", direction: "in", reference: ref }), leg({ id: "i2", extractionId: "C", direction: "in", reference: ref })];
     expect(pairOwnTransfers([o, ...ins])).toHaveLength(0);
   });
+  it("SBI: pairs the bank's own transfer entries (WDL TFR / DEP TFR) with no account number printed, when the partner is unique", () => {
+    const out = leg({ id: "o", amount: 150000, description: "WDL TFR TRANSFER TO" });
+    const inn = leg({ id: "i", extractionId: "B", direction: "in", amount: 150000, description: "DEP TFR TRANSFER FROM" });
+    const p = pairOwnTransfers([out, inn]);
+    expect(p).toHaveLength(1);
+    expect(p[0]!.evidence).toMatch(/bank's own transfer entries/);
+  });
+  it("two identical transfers out and two in on one day are paired in order, since any pairing gives the same result", () => {
+    const o = (id: string) => leg({ id, amount: 800000, description: "WDL TFR INB Transfer" });
+    const i = (id: string) => leg({ id, extractionId: "B", direction: "in", amount: 800000, description: "DEP TFR INB Transfer" });
+    const p = pairOwnTransfers([o("o1"), o("o2"), i("i1"), i("i2")]);
+    expect(p.map((x) => [x.out.id, x.in.id])).toEqual([["o1", "i1"], ["o2", "i2"]]);
+    expect(p[0]!.evidence).toMatch(/2 identical transfers/);
+    // The same amount on another day, unpaired, does not stop the group being recognised.
+    const other = leg({ id: "far", amount: 800000, date: "2026-03-20", description: "WDL TFR INB Transfer" });
+    expect(pairOwnTransfers([o("o1"), o("o2"), i("i1"), i("i2"), other])).toHaveLength(2);
+    // Unequal numbers are not guessed.
+    expect(pairOwnTransfers([o("o1"), o("o2"), i("i1")])).toHaveLength(0);
+  });
+  it("two equal transfers with two possible partners are left to a person", () => {
+    const out = leg({ id: "o", amount: 150000, description: "WDL TFR TRANSFER TO" });
+    const ins = ["i1", "i2"].map((id, n) => leg({ id, extractionId: n ? "C" : "B", direction: "in", amount: 150000, description: "DEP TFR TRANSFER FROM" }));
+    expect(pairOwnTransfers([out, ...ins])).toHaveLength(0);
+  });
+  it("a transfer to a third party is not paired with an ordinary credit", () => {
+    const out = leg({ id: "o", amount: 150000, description: "WDL TFR TRANSFER TO" });
+    const inn = leg({ id: "i", extractionId: "B", direction: "in", amount: 150000, description: "UPI/CR/RAMESH" });
+    expect(pairOwnTransfers([out, inn])).toHaveLength(0);
+  });
   it("a one-sided transfer stays unpaired", () => {
     expect(pairOwnTransfers([leg({ id: "o", reference: "UTR9988776655" })])).toHaveLength(0);
   });

@@ -379,6 +379,7 @@ export const reopenPracticeException = createServerFn({ method: "POST" })
     withFirm(context.userId, async (db, ctx) => {
       const recon = await import("./recon.server");
       const res = await recon.reopenException(db, ctx, data.id);
+      await (await import("./exceptionWork.server")).followResolution(db, ctx, data.id, "reopened");
       const { data: ex } = await db.from("ca_exceptions").select("business_id, period_start, period_end").eq("id", data.id).maybeSingle();
       if (ex?.business_id) await recon.refreshOpenReasons(db, ctx, ex.business_id, ex.period_start ? String(ex.period_start) : null, ex.period_end ? String(ex.period_end) : null).catch(() => undefined);
       return res;
@@ -410,6 +411,7 @@ export const resolvePracticeException = createServerFn({ method: "POST" })
         data.note,
         { allowDifference: data.allow_difference },
       );
+      await (await import("./exceptionWork.server")).followResolution(db, ctx, data.id, data.action === "ignore" ? "ignored" : "resolved", data.note);
       // Clearing the last exception can make the month ready for its MIS.
       const { data: ex } = await db
         .from("ca_exceptions")
@@ -1455,3 +1457,48 @@ export const submitPracticeProblemReport = createServerFn({ method: "POST" })
 export const getPracticeProblemReports = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => withFirm(context.userId, async (db, ctx) => (await import("./reports.server")).myReports(db, ctx)));
+
+/* ── team work on exceptions: owners, status, remarks, review, history ─────────────── */
+
+const workStatus = z.enum(["open", "query_sent", "answered", "resolved", "accepted_timing"]);
+
+export const getPracticeTeamMembers = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./exceptionWork.server")).assignableMembers(db, ctx)),
+  );
+
+export const assignPracticeExceptions = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ ids: z.array(uuid).min(1).max(200), owner_id: uuid.nullable(), note: z.string().max(300).optional() }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./exceptionWork.server")).assignExceptions(db, ctx, data.ids, data.owner_id, data.note)),
+  );
+
+export const setPracticeExceptionStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: uuid, status: workStatus, note: z.string().max(500).optional() }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./exceptionWork.server")).setWorkStatus(db, ctx, data.id, data.status, data.note)),
+  );
+
+export const setPracticeExceptionRemark = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: uuid, remark: z.string().max(1000).optional(), due_date: z.string().max(10).nullable().optional() }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./exceptionWork.server")).setRemarkAndDue(db, ctx, data.id, { remark: data.remark, dueDate: data.due_date })),
+  );
+
+export const reviewPracticeException = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: uuid, action: z.enum(["send", "return", "approve"]), reviewer_id: uuid.optional(), note: z.string().max(500).optional() }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./exceptionWork.server")).reviewAction(db, ctx, data.id, data.action, { reviewerId: data.reviewer_id, note: data.note })),
+  );
+
+export const getPracticeExceptionTimeline = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: uuid }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./exceptionWork.server")).exceptionTimeline(db, ctx, data.id)),
+  );

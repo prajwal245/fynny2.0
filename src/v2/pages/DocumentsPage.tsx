@@ -2,7 +2,7 @@ import { txnType, txnDirection } from "@/lib/practice/txnType";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { SheetPicker } from "../components/SheetPicker";
-import { acceptPracticeStatement, chooseDocumentSheet, confirmStatementOwner, removePracticeDocument } from "@/lib/practice/practice.functions";
+import { acceptPracticeStatement, checkPracticeAiReader, chooseDocumentSheet, confirmStatementOwner, removePracticeDocument } from "@/lib/practice/practice.functions";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertTriangle,
@@ -666,6 +666,7 @@ export default function DocumentsPage({
                     ? `This looks temporary. The Extract agent will try again at ${clock(active.retryAt)} (attempt ${(active.attempts ?? 1) + 1} of 3), or retry it now.`
                     : "Retry it, or upload a clearer copy (a text PDF, CSV or Excel export reads best)."}
                 </div>
+                {/AI|scan reader|AI key/i.test(active.error ?? "") && <AiCheck />}
               </div>
             )}
 
@@ -971,5 +972,35 @@ export default function DocumentsPage({
         )}
       </Modal>
     </>
+  );
+}
+
+
+/** Owner or partner: asks each AI provider a tiny question and shows which answered or the reason it did not. */
+function AiCheck() {
+  const [state, setState] = useState<"idle" | "running" | { configured: string[]; edge: boolean; results: { provider: string; ok: boolean; ms: number; detail: string }[] } | string>("idle");
+  const run = async () => {
+    setState("running");
+    try {
+      setState(await checkPracticeAiReader());
+    } catch (e) {
+      setState(e instanceof Error ? e.message : "Could not check.");
+    }
+  };
+  return (
+    <div style={{ marginTop: 10, color: V.body }}>
+      <button className="v2-btn v2-btn-ghost" onClick={() => void run()} disabled={state === "running"}>
+        {state === "running" ? "Checking…" : "Check the AI reader"}
+      </button>
+      {typeof state === "string" && state !== "idle" && state !== "running" && <div style={{ marginTop: 6 }}>{state}</div>}
+      {typeof state === "object" && (
+        <div style={{ marginTop: 8, fontSize: 12.5, display: "grid", gap: 4 }}>
+          {!state.configured.length && <div>No AI key is visible to this deployment{state.edge ? "; the built-in fallback is available." : ", and the built-in fallback is not available."}</div>}
+          {state.results.map((r) => (
+            <div key={r.provider}>{r.ok ? "Working" : "Not working"}: {r.provider}, {r.ms} ms. {r.ok ? "" : r.detail}</div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

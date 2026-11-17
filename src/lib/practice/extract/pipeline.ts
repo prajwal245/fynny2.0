@@ -425,6 +425,23 @@ const MIN_OCR_CHARS = 40;
 /** Lines read from a scan never outrank a person's glance unless the balances verify. */
 const OCR_CONFIDENCE_CAP = 0.8;
 
+/**
+ * Says what actually happened when the AI reader did not give an answer, from the calls made: no key at all, a key the provider
+ * rejected, a quota or rate limit, a timeout. Provider text is trimmed and never carries a key.
+ */
+export function aiWhy(hasClient: boolean, calls: AiCallRecord[]): { text: string; retryable: boolean } {
+  if (!hasClient) return { text: "No AI key is set for this deployment, so nothing was sent to the AI reader.", retryable: false };
+  const last = [...calls].reverse().find((c) => c.status === "error" && c.error);
+  if (!last) return { text: "The AI reader was not asked (its daily safety limit may have been reached).", retryable: true };
+  const raw = String(last.error);
+  const clean = raw.replace(/(AIza[0-9A-Za-z_-]{10,}|sk-[0-9A-Za-z_-]{10,}|key=[^&\s]+)/g, "[key]").replace(/\s+/g, " ").slice(0, 160);
+  if (/\b(401|403)\b|api key|permission|unauthori[sz]ed|invalid.*key|PERMISSION_DENIED/i.test(raw)) return { text: `The AI provider rejected the key (${clean}). The owner needs to check the key in the deployment settings.`, retryable: false };
+  if (/\b404\b|not found|model/i.test(raw) && !/timed? ?out/i.test(raw)) return { text: `The AI model name was not accepted (${clean}).`, retryable: false };
+  if (/\b429\b|quota|rate|resource.?exhaust/i.test(raw)) return { text: `The AI provider is limiting requests right now (${clean}). It will be tried again.`, retryable: true };
+  if (/timed? ?out|took too long|abort/i.test(raw)) return { text: "The AI reader took too long to answer. It will be tried again.", retryable: true };
+  return { text: `The AI reader did not answer (${clean}).`, retryable: true };
+}
+
 /** Says why a photo could not be read, from what the OCR and AI calls actually did. */
 function photoFailureMessage(calls: AiCallRecord[], ocrOn: boolean): string {
   const ocr = calls.find((c) => c.purpose === "extract_ocr");
@@ -809,7 +826,13 @@ export async function runExtract(
           positioned = null; // fall back to the text readers below
         }
       }
-      const statement = positioned && positioned.rows.length >= 3 && positioned.verifiedShare >= 0.7 ? positioned : rowsFromStatementText(sourceText);
+      // Two deterministic readers, and the one that recovers more of the statement wins: a column reader that finds a few lines
+      // must not beat a text reader that finds the whole statement (a bank that numbers its lines, for example).
+      const byText = rowsFromStatementText(sourceText);
+      const positionedOk = Boolean(positioned && positioned.rows.length >= 3 && positioned.verifiedShare >= 0.7);
+      const textOk = byText.rows.length >= 3 && byText.verifiedShare >= 0.7;
+      const preferText = positionedOk && positioned ? textOk && byText.rows.length > positioned.rows.length * 1.3 : true;
+      const statement = positionedOk && positioned && !preferText ? positioned : byText;
       if (statement === positioned && positioned) {
         parsed = positioned.rows;
         documentKind = "bank_statement";
@@ -834,7 +857,7 @@ export async function runExtract(
           return fail(
             kind,
             "needs_ai",
-            "The PDF has text but no statement layout was recognised, and the AI reader is not configured.",
+            `The PDF has text but no statement layout was recognised. ${aiWhy(Boolean(deps.llm), calls).text}`,
             calls,
           );
         }
@@ -869,7 +892,7 @@ export async function runExtract(
           kind,
           "needs_ai",
           // Said to the firm in plain words; Settings → Integrations tells the owner what to switch on.
-          "This PDF is a scan, and reading scans isn't switched on yet. Upload the statement your bank lets you download (Excel, CSV or PDF) instead, or try again later.",
+          `This PDF is a scan. ${deps.ocr || deps.llm ? aiWhy(Boolean(deps.llm), calls).text : "Neither the scan reader nor the AI reader is switched on."} You can upload the statement your bank lets you download (Excel, CSV or PDF) instead.`,
           calls,
         );
       if (read) {

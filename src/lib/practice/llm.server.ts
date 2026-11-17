@@ -32,6 +32,29 @@ function env(name: string): string | undefined {
 const supabaseUrl = () =>
   env("SUPABASE_URL") ?? env("NEXT_PUBLIC_SUPABASE_URL") ?? import.meta.env.VITE_SUPABASE_URL;
 
+/** The Gemini key, under the names it is commonly saved as. */
+function geminiKey(): string | undefined {
+  return env("GEMINI_API_KEY") ?? env("GOOGLE_API_KEY") ?? env("GOOGLE_GENERATIVE_AI_API_KEY") ?? env("GEMINI_KEY");
+}
+
+/** What this deployment can reach, without any key value: for the owner's "check the AI reader" button. */
+export async function checkAiProviders(): Promise<{ configured: string[]; edge: boolean; results: { provider: string; ok: boolean; ms: number; detail: string }[] }> {
+  const list = providers();
+  const edge = Boolean(supabaseUrl() && env("SUPABASE_SERVICE_ROLE_KEY")) && env("PRACTICE_AI_DISABLED") !== "1";
+  const results: { provider: string; ok: boolean; ms: number; detail: string }[] = [];
+  for (const p of list) {
+    const t0 = Date.now();
+    try {
+      const r = await callProvider(p, { purpose: "ai_check", system: "Reply with JSON only.", user: 'Return {"ok": true}.' } as LlmJsonRequest, 15_000);
+      results.push({ provider: `${p.name} (${p.model})`, ok: true, ms: Date.now() - t0, detail: r.raw.slice(0, 40) });
+    } catch (e) {
+      const m = (e instanceof Error ? e.message : String(e)).replace(/(AIza[0-9A-Za-z_-]{10,}|sk-[0-9A-Za-z_-]{10,}|key=[^&\s]+)/g, "[key]");
+      results.push({ provider: `${p.name} (${p.model})`, ok: false, ms: Date.now() - t0, detail: m.slice(0, 200) });
+    }
+  }
+  return { configured: list.map((p) => p.name), edge, results };
+}
+
 function providers(): Provider[] {
   const list: Provider[] = [];
   const groq = env("GROQ_API_KEY");
@@ -52,7 +75,7 @@ function providers(): Provider[] {
       model: env("LOVABLE_AI_MODEL") ?? "google/gemini-2.5-flash",
       vision: true,
     });
-  const gemini = env("GEMINI_API_KEY");
+  const gemini = geminiKey();
   if (gemini)
     list.push({
       name: "gemini",

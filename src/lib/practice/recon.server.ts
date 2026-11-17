@@ -153,6 +153,50 @@ function reconMessage(written: number, open: number, already: number, byStage: R
   return `${head}${how.length ? ` (${how.join(", ")})` : ""}. ${exceptions ? `${exceptions} exception${exceptions === 1 ? " needs" : "s need"} a decision.` : "Nothing left to decide."}`;
 }
 
+/**
+ * Starts the period over: every automatic match and every automatic set-aside (own-account transfers, reversed payments) goes back
+ * to open, so the next run decides again with the current rules. A person's manual matches, and the exceptions they resolved, stay.
+ * An earlier run made with older rules cannot keep a line from its right entry.
+ */
+export async function resetAutoMatches(db: Db, ctx: FirmContext, businessId: string, periodInput: string | { start: string; end: string }): Promise<{ reopened: number }> {
+  await assertClient(db, ctx, businessId);
+  const period = parsePeriod(periodInput);
+  const { data: matches } = await db
+    .from("ca_recon_matches")
+    .select("id, bank_txn_id, book_txn_ids, match_stage")
+    .eq("ca_firm_id", ctx.firmId)
+    .eq("business_id", businessId)
+    .lte("period_start", period.end)
+    .gte("period_end", period.start)
+    .limit(5000);
+  const auto = ((matches ?? []) as { id: string; bank_txn_id: string; book_txn_ids: string[] | null; match_stage: string }[]).filter((m) => m.match_stage !== "manual");
+  const ids = [...new Set(auto.flatMap((m) => [m.bank_txn_id, ...(m.book_txn_ids ?? [])]))];
+  let reopened = 0;
+  for (let i = 0; i < ids.length; i += 300) {
+    const { data } = await db.from("ca_txns").update({ match_status: "unmatched" }).in("id", ids.slice(i, i + 300)).eq("match_status", "matched").select("id");
+    reopened += data?.length ?? 0;
+  }
+  const matchIds = auto.map((m) => m.id);
+  for (let i = 0; i < matchIds.length; i += 300) await db.from("ca_recon_matches").delete().in("id", matchIds.slice(i, i + 300));
+  // Automatic set-asides in the period.
+  const { data: aside } = await db
+    .from("ca_txns")
+    .select("id, recon_tag")
+    .eq("ca_firm_id", ctx.firmId)
+    .eq("business_id", businessId)
+    .eq("match_status", "ignored")
+    .gte("txn_date", shiftDay(period.start, -2))
+    .lte("txn_date", shiftDay(period.end, 2))
+    .limit(5000);
+  const asideIds = ((aside ?? []) as { id: string; recon_tag: string | null }[]).filter((r) => r.recon_tag && (r.recon_tag.startsWith(OWN_TAG) || r.recon_tag.startsWith(REV_TAG))).map((r) => r.id);
+  for (let i = 0; i < asideIds.length; i += 300) {
+    const { data } = await db.from("ca_txns").update({ match_status: "unmatched", recon_tag: null }).in("id", asideIds.slice(i, i + 300)).select("id");
+    reopened += data?.length ?? 0;
+  }
+  await logActivity(db, ctx.firmId, businessId, "recon", `Started ${period.label} over: ${reopened} line${reopened === 1 ? "" : "s"} put back to open (automatic matches and set-asides only; manual matches kept).`);
+  return { reopened };
+}
+
 export async function runRecon(
   db: Db,
   ctx: FirmContext,
@@ -427,8 +471,14 @@ export async function runRecon(
       batch = batch.map(({ created_by: _c, ...rest }) => rest);
       ({ error } = await db.from("ca_exceptions").insert(batch));
     }
-    if (error && !/duplicate key/i.test(error.message))
-      throw new PracticeError("db_error", error.message);
+    if (error && /duplicate key/i.test(error.message)) {
+      // One line already has an open exception (the index allows one per line). That must not drop the other rows of the batch:
+      // insert them one by one and skip only the ones that already exist.
+      for (const row of batch) {
+        const { error: rowErr } = await db.from("ca_exceptions").insert(row);
+        if (rowErr && !/duplicate key/i.test(rowErr.message)) throw new PracticeError("db_error", rowErr.message);
+      }
+    } else if (error) throw new PracticeError("db_error", error.message);
   }
   const excIds = outcome.exceptions.map((e) => e.txn_id);
   for (let i = 0; i < excIds.length; i += 500) {
@@ -501,15 +551,31 @@ async function accountOfFn(db: Db, firmId: string, businessId: string): Promise<
 }
 
 async function splitAwaitingStatement(db: Db, firmId: string, businessId: string, books: TxnRow[]): Promise<{ books: TxnRow[]; awaiting: number }> {
-  const { data } = await db.from("ca_document_extractions").select("id, acct:extracted->>account_no").eq("ca_firm_id", firmId).eq("business_id", businessId).eq("side", "bank");
-  const known = new Set((data ?? []).map((d: { acct: string | null }) => String(d.acct ?? "").replace(/\D/g, "").slice(-4)).filter((t: string) => t.length === 4));
+  const { data } = await db
+    .from("ca_document_extractions")
+    .select("id, acct:extracted->>account_no, first:extracted->statement_check->>first, last:extracted->statement_check->>last")
+    .eq("ca_firm_id", firmId)
+    .eq("business_id", businessId)
+    .eq("side", "bank");
+  // What each account's statements cover, by month. An account that has a statement for December but none for September is still
+  // waiting for September's: waiting is per account and month, not per account.
+  const cover = new Map<string, { from: string; to: string }[]>();
+  for (const d of (data ?? []) as { acct: string | null; first: string | null; last: string | null }[]) {
+    const t = String(d.acct ?? "").replace(/\D/g, "").slice(-4);
+    if (t.length !== 4) continue;
+    const list = cover.get(t) ?? cover.set(t, []).get(t)!;
+    // A statement that does not say its dates covers everything (the earlier, safer reading).
+    list.push({ from: d.first ? String(d.first).slice(0, 7) : "0000-00", to: d.last ? String(d.last).slice(0, 7) : "9999-99" });
+  }
   // With no statement that names its account there is nothing to compare an account with: leave every entry in.
-  if (!known.size) return { books, awaiting: 0 };
+  if (!cover.size) return { books, awaiting: 0 };
   const keep: TxnRow[] = [];
   let awaiting = 0;
   for (const b of books) {
     const t = ledgerTail(b.description);
-    if (t && !known.has(t)) awaiting++;
+    const month = String(b.txn_date).slice(0, 7);
+    const spans = t ? cover.get(t) : null;
+    if (t && (!spans || !spans.some((c) => month >= c.from && month <= c.to))) awaiting++;
     else keep.push(b);
   }
   return { books: keep, awaiting };

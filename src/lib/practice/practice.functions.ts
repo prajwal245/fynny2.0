@@ -210,6 +210,45 @@ export const reprocessPracticeDocument = createServerFn({ method: "POST" })
     }),
   );
 
+/** Owner or partner: asks every AI provider this deployment has a tiny question, and says which answered or why not. No key is shown. */
+export const checkPracticeAiReader = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) =>
+    withWork(context.userId, async (_db, ctx) => {
+      if (!["owner", "admin", "partner"].includes(ctx.role)) throw new Error("Only a partner can check the AI reader.");
+      return (await import("./llm.server")).checkAiProviders();
+    }),
+  );
+
+/**
+ * Reads again the documents of this firm whose automatic retry time has passed. The retry never depends on an outside scheduler:
+ * an open workspace asks for it. A few at a time, so one call stays well inside the server's time limit.
+ */
+export const retryDuePracticeDocuments = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) =>
+    withWork(context.userId, async (db, ctx) => {
+      const { MAX_EXTRACT_ATTEMPTS } = await import("./orchestrate");
+      const now = new Date().toISOString();
+      const { data } = await db
+        .from("ca_document_extractions")
+        .select("id")
+        .eq("ca_firm_id", ctx.firmId)
+        .eq("extract_status", "failed")
+        .lte("extract_next_attempt_at", now)
+        .lt("extract_attempts", MAX_EXTRACT_ATTEMPTS)
+        .order("extract_next_attempt_at", { ascending: true })
+        .limit(1);
+      const { processExtraction } = await import("./documents.server");
+      let done = 0;
+      for (const row of data ?? []) {
+        await processExtraction(db, row.id, { trigger: "retry", userId: ctx.userId });
+        done++;
+      }
+      return { retried: done };
+    }),
+  );
+
 /**
  * A statement was held because it looks like another client's. A partner or manager says it does belong to this client: the
  * statement is read again and filed.
@@ -355,10 +394,14 @@ export const resolvePracticeReview = createServerFn({ method: "POST" })
 
 export const runPracticeRecon = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({ business_id: uuid, period }).parse(d))
+  .inputValidator((d) => z.object({ business_id: uuid, period, fresh: z.boolean().optional() }).parse(d))
   .handler(async ({ data, context }) =>
     withWork(context.userId, async (db, ctx) => {
       const orch = await import("./orchestrator.server");
+      if (data.fresh) {
+        if (!["owner", "admin", "partner", "manager"].includes(ctx.role)) throw new Error("Only a partner or manager can start a period over.");
+        await (await import("./recon.server")).resetAutoMatches(db, ctx, data.business_id, data.period);
+      }
       const { parsePeriod } = await import("./core");
       const label = parsePeriod(data.period).label;
       const summary = await orch.withRun(

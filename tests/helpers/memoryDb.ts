@@ -24,7 +24,7 @@ export function memoryDb(
     let wantCount = false;
     let max = Infinity;
     let offset = 0;
-    let aliases: { alias: string; col: string; path: string }[] = [];
+    let aliases: { alias: string; col: string; path: string[] }[] = [];
     let afterWrite = false;
 
     const run = (): {
@@ -68,7 +68,7 @@ export function memoryDb(
       }
       const h = hit()
         .slice(offset, offset + max)
-        .map((r) => (aliases.length ? { ...r, ...Object.fromEntries(aliases.map((a) => [a.alias, (r[a.col] as Row | undefined)?.[a.path] ?? null])) } : r));
+        .map((r) => (aliases.length ? { ...r, ...Object.fromEntries(aliases.map((a) => [a.alias, a.path.reduce<unknown>((o, k) => (o as Row | undefined)?.[k], r[a.col]) ?? null])) } : r));
       return {
         data: head ? null : h,
         error: null,
@@ -86,7 +86,7 @@ export function memoryDb(
       };
     q["select"] = (cols?: string, o?: { count?: string; head?: boolean }) => {
       // PostgREST JSON paths with an alias ("acct:extracted->>account_no") add a computed field to each row.
-      aliases = [...(cols ?? "").matchAll(/(\w+):(\w+)->>?(\w+)/g)].map((m) => ({ alias: m[1]!, col: m[2]!, path: m[3]! }));
+      aliases = [...(cols ?? "").matchAll(/(\w+):(\w+)((?:->>?\w+)+)/g)].map((m) => ({ alias: m[1]!, col: m[2]!, path: [...m[3]!.matchAll(/->>?(\w+)/g)].map((x) => x[1]!) }));
       if (op === "select") {
         head = !!o?.head;
         wantCount = !!o?.count;

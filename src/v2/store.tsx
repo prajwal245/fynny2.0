@@ -33,6 +33,7 @@ import {
   getPracticeDocumentUrl,
   getPracticeWorkspace,
   reprocessPracticeDocument,
+  retryDuePracticeDocuments,
   unlockPracticeDocument,
   discardPracticeReviewForDocument,
   registerPracticeUpload,
@@ -455,7 +456,7 @@ type Store = {
   reopenException: (id: string) => Promise<void>;
   /** Updates exceptions on screen at once (before the server answers); the next refresh confirms or reverts it. */
   patchExceptions: (ids: string[], patch: Partial<Exception>) => void;
-  runRecon: (clientId: string, onDone?: (r: ReconResult) => void) => void;
+  runRecon: (clientId: string, onDone?: (r: ReconResult) => void, opts?: { fresh?: boolean }) => void;
   generateReport: (
     clientId: string,
     period: string,
@@ -760,7 +761,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
 
   // Documents from Gmail / WhatsApp and scheduled chaser emails arrive in the
   // background, so the workspace refreshes itself while the tab is open.
-  // Quick (5s) while an agent or a document is mid-work so results appear as they land, calm (20s) otherwise, and
+  // Quick (5s) while an agent or a document is mid-work so results appear as they land, calm (60s) otherwise, and
   // at once when the person comes back to the tab. A refresh never runs twice at the same time.
   useEffect(() => {
     let busy = false;
@@ -774,12 +775,29 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
         busy = false;
       }
     };
+    // A document whose automatic retry time has passed is read again from here: the retry does not wait for an outside scheduler.
+    let retrying = false;
+    const retryDue = async () => {
+      if (retrying || document.visibilityState !== "visible") return;
+      const now = Date.now();
+      if (!docsRef.current.some((d) => d.status === "Failed" && d.retryAt && Date.parse(d.retryAt) <= now)) return;
+      retrying = true;
+      try {
+        await retryDuePracticeDocuments();
+        await go();
+      } catch {
+        /* the next tick tries again */
+      } finally {
+        retrying = false;
+      }
+    };
     const t = setInterval(() => {
       tick++;
+      void retryDue();
       const working =
         runsRef.current.some((r) => r.status === "running") ||
         docsRef.current.some((d) => d.status === "Uploading" || d.status === "Processing" || d.status === "Queued");
-      if (working || tick % 4 === 0) void go();
+      if (working || tick % 12 === 0) void go();
     }, 5_000);
     const onShow = () => void go();
     document.addEventListener("visibilitychange", onShow);
@@ -1489,7 +1507,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
 
   /** Workflow B — deterministic matching of bank lines against the books, on the server. */
   const runRecon = useCallback(
-    (clientId: string, onDone?: (r: ReconResult) => void) => {
+    (clientId: string, onDone?: (r: ReconResult) => void, opts: { fresh?: boolean } = {}) => {
       if (isRunning("recon", clientId)) {
         toast.info("Recon is already matching this client. It will finish shortly.");
         return;
@@ -1505,11 +1523,11 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
             s.run_id
               ? `${s.matched_total} matched · ${s.exceptions} exception${s.exceptions === 1 ? "" : "s"} with reason codes`
               : s.message,
-          onRetry: () => runRecon(clientId, onDone),
+          onRetry: () => runRecon(clientId, onDone, opts),
         },
         async () => {
           await waitForClient(clientId);
-          return runPracticeRecon({ data: { business_id: clientId, period } });
+          return runPracticeRecon({ data: { business_id: clientId, period, ...(opts.fresh ? { fresh: true } : {}) } });
         },
       )
         .then((s) => {

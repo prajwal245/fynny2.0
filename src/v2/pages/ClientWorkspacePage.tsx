@@ -241,6 +241,19 @@ export default function ClientWorkspacePage() {
               {reconRunning ? <><AgentGlyph agent="recon" state="running" size={20} /><ShimmerText text="Recon agent is working" tone="light" /></> : `Run recon for ${period}`}
             </button>
             <button className="v2-btn v2-btn-ghost" onClick={() => setTab("exceptions")}>View exceptions</button>
+            {bankSide.length > 0 && bookSide.length > 0 && (
+              <button
+                className="v2-btn v2-btn-ghost"
+                disabled={reconRunning}
+                title="Puts every automatic match back to open and matches again with the current rules. Your manual matches are kept."
+                onClick={() => {
+                  if (!window.confirm(`Start ${period} over? Automatic matches are cleared and matched again. Your manual matches stay.`)) return;
+                  runRecon(client.id, (r) => toast.success(`Started over. Matched ${r.matched}, exceptions ${r.exceptions}.`), { fresh: true });
+                }}
+              >
+                Start over
+              </button>
+            )}
             <AgentStatusBadge agent="recon" active={reconRunning} label={reconRunning ? "Matching transactions" : "Exact, fuzzy, then rules"} />
           </div>
           {bankSide.length === 0 && bookSide.length === 0 ? (

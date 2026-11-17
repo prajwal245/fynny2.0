@@ -155,9 +155,9 @@ export function HandlingPanel({ ex, work, role }: { ex: Exception; work: Work; r
           {moves.map((m) => (
             <button key={m} className="bx-btn bx-sm" disabled={busy} onClick={() => {
               if (m === "accepted_timing" && !note.trim()) return void toast.info("Write why it is only a timing difference in the note below first.");
-              void act(() => work.setStatus(ex.id, m, note.trim() || undefined));
+              void act(() => work.setStatus(ex.id, m, note.trim() || undefined)).then((ok) => { if (ok) setNote(""); });
             }}>
-              {m === "query_sent" ? "Mark query sent" : m === "answered" ? "Mark answered" : m === "accepted_timing" ? "Accept as timing" : "Reopen handling"}
+              {busy ? "Saving…" : m === "query_sent" ? "Mark query sent" : m === "answered" ? "Mark answered" : m === "accepted_timing" ? "Accept as timing" : "Reopen handling"}
             </button>
           ))}
         </div>
@@ -182,8 +182,8 @@ export function HandlingPanel({ ex, work, role }: { ex: Exception; work: Work; r
               <div style={{ display: "grid", gap: 8 }}>
                 <input className="v2-input" placeholder="Note (required to return it)" value={note} onChange={(e) => setNote(e.target.value)} aria-label="Review note" />
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button className="bx-btn bx-sm bx-primary" disabled={busy} onClick={() => void act(() => work.review(ex.id, "approve", { note: note.trim() || undefined }))}>Approve</button>
-                  <button className="bx-btn bx-sm" disabled={busy || !note.trim()} onClick={() => void act(() => work.review(ex.id, "return", { note: note.trim() }))}>Return to {work.nameOf(ex.ownerId) ?? "owner"}</button>
+                  <button className="bx-btn bx-sm bx-primary" disabled={busy} onClick={() => void act(() => work.review(ex.id, "approve", { note: note.trim() || undefined })).then((ok) => { if (ok) setNote(""); })}>Approve</button>
+                  <button className="bx-btn bx-sm" disabled={busy || !note.trim()} onClick={() => void act(() => work.review(ex.id, "return", { note: note.trim() })).then((ok) => { if (ok) setNote(""); })}>Return to {work.nameOf(ex.ownerId) ?? "owner"}</button>
                 </div>
               </div>
             ) : <div style={{ fontSize: 13, color: V.body }}>Waiting for {work.nameOf(ex.reviewerId) ?? "a senior"} to review it.</div>

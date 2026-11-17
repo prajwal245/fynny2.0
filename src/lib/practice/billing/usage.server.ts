@@ -38,6 +38,10 @@ export async function usageFor(db: Db, firmId: string, month: string = billingMo
   ]);
   const activeIds = new Set<string>();
   for (const r of [...(docs.data ?? []), ...(runs.data ?? [])]) if (r.business_id) activeIds.add(String(r.business_id));
+  // An archived client is out of the count, whatever was done for it earlier this month: archiving frees the place (and restoring
+  // takes it back). Documents already uploaded still count toward the document allowance.
+  const archived = await db.from("ca_clients").select("business_id").eq("ca_firm_id", firmId).eq("client_status", "archived").limit(2000);
+  for (const a of archived.data ?? []) if (a.business_id) activeIds.delete(String(a.business_id));
   return { month, activeClients: activeIds.size, documents: docCount.count ?? 0, activeIds };
 }
 

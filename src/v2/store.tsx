@@ -9,7 +9,7 @@
  * from transactions read out of files the practice actually uploaded.
  */
 import { WorkspaceUnavailable, loadWorkspaceWithRetry, messageOf } from "./lib/workspaceLoad";
-import { workflowFor, type WorkflowStep } from "./lib/closeWorkflow";
+import { stepsDone, workflowFor, type WorkflowStep } from "./lib/closeWorkflow";
 import { signupAttribution } from "@/lib/attribution";
 import { getLeadAttribution } from "@/lib/leadAttribution";
 import {
@@ -36,6 +36,7 @@ import {
   unlockPracticeDocument,
   discardPracticeReviewForDocument,
   registerPracticeUpload,
+  checkPracticeUploadRoom,
   requestPracticeReportCorrection,
   markPracticeReportCorrected,
   archivePracticeClient,
@@ -452,6 +453,8 @@ type Store = {
     opts?: { action?: "match" | "reconciled_external"; counterpartIds?: string[]; note?: string; allowDifference?: boolean },
   ) => Promise<string | null>;
   reopenException: (id: string) => Promise<void>;
+  /** Updates exceptions on screen at once (before the server answers); the next refresh confirms or reverts it. */
+  patchExceptions: (ids: string[], patch: Partial<Exception>) => void;
   runRecon: (clientId: string, onDone?: (r: ReconResult) => void) => void;
   generateReport: (
     clientId: string,
@@ -515,6 +518,8 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
   const [chases, setChases] = useState<Chase[]>([]);
   const [runs, setRuns] = useState<AgentRun[]>([]);
   const [recon, setRecon] = useState<Record<string, ReconResult>>({});
+  /** Every month's recon, keyed "clientId|Month YYYY": the close of an earlier month still sees its own run. */
+  const [reconByPeriod, setReconByPeriod] = useState<Record<string, ReconResult>>({});
   const [hydrated, setHydrated] = useState(false);
   const [bootError, setBootError] = useState<string | null>(null);
   /** Every month between the firm's first and last transaction ("2025-03"), so older months can be picked. */
@@ -587,6 +592,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
     setReports(w.reports as unknown as Report[]);
     setChases(w.chases as Chase[]);
     setRecon(w.recon);
+    setReconByPeriod((w as { reconByPeriod?: Record<string, ReconResult> }).reconByPeriod ?? {});
     setActivity(w.activity as Activity[]);
     setAgentRuns((w.agentRuns ?? []) as AgentRunRecord[]);
     const r = String(w.firm?.role ?? "");
@@ -992,6 +998,21 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
     if (pending) await pending;
   }, []);
 
+  // The plan's room for a client, asked once per client per minute. Returns the reason in words when there is none.
+  const roomCheck = useRef<Record<string, { at: number; answer: Promise<string | null> }>>({});
+  const lastLimitToast = useRef("");
+  const lastLimitToastAt = useRef(0);
+  const ensureUploadRoom = useCallback(async (clientId: string): Promise<string | null> => {
+    const hit = roomCheck.current[clientId];
+    if (hit && Date.now() - hit.at < 60_000) return hit.answer;
+    const answer = checkPracticeUploadRoom({ data: { business_id: clientId, files: 1 } })
+      .then((r) => (r.ok ? null : r.message))
+      // A failed check is not a limit: let the upload go on and report whatever it meets.
+      .catch(() => null);
+    roomCheck.current[clientId] = { at: Date.now(), answer };
+    return answer;
+  }, []);
+
   const addClient = useCallback(
     (c: Omit<Client, "id">) => {
       const id = uid();
@@ -1126,16 +1147,19 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
 
       const work = async (setStage: (s: string) => void) => {
         await waitForClient(clientId);
+        // Is there room on the plan for this client? Asked once for the whole batch, before any file is sent, so a limit is
+        // reported at once and in one message instead of after every file has waited its turn.
+        const room = await ensureUploadRoom(clientId);
+        if (room) throw new Error(room);
         const fid = firmId.current ?? (await firmReady.current);
         if (!fid) throw new Error("Create your practice first.");
         const path = `${fid}/${clientId}/app/${Date.now()}_${safeName(name)}`;
         setStage("Uploading securely");
-        const { error: upErr } = await sb.storage
-          .from("ca-client-documents")
-          .upload(path, file, {
-            contentType: file.type || undefined,
-            upsert: false,
-          });
+        // A stalled connection must say so: no upload waits forever.
+        const { error: upErr } = await Promise.race([
+          sb.storage.from("ca-client-documents").upload(path, file, { contentType: file.type || undefined, upsert: false }),
+          new Promise<{ error: { message: string } }>((resolve) => setTimeout(() => resolve({ error: { message: "this is taking too long. Check the connection and try again" } }), 180_000)),
+        ]);
         if (upErr) throw new Error(`Upload failed: ${upErr.message}`);
         setDocs((p) =>
           p.map((d) => (d.id === tempId ? { ...d, status: "Processing" } : d)),
@@ -1211,7 +1235,13 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
                 : d,
             ),
           );
-          toast.error(`${name}: ${errMsg(e)}`);
+          // A limit hits every file of a batch with the same words: say it once, not once per file.
+          const text = errMsg(e);
+          if (/covers (up to )?\d+ active clients|covers \d+ documents|plan is paused|paused/i.test(text)) {
+            if (lastLimitToast.current !== text || Date.now() - lastLimitToastAt.current > 8000) toast.error(text, { duration: 15000 });
+            lastLimitToast.current = text;
+            lastLimitToastAt.current = Date.now();
+          } else toast.error(`${name}: ${text}`);
           if (isTimeout(e)) setTimeout(() => void refresh(), 35_000);
         })
         .finally(() => {
@@ -1419,6 +1449,11 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       }
     },
     [exceptions, refresh],
+  );
+
+  const patchExceptions = useCallback(
+    (ids: string[], patch: Partial<Exception>) => setExceptions((p) => p.map((e) => (ids.includes(e.id) ? { ...e, ...patch } : e))),
+    [],
   );
 
   const reopenException = useCallback(
@@ -1796,7 +1831,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       );
       const run = recon[clientId];
       const reconRun =
-        run && (!run.period || run.period === period) ? run : undefined;
+        reconByPeriod[`${clientId}|${period}`] ?? (run && (!run.period || run.period === period) ? run : undefined);
       const mis = reports.filter(
         (r) => r.clientId === clientId && r.period === period,
       );
@@ -1857,9 +1892,9 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       });
 
       const firstOpen = steps.find((s) => !s.done);
-      const percent = Math.round(
-        (steps.filter((s) => s.done).length / steps.length) * 100,
-      );
+      // The percentage is the share of the steps the screen counts ("5 of 9"), so the two can never disagree.
+      const counted = stepsDone(workflow);
+      const percent = counted.total ? Math.round((counted.done / counted.total) * 100) : Math.round((steps.filter((s) => s.done).length / steps.length) * 100);
 
       let next: CloseState["next"];
       if (!firstOpen) {
@@ -1930,7 +1965,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
         next,
       };
     },
-    [docs, review, exceptions, chases, recon, reports, period],
+    [docs, review, exceptions, chases, recon, reconByPeriod, reports, period],
   );
 
   // Any month with data can be opened, however old (not just the last 12).
@@ -1992,6 +2027,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       resolveReview,
       setExceptionStatus,
       reopenException,
+      patchExceptions,
       runRecon,
       generateReport,
       addChase,
@@ -2070,6 +2106,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
       resolveReview,
       setExceptionStatus,
       reopenException,
+      patchExceptions,
       runRecon,
       generateReport,
       addChase,

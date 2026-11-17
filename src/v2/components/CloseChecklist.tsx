@@ -243,3 +243,31 @@ export function CloseChecklist({ clientId, onTab }: { clientId: string; onTab: (
     </div>
   );
 }
+
+/** One line on the client's Overview: where the real month-end close stands, with a way in. It reads the same checklist as the Month-end close tab. */
+export function CloseOverviewLine({ clientId, onOpen }: { clientId: string; onOpen: () => void }) {
+  const { period, docs, exceptions, reports } = useV2();
+  const [data, setData] = useState<Data | null>(null);
+  let key = "";
+  try { key = parsePeriod(period).key; } catch { key = ""; }
+  useEffect(() => {
+    if (!key) return;
+    let live = true;
+    void getPracticeClientClose({ data: { business_id: clientId, period: key } }).then((d) => live && setData(d)).catch(() => undefined);
+    return () => { live = false; };
+  }, [clientId, key, docs.length, exceptions.length, reports.length]);
+  const sum = data?.summary;
+  if (!sum) return null;
+  const cs = closeState(sum.steps);
+  return (
+    <Card style={{ marginBottom: 18, display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", justifyContent: "space-between" }} data-testid="close-overview-line">
+      <div>
+        <div style={{ fontWeight: 600, color: V.ink }}>Month-end close for {period}</div>
+        <div style={{ fontSize: 13, color: V.body, marginTop: 2 }}>
+          <Badge tone={STATE_TONE[cs.state]}>{CLOSE_LABEL[cs.state]}</Badge> <span style={{ marginLeft: 6 }}>{cs.done} of {cs.total} steps{cs.next ? ` · next: ${cs.next.label}` : ""}</span>
+        </div>
+      </div>
+      <button className="bx-btn bx-sm" onClick={onOpen}>Open the checklist</button>
+    </Card>
+  );
+}

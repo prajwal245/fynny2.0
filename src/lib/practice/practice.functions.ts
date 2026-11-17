@@ -1595,3 +1595,11 @@ export const checkPracticeUploadRoom = createServerFn({ method: "POST" })
       }
     }),
   );
+
+/** Removes an uploaded file and what was read from it (matches reversed, nothing left pointing at it). */
+export const removePracticeDocument = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: uuid }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./documents.server")).removeDocument(db, ctx, data.id)),
+  );

@@ -6,6 +6,7 @@ import { Users, Plus, Search, ArchiveRestore } from "lucide-react";
 import { Badge, Card, EmptyState, PageHeader, Segmented, V } from "../ui";
 import { listPracticeArchivedClients, unarchivePracticeClient } from "@/lib/practice/practice.functions";
 import { RESTORE_DAYS } from "@/lib/practice/archive";
+import { AgentWorking } from "../components/AgentTrace";
 import { useV2 } from "../store";
 import AddClientModal from "../components/AddClientModal";
 
@@ -87,7 +88,7 @@ export default function ClientsPage() {
                       }
                     }}
                   >
-                    <ArchiveRestore size={14} /> {restoring === c.businessId ? "Restoring…" : "Restore"}
+                    {restoring === c.businessId ? <AgentWorking agent="extract" text="Restoring" /> : <><ArchiveRestore size={14} /> Restore</>}
                   </button>
                 ) : (
                   <Badge>A partner can restore</Badge>

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { FileSpreadsheet, ShieldCheck, Upload, Copy, Download, MessageCircle, X, CheckCircle2 } from "lucide-react";
 import { Badge, Card, EmptyState, PageHeader, Stat, Tabs, V } from "../ui";
 import { useV2 } from "../store";
+import { AgentTrace } from "../components/AgentTrace";
 import { readGstFile, toCsv } from "@/lib/practice/gst/files";
 import type { ReadInvoices } from "@/lib/practice/gst/invoices";
 import { reconcileGstr2b, vendorMessage, type Gstr2bRecon } from "@/lib/practice/gst/reconcile";
@@ -35,7 +36,7 @@ function Drop({ title, hint, accept, loaded, busy, onFile, onClear }: { title: s
           )}
         </div>
         {busy ? (
-          <span style={{ color: V.muted, fontSize: 13 }}>Reading…</span>
+          <AgentTrace agent="extract" compact title="Reading the file" steps={["Opening the file", "Finding the invoice table", "Reading each invoice", "Adding up one invoice per row"]} />
         ) : loaded ? (
           <span style={{ color: V.body, fontSize: 13 }}>
             {loaded.name}: {loaded.read.invoices.length} invoices{loaded.read.period ? `, ${loaded.read.period}` : ""}

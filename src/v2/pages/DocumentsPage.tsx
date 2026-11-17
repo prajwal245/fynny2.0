@@ -1,7 +1,7 @@
 import { txnType, txnDirection } from "@/lib/practice/txnType";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { acceptPracticeStatement, chooseDocumentSheet, confirmStatementOwner } from "@/lib/practice/practice.functions";
+import { acceptPracticeStatement, chooseDocumentSheet, confirmStatementOwner, removePracticeDocument } from "@/lib/practice/practice.functions";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertTriangle,
@@ -11,6 +11,7 @@ import {
   FileText,
   Inbox,
   LockKeyhole,
+  Trash2,
   RotateCw,
   Search,
   UploadCloud,
@@ -20,6 +21,7 @@ import {
   Card,
   Drawer,
   EmptyState,
+  Modal,
   PageHeader,
   SortTh,
   Tabs,
@@ -180,6 +182,8 @@ export default function DocumentsPage({
   } = useV2();
   const [tab, setTab] = useState("All");
   const [holdBusy, setHoldBusy] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [removeBusy, setRemoveBusy] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   const [rowQuery, setRowQuery] = useState("");
   const [uploadClient, setUploadClient] = useState(
@@ -765,6 +769,12 @@ export default function DocumentsPage({
               </div>
             </div>
 
+            {active.status !== "Processing" && active.status !== "Uploading" && (
+              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", margin: "0 0 12px" }}>
+                <button className="v2-btn v2-btn-quiet v2-btn-sm" onClick={() => setRemoving(true)} data-testid="remove-file"><Trash2 size={14} /> Remove this file</button>
+                <span style={{ fontSize: 12, color: V.muted }}>To replace a file, remove it and upload the new one. Matches that used it are reversed; the original stays stored.</span>
+              </div>
+            )}
             {active.sheetNames && active.sheetNames.length > 1 && active.status !== "Processing" && active.status !== "Uploading" && (
               <div style={{ margin: "0 0 12px", padding: "10px 12px", border: `1px solid ${V.line}`, borderRadius: 8, fontSize: 13 }}>
                 <label htmlFor="sheet-pick" style={{ fontWeight: 600 }}>This Excel file has {active.sheetNames.length} sheets. Sheet to read: </label>
@@ -937,6 +947,38 @@ export default function DocumentsPage({
           </div>
         )}
       </Drawer>
+      <Modal open={removing} onClose={() => (removeBusy ? undefined : setRemoving(false))} title={active ? `Remove ${active.name}?` : "Remove file"}>
+        {active && (
+          <>
+            <p style={{ marginTop: 0, fontSize: 13, color: V.body, lineHeight: 1.6 }}>
+              This takes {active.name} and the {(active.txnCount ?? active.rows.length) || 0} line{((active.txnCount ?? active.rows.length) || 0) === 1 ? "" : "s"} read from it out of {clientName(active.clientId)}. Any match that used one of those lines is reversed, and the line on the other side becomes unmatched again. The original file stays stored. {active.side === "bank" ? "Only a partner can remove a bank statement." : ""}
+            </p>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 14 }}>
+              <button className="bx-btn" onClick={() => setRemoving(false)} disabled={removeBusy}>Keep it</button>
+              <button
+                className="bx-btn bx-primary"
+                disabled={removeBusy}
+                onClick={async () => {
+                  setRemoveBusy(true);
+                  try {
+                    const r = await removePracticeDocument({ data: { id: active.id } });
+                    toast.success(`${r.filename} removed${r.matchesReversed ? `. ${r.matchesReversed} match${r.matchesReversed === 1 ? "" : "es"} reversed.` : "."} Upload the new file, then run recon again.`, { duration: 9000 });
+                    setRemoving(false);
+                    setOpen(null);
+                    await refresh();
+                  } catch (e) {
+                    toast.error(e instanceof Error ? e.message : "Could not remove it.");
+                  } finally {
+                    setRemoveBusy(false);
+                  }
+                }}
+              >
+                {removeBusy ? "Removing…" : "Remove file"}
+              </button>
+            </div>
+          </>
+        )}
+      </Modal>
     </>
   );
 }

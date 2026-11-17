@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { Badge, V, formatDate } from "../ui";
+import { AgentWorking } from "./AgentTrace";
 import type { Exception } from "../store";
 import { KIND_ACTION, KIND_LABEL, WORK_LABEL, nextStatuses, type WorkStatus } from "@/lib/practice/exceptionKinds";
 import { getPracticeOwnTransfers, unpairPracticeOwnTransfer } from "@/lib/practice/practice.functions";
@@ -202,7 +203,7 @@ export function HandlingPanel({ ex, work, role }: { ex: Exception; work: Work; r
       )}
 
       <div>
-        <div className="v2-label">History</div>
+        <div className="v2-label" style={{ display: "flex", justifyContent: "space-between" }}><span>History</span>{busy && <AgentWorking agent="chaser" text="Saving" />}</div>
         <Timeline events={events} />
       </div>
     </div>

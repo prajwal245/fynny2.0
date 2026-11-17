@@ -13,6 +13,7 @@ import {
   removePracticeExpectedStatement,
 } from "@/lib/practice/practice.functions";
 import { CLOSE_LABEL, closeState, mayConfirm, type StepState } from "@/lib/practice/close/steps";
+import { AgentTrace } from "./AgentTrace";
 
 type Data = Awaited<ReturnType<typeof getPracticeClientClose>>;
 const msg = (e: unknown) => (e instanceof Error && e.message ? e.message : "Something went wrong. Please try again.");
@@ -78,7 +79,7 @@ export function CloseChecklist({ clientId, onTab }: { clientId: string; onTab: (
 
   if (!key) return <Card><p style={{ margin: 0, color: V.muted }}>Pick a single month in the top bar to see its close checklist.</p></Card>;
   if (error) return <Card><p style={{ margin: 0, color: V.maroon }}>{error}</p></Card>;
-  if (!data) return <Card><p style={{ margin: 0, color: V.muted }}>Reading the month…</p></Card>;
+  if (!data) return <Card><AgentTrace agent="recon" title="Reading the month" steps={["Reading the statements", "Checking each against the bank's own figures", "Counting what is still open", "Checking who has confirmed what"]} /></Card>;
   const sum = data.summary;
   if (!sum) return <Card><p style={{ margin: 0, color: V.muted }}>This client was not found.</p></Card>;
   const cs = closeState(sum.steps);

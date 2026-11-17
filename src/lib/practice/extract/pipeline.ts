@@ -281,6 +281,69 @@ async function aiRead(
   }
 }
 
+/** How much statement text one model call reads. A long statement is read in parts so no answer is cut off by the model's output size. */
+const CHUNK_CHARS = 12_000;
+const MAX_CHUNKS = 16;
+
+/** Splits text at line boundaries, preferring the start of a dated line so a transaction's wrapped narration stays with it. */
+export function splitForAi(text: string, size = CHUNK_CHARS): string[] {
+  if (text.length <= size) return [text];
+  const lines = text.split("\n");
+  const chunks: string[] = [];
+  let cur: string[] = [];
+  let len = 0;
+  const startsLine = (l: string) => /^\s*\d{1,2}[-\/. ][A-Za-z0-9]{1,3}[-\/. ]\d{2,4}/.test(l);
+  for (const l of lines) {
+    if (len + l.length + 1 > size && cur.length && startsLine(l)) {
+      chunks.push(cur.join("\n"));
+      cur = [];
+      len = 0;
+    } else if (len + l.length + 1 > size * 1.4 && cur.length) {
+      // No dated line to break at: break anyway rather than send an oversize part.
+      chunks.push(cur.join("\n"));
+      cur = [];
+      len = 0;
+    }
+    cur.push(l);
+    len += l.length + 1;
+  }
+  if (cur.length) chunks.push(cur.join("\n"));
+  return chunks;
+}
+
+/**
+ * Reads document text with the model. A long statement is read in parts, four at a time, and the rows joined in order. All or nothing:
+ * if any part fails the whole read is declined, because a statement with a part missing would look complete. What comes back is then
+ * checked the same way as a statement read in code (the running balance and the bank's own totals), so more AI is more coverage and
+ * never less accuracy.
+ */
+export async function aiReadText(
+  deps: ExtractDeps,
+  calls: AiCallRecord[],
+  purpose: string,
+  text: string,
+): Promise<{ rows: AiReadRow[]; kind: string | null } | null> {
+  const parts = splitForAi(text);
+  if (parts.length === 1) return aiRead(deps, calls, { purpose, system: READ_SYSTEM_PROMPT, user: `Document text:\n${text}` });
+  if (parts.length > MAX_CHUNKS) return null;
+  const results: ({ rows: AiReadRow[]; kind: string | null } | null)[] = new Array(parts.length).fill(null);
+  let next = 0;
+  const worker = async () => {
+    for (;;) {
+      const i = next++;
+      if (i >= parts.length) return;
+      results[i] = await aiRead(deps, calls, {
+        purpose,
+        system: READ_SYSTEM_PROMPT,
+        user: `Document text, part ${i + 1} of ${parts.length}. Read only the transactions that are in this part; the other parts are read separately.\n${parts[i]}`,
+      });
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(4, parts.length) }, worker));
+  if (results.some((r) => r === null)) return null;
+  return { rows: results.flatMap((r) => r!.rows), kind: results.find((r) => r?.kind)?.kind ?? null };
+}
+
 async function aiClassify(
   deps: ExtractDeps,
   calls: AiCallRecord[],
@@ -740,11 +803,8 @@ export async function runExtract(
         parsed = statement.rows;
         documentKind = "bank_statement";
       } else {
-        const read = await aiRead(deps, calls, {
-          purpose: "extract_read_text",
-          system: READ_SYSTEM_PROMPT,
-          user: `Document text:\n${sourceText}`,
-        });
+        // The whole text (not the stored preview) goes to the model, in parts when it is long.
+        const read = await aiReadText(deps, calls, "extract_read_text", text);
         if (read) {
           aiReadUsed = true;
           parsed = rowsFromAiRead(read.rows, sourceText);
@@ -847,13 +907,7 @@ export async function runExtract(
 
   if (parsed === null) {
     // Table without a recognisable header: let the AI read the text, if available.
-    const read = sourceText
-      ? await aiRead(deps, calls, {
-          purpose: "extract_read_text",
-          system: READ_SYSTEM_PROMPT,
-          user: `Document text:\n${sourceText.slice(0, MAX_TEXT_CHARS)}`,
-        })
-      : null;
+    const read = sourceText ? await aiReadText(deps, calls, "extract_read_text", sourceText) : null;
     if (!read)
       return fail(
         kind,

@@ -391,7 +391,7 @@ export async function processExtraction(
       clientGstin: (clientRow as { gstin?: string | null } | null)?.gstin ?? null,
     },
     {
-      llm: (await withinAiCap(db, doc.ca_firm_id)) ? practiceLlm() : null,
+      llm: (await withinAiCap(db, doc.ca_firm_id)) ? practiceLlm({ timeoutMs: 50_000, budgetMs: 52_000 }) : null,
       ocr: practiceOcr(),
       pdfText: (b) => pdfText(b, opts.password),
       pdfItems: (b) => pdfItems(b, opts.password),

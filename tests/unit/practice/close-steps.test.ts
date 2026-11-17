@@ -68,3 +68,13 @@ describe("month-end close", () => {
     expect(mayConfirm("owner", "partner")).toBe(false);
   });
 });
+
+describe("a client that shares only bank statements", () => {
+  it("shows the bank-only check as the reconciliation step, and says what the books would add", () => {
+    const s = deriveSteps("2026-10", facts({ recon: { bank: 120, runDone: true, bankOnly: true } }));
+    const step = s.find((x) => x.key === "recon_done")!;
+    expect(step.status).toBe("done");
+    expect(step.detail).toMatch(/bank statements alone/);
+    expect(step.detail).toMatch(/Upload the books/);
+  });
+});

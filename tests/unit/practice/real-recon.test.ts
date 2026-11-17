@@ -85,4 +85,14 @@ describe.skipIf(!REAL || !existsSync(REAL ?? ""))("reconciliation on real statem
     for (const l of r.left.slice(0, 14)) console.log(`   open: ${l}`);
     expect(r.pairable).toBeLessThanOrEqual(2);
   });
+  it("SSSL as a bank-only client: statements alone for May, no books", async () => {
+    const icici = has(/Sri Satyanarayana.*\|\|ICICI_1053_AprJun25/);
+    const hdfc = has(/Sri Satyanarayana.*\|\|HDFC_2932/);
+    if (!icici || !hdfc) return;
+    const r = await reconCase("Sri Satyanarayana Swamy Logistics", [icici, hdfc], [], { start: "2025-05-01", end: "2025-05-31" });
+    console.log(`   bank-only May: ${r.summary.message}`);
+    expect(r.summary.bank_only).toBe(true);
+    expect(r.summary.exceptions).toBe(0);
+    expect(r.summary.run_id).toBeTruthy();
+  });
 });

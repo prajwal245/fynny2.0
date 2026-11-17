@@ -134,6 +134,8 @@ export interface ReconSummary {
   own_transfers?: number;
   /** Payments the bank reversed (a debit and its RVSL credit) that were paired and set aside this run. */
   reversed_payments?: number;
+  /** The month was checked on the bank statements alone, because no books were uploaded. */
+  bank_only?: boolean;
   /** Book entries for a bank account whose statement has not been uploaded; they wait for it. */
   awaiting_statement?: number;
 }
@@ -210,10 +212,48 @@ export async function runRecon(
     .eq("side", "books")
     .gte("txn_date", period.start)
     .lte("txn_date", period.end);
-  if (!bookCount)
-    return empty(
-      `No book entries for ${period.label}. Upload the Tally export or ledger before running recon.`,
-    );
+  // A client that shares only bank statements has no books to match. That is a complete result of its own: transfers between the
+  // client's accounts and payments the bank reversed are paired and set aside, nothing is left waiting, and it says what uploading
+  // the books would add. The run is recorded, so the month's close can see it.
+  if (!bookCount) {
+    const total = bank.length + (alreadyMatched ?? 0);
+    const setAside = (transfers.length + reversals.length) * 2;
+    const message = `Checked on its own: ${total} bank line${total === 1 ? "" : "s"} for ${period.label}, no books uploaded.${transfers.length ? ` ${transfers.length} transfer${transfers.length === 1 ? "" : "s"} between the client's own accounts paired and set aside.` : ""}${reversals.length ? ` ${reversals.length} reversed payment${reversals.length === 1 ? "" : "s"} paired and set aside.` : ""} Upload the Tally Day Book or ledgers to match the rest against the books.`;
+    const { data: run } = await db
+      .from("ca_recon_runs")
+      .insert({
+        ca_firm_id: ctx.firmId,
+        business_id: businessId,
+        recon_type: "bank_only",
+        period: period.label,
+        total_items: total,
+        matched: setAside + (alreadyMatched ?? 0),
+        mismatched: 0,
+        unmatched: 0,
+        total_matched_value: 0,
+        total_at_risk: 0,
+        run_by: ctx.userId,
+        snapshot: { status: "done", period, bank_only: true, set_aside: setAside },
+      })
+      .select("id")
+      .single();
+    await logActivity(db, ctx.firmId, businessId, "recon", `Recon for ${client.client_name}, ${period.label}: ${message}`);
+    return {
+      run_id: run?.id ?? null,
+      period,
+      bank: total,
+      books: 0,
+      matched: setAside,
+      matched_total: setAside + (alreadyMatched ?? 0),
+      exceptions: 0,
+      matched_by_stage: {},
+      exceptions_by_reason: {},
+      message,
+      own_transfers: transfers.length,
+      reversed_payments: reversals.length,
+      bank_only: true,
+    };
+  }
   const { count: bankCount } = await db
     .from("ca_txns")
     .select("id", { count: "exact", head: true })

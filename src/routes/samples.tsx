@@ -71,6 +71,18 @@ const RETEST = [
   },
 ];
 
+/** The 20-minute demo client: real PDFs and Excel, with designed moments. Every claim is asserted in tests/unit/practice/demo-pack.test.ts. */
+const DEMO = [
+  { file: "01_HDFC_Current_Sep2026.pdf", what: "HDFC bank statement (upload as Bank)", expect: "26 lines read; ties to the bank's own printed totals (14 debits, 12 credits)" },
+  { file: "02_ICICI_Current_Sep2026.pdf", what: "ICICI bank statement (upload as Bank)", expect: "6 lines; holds the other leg of a ₹5,00,000 transfer" },
+  { file: "03_HDFC_Current_Sep2026_one_line_missing.pdf", what: "HDFC statement with one line removed (upload as Bank)", expect: "Held for review: bank prints 14 debits, 13 read, ₹3,10,000 short. Remove it after showing" },
+  { file: "04_Tally_DayBook_Sep2026.xlsx", what: "Tally Day Book, 30 vouchers (upload as Books)", expect: "With 01 and 02: 26 of 32 bank lines matched, 4 set aside, 3 decisions left" },
+  { file: "05_Axis_Loan_Account_Statement.pdf", what: "Axis loan account statement", expect: "Recognised as a loan statement, not read as bank lines" },
+  { file: "06_Purchase_Register_Sep2026.xlsx", what: "Purchase register, 6 invoices (GST: books side)", expect: "With 07: 4 matched, 1 amount differs (₹1,800 tax)" },
+  { file: "07_GSTR2B_Sep2026.json", what: "GSTR-2B from the portal, 5 invoices (GST: portal side)", expect: "Kaveri Packers missing on the portal: ₹7,560 ITC at risk" },
+  { file: "README.md", what: "Expected results in full", expect: "" },
+];
+
 /** Tally XML in every shape a firm receives: masters, voucher imports, Day Book, bank and cash books, party ledgers. Three made-up companies. */
 const TALLY = [
   {
@@ -205,6 +217,67 @@ function SamplesPage() {
                 style={{ fontWeight: 600, color: "#141414" }}
               >
                 {i + 1}. {f.file}
+              </a>
+              <span style={{ fontSize: 14, color: "#4a4844" }}>{f.what}</span>
+              {f.expect && (
+                <span style={{ fontSize: 13, color: "#1F5A46" }}>
+                  Expect: {f.expect}
+                </span>
+              )}
+            </li>
+          ))}
+        </ol>
+
+        <h2
+          style={{
+            fontSize: 22,
+            letterSpacing: "-0.02em",
+            margin: "40px 0 8px",
+          }}
+        >
+          Demo client: Sunrise Traders Pvt Ltd
+        </h2>
+        <p style={{ color: "#4a4844", margin: "0 0 16px", lineHeight: 1.6 }}>
+          The files for the 20-minute demo, September 2026. Made-up client, safe
+          to screen-share. Upload 01, 02 and 04, then run reconciliation for
+          September 2026: three decisions are left (Kaveri Fashions ₹2,000
+          difference, an unidentified ₹25,000 credit, and a ₹30,000 cheque not
+          yet presented). File 03 is the same HDFC statement with one line
+          dropped, to show it is held rather than trusted.
+        </p>
+        <ol
+          style={{
+            listStyle: "none",
+            padding: 0,
+            margin: 0,
+            display: "grid",
+            gap: 10,
+          }}
+        >
+          {DEMO.map((f) => (
+            <li
+              key={f.file}
+              style={{
+                border: "1px solid #e6e3dc",
+                borderRadius: 14,
+                padding: "14px 16px",
+                background: "#fff",
+                display: "grid",
+                gap: 4,
+              }}
+            >
+              <a
+                href={`/samples/demo-client/${f.file}`}
+                download
+                style={{
+                  fontWeight: 600,
+                  color: "#141414",
+                  fontFamily: "var(--font-geist-mono)",
+                  fontSize: 14,
+                  overflowWrap: "anywhere",
+                }}
+              >
+                {f.file}
               </a>
               <span style={{ fontSize: 14, color: "#4a4844" }}>{f.what}</span>
               {f.expect && (

@@ -40,7 +40,7 @@ export const STEPS: StepDef[] = [
 
 export interface CloseFacts {
   statements: { expected: number; received: number; verified: number; held: number; failed: number; notAvailable: number };
-  recon: { bank: number; runDone: boolean };
+  recon: { bank: number; runDone: boolean; /** The run was on bank statements alone (no books uploaded). */ bankOnly?: boolean };
   exceptions: { open: number; explained: number };
   report: { exists: boolean; signedOff: boolean };
   /** Confirmations by a person, by step key. */
@@ -100,7 +100,7 @@ export function deriveSteps(period: string, f: CloseFacts): StepState[] {
             : `${plural(s.verified, "statement")} verified.`,
     s.held > 0,
   );
-  auto(get("recon_done"), f.recon.runDone && f.recon.bank > 0, f.recon.bank === 0 ? "There are no bank lines to reconcile yet." : f.recon.runDone ? "Reconciliation has been run." : "Reconciliation has not been run for this month.");
+  auto(get("recon_done"), f.recon.runDone && f.recon.bank > 0, f.recon.bank === 0 ? "There are no bank lines to reconcile yet." : f.recon.runDone ? (f.recon.bankOnly ? "Checked on the bank statements alone (no books uploaded). Upload the books to match them." : "Reconciliation has been run.") : "Reconciliation has not been run for this month.");
   const unexplained = Math.max(0, f.exceptions.open - f.exceptions.explained);
   auto(get("exceptions_explained"), f.recon.runDone && unexplained === 0, !f.recon.runDone ? "Waiting for reconciliation." : unexplained === 0 ? "No exception needs attention." : `${plural(unexplained, "exception")} still need${unexplained === 1 ? "s" : ""} a decision.`, false);
   person(get("gst"), f.confirmed["gst"] ? "Confirmed by a person." : "Waiting for a partner or manager to confirm.");

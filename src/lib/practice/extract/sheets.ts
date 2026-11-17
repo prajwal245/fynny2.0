@@ -156,3 +156,31 @@ export function chooseSheet(
     note: `This file has ${sheets.length} sheets (${names}). FynHelp read "${chosen.sheet.name}", the one with the bank entries (${chosen.lines} lines). Not read: ${others.join(", ")}. If that is the wrong sheet, choose another one.`,
   };
 }
+
+export interface SheetPreview {
+  name: string;
+  /** Non-empty rows in the sheet. */
+  rows: number;
+  /** What FynHelp finds in it, in words: "Bank or books lines (1,641)", "TDS register", "Nothing it can read as a table". */
+  finds: string;
+  /** The first lines of the sheet's title rows (company, report name, period), to tell sheets apart. */
+  title: string;
+  /** Whether this is the sheet FynHelp would read on its own. */
+  chosen: boolean;
+}
+
+/**
+ * Describes every sheet of a workbook for the person choosing one: its name, size, what it contains, and its title lines. Reads
+ * nothing new: it reports what the reader already works out.
+ */
+export function describeSheets(sheets: Sheet[], client: string | null | undefined, side: "bank" | "books" | undefined, registerLabel: (k: string) => string): SheetPreview[] {
+  const auto = chooseSheet(sheets, client, side);
+  return sheets.map((sh, i) => {
+    const info = inspect(sh, i, side);
+    const filled = sh.rows.filter((r) => r.some((c) => String(c ?? "").trim()));
+    const kind = detectRegister(sh.rows, sh.name);
+    const finds = kind ? `${registerLabel(kind)}, kept as a register (not reconciled)` : info.lines > 0 ? `${side === "bank" ? "Bank" : side === "books" ? "Book" : "Transaction"} lines: ${info.lines.toLocaleString("en-IN")}` : "Nothing it can read as a table of transactions";
+    const title = filled.slice(0, 3).map((r) => r.filter((c) => String(c ?? "").trim()).join(" ").slice(0, 80)).filter(Boolean).join(" · ");
+    return { name: sh.name, rows: filled.length, finds, title, chosen: auto?.sheet.name === sh.name };
+  });
+}

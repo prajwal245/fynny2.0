@@ -72,7 +72,7 @@ export interface MisFigures {
 
 /** "Party — narration", without repeating the party when the narration is the same text. */
 export function particularsOf(counterparty: string | null, description: string | null): string {
-  const party = counterparty?.trim() ?? "";
+  const party = isNamedParty(counterparty) ? counterparty!.trim() : "";
   const desc = description?.trim() ?? "";
   if (!party) return desc || "Transaction";
   if (!desc || desc.toLowerCase() === party.toLowerCase() || desc.toLowerCase().includes(party.toLowerCase()) && desc.length - party.length < 4) return party.length >= desc.length ? party : desc;
@@ -86,8 +86,10 @@ export const toSourceRow = (t: NarrateTxn): SourceRow => ({
   amount: t.direction === "out" ? -t.amount : t.amount,
 });
 
-const partyOf = (t: NarrateTxn) =>
-  (t.counterparty?.trim() || "Unnamed party").slice(0, 80);
+/** Bank transaction codes and prefixes are never a customer or supplier: "TFR 66% of revenue" says nothing. */
+const GENERIC_PARTY = /^(tfr|trf|neft|imps|upi|rtgs|chq|cheque|clg|dep|wdl|cash|atm|inb|by|to|transfer|deposit|withdrawal|credit|debit|unnamed party)\b\.?$/i;
+export const isNamedParty = (name: string | null | undefined) => Boolean(name && name.trim().length >= 3 && !GENERIC_PARTY.test(name.trim()));
+const partyOf = (t: NarrateTxn) => (isNamedParty(t.counterparty) ? t.counterparty!.trim() : "Unnamed party").slice(0, 80);
 const byAmountDesc = (a: NarrateTxn, b: NarrateTxn) =>
   b.amount - a.amount || (a.id < b.id ? -1 : 1);
 
@@ -319,8 +321,8 @@ export function ruleInsights(f: MisFigures, matched: NarrateTxn[], revenue?: Nar
     out.push({
       text:
         net >= 0
-          ? `Receipts exceeded payments by ${inr(net)} for the period (${inr(n.total_receipts.value)} in, ${inr(n.total_payments.value)} out).`
-          : `Payments exceeded receipts by ${inr(net)} for the period (${inr(n.total_receipts.value)} in, ${inr(n.total_payments.value)} out).`,
+          ? `Counting every rupee in and out, including loans, taxes, advances and transfers, receipts exceeded payments by ${inr(net)} for the period (${inr(n.total_receipts.value)} in, ${inr(n.total_payments.value)} out).`
+          : `Counting every rupee in and out, including loans, taxes, advances and transfers, payments exceeded receipts by ${inr(net)} for the period (${inr(n.total_receipts.value)} in, ${inr(n.total_payments.value)} out).`,
       cited_transaction_ids: netIds,
       confidence: 1,
       origin: "rules",
@@ -333,7 +335,8 @@ export function ruleInsights(f: MisFigures, matched: NarrateTxn[], revenue?: Nar
   const baseTotal = sumRupees(base.map((t) => t.amount));
   const parties = groupParties(base.filter((t) => t.direction === "in"));
   const topR = parties[0];
-  if (topR && baseTotal > 0 && parties.length > 1) {
+  // Only a named party can be a concentration: lines with no usable name are grouped as "Unnamed party" and say nothing about customers.
+  if (topR && topR.party !== "Unnamed party" && baseTotal > 0 && parties.length > 1) {
     const share = round2((topR.total / baseTotal) * 100);
     if (share >= 40) {
       out.push({

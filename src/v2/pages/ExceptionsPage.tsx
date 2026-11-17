@@ -37,9 +37,9 @@ export default function ExceptionsPage({
   focusTxnId,
   onFocused,
 }: { clientId?: string; focusTxnId?: string; onFocused?: () => void } = {}) {
-  const { exceptions, clients, clientName, setExceptionStatus, reopenException, runs, docs, period, refresh } =
+  const { exceptions, clients, clientName, setExceptionStatus, reopenException, runs, docs, period, refresh, patchExceptions } =
     useV2();
-  const work = useExceptionWork(refresh);
+  const work = useExceptionWork(refresh, patchExceptions as (ids: string[], p: Record<string, unknown>) => void);
   // My exceptions, the unassigned ones awaiting an owner, or all; then narrowed by kind, status and owner.
   const [tab, setTab] = useState<"mine" | "unassigned" | "all">("all");
   const [kindF, setKindF] = useState("all");

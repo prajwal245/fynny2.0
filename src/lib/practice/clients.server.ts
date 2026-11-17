@@ -188,12 +188,14 @@ export async function archivePracticeClient(db: Db, ctx: FirmContext, businessId
   if (!canSignOff(ctx)) throw new PracticeError("forbidden", "Only a partner can archive a client.");
   const { data: c } = await db
     .from("ca_clients")
-    .select("id, client_name")
+    .select("id, client_name, notes")
     .eq("ca_firm_id", ctx.firmId)
     .eq("business_id", businessId)
     .maybeSingle();
   if (!c) throw new PracticeError("not_found", "Client not found.");
-  await db.from("ca_clients").update({ client_status: "archived" }).eq("id", c.id);
+  // The time is kept with the client (in its notes record), so the firm can restore it for 14 days.
+  const { clientMeta } = await import("./db.server");
+  await db.from("ca_clients").update({ client_status: "archived", notes: JSON.stringify({ ...clientMeta(c.notes as string | null), archivedAt: new Date().toISOString() }) }).eq("id", c.id);
   await db
     .from("ca_document_requests")
     .update({ status: "closed", next_follow_up_at: null })
@@ -201,5 +203,67 @@ export async function archivePracticeClient(db: Db, ctx: FirmContext, businessId
     .eq("business_id", businessId)
     .eq("status", "open");
   await logActivity(db, ctx.firmId, businessId, "system", `${c.client_name} archived${reason.trim() ? `: ${reason.trim()}` : ""}. Its documents, reports and history are kept.`);
+  return { ok: true };
+}
+
+export interface ArchivedClient {
+  businessId: string;
+  name: string;
+  archivedAt: string | null;
+  restorable: boolean;
+  daysLeft: number | null;
+  label: string;
+}
+
+/** When a client was archived: the time kept with it, else the history entry written when it was archived. */
+async function archivedAtOf(db: Db, ctx: FirmContext, businessId: string, notes: string | null): Promise<string | null> {
+  const { clientMeta } = await import("./db.server");
+  const meta = clientMeta(notes) as { archivedAt?: string };
+  if (meta.archivedAt) return meta.archivedAt;
+  const { data } = await db
+    .from("ca_activity_log")
+    .select("created_at, description")
+    .eq("ca_firm_id", ctx.firmId)
+    .eq("business_id", businessId)
+    .eq("action_type", "system")
+    .like("description", "% archived%")
+    .order("created_at", { ascending: false })
+    .limit(1);
+  return (data?.[0]?.created_at as string | undefined) ?? null;
+}
+
+/** Archived clients, newest first, each with how long it can still be restored. */
+export async function listArchivedClients(db: Db, ctx: FirmContext): Promise<ArchivedClient[]> {
+  const { restoreWindow, restoreLabel } = await import("./archive");
+  const { data } = await db.from("ca_clients").select("business_id, client_name, notes").eq("ca_firm_id", ctx.firmId).eq("client_status", "archived").limit(500);
+  const out: ArchivedClient[] = [];
+  for (const c of (data ?? []) as { business_id: string | null; client_name: string; notes: string | null }[]) {
+    if (!c.business_id) continue;
+    const at = await archivedAtOf(db, ctx, c.business_id, c.notes);
+    const w = restoreWindow(at);
+    out.push({ businessId: c.business_id, name: c.client_name, archivedAt: at, restorable: w.restorable, daysLeft: w.daysLeft, label: restoreLabel(w) });
+  }
+  return out.sort((a, b) => String(b.archivedAt ?? "").localeCompare(String(a.archivedAt ?? "")));
+}
+
+/**
+ * Brings an archived client back, within 14 days of archiving. Partners only. The client counts toward the plan again, so the plan's
+ * active-client limit is checked first and the message says what to do if there is no room.
+ */
+export async function unarchivePracticeClient(db: Db, ctx: FirmContext, businessId: string) {
+  const { canSignOff, clientMeta } = await import("./db.server");
+  if (!canSignOff(ctx)) throw new PracticeError("forbidden", "Only a partner can restore a client.");
+  const { data: c } = await db.from("ca_clients").select("id, client_name, client_status, notes").eq("ca_firm_id", ctx.firmId).eq("business_id", businessId).maybeSingle();
+  if (!c) throw new PracticeError("not_found", "Client not found.");
+  if (c.client_status !== "archived") throw new PracticeError("invalid", `${c.client_name} is not archived.`);
+  const { restoreWindow, RESTORE_DAYS } = await import("./archive");
+  const w = restoreWindow(await archivedAtOf(db, ctx, businessId, c.notes as string | null));
+  if (!w.restorable) throw new PracticeError("expired", `${c.client_name} was archived more than ${RESTORE_DAYS} days ago. Ask FynHelp support to restore it.`);
+  // Back in the count: is there room on the plan?
+  const billing = await import("./billing.server");
+  await billing.assertWorkRoom(db, ctx.firmId, { businessId, newDocument: false });
+  const { archivedAt: _gone, ...meta } = clientMeta(c.notes as string | null) as Record<string, unknown>;
+  await db.from("ca_clients").update({ client_status: "active", notes: Object.keys(meta).length ? JSON.stringify(meta) : null }).eq("id", c.id);
+  await logActivity(db, ctx.firmId, businessId, "system", `${c.client_name} restored from the archive by ${ctx.role}. Its documents, reports and history are as they were.`);
   return { ok: true };
 }

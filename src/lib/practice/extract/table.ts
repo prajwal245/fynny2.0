@@ -6,6 +6,7 @@
  * header, different column names per bank, separate debit/credit columns,
  * DR/CR suffixes, multi-line narrations and totals rows at the bottom.
  */
+import { isBankLedgerName } from "./tally";
 import {
   detectAmountPattern,
   findHeaderIndex,
@@ -271,6 +272,41 @@ export function rowsFromTable(rows: string[][], side?: "bank" | "books"): Extrac
   const dayBook = tallyLayout && rows.slice(0, map.headerRow).some((r) => /\bday ?book\b/i.test(r.join(" ")));
   const NON_BANK_VCH = /^(sales|sale|purchase|journal|credit note|debit note|memorandum|stock journal|rejections? (in|out))\b/i;
   const out: ExtractedRow[] = [];
+  // A Day Book lists each voucher's ledger legs on the lines under its date: the party, any charges, and the bank account. The
+  // book entry that must match the bank statement is the BANK leg, whose amount includes the charges (a payment of ₹47,32,488 plus
+  // ₹29.21 charges leaves the bank as ₹47,32,517.21). The legs are collected here and the voucher's line is corrected when it ends.
+  type Leg = { ledger: string; debit: number; credit: number };
+  let voucher: { row: ExtractedRow; legs: Leg[] } | null = null;
+  const cashOnly = new Set<ExtractedRow>();
+  const num = (s: string) => {
+    const n = Number(String(s).replace(/[,₹\s]/g, ""));
+    return Number.isFinite(n) ? n : 0;
+  };
+  const flush = () => {
+    const v = voucher;
+    voucher = null;
+    if (!v) return;
+    const banks = v.legs.filter((l) => isBankLedgerName(l.ledger) && !/^(petty\s+)?cash\b/i.test(l.ledger.trim()) && (l.debit > 0 || l.credit > 0));
+    // A voucher paid or received in cash never appears on a bank statement: it is not a bank reconciliation line.
+    if (!banks.length) {
+      if (v.legs.some((l) => /^(petty\s+)?cash\b/i.test(l.ledger.trim()) && (l.debit > 0 || l.credit > 0))) cashOnly.add(v.row);
+      return;
+    }
+    const party = v.legs.find((l) => !isBankLedgerName(l.ledger) && l.ledger && !/\b(charges?|interest|commission|gst|tds)\b/i.test(l.ledger))?.ledger ?? null;
+    const baseDescription = v.row.description;
+    banks.forEach((b, n) => {
+      const row = n === 0 ? v.row : { ...v.row, row_index: v.row.row_index + n * 500_000, parse_issues: [...v.row.parse_issues] };
+      // A transfer between two bank accounts names the OTHER account as the party, so each line reads "Indian Bank CC (Indian bank CA)".
+      const other = banks.filter((o) => o !== b).map((o) => o.ledger).join(" / ");
+      row.amount = round2(Math.max(b.debit, b.credit));
+      // A debit to the bank ledger is money in; a credit is money out.
+      row.direction = b.debit > 0 ? "in" : "out";
+      row.counterparty = party ?? (other || row.counterparty);
+      row.description = `${party ?? (other || baseDescription)} (${b.ledger})`.trim();
+      if (banks.length > 1) row.parse_issues.push(`This voucher moves money between ${banks.length} bank accounts; one line per account`);
+      if (n > 0) out.push(row);
+    });
+  };
   for (let r = map.headerRow + 1; r < rows.length; r++) {
     const row = rows[r];
     const rawText = header
@@ -289,6 +325,12 @@ export function rowsFromTable(rows: string[][], side?: "bank" | "books"): Extrac
         : rawDescription;
     // Opening and closing balances and totals have no voucher type: they are checks, never transactions.
     if (tallyLayout && !vchTypeCell && SUMMARY_LINE.test(row.join(" "))) continue;
+    if (dayBook && date) flush();
+    if (dayBook && !date && voucher) {
+      const d = num(cell(row, map.debit));
+      const c = num(cell(row, map.credit));
+      if (d > 0 || c > 0) voucher.legs.push({ ledger: rawDescription, debit: d, credit: c });
+    }
     if (dayBook && NON_BANK_VCH.test(vchTypeCell)) continue;
     let signed = round2(
       normaliseAmount(
@@ -377,6 +419,16 @@ export function rowsFromTable(rows: string[][], side?: "bank" | "books"): Extrac
       parse_confidence: confidence,
       parse_issues: issues,
     });
+    if (dayBook && date) {
+      const first: Leg = { ledger: rawDescription, debit: num(cell(row, map.debit)), credit: num(cell(row, map.credit)) };
+      voucher = { row: out[out.length - 1]!, legs: [first] };
+    }
+  }
+  flush();
+  if (cashOnly.size) {
+    const keep = out.filter((r) => !cashOnly.has(r));
+    out.length = 0;
+    out.push(...keep);
   }
   // Safety net: if almost every amount is just the day of the month in that row's own date, the amount column was
   // misread (a Kotak CSV once gave Rs 25 and Rs 9 for 25 and 9 December). Do not hand a person 500 wrong lines to confirm.

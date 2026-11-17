@@ -1,4 +1,4 @@
-import { CloseChecklist } from "../components/CloseChecklist";
+import { CloseChecklist, CloseOverviewLine } from "../components/CloseChecklist";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
@@ -188,6 +188,7 @@ export default function ClientWorkspacePage() {
           <div style={{ marginBottom: 18 }}>
             <NextAction state={close} onGo={runNext} />
           </div>
+          <CloseOverviewLine clientId={client.id} onOpen={() => setTab("close")} />
           <Card style={{ marginBottom: 18 }}>
             <CloseProgress state={close} />
           </Card>

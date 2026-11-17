@@ -81,7 +81,7 @@ export async function portfolioClose(db: Db, ctx: FirmContext, periodKey: string
         .gte("extracted->statement_check->>last", p.start)
         .limit(5000),
     ),
-    safe(() => db.from("ca_recon_runs").select("business_id, total_items, period").eq("ca_firm_id", f).eq("period", p.label).limit(5000)),
+    safe(() => db.from("ca_recon_runs").select("business_id, total_items, period, recon_type").eq("ca_firm_id", f).eq("period", p.label).limit(5000)),
     safe(() => db.from("ca_exceptions").select("business_id, status, work_status").eq("ca_firm_id", f).eq("status", "open").gte("period_start", p.start).lte("period_end", p.end).limit(20000)),
     safe(() => db.from("ca_reports_log").select("business_id, signed_off_at, signed_off_by").eq("ca_firm_id", f).eq("period", p.label).limit(5000)),
     safe(() => db.from("ca_close_steps").select("business_id, step_key, confirmed_by_name, confirmed_at, note").eq("ca_firm_id", f).eq("period", p.key).limit(20000)),
@@ -137,6 +137,7 @@ export async function portfolioClose(db: Db, ctx: FirmContext, periodKey: string
 
     const open = excBy.get(id) ?? [];
     const run = runBy.get(id)?.[0];
+    const bankOnly = run ? (runBy.get(id) ?? []).every((r) => r.recon_type === "bank_only") : false;
     const confirmed: CloseFacts["confirmed"] = {};
     for (const s of stepBy.get(id) ?? []) confirmed[String(s.step_key)] = { by: s.confirmed_by_name ?? null, at: String(s.confirmed_at), note: s.note ?? null };
     const reps = repBy.get(id) ?? [];
@@ -154,7 +155,7 @@ export async function portfolioClose(db: Db, ctx: FirmContext, periodKey: string
         failed: 0,
         notAvailable: counted.filter((s) => s.verification.result === "not_available").length,
       },
-      recon: { bank: Number(run?.total_items ?? 0), runDone: Boolean(run) },
+      recon: { bank: Number(run?.total_items ?? 0), runDone: Boolean(run), bankOnly },
       exceptions: { open: open.length, explained: open.filter((e) => isExplained(e.work_status)).length },
       report: { exists: reps.length > 0, signedOff: Boolean(signed) },
       confirmed,

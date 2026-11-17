@@ -104,7 +104,7 @@ export default function ReportDetailPage() {
   const metrics = [
     { label: "Receipts", value: report.revenue, tone: V.green, rows: [...report.sources.revenue, ...grossUpIn] },
     { label: "Expenses", value: report.expenses, tone: V.maroon, rows: [...report.sources.expenses, ...grossUpOut] },
-    { label: "Net", value: net, tone: net >= 0 ? V.green : V.maroon, rows: [...allRows, ...grossUpIn, ...grossUpOut] },
+    { label: "Net operating result", value: net, tone: net >= 0 ? V.green : V.maroon, rows: [...allRows, ...grossUpIn, ...grossUpOut] },
   ];
 
   return (

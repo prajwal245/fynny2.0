@@ -8,6 +8,7 @@ import { parsePeriod } from "@/lib/practice/core";
 import { getPracticePortfolioClose } from "@/lib/practice/practice.functions";
 import { CLOSE_LABEL, dueOn, overdueSteps, type StepState } from "@/lib/practice/close/steps";
 import { STATE_TONE } from "../components/CloseChecklist";
+import { AgentTrace } from "../components/AgentTrace";
 
 type Row = Awaited<ReturnType<typeof getPracticePortfolioClose>>[number];
 type Filter = "all" | "attention" | "bank_books_closed" | "fully_closed" | "not_started";
@@ -64,7 +65,7 @@ export default function ClosePage() {
     <>
       <PageHeader title="Month-end close" subtitle={`Where every client stands for ${period}. Bank and Books Closed is what FynHelp can check; Fully Closed also needs GST, TDS, provisions, the MIS review and partner sign-off confirmed by people.`} />
       {error && <p style={{ color: V.maroon, fontSize: 13 }}>{error}</p>}
-      {!rows && !error && <p style={{ color: V.muted, fontSize: 13 }}>Reading every client's month…</p>}
+      {!rows && !error && <Card style={{ marginBottom: 18 }}><AgentTrace agent="recon" title="Reading every client's month" steps={["Finding each client's statements", "Verifying them", "Counting open exceptions", "Working out where each close stands"]} /></Card>}
       {rows && (
         <>
           <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", marginBottom: 18 }}>

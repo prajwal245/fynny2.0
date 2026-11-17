@@ -584,6 +584,14 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       period: r.period,
     };
   }
+  // Every month's run, newest first per client and month. The close of an EARLIER month must still see that its recon ran, however
+  // many later months have been reconciled since.
+  const reconByPeriod: Record<string, { matched: number; exceptions: number; bank: number; at: string; period?: string }> = {};
+  for (const r of nRes.data ?? []) {
+    const k = `${r.business_id}|${r.period}`;
+    if (reconByPeriod[k]) continue;
+    reconByPeriod[k] = { matched: r.matched ?? 0, exceptions: r.unmatched ?? 0, bank: r.total_items ?? 0, at: String(r.run_at ?? r.created_at ?? "").slice(0, 10), period: r.period };
+  }
   await Promise.all(
     Object.entries(recon).map(async ([businessId, summary]) => {
       let p;
@@ -677,6 +685,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
     reports,
     chases,
     recon,
+    reconByPeriod,
     activity,
     agentRuns,
     readyForMis,

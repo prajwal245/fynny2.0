@@ -545,10 +545,13 @@ export function reconcile(
           ref !== "" &&
           normaliseRef(b.reference) === ref,
       ) ??
-      list.find(
-        (b) =>
-          !usedBook.has(b.id) && ref === "" && normaliseRef(b.reference) === "",
-      );
+      (() => {
+        const free = list.filter((b) => !usedBook.has(b.id) && ref === "" && normaliseRef(b.reference) === "");
+        // Several entries with this amount and date: take the one whose party agrees, not simply the first, so two receipts of the
+        // same amount from different customers are not swapped.
+        if (free.length < 2) return free[0];
+        return free.reduce((best, b) => (fuzzyScore(t, b, cfg, aliases).score > fuzzyScore(t, best, cfg, aliases).score ? b : best), free[0]!);
+      })();
     if (!pick) continue;
     usedBank.add(t.id);
     usedBook.add(pick.id);
@@ -592,6 +595,69 @@ export function reconcile(
       score: gap === 0 ? 1 : Math.max(0.9, s.score),
       explanation: { ...s.explanation, note: "Only entry with this amount within 2 days" },
     });
+  }
+
+  // Stage 1b+ — identical amounts. When the same amount appears more than once (EMIs, salaries, daily receipts, two FDR credits), no
+  // line has a *unique* partner, so the stages above skip all of them. Money-wise any one-to-one pairing of identical amounts is right,
+  // so they are paired here: the bank lines and book entries of one direction and amount, within two days of one another, are taken
+  // as a group. With equal numbers on each side every line is paired; with unequal numbers only lines of the same date are, and the
+  // surplus stays an exception that says so. Within a group the pairing follows the party (so two receipts of ₹50,000 from different
+  // customers are not swapped), then the date.
+  {
+    const GROUP_WINDOW = 2;
+    for (const [key, allBank] of bankByAmount) {
+      const freeBank = allBank.filter((t) => !usedBank.has(t.id));
+      const freeBooks = (booksByAmount.get(key) ?? []).filter((b) => !usedBook.has(b.id));
+      if (!freeBank.length || !freeBooks.length || freeBank.length + freeBooks.length < 3) continue;
+      // Clusters of lines close in time, both sides together.
+      const items = [
+        ...freeBank.map((t) => ({ t, side: "bank" as const })),
+        ...freeBooks.map((t) => ({ t, side: "books" as const })),
+      ].sort((x, y) => (x.t.txn_date < y.t.txn_date ? -1 : x.t.txn_date > y.t.txn_date ? 1 : x.t.id < y.t.id ? -1 : 1));
+      const clusters: (typeof items)[] = [];
+      for (const it of items) {
+        const cur = clusters[clusters.length - 1];
+        if (cur && daysBetween(cur[cur.length - 1]!.t.txn_date, it.t.txn_date) <= GROUP_WINDOW) cur.push(it);
+        else clusters.push([it]);
+      }
+      for (const cl of clusters) {
+        const cb = cl.filter((x) => x.side === "bank").map((x) => x.t);
+        const ck = cl.filter((x) => x.side === "books").map((x) => x.t);
+        if (!cb.length || !ck.length) continue;
+        const equal = cb.length === ck.length;
+        // Candidate pairs, best first: party agreement, then nearest date, then order.
+        const cand: { t: ReconTxn; b: ReconTxn; score: number; gap: number }[] = [];
+        for (const t of cb)
+          for (const b of ck) {
+            const gap = daysBetween(t.txn_date, b.txn_date);
+            // Unequal numbers: which line the entry belongs to is a guess unless the party agrees, so a pair needs the same date AND the party.
+            if (!equal && (gap !== 0 || counterpartyScore(t, b, aliases) < 0.6)) continue;
+            cand.push({ t, b, score: fuzzyScore(t, b, cfg, aliases).score, gap });
+          }
+        cand.sort((x, y) => y.score - x.score || x.gap - y.gap || (x.t.id < y.t.id ? -1 : x.t.id > y.t.id ? 1 : x.b.id < y.b.id ? -1 : 1));
+        let made = 0;
+        for (const c of cand) {
+          if (usedBank.has(c.t.id) || usedBook.has(c.b.id)) continue;
+          usedBank.add(c.t.id);
+          usedBook.add(c.b.id);
+          made++;
+          const s = fuzzyScore(c.t, c.b, cfg, aliases);
+          matches.push({
+            bank_txn_id: c.t.id,
+            book_txn_ids: [c.b.id],
+            stage: c.gap === 0 ? "exact" : "fuzzy",
+            score: c.gap === 0 ? 1 : Math.max(0.9, s.score),
+            explanation: {
+              ...s.explanation,
+              note: equal
+                ? `One of ${cb.length} identical entries (same amount and direction within two days). Paired by party, then by date: any pairing gives the same total.`
+                : `${cb.length} bank lines and ${ck.length} book entries have this amount on this date; this is one of the ${Math.min(cb.length, ck.length)} that can be paired. The rest stay open.`,
+            },
+          });
+        }
+        void made;
+      }
+    }
   }
 
   // Stage 1c — booked a few days late. Books are often written up days after the bank
@@ -1119,6 +1185,67 @@ function explain(
     reason_code: "amount_mismatch",
     detail: `Nearest candidate is ${fmt(best.o.amount)} (difference ${fmt(Math.abs(best.o.amount - t.amount))}).`,
   };
+}
+
+/**
+ * Reconciles each bank account against the books of THAT account.
+ *
+ * A client with several statements (ICICI, HDFC, Union Bank ...) has one Day Book with a line for every account. Matching all the bank
+ * lines against all the book lines at once lets an ICICI payment match an HDFC entry of the same amount and date: the amounts agree
+ * and the account is wrong. Here each statement's lines are matched only against book entries that name its account, plus entries
+ * that name no account (a ledger called just "Bank"), each book entry being used once. `accountOf` gives an entry's account (the last
+ * 4 digits), or null when it does not say. When no bank line names an account this is exactly `reconcile`.
+ */
+export function reconcileByAccount(
+  bank: ReconTxn[],
+  books: ReconTxn[],
+  accountOf: (t: ReconTxn) => string | null,
+  opts: Parameters<typeof reconcile>[2] = {},
+): ReconOutcome {
+  const groups = new Map<string, ReconTxn[]>();
+  for (const t of bank) {
+    const k = accountOf(t) ?? "";
+    (groups.get(k) ?? groups.set(k, []).get(k)!).push(t);
+  }
+  const named = [...groups.keys()].filter((k) => k !== "");
+  if (named.length < 1) return reconcile(bank, books, opts);
+
+  // Accounts with the most lines first; lines of unknown account last, so they only take what the others left.
+  const order = [...groups.keys()].sort((a, b) => Number(a === "") - Number(b === "") || groups.get(b)!.length - groups.get(a)!.length);
+  const usedBooks = new Set<string>();
+  const merged: ReconOutcome = {
+    matches: [],
+    exceptions: [],
+    tags: {},
+    stats: { bank_count: 0, book_count: books.length, matched: 0, matched_by_stage: { exact: 0, fuzzy: 0, rules: 0 }, matched_value: 0, exceptions: 0, exceptions_by_reason: {}, at_risk_value: 0 },
+  };
+  const bookExceptionSeen = new Set<string>();
+  const lateExceptions: ExceptionDecision[] = [];
+  for (const k of order) {
+    const bankG = groups.get(k)!;
+    const booksG = books.filter((b) => !usedBooks.has(b.id) && (k === "" || accountOf(b) === k || accountOf(b) === null));
+    const out = reconcile(bankG, booksG, opts);
+    for (const m of out.matches) for (const id of m.book_txn_ids) usedBooks.add(id);
+    merged.matches.push(...out.matches);
+    Object.assign(merged.tags, out.tags);
+    for (const e of out.exceptions) {
+      if (e.side === "bank") merged.exceptions.push(e);
+      else if (!bookExceptionSeen.has(e.txn_id)) {
+        bookExceptionSeen.add(e.txn_id);
+        lateExceptions.push(e);
+      }
+    }
+    merged.stats.bank_count += out.stats.bank_count;
+    merged.stats.matched += out.stats.matched;
+    merged.stats.matched_value += out.stats.matched_value;
+    merged.stats.at_risk_value += out.stats.at_risk_value;
+    for (const st of ["exact", "fuzzy", "rules"] as const) merged.stats.matched_by_stage[st] += out.stats.matched_by_stage[st];
+  }
+  // A book entry left open by one account's pass may have been taken by another's: only the ones nobody used remain exceptions.
+  merged.exceptions.push(...lateExceptions.filter((e) => !usedBooks.has(e.txn_id)));
+  merged.stats.exceptions = merged.exceptions.length;
+  for (const e of merged.exceptions) merged.stats.exceptions_by_reason[e.reason_code] = (merged.stats.exceptions_by_reason[e.reason_code] ?? 0) + 1;
+  return merged;
 }
 
 export const REASON_LABELS: Record<ReasonCode, string> = {

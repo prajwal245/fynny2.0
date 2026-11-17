@@ -13,6 +13,7 @@ import {
   removePracticeExpectedStatement,
 } from "@/lib/practice/practice.functions";
 import { CLOSE_LABEL, closeState, mayConfirm, type StepState } from "@/lib/practice/close/steps";
+import { AgentTrace } from "./AgentTrace";
 
 type Data = Awaited<ReturnType<typeof getPracticeClientClose>>;
 const msg = (e: unknown) => (e instanceof Error && e.message ? e.message : "Something went wrong. Please try again.");
@@ -78,7 +79,7 @@ export function CloseChecklist({ clientId, onTab }: { clientId: string; onTab: (
 
   if (!key) return <Card><p style={{ margin: 0, color: V.muted }}>Pick a single month in the top bar to see its close checklist.</p></Card>;
   if (error) return <Card><p style={{ margin: 0, color: V.maroon }}>{error}</p></Card>;
-  if (!data) return <Card><p style={{ margin: 0, color: V.muted }}>Reading the month…</p></Card>;
+  if (!data) return <Card><AgentTrace agent="recon" title="Reading the month" steps={["Reading the statements", "Checking each against the bank's own figures", "Counting what is still open", "Checking who has confirmed what"]} /></Card>;
   const sum = data.summary;
   if (!sum) return <Card><p style={{ margin: 0, color: V.muted }}>This client was not found.</p></Card>;
   const cs = closeState(sum.steps);
@@ -241,5 +242,33 @@ export function CloseChecklist({ clientId, onTab }: { clientId: string; onTab: (
         )}
       </Modal>
     </div>
+  );
+}
+
+/** One line on the client's Overview: where the real month-end close stands, with a way in. It reads the same checklist as the Month-end close tab. */
+export function CloseOverviewLine({ clientId, onOpen }: { clientId: string; onOpen: () => void }) {
+  const { period, docs, exceptions, reports } = useV2();
+  const [data, setData] = useState<Data | null>(null);
+  let key = "";
+  try { key = parsePeriod(period).key; } catch { key = ""; }
+  useEffect(() => {
+    if (!key) return;
+    let live = true;
+    void getPracticeClientClose({ data: { business_id: clientId, period: key } }).then((d) => live && setData(d)).catch(() => undefined);
+    return () => { live = false; };
+  }, [clientId, key, docs.length, exceptions.length, reports.length]);
+  const sum = data?.summary;
+  if (!sum) return null;
+  const cs = closeState(sum.steps);
+  return (
+    <Card style={{ marginBottom: 18, display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", justifyContent: "space-between" }} data-testid="close-overview-line">
+      <div>
+        <div style={{ fontWeight: 600, color: V.ink }}>Month-end close for {period}</div>
+        <div style={{ fontSize: 13, color: V.body, marginTop: 2 }}>
+          <Badge tone={STATE_TONE[cs.state]}>{CLOSE_LABEL[cs.state]}</Badge> <span style={{ marginLeft: 6 }}>{cs.done} of {cs.total} steps{cs.next ? ` · next: ${cs.next.label}` : ""}</span>
+        </div>
+      </div>
+      <button className="bx-btn bx-sm" onClick={onOpen}>Open the checklist</button>
+    </Card>
   );
 }

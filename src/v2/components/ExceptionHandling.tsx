@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { Badge, V, formatDate } from "../ui";
+import { AgentWorking } from "./AgentTrace";
 import type { Exception } from "../store";
 import { KIND_ACTION, KIND_LABEL, WORK_LABEL, nextStatuses, type WorkStatus } from "@/lib/practice/exceptionKinds";
 import { getPracticeOwnTransfers, unpairPracticeOwnTransfer } from "@/lib/practice/practice.functions";
@@ -155,9 +156,9 @@ export function HandlingPanel({ ex, work, role }: { ex: Exception; work: Work; r
           {moves.map((m) => (
             <button key={m} className="bx-btn bx-sm" disabled={busy} onClick={() => {
               if (m === "accepted_timing" && !note.trim()) return void toast.info("Write why it is only a timing difference in the note below first.");
-              void act(() => work.setStatus(ex.id, m, note.trim() || undefined));
+              void act(() => work.setStatus(ex.id, m, note.trim() || undefined)).then((ok) => { if (ok) setNote(""); });
             }}>
-              {m === "query_sent" ? "Mark query sent" : m === "answered" ? "Mark answered" : m === "accepted_timing" ? "Accept as timing" : "Reopen handling"}
+              {busy ? "Saving…" : m === "query_sent" ? "Mark query sent" : m === "answered" ? "Mark answered" : m === "accepted_timing" ? "Accept as timing" : "Reopen handling"}
             </button>
           ))}
         </div>
@@ -182,8 +183,8 @@ export function HandlingPanel({ ex, work, role }: { ex: Exception; work: Work; r
               <div style={{ display: "grid", gap: 8 }}>
                 <input className="v2-input" placeholder="Note (required to return it)" value={note} onChange={(e) => setNote(e.target.value)} aria-label="Review note" />
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button className="bx-btn bx-sm bx-primary" disabled={busy} onClick={() => void act(() => work.review(ex.id, "approve", { note: note.trim() || undefined }))}>Approve</button>
-                  <button className="bx-btn bx-sm" disabled={busy || !note.trim()} onClick={() => void act(() => work.review(ex.id, "return", { note: note.trim() }))}>Return to {work.nameOf(ex.ownerId) ?? "owner"}</button>
+                  <button className="bx-btn bx-sm bx-primary" disabled={busy} onClick={() => void act(() => work.review(ex.id, "approve", { note: note.trim() || undefined })).then((ok) => { if (ok) setNote(""); })}>Approve</button>
+                  <button className="bx-btn bx-sm" disabled={busy || !note.trim()} onClick={() => void act(() => work.review(ex.id, "return", { note: note.trim() })).then((ok) => { if (ok) setNote(""); })}>Return to {work.nameOf(ex.ownerId) ?? "owner"}</button>
                 </div>
               </div>
             ) : <div style={{ fontSize: 13, color: V.body }}>Waiting for {work.nameOf(ex.reviewerId) ?? "a senior"} to review it.</div>
@@ -202,7 +203,7 @@ export function HandlingPanel({ ex, work, role }: { ex: Exception; work: Work; r
       )}
 
       <div>
-        <div className="v2-label">History</div>
+        <div className="v2-label" style={{ display: "flex", justifyContent: "space-between" }}><span>History</span>{busy && <AgentWorking agent="chaser" text="Saving" />}</div>
         <Timeline events={events} />
       </div>
     </div>
@@ -235,7 +236,7 @@ export function AssignControl({ ids, work, onDone }: { ids: string[]; work: Work
 
 /** Transfers between the client's own accounts that were paired and set aside, each with its evidence and an Undo. */
 export function OwnTransfersPanel({ clientId, refresh }: { clientId?: string; refresh: () => Promise<void> }) {
-  const [rows, setRows] = useState<{ outId: string; inId: string; businessId: string; amount: number; date: string; outNarration: string; inNarration: string }[] | null>(null);
+  const [rows, setRows] = useState<{ kind?: "own_account" | "reversal"; outId: string; inId: string; businessId: string; amount: number; date: string; outNarration: string; inNarration: string }[] | null>(null);
   const [openList, setOpenList] = useState(false);
   const load = () => void getPracticeOwnTransfers({ data: { business_id: clientId } }).then((r) => setRows(r)).catch(() => setRows([]));
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -244,9 +245,9 @@ export function OwnTransfersPanel({ clientId, refresh }: { clientId?: string; re
   return (
     <div className="v2-card" style={{ padding: 14, marginBottom: 16 }} data-testid="own-transfers">
       <button className="bx-btn bx-sm" onClick={() => setOpenList((o) => !o)} aria-expanded={openList}>
-        {rows.length} transfer{rows.length === 1 ? "" : "s"} between the client's own accounts set aside {openList ? "▾" : "▸"}
+        {rows.length} pair{rows.length === 1 ? "" : "s"} set aside automatically ({rows.filter((r) => r.kind !== "reversal").length} own-account transfers, {rows.filter((r) => r.kind === "reversal").length} reversed payments) {openList ? "▾" : "▸"}
       </button>
-      <span style={{ fontSize: 12.5, color: V.muted, marginLeft: 10 }}>Equal amounts, opposite directions, within two days, with a shared reference. Not income or expense.</span>
+      <span style={{ fontSize: 12.5, color: V.muted, marginLeft: 10 }}>Each pair nets to nothing: a transfer between the client's own accounts, or a payment the bank gave back. Not income or expense. Undo any of them.</span>
       {openList && (
         <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
           {rows.slice(0, 50).map((r) => (

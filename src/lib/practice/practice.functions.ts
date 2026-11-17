@@ -1566,3 +1566,48 @@ export const unpairPracticeOwnTransfer = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) =>
     withFirm(context.userId, async (db, ctx) => (await import("./recon.server")).unpairOwnTransfer(db, ctx, data.txn_id, data.note)),
   );
+
+/* ── archived clients, restore, and the upload room check ───────────── */
+
+export const listPracticeArchivedClients = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => withFirm(context.userId, async (db, ctx) => (await import("./clients.server")).listArchivedClients(db, ctx)));
+
+export const unarchivePracticeClient = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: uuid }).parse(d))
+  .handler(async ({ data, context }) => withFirm(context.userId, async (db, ctx) => (await import("./clients.server")).unarchivePracticeClient(db, ctx, data.id)));
+
+/** Asks, before any file is sent, whether the firm's plan has room for this client and this many files. Never throws for a limit: it says so. */
+export const checkPracticeUploadRoom = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ business_id: uuid.nullable(), files: z.number().int().min(1).max(500).default(1) }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      const billing = await import("./billing.server");
+      try {
+        await billing.assertWorkRoom(db, ctx.firmId, { businessId: data.business_id, newDocument: true });
+        return { ok: true as const, message: null as string | null };
+      } catch (e) {
+        const err = e as { code?: string; message?: string };
+        if (err.code === "usage_limit" || err.code === "billing_paused") return { ok: false as const, message: err.message ?? "Your plan does not cover this." };
+        throw e;
+      }
+    }),
+  );
+
+/** Removes an uploaded file and what was read from it (matches reversed, nothing left pointing at it). */
+export const removePracticeDocument = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: uuid }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./documents.server")).removeDocument(db, ctx, data.id)),
+  );
+
+/** What each sheet of a stored Excel file contains, to choose which one to read. */
+export const previewPracticeDocumentSheets = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: uuid }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./documents.server")).previewDocumentSheets(db, ctx, data.id)),
+  );

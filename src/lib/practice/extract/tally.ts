@@ -43,6 +43,9 @@ const NOT_BANK = /\b(charges?|interest|commission|fees?|gst|tds|loan)\b/i;
 const BANK_HINT =
   /\b(bank|hdfc|icici|sbi|axis|kotak|yes bank|idfc|indusind|federal|canara|pnb|bob|union bank|cash)\b/i;
 
+/** True for the name of a bank account ledger ("Indian bank CA 7856871247", "HDFC Bank"), not for bank charges, interest or a loan. */
+export const isBankLedgerName = (name: string) => BANK_HINT.test(name) && !NOT_BANK.test(name);
+
 const CASH_LEDGER = /^(petty\s+)?cash(\s*-?\s*in\s*-?\s*hand)?(\s+a\/c)?$/i;
 
 function ledgerEntries(v: XmlNode): LedgerEntry[] {

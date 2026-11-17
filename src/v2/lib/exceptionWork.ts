@@ -31,7 +31,7 @@ const message = (e: unknown) => (e instanceof Error && e.message ? e.message : "
 let cache: TeamMember[] | null = null;
 
 /** The firm's team, read once, and the actions a person takes on an exception. Every action refreshes the queue when it is done. */
-export function useExceptionWork(refresh: () => Promise<void>) {
+export function useExceptionWork(refresh: () => Promise<void>, patch?: (ids: string[], p: Record<string, unknown>) => void) {
   const [members, setMembers] = useState<TeamMember[]>(cache ?? []);
   const [loaded, setLoaded] = useState(Boolean(cache));
   useEffect(() => {
@@ -51,20 +51,25 @@ export function useExceptionWork(refresh: () => Promise<void>) {
   const me = members.find((m) => m.isYou) ?? null;
   const nameOf = useCallback((id: string | null | undefined) => (id ? (members.find((m) => m.userId === id)?.name ?? "A former member") : null), [members]);
 
-  /** Runs a server call, says what went wrong in plain words, and refreshes. Returns true when it worked. */
+  /**
+   * Shows the change at once, saves it, and says what went wrong in plain words. A failure puts the screen back as the server has it.
+   * The reload that confirms a success runs in the background, so nothing waits on it.
+   */
   const run = useCallback(
-    async (fn: () => Promise<unknown>, ok?: string): Promise<boolean> => {
+    async (fn: () => Promise<unknown>, ok?: string, change?: { ids: string[]; patch: Record<string, unknown> }): Promise<boolean> => {
+      if (change && patch) patch(change.ids, change.patch);
       try {
         await fn();
         if (ok) toast.success(ok);
-        await refresh();
+        void refresh();
         return true;
       } catch (e) {
         toast.error(message(e));
+        await refresh();
         return false;
       }
     },
-    [refresh],
+    [refresh, patch],
   );
 
   return {
@@ -73,9 +78,9 @@ export function useExceptionWork(refresh: () => Promise<void>) {
     loaded,
     nameOf,
     assign: (ids: string[], ownerId: string | null, note?: string) =>
-      run(() => assignPracticeExceptions({ data: { ids, owner_id: ownerId, note } }), ownerId ? `Assigned ${ids.length} to ${nameOf(ownerId) ?? "them"}.` : `${ids.length} unassigned.`),
-    setStatus: (id: string, status: WorkStatus, note?: string) => run(() => setPracticeExceptionStatus({ data: { id, status, note } })),
-    saveRemark: (id: string, patch: { remark?: string; dueDate?: string | null }) => run(() => setPracticeExceptionRemark({ data: { id, remark: patch.remark, due_date: patch.dueDate } }), "Saved."),
+      run(() => assignPracticeExceptions({ data: { ids, owner_id: ownerId, note } }), ownerId ? `Assigned ${ids.length} to ${nameOf(ownerId) ?? "them"}.` : `${ids.length} unassigned.`, { ids, patch: { ownerId } }),
+    setStatus: (id: string, status: WorkStatus, note?: string) => run(() => setPracticeExceptionStatus({ data: { id, status, note } }), undefined, { ids: [id], patch: { workStatus: status } }),
+    saveRemark: (id: string, patch: { remark?: string; dueDate?: string | null }) => run(() => setPracticeExceptionRemark({ data: { id, remark: patch.remark, due_date: patch.dueDate } }), "Saved.", { ids: [id], patch: { ...(patch.remark !== undefined ? { remark: patch.remark } : {}), ...(patch.dueDate !== undefined ? { dueDate: patch.dueDate } : {}) } }),
     review: (id: string, action: "send" | "return" | "approve", o: { reviewerId?: string; note?: string } = {}) =>
       run(() => reviewPracticeException({ data: { id, action, reviewer_id: o.reviewerId, note: o.note } }), action === "send" ? "Sent for review." : action === "return" ? "Returned with your note." : "Approved."),
     timeline: async (id: string): Promise<TimelineEvent[]> => {

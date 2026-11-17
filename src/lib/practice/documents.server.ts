@@ -391,7 +391,7 @@ export async function processExtraction(
       clientGstin: (clientRow as { gstin?: string | null } | null)?.gstin ?? null,
     },
     {
-      llm: (await withinAiCap(db, doc.ca_firm_id)) ? practiceLlm() : null,
+      llm: (await withinAiCap(db, doc.ca_firm_id)) ? practiceLlm({ timeoutMs: 50_000, budgetMs: 52_000 }) : null,
       ocr: practiceOcr(),
       pdfText: (b) => pdfText(b, opts.password),
       pdfItems: (b) => pdfItems(b, opts.password),
@@ -855,6 +855,61 @@ export async function dropSyncedBooks(db: Db, extractionId: string, system = "Ta
   for (let i = 0; i < bankIds.length; i += 200) await db.from("ca_txns").update({ match_status: "unmatched" }).in("id", bankIds.slice(i, i + 200)).eq("match_status", "matched");
   for (let i = 0; i < ids.length; i += 200) await db.from("ca_txns").delete().in("id", ids.slice(i, i + 200));
   return { removed: ids.length, reopened: bankIds.length };
+}
+
+/**
+ * Removes an uploaded file and what was read from it: its lines, its open review items and its exceptions. Any match that used one of
+ * its lines is reversed (kept in the history as reversed) and the line on the other side becomes unmatched again, so nothing is left
+ * pointing at a file that is gone. The stored original is kept. A bank statement is removed only by a partner, because verification
+ * and the MIS rest on it.
+ */
+export async function removeDocument(db: Db, ctx: FirmContext, extractionId: string): Promise<{ filename: string; lines: number; matchesReversed: number }> {
+  const { data: doc } = await db.from("ca_document_extractions").select("id, business_id, original_filename, side").eq("id", extractionId).eq("ca_firm_id", ctx.firmId).maybeSingle();
+  if (!doc) throw new PracticeError("not_found", "File not found.");
+  const filename = String(doc.original_filename ?? "this file");
+  if (doc.side === "bank" && !(await import("./db.server")).canSignOff(ctx)) throw new PracticeError("forbidden", "Only a partner can remove a bank statement. A books file can be removed by anyone on the team.");
+  const { data: lineRows } = await db.from("ca_txns").select("id, side").eq("extraction_id", extractionId).limit(50_000);
+  const lines = (lineRows ?? []) as { id: string; side: string }[];
+  const ids = lines.map((l) => l.id);
+  const now = new Date().toISOString();
+  let reversed = 0;
+  const reopenBank = new Set<string>();
+  const reopenBooks = new Set<string>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const chunk = ids.slice(i, i + 200);
+    // A match is reversed when either side was in this file.
+    const { data: byBank } = await db.from("ca_recon_matches").select("id, bank_txn_id, book_txn_ids").eq("status", "active").in("bank_txn_id", chunk);
+    const { data: byBook } = await db.from("ca_recon_matches").select("id, bank_txn_id, book_txn_ids").eq("status", "active").overlaps("book_txn_ids", chunk);
+    for (const m of [...(byBank ?? []), ...(byBook ?? [])] as { id: string; bank_txn_id: string; book_txn_ids: string[] }[]) {
+      const done = await db.from("ca_recon_matches").update({ status: "reversed", reversed_at: now, reversed_by: ctx.userId, notes: `The file ${filename} was removed.` }).eq("id", m.id).eq("status", "active").select("id");
+      if (!done.data?.length) continue;
+      reversed++;
+      reopenBank.add(m.bank_txn_id);
+      for (const b of m.book_txn_ids ?? []) reopenBooks.add(b);
+    }
+  }
+  const gone = new Set(ids);
+  const reopen = [...reopenBank, ...reopenBooks].filter((x) => !gone.has(x));
+  for (let i = 0; i < reopen.length; i += 200) await db.from("ca_txns").update({ match_status: "unmatched" }).in("id", reopen.slice(i, i + 200)).eq("match_status", "matched");
+  for (let i = 0; i < ids.length; i += 200) await db.from("ca_txns").delete().in("id", ids.slice(i, i + 200));
+  await db.from("ca_review_items").delete().eq("extraction_id", extractionId);
+  await db.from("ca_document_extractions").delete().eq("id", extractionId).eq("ca_firm_id", ctx.firmId);
+  await logActivity(db, ctx.firmId, doc.business_id as string | null, "extract", `${filename} was removed${lines.length ? `: ${lines.length} line${lines.length === 1 ? "" : "s"} taken out` : ""}${reversed ? `, ${reversed} match${reversed === 1 ? "" : "es"} reversed and the other side is open again` : ""}. The original file is kept.`.slice(0, 1900));
+  return { filename, lines: lines.length, matchesReversed: reversed };
+}
+
+/** What is in each sheet of a stored Excel file, so a person can choose which one to read. */
+export async function previewDocumentSheets(db: Db, ctx: FirmContext, extractionId: string) {
+  const { data: doc } = await db.from("ca_document_extractions").select("id, business_id, storage_path, side, original_filename, extracted").eq("id", extractionId).eq("ca_firm_id", ctx.firmId).maybeSingle();
+  if (!doc || !doc.storage_path) throw new PracticeError("not_found", "File not found.");
+  const bytes = await download(db, String(doc.storage_path));
+  const sheets = (await loadSheetsReader())(bytes);
+  const { data: client } = doc.business_id ? await db.from("ca_clients").select("client_name").eq("ca_firm_id", ctx.firmId).eq("business_id", doc.business_id).maybeSingle() : { data: null };
+  const { describeSheets } = await import("./extract/sheets");
+  const { REGISTER_LABELS } = await import("./extract/registers");
+  const side = doc.side === "bank" || doc.side === "books" ? (doc.side as "bank" | "books") : undefined;
+  const chosen = ((doc.extracted ?? {}) as { sheet_name?: string }).sheet_name ?? null;
+  return { sheets: describeSheets(sheets, (client?.client_name as string | undefined) ?? null, side, (k) => (REGISTER_LABELS as Record<string, string>)[k] ?? k), chosen };
 }
 
 const CHASE_HINTS: { re: RegExp; side: Side | null }[] = [

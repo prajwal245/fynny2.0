@@ -5,6 +5,7 @@
  * a bank line can be in only one live match, and each transaction has at most
  * one open exception which is updated in place.
  */
+import { isBankLedgerName } from "./extract/tally";
 import { isDistinctiveName } from "./memory";
 import {
   PracticeError,
@@ -25,12 +26,14 @@ import { decisionCount,
   DEFAULT_RULES,
   REASON_LABELS,
   reconcile,
+  reconcileByAccount,
   withoutUnmatchedPairs,
   type ExceptionDecision,
   type ReconRule,
   type ReconTxn,
 } from "./recon/engine";
 import { pairOwnTransfers, type TransferPair } from "./recon/ownTransfers";
+import { pairReversals, type ReversalPair } from "./recon/reversals";
 
 interface TxnRow extends ReconTxn {
   match_status: string;
@@ -129,6 +132,12 @@ export interface ReconSummary {
   message: string;
   /** Transfers between the client's own accounts that were paired and set aside this run. */
   own_transfers?: number;
+  /** Payments the bank reversed (a debit and its RVSL credit) that were paired and set aside this run. */
+  reversed_payments?: number;
+  /** The month was checked on the bank statements alone, because no books were uploaded. */
+  bank_only?: boolean;
+  /** Book entries for a bank account whose statement has not been uploaded; they wait for it. */
+  awaiting_statement?: number;
 }
 
 /** "7 already matched; this run matched 5 more of 12 (4 same amount and date, 1 part payment). 2 need a decision." */
@@ -158,9 +167,14 @@ export async function runRecon(
   ]);
   // Transfers between the client's own accounts are paired first: they are neither income nor expense and need no ledger match.
   const transfers = await pairAccountTransfers(db, ctx, businessId, period).catch(() => [] as TransferPair[]);
-  const pairedIds = new Set(transfers.flatMap((t) => [t.out.id, t.in.id]));
+  const allScopeBooks = scope.filter((t) => t.side === "books");
+  const reversals = await pairReversedPayments(db, ctx, businessId, scope.filter((t) => t.side === "bank"), allScopeBooks).catch(() => [] as ReversalPair[]);
+  const pairedIds = new Set([...transfers.flatMap((t) => [t.out.id, t.in.id]), ...reversals.flatMap((t) => [t.out.id, t.in.id])]);
   const bank = scope.filter((t) => t.side === "bank" && !pairedIds.has(t.id));
-  const books = scope.filter((t) => t.side === "books");
+  // A Day Book has a line for every bank account of the client, including accounts whose statement has not been uploaded (a CC account,
+  // a loan, another bank). Those entries wait for their statement; they are not exceptions and do not compete with the accounts that
+  // can be reconciled now. An entry whose bank ledger names no account digits is kept.
+  const { books, awaiting } = await splitAwaitingStatement(db, ctx.firmId, businessId, scope.filter((t) => t.side === "books"));
   const { count: alreadyMatched } = await db
     .from("ca_txns")
     .select("id", { count: "exact", head: true })
@@ -198,10 +212,48 @@ export async function runRecon(
     .eq("side", "books")
     .gte("txn_date", period.start)
     .lte("txn_date", period.end);
-  if (!bookCount)
-    return empty(
-      `No book entries for ${period.label}. Upload the Tally export or ledger before running recon.`,
-    );
+  // A client that shares only bank statements has no books to match. That is a complete result of its own: transfers between the
+  // client's accounts and payments the bank reversed are paired and set aside, nothing is left waiting, and it says what uploading
+  // the books would add. The run is recorded, so the month's close can see it.
+  if (!bookCount) {
+    const total = bank.length + (alreadyMatched ?? 0);
+    const setAside = (transfers.length + reversals.length) * 2;
+    const message = `Checked on its own: ${total} bank line${total === 1 ? "" : "s"} for ${period.label}, no books uploaded.${transfers.length ? ` ${transfers.length} transfer${transfers.length === 1 ? "" : "s"} between the client's own accounts paired and set aside.` : ""}${reversals.length ? ` ${reversals.length} reversed payment${reversals.length === 1 ? "" : "s"} paired and set aside.` : ""} Upload the Tally Day Book or ledgers to match the rest against the books.`;
+    const { data: run } = await db
+      .from("ca_recon_runs")
+      .insert({
+        ca_firm_id: ctx.firmId,
+        business_id: businessId,
+        recon_type: "bank_only",
+        period: period.label,
+        total_items: total,
+        matched: setAside + (alreadyMatched ?? 0),
+        mismatched: 0,
+        unmatched: 0,
+        total_matched_value: 0,
+        total_at_risk: 0,
+        run_by: ctx.userId,
+        snapshot: { status: "done", period, bank_only: true, set_aside: setAside },
+      })
+      .select("id")
+      .single();
+    await logActivity(db, ctx.firmId, businessId, "recon", `Recon for ${client.client_name}, ${period.label}: ${message}`);
+    return {
+      run_id: run?.id ?? null,
+      period,
+      bank: total,
+      books: 0,
+      matched: setAside,
+      matched_total: setAside + (alreadyMatched ?? 0),
+      exceptions: 0,
+      matched_by_stage: {},
+      exceptions_by_reason: {},
+      message,
+      own_transfers: transfers.length,
+      reversed_payments: reversals.length,
+      bank_only: true,
+    };
+  }
   const { count: bankCount } = await db
     .from("ca_txns")
     .select("id", { count: "exact", head: true })
@@ -216,7 +268,7 @@ export async function runRecon(
     );
 
   const { rules, aliases } = await firmRules(db, ctx.firmId);
-  const outcome = withoutUnmatchedPairs(reconcile(bank, books, { rules, aliases, pairContext: await chequeContext(db, ctx.firmId, businessId, period) }), await unmatchedPairs(db, ctx.firmId, businessId), scope);
+  const outcome = withoutUnmatchedPairs(reconcileByAccount(bank, books, await accountOfFn(db, ctx.firmId, businessId), { rules, aliases, pairContext: await chequeContext(db, ctx.firmId, businessId, period) }), await unmatchedPairs(db, ctx.firmId, businessId), scope);
 
   const { data: run, error: runErr } = await db
     .from("ca_recon_runs")
@@ -393,8 +445,10 @@ export async function runRecon(
     exceptions: decisionCount(outcome.exceptions),
     matched_by_stage: outcome.stats.matched_by_stage,
     exceptions_by_reason: outcome.stats.exceptions_by_reason,
-    message: reconMessage(written, bank.length, alreadyMatched ?? 0, outcome.stats.matched_by_stage, decisionCount(outcome.exceptions)) + (transfers.length ? ` ${transfers.length} transfer${transfers.length === 1 ? "" : "s"} between the client's own accounts paired and set aside.` : ""),
+    message: reconMessage(written, bank.length, alreadyMatched ?? 0, outcome.stats.matched_by_stage, decisionCount(outcome.exceptions)) + (transfers.length ? ` ${transfers.length} transfer${transfers.length === 1 ? "" : "s"} between the client's own accounts paired and set aside.` : "") + (reversals.length ? ` ${reversals.length} payment${reversals.length === 1 ? "" : "s"} reversed by the bank paired and set aside.` : "") + (awaiting ? ` ${awaiting} book entr${awaiting === 1 ? "y" : "ies"} for bank accounts with no statement yet ${awaiting === 1 ? "is" : "are"} waiting for it.` : ""),
     own_transfers: transfers.length,
+    reversed_payments: reversals.length,
+    awaiting_statement: awaiting,
   };
   await db
     .from("ca_recon_runs")
@@ -415,6 +469,46 @@ export async function runRecon(
 
 const shiftDay = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 const OWN_TAG = "own_account:";
+const REV_TAG = "reversal:";
+
+/**
+ * The last 4 digits of the bank account a book line names: the first bracketed bank ledger with digits, because the Day Book reader
+ * writes "Party (Indian bank CA 7856871247)" and any narration follows it. "Payment (Indian bank CA 7856871247) rent" gives "1247".
+ */
+export function ledgerTail(description: string | null | undefined): string | null {
+  for (const m of String(description ?? "").matchAll(/\(([^()]*)\)/g)) {
+    const group = m[1]!;
+    const run = [...group.matchAll(/\d{4,}/g)].pop()?.[0];
+    if (run && isBankLedgerName(group)) return run.slice(-4);
+  }
+  return null;
+}
+
+/** Which account a line belongs to: a bank line by its statement, a book entry by the bank ledger it names. Null when it does not say. */
+async function accountOfFn(db: Db, firmId: string, businessId: string): Promise<(t: { id: string; side: string; description?: string | null }) => string | null> {
+  const { data } = await db.from("ca_document_extractions").select("id, acct:extracted->>account_no").eq("ca_firm_id", firmId).eq("business_id", businessId).eq("side", "bank");
+  const tails = new Map<string, string>();
+  for (const d of (data ?? []) as { id: string; acct: string | null }[]) {
+    const t = String(d.acct ?? "").replace(/\D/g, "").slice(-4);
+    if (t.length === 4) tails.set(d.id, t);
+  }
+  return (t) => (t.side === "bank" ? (tails.get((t as unknown as TxnRow).extraction_id ?? "") ?? null) : ledgerTail(t.description));
+}
+
+async function splitAwaitingStatement(db: Db, firmId: string, businessId: string, books: TxnRow[]): Promise<{ books: TxnRow[]; awaiting: number }> {
+  const { data } = await db.from("ca_document_extractions").select("id, acct:extracted->>account_no").eq("ca_firm_id", firmId).eq("business_id", businessId).eq("side", "bank");
+  const known = new Set((data ?? []).map((d: { acct: string | null }) => String(d.acct ?? "").replace(/\D/g, "").slice(-4)).filter((t: string) => t.length === 4));
+  // With no statement that names its account there is nothing to compare an account with: leave every entry in.
+  if (!known.size) return { books, awaiting: 0 };
+  const keep: TxnRow[] = [];
+  let awaiting = 0;
+  for (const b of books) {
+    const t = ledgerTail(b.description);
+    if (t && !known.has(t)) awaiting++;
+    else keep.push(b);
+  }
+  return { books: keep, awaiting };
+}
 
 /**
  * Finds transfers between the client's own bank accounts and sets both legs aside (ignored, tagged with the other leg). Only a
@@ -454,32 +548,64 @@ export async function pairAccountTransfers(db: Db, ctx: FirmContext, businessId:
   return done;
 }
 
-/** The transfers set aside as own-account, newest first, so a person can check and undo them. */
-export async function listOwnTransfers(db: Db, ctx: FirmContext, businessId?: string) {
-  let q = db.from("ca_txns").select("id, business_id, direction, amount, txn_date, description, reference, recon_tag").eq("ca_firm_id", ctx.firmId).like("recon_tag", `${OWN_TAG}%`).order("txn_date", { ascending: false }).limit(400);
-  if (businessId) q = q.eq("business_id", businessId);
-  const { data } = await q;
-  const rows = (data ?? []) as { id: string; business_id: string; direction: string; amount: number | string; txn_date: string; description: string | null; reference: string | null; recon_tag: string }[];
-  const byId = new Map(rows.map((r) => [r.id, r]));
-  const seen = new Set<string>();
-  const out: { outId: string; inId: string; businessId: string; amount: number; date: string; outNarration: string; inNarration: string }[] = [];
-  for (const r of rows) {
-    if (r.direction !== "out" || seen.has(r.id)) continue;
-    const other = byId.get(r.recon_tag.slice(OWN_TAG.length));
-    if (!other) continue;
-    seen.add(r.id);
-    out.push({ outId: r.id, inId: other.id, businessId: r.business_id, amount: Number(r.amount), date: String(r.txn_date), outNarration: r.description ?? "", inNarration: other.description ?? "" });
+/**
+ * A payment the bank took and gave back (a UPI debit and its RVSL credit on one statement) nets to nothing. Both lines are set aside
+ * together, tagged with each other, unless the books have an entry for that payment, in which case normal matching decides. Undone with
+ * unpairOwnTransfer, like an own-account transfer.
+ */
+export async function pairReversedPayments(db: Db, ctx: FirmContext, businessId: string, bank: TxnRow[], books: TxnRow[]): Promise<ReversalPair[]> {
+  const legs = bank.filter((t) => t.extraction_id).map((t) => ({ id: t.id, extractionId: t.extraction_id, direction: t.direction as "in" | "out", amount: t.amount, date: String(t.txn_date), description: t.description }));
+  const pairs = pairReversals(legs);
+  if (!pairs.length) return [];
+  const DAY = 86_400_000;
+  const booked = (p: ReversalPair) => books.some((b) => b.direction === "out" && Math.round(b.amount * 100) === Math.round(p.out.amount * 100) && Math.abs(Date.parse(String(b.txn_date)) - Date.parse(p.out.date)) <= 5 * DAY);
+  const done: ReversalPair[] = [];
+  for (const p of pairs.filter((x) => !booked(x))) {
+    const a = await db.from("ca_txns").update({ match_status: "ignored", recon_tag: `${REV_TAG}${p.in.id}` }).eq("id", p.out.id).in("match_status", ["unmatched", "exception"]).select("id");
+    const b = await db.from("ca_txns").update({ match_status: "ignored", recon_tag: `${REV_TAG}${p.out.id}` }).eq("id", p.in.id).in("match_status", ["unmatched", "exception"]).select("id");
+    if (!a.data?.length || !b.data?.length) {
+      if (a.data?.length) await db.from("ca_txns").update({ match_status: "unmatched", recon_tag: null }).eq("id", p.out.id);
+      if (b.data?.length) await db.from("ca_txns").update({ match_status: "unmatched", recon_tag: null }).eq("id", p.in.id);
+      continue;
+    }
+    await db.from("ca_exceptions").update({ status: "resolved", resolution_action: "payment_reversed", resolution_note: p.evidence, resolved_at: new Date().toISOString() }).in("txn_id", [p.out.id, p.in.id]).eq("status", "open");
+    done.push(p);
   }
-  return out;
+  if (done.length)
+    await logActivity(db, ctx.firmId, businessId, "recon", `Paired ${done.length} payment${done.length === 1 ? "" : "s"} the bank reversed: ${done.slice(0, 5).map((p) => `₹${p.out.amount.toLocaleString("en-IN")} on ${p.out.date}`).join("; ")}${done.length > 5 ? "; and more" : ""}. Each debit has a credit marked as a reversal for the same amount, and the books have no entry for it.`.slice(0, 1900));
+  return done;
+}
+
+/** The lines set aside automatically (own-account transfers and reversed payments), newest first, so a person can check and undo them. */
+export async function listOwnTransfers(db: Db, ctx: FirmContext, businessId?: string) {
+  const out: { kind: "own_account" | "reversal"; outId: string; inId: string; businessId: string; amount: number; date: string; outNarration: string; inNarration: string }[] = [];
+  for (const [tag, kind] of [[OWN_TAG, "own_account"], [REV_TAG, "reversal"]] as const) {
+    let q = db.from("ca_txns").select("id, business_id, direction, amount, txn_date, description, reference, recon_tag").eq("ca_firm_id", ctx.firmId).like("recon_tag", `${tag}%`).order("txn_date", { ascending: false }).limit(400);
+    if (businessId) q = q.eq("business_id", businessId);
+    const { data } = await q;
+    const rows = (data ?? []) as { id: string; business_id: string; direction: string; amount: number | string; txn_date: string; description: string | null; reference: string | null; recon_tag: string }[];
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    const seen = new Set<string>();
+    for (const r of rows) {
+      if (r.direction !== "out" || seen.has(r.id)) continue;
+      const other = byId.get(r.recon_tag.slice(tag.length));
+      if (!other) continue;
+      seen.add(r.id);
+      out.push({ kind, outId: r.id, inId: other.id, businessId: r.business_id, amount: Number(r.amount), date: String(r.txn_date), outNarration: r.description ?? "", inNarration: other.description ?? "" });
+    }
+  }
+  return out.sort((a, b) => b.date.localeCompare(a.date));
 }
 
 /** Puts both legs back as ordinary unmatched lines, for the next recon run to treat on their own. */
 export async function unpairOwnTransfer(db: Db, ctx: FirmContext, txnId: string, note?: string) {
   const { data: t } = await db.from("ca_txns").select("id, business_id, recon_tag").eq("id", txnId).eq("ca_firm_id", ctx.firmId).maybeSingle();
-  if (!t || !String(t.recon_tag ?? "").startsWith(OWN_TAG)) throw new PracticeError("not_found", "That line is not a paired transfer.");
-  const other = String(t.recon_tag).slice(OWN_TAG.length);
-  await db.from("ca_txns").update({ match_status: "unmatched", recon_tag: null }).in("id", [t.id, other]).eq("ca_firm_id", ctx.firmId).like("recon_tag", `${OWN_TAG}%`);
-  await logActivity(db, ctx.firmId, t.business_id, "recon", `Un-paired a transfer between the client's own accounts${note ? `: ${note.slice(0, 200)}` : ""}. Both lines are open again; run recon to treat them.`);
+  const tag = String(t?.recon_tag ?? "");
+  const prefix = tag.startsWith(OWN_TAG) ? OWN_TAG : tag.startsWith(REV_TAG) ? REV_TAG : null;
+  if (!t || !prefix) throw new PracticeError("not_found", "That line is not a paired transfer or reversal.");
+  const other = tag.slice(prefix.length);
+  await db.from("ca_txns").update({ match_status: "unmatched", recon_tag: null }).in("id", [t.id, other]).eq("ca_firm_id", ctx.firmId).like("recon_tag", `${prefix}%`);
+  await logActivity(db, ctx.firmId, t.business_id, "recon", `Un-paired ${prefix === REV_TAG ? "a reversed payment" : "a transfer between the client's own accounts"}${note ? `: ${note.slice(0, 200)}` : ""}. Both lines are open again; run recon to treat them.`);
   return { ok: true };
 }
 
@@ -957,7 +1083,7 @@ export async function refreshOpenReasons(db: Db, ctx: FirmContext, businessId: s
   if (!bank.length && !books.length) return;
   const { rules, aliases } = await firmRules(db, ctx.firmId);
   // Only explain what is left: lines a person has not decided keep their exception.
-  const outcome = withoutUnmatchedPairs(reconcile(bank, books, { rules, aliases, pairContext: await chequeContext(db, ctx.firmId, businessId, period) }), await unmatchedPairs(db, ctx.firmId, businessId), scope);
+  const outcome = withoutUnmatchedPairs(reconcileByAccount(bank, books, await accountOfFn(db, ctx.firmId, businessId), { rules, aliases, pairContext: await chequeContext(db, ctx.firmId, businessId, period) }), await unmatchedPairs(db, ctx.firmId, businessId), scope);
   const byTxn = new Map(outcome.exceptions.map((e) => [e.txn_id, e]));
   const { data: open } = await db
     .from("ca_exceptions")

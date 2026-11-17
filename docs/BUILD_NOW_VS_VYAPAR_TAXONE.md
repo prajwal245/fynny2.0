@@ -17,7 +17,7 @@
 |---|---|---|---|
 | 1 | Deploy the pending fixes and keep a **golden-corpus gate**: every merge runs the real Satkaarika, SSSL and demo files and fails on any drop | Today's real defects were all things a corpus would have caught | CI shows the counts per file, and a regression blocks the merge |
 | 2 | Verify the real Gemini reader with the key, and read the admin AI panel daily | A reader nobody has verified is a claim, not a feature | Admin "live check" is green; a held-for-AI statement is read and tied end to end |
-| 3 | Finish the open real-file items: SSSL's last identical-amount lines, Indian Bank CC statement, Axis CV loan statements, **PhonePe as UPI evidence** (match UTR numbers to the bank's UPI lines to name the payee) | Each is a real firm's month | Devi's SSSL May at 465 or more of 469; every file in her folder reads or says exactly why not |
+| 3 | Finish the open real-file items: SSSL's last identical-amount lines, Indian Bank CC statement, Axis CV loan statements | Each is a real firm's month | Devi's SSSL May at 465 or more of 469; every file in her folder reads or says exactly why not |
 | 4 | **Open the app fast on a large firm**: send transactions on demand for the open document, not all at once | Opening time is the first impression every day | Largest firm opens in under 5 seconds on a normal connection |
 | 5 | Make every promised background action app-driven, with the scheduler only as backup (retries done; follow-ups, Gmail polling next) | A silent scheduler is why retries "failed" | No user-visible promise depends on an outside timer |
 

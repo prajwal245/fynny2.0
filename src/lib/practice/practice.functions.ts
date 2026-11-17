@@ -210,16 +210,6 @@ export const reprocessPracticeDocument = createServerFn({ method: "POST" })
     }),
   );
 
-/** Owner or partner: asks every AI provider this deployment has a tiny question, and says which answered or why not. No key is shown. */
-export const checkPracticeAiReader = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) =>
-    withWork(context.userId, async (_db, ctx) => {
-      if (!["owner", "admin", "partner"].includes(ctx.role)) throw new Error("Only a partner can check the AI reader.");
-      return (await import("./llm.server")).checkAiProviders();
-    }),
-  );
-
 /**
  * Reads again the documents of this firm whose automatic retry time has passed. The retry never depends on an outside scheduler:
  * an open workspace asks for it. A few at a time, so one call stays well inside the server's time limit.

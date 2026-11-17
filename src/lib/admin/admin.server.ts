@@ -728,10 +728,27 @@ export async function systemHealth(ctx: AdminCtx) {
 
   const since = new Date(Date.now() - DAY).toISOString();
   const stuckBefore = new Date(Date.now() - 10 * 60_000).toISOString();
+  // The AI reader: which providers this deployment can reach, and what the last day's calls actually did. The reason a call failed
+  // is for admins only; firms see a plain message.
+  const aiCalls = await ctx.db.from("ca_ai_calls").select("ca_firm_id, purpose, provider, model, status, error, created_at").gte("created_at", since).order("created_at", { ascending: false }).limit(2000);
+  const aiRows = (aiCalls.data ?? []) as { ca_firm_id: string | null; purpose: string; provider: string | null; model: string | null; status: string; error: string | null; created_at: string }[];
+  const aiFailed = aiRows.filter((r) => r.status === "error");
+  {
+    const keyed = Boolean(process.env["GEMINI_API_KEY"] || process.env["GOOGLE_API_KEY"] || process.env["GOOGLE_GENERATIVE_AI_API_KEY"] || process.env["GEMINI_KEY"] || process.env["GROQ_API_KEY"] || process.env["LOVABLE_API_KEY"]);
+    const edge = Boolean((process.env["SUPABASE_URL"] ?? process.env["NEXT_PUBLIC_SUPABASE_URL"]) && process.env["SUPABASE_SERVICE_ROLE_KEY"]) && process.env["PRACTICE_AI_DISABLED"] !== "1";
+    const rate = aiRows.length ? aiFailed.length / aiRows.length : 0;
+    const last = aiFailed[0]?.error ? String(aiFailed[0].error).replace(/(AIza[0-9A-Za-z_-]{10,}|sk-[0-9A-Za-z_-]{10,}|key=[^&\s]+)/g, "[key]").slice(0, 200) : null;
+    checks.push({
+      key: "ai", name: "AI reader (document reading)",
+      status: !keyed && !edge ? "down" : rate > 0.5 && aiRows.length >= 3 ? "down" : rate > 0.2 ? "warn" : "ok",
+      detail: !keyed && !edge ? "No AI key is visible to the server. Set GEMINI_API_KEY for Production and redeploy."
+        : `${keyed ? "A provider key is set" : "No provider key; using the built-in fallback"}. Last 24 hours: ${aiRows.length} calls, ${aiFailed.length} failed${last ? `. Last error: ${last}` : ""}`,
+    });
+  }
   const [runs, stuck, failedRuns, queue, lastWebhook, lastSchedule] = await Promise.all([
     ctx.db.from("ca_agent_runs").select("status").gte("started_at", since).limit(5000),
     ctx.db.from("ca_agent_runs").select("id", { count: "exact", head: true }).eq("status", "running").lt("started_at", stuckBefore),
-    ctx.db.from("ca_agent_runs").select("id, ca_firm_id, agent, error, started_at").eq("status", "failed").gte("started_at", since).order("started_at", { ascending: false }).limit(8),
+    ctx.db.from("ca_agent_runs").select("id, ca_firm_id, agent, error, detail, started_at").eq("status", "failed").gte("started_at", since).order("started_at", { ascending: false }).limit(8),
     ctx.db.from("ca_document_extractions").select("extract_status").in("extract_status", ["queued", "retry", "processing", "failed"]).limit(5000),
     ctx.db.from("ca_billing_events").select("event, received_at").order("received_at", { ascending: false }).limit(1).maybeSingle(),
     ctx.db.from("ca_agent_runs").select("started_at").eq("trigger", "schedule").order("started_at", { ascending: false }).limit(1).maybeSingle(),
@@ -748,6 +765,7 @@ export async function systemHealth(ctx: AdminCtx) {
     detail: total ? `${total} runs, ${byStatus["failed"] ?? 0} failed, ${stuck.count ?? 0} stuck` : "No runs in the last 24 hours",
   });
   const names = await firmNames(ctx, (failedRuns.data ?? []).map((r) => r.ca_firm_id));
+  const aiNames = await firmNames(ctx, aiFailed.slice(0, 15).map((r) => r.ca_firm_id).filter((x): x is string => Boolean(x)));
   return {
     checkedAt: new Date().toISOString(),
     checks,
@@ -755,8 +773,14 @@ export async function systemHealth(ctx: AdminCtx) {
     documents: docs,
     lastWebhook: lastWebhook.data ?? null,
     lastScheduledRun: lastSchedule.data?.started_at ?? null,
-    recentFailures: (failedRuns.data ?? []).map((r) => ({ ...r, firm: names.get(r.ca_firm_id) ?? "—" })),
+    recentFailures: (failedRuns.data ?? []).map((r) => ({ id: r.id, agent: r.agent, error: r.error, started_at: r.started_at, firm: names.get(r.ca_firm_id) ?? "—", adminNote: ((r.detail ?? {}) as { admin_note?: string }).admin_note ?? null })),
+    aiFailures: aiFailed.slice(0, 15).map((r) => ({ at: r.created_at, firm: r.ca_firm_id ? (aiNames.get(r.ca_firm_id) ?? "—") : "—", purpose: r.purpose, provider: r.provider ?? "—", model: r.model ?? "—", error: String(r.error ?? "").replace(/(AIza[0-9A-Za-z_-]{10,}|sk-[0-9A-Za-z_-]{10,}|key=[^&\s]+)/g, "[key]").slice(0, 300) })),
   };
+}
+
+/** Admin only: asks every AI provider this deployment has a tiny question and says which answered, or why not. No key is shown. */
+export async function aiReaderCheck(_ctx: AdminCtx) {
+  return (await import("@/lib/practice/llm.server")).checkAiProviders();
 }
 
 /* ── follow-ups: people who stalled on the way ───────────── */

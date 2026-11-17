@@ -1,5 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
-import { adminSystemHealth } from "@/lib/admin/admin.functions";
+import { useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { adminAiReaderCheck, adminSystemHealth } from "@/lib/admin/admin.functions";
 import { adminCall } from "@/components/admin/adminClient";
 import { Btn, Empty, ErrorNote, Kpi, PageHead, Panel, Pill, Table, Td, muted, when } from "./ui";
 
@@ -12,6 +13,8 @@ export default function SystemHealthPage() {
     queryFn: () => adminCall(() => adminSystemHealth()),
     refetchInterval: 60_000,
   });
+  const ai = useMutation({ mutationFn: () => adminCall(() => adminAiReaderCheck()) });
+  const [showAi, setShowAi] = useState(false);
   const d = h.data;
   const worst = d?.checks.some((c) => c.status === "down") ? "down" : d?.checks.some((c) => c.status === "warn") ? "warn" : "ok";
 
@@ -46,17 +49,48 @@ export default function SystemHealthPage() {
               Last scheduled job run: {d.lastScheduledRun ? when(d.lastScheduledRun) : "none recorded"}. Settings are checked for presence only; their values never leave the server.
             </p>
           </Panel>
+          <Panel title="AI reader">
+            <div className="flex items-center gap-3 mb-3">
+              <Btn onClick={() => { setShowAi(true); ai.mutate(); }} disabled={ai.isPending} testId="ai-check">{ai.isPending ? "Asking the AI…" : "Run a live check"}</Btn>
+              <span className="text-xs" style={{ color: muted }}>Sends each configured provider a tiny question and shows whether it answered. Keys are never shown.</span>
+            </div>
+            <ErrorNote error={ai.error} />
+            {showAi && ai.data && (
+              <div className="text-sm mb-3">
+                {!ai.data.configured.length && <p>No provider key is visible to the server{ai.data.edge ? "; the built-in fallback is available." : ", and the built-in fallback is not available."}</p>}
+                {ai.data.results.map((r) => (
+                  <p key={r.provider}>{r.ok ? "Working" : "Not working"}: {r.provider}, {r.ms} ms.{r.ok ? "" : ` ${r.detail}`}</p>
+                ))}
+              </div>
+            )}
+            {d.aiFailures.length === 0 ? (
+              <Empty>No failed AI calls in the last 24 hours.</Empty>
+            ) : (
+              <Table head={["When", "Firm", "What it was reading", "Provider", "Reason"]}>
+                {d.aiFailures.map((r, i) => (
+                  <tr key={`${r.at}-${i}`}>
+                    <Td>{when(r.at)}</Td>
+                    <Td>{r.firm}</Td>
+                    <Td>{r.purpose}</Td>
+                    <Td>{r.provider} {r.model !== "—" ? `(${r.model})` : ""}</Td>
+                    <Td className="max-w-[420px] break-words">{r.error || "—"}</Td>
+                  </tr>
+                ))}
+              </Table>
+            )}
+          </Panel>
           <Panel title="Failures in the last 24 hours">
             {d.recentFailures.length === 0 ? (
               <Empty>No agent failures in the last 24 hours.</Empty>
             ) : (
-              <Table head={["When", "Firm", "Agent", "Error"]}>
+              <Table head={["When", "Firm", "Agent", "What the firm saw", "Admin detail"]}>
                 {d.recentFailures.map((r) => (
                   <tr key={r.id}>
                     <Td>{when(r.started_at)}</Td>
                     <Td>{r.firm}</Td>
                     <Td>{r.agent}</Td>
                     <Td className="max-w-[420px] break-words">{r.error ?? "—"}</Td>
+                    <Td className="max-w-[420px] break-words">{r.adminNote ?? "—"}</Td>
                   </tr>
                 ))}
               </Table>

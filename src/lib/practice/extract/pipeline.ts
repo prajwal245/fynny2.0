@@ -151,7 +151,7 @@ export interface ExtractOutcome {
   note?: string;
   /** The control figures the bank printed on the statement (counts, totals, line numbers, page count), when it printed any. */
   bankSummary?: BankSummary | null;
-  error: { code: string; message: string } | null;
+  error: { code: string; message: string; /** For admins only: the technical reason (never shown to a firm's users). */ adminNote?: string } | null;
 }
 
 export class PdfPasswordError extends Error {
@@ -408,6 +408,7 @@ function fail(
   code: string,
   message: string,
   calls: AiCallRecord[] = [],
+  adminNote?: string,
 ): ExtractOutcome {
   return {
     kind,
@@ -416,7 +417,7 @@ function fail(
     sourceText: "",
     aiCalls: calls,
     documentKind: null,
-    error: { code, message },
+    error: { code, message, ...(adminNote ? { adminNote } : {}) },
   };
 }
 
@@ -857,8 +858,9 @@ export async function runExtract(
           return fail(
             kind,
             "needs_ai",
-            `The PDF has text but no statement layout was recognised. ${aiWhy(Boolean(deps.llm), calls).text}`,
+            "This statement's layout could not be read automatically right now. It will be tried again shortly. Uploading the bank's Excel or CSV version also works.",
             calls,
+            `Text PDF, no rule layout matched. ${aiWhy(Boolean(deps.llm), calls).text}`,
           );
         }
       }
@@ -892,8 +894,9 @@ export async function runExtract(
           kind,
           "needs_ai",
           // Said to the firm in plain words; Settings → Integrations tells the owner what to switch on.
-          `This PDF is a scan. ${deps.ocr || deps.llm ? aiWhy(Boolean(deps.llm), calls).text : "Neither the scan reader nor the AI reader is switched on."} You can upload the statement your bank lets you download (Excel, CSV or PDF) instead.`,
+          "This PDF is a scan and could not be read right now. It will be tried again shortly, or you can upload the statement your bank lets you download (Excel, CSV or PDF).",
           calls,
+          `Scanned PDF. ${deps.ocr || deps.llm ? aiWhy(Boolean(deps.llm), calls).text : "Neither the scan reader nor the AI reader is switched on."}`,
         );
       if (read) {
         aiReadUsed = true;

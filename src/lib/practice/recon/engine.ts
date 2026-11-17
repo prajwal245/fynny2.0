@@ -1187,6 +1187,67 @@ function explain(
   };
 }
 
+/**
+ * Reconciles each bank account against the books of THAT account.
+ *
+ * A client with several statements (ICICI, HDFC, Union Bank ...) has one Day Book with a line for every account. Matching all the bank
+ * lines against all the book lines at once lets an ICICI payment match an HDFC entry of the same amount and date: the amounts agree
+ * and the account is wrong. Here each statement's lines are matched only against book entries that name its account, plus entries
+ * that name no account (a ledger called just "Bank"), each book entry being used once. `accountOf` gives an entry's account (the last
+ * 4 digits), or null when it does not say. When no bank line names an account this is exactly `reconcile`.
+ */
+export function reconcileByAccount(
+  bank: ReconTxn[],
+  books: ReconTxn[],
+  accountOf: (t: ReconTxn) => string | null,
+  opts: Parameters<typeof reconcile>[2] = {},
+): ReconOutcome {
+  const groups = new Map<string, ReconTxn[]>();
+  for (const t of bank) {
+    const k = accountOf(t) ?? "";
+    (groups.get(k) ?? groups.set(k, []).get(k)!).push(t);
+  }
+  const named = [...groups.keys()].filter((k) => k !== "");
+  if (named.length < 1) return reconcile(bank, books, opts);
+
+  // Accounts with the most lines first; lines of unknown account last, so they only take what the others left.
+  const order = [...groups.keys()].sort((a, b) => Number(a === "") - Number(b === "") || groups.get(b)!.length - groups.get(a)!.length);
+  const usedBooks = new Set<string>();
+  const merged: ReconOutcome = {
+    matches: [],
+    exceptions: [],
+    tags: {},
+    stats: { bank_count: 0, book_count: books.length, matched: 0, matched_by_stage: { exact: 0, fuzzy: 0, rules: 0 }, matched_value: 0, exceptions: 0, exceptions_by_reason: {}, at_risk_value: 0 },
+  };
+  const bookExceptionSeen = new Set<string>();
+  const lateExceptions: ExceptionDecision[] = [];
+  for (const k of order) {
+    const bankG = groups.get(k)!;
+    const booksG = books.filter((b) => !usedBooks.has(b.id) && (k === "" || accountOf(b) === k || accountOf(b) === null));
+    const out = reconcile(bankG, booksG, opts);
+    for (const m of out.matches) for (const id of m.book_txn_ids) usedBooks.add(id);
+    merged.matches.push(...out.matches);
+    Object.assign(merged.tags, out.tags);
+    for (const e of out.exceptions) {
+      if (e.side === "bank") merged.exceptions.push(e);
+      else if (!bookExceptionSeen.has(e.txn_id)) {
+        bookExceptionSeen.add(e.txn_id);
+        lateExceptions.push(e);
+      }
+    }
+    merged.stats.bank_count += out.stats.bank_count;
+    merged.stats.matched += out.stats.matched;
+    merged.stats.matched_value += out.stats.matched_value;
+    merged.stats.at_risk_value += out.stats.at_risk_value;
+    for (const st of ["exact", "fuzzy", "rules"] as const) merged.stats.matched_by_stage[st] += out.stats.matched_by_stage[st];
+  }
+  // A book entry left open by one account's pass may have been taken by another's: only the ones nobody used remain exceptions.
+  merged.exceptions.push(...lateExceptions.filter((e) => !usedBooks.has(e.txn_id)));
+  merged.stats.exceptions = merged.exceptions.length;
+  for (const e of merged.exceptions) merged.stats.exceptions_by_reason[e.reason_code] = (merged.stats.exceptions_by_reason[e.reason_code] ?? 0) + 1;
+  return merged;
+}
+
 export const REASON_LABELS: Record<ReasonCode, string> = {
   amount_mismatch: "Amount mismatch",
   date_gap: "Date gap",

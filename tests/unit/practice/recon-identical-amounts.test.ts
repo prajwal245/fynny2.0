@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { reconcile, type ReconTxn } from "@/lib/practice/recon/engine";
+import { reconcile, reconcileByAccount, type ReconTxn } from "@/lib/practice/recon/engine";
 import { ledgerTail } from "@/lib/practice/recon.server";
 import { rowsFromTable } from "@/lib/practice/extract/table";
 
@@ -117,5 +117,35 @@ describe("which bank account a book line is for", () => {
     expect(ledgerTail("Payment (HDFC Bank)")).toBeNull();
     expect(ledgerTail("Payment to Sharma 7856871247 for rent")).toBeNull();
     expect(ledgerTail(null)).toBeNull();
+  });
+});
+
+describe("each bank account is matched against its own ledger", () => {
+  
+  const acct = (t: ReconTxn) => (t.description?.match(/\[(\d{4})\]/)?.[1] ?? null);
+  const bank = (id: string, a: string, amount = 5000, date = "2025-05-02") => tx(id, "bank", date, amount, { description: `NEFT [${a}]`, reference: `UTR${id}0001` });
+  const book = (id: string, a: string | null, amount = 5000, date = "2025-05-02") => tx(id, "books", date, amount, { description: a ? `Payment (HDFC ${a}) [${a}]` : "Payment" });
+
+  it("an ICICI line does not match an HDFC entry of the same amount and date", () => {
+    const r = reconcileByAccount([bank("b1", "1053")], [book("k1", "2932")], acct);
+    expect(r.matches).toHaveLength(0);
+  });
+  it("matches inside each account, even when the amounts are identical across accounts", () => {
+    const r = reconcileByAccount([bank("b1", "1053"), bank("b2", "2932")], [book("k1", "2932"), book("k2", "1053")], acct);
+    expect(r.matches.map((m) => `${m.bank_txn_id}>${m.book_txn_ids[0]}`).sort()).toEqual(["b1>k2", "b2>k1"]);
+  });
+  it("an entry that names no account can be matched by any account, once", () => {
+    const r = reconcileByAccount([bank("b1", "1053"), bank("b2", "2932")], [book("k1", null)], acct);
+    expect(r.matches).toHaveLength(1);
+    expect(r.exceptions.filter((e) => e.side === "bank")).toHaveLength(1);
+  });
+  it("with one account it is exactly reconcile", () => {
+    const b = [bank("b1", "1053")];
+    const k = [book("k1", "1053")];
+    expect(reconcileByAccount(b, k, acct).matches).toEqual(reconcile(b, k).matches);
+  });
+  it("a book entry left open by one account but used by another is not an exception", () => {
+    const r = reconcileByAccount([bank("b1", "1053"), bank("b2", "2932", 7000)], [book("k1", null), book("k9", "2932", 9999)], acct);
+    expect(r.exceptions.filter((e) => e.side === "books").map((e) => e.txn_id)).toEqual(["k9"]);
   });
 });

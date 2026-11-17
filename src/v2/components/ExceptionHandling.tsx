@@ -235,7 +235,7 @@ export function AssignControl({ ids, work, onDone }: { ids: string[]; work: Work
 
 /** Transfers between the client's own accounts that were paired and set aside, each with its evidence and an Undo. */
 export function OwnTransfersPanel({ clientId, refresh }: { clientId?: string; refresh: () => Promise<void> }) {
-  const [rows, setRows] = useState<{ outId: string; inId: string; businessId: string; amount: number; date: string; outNarration: string; inNarration: string }[] | null>(null);
+  const [rows, setRows] = useState<{ kind?: "own_account" | "reversal"; outId: string; inId: string; businessId: string; amount: number; date: string; outNarration: string; inNarration: string }[] | null>(null);
   const [openList, setOpenList] = useState(false);
   const load = () => void getPracticeOwnTransfers({ data: { business_id: clientId } }).then((r) => setRows(r)).catch(() => setRows([]));
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -244,9 +244,9 @@ export function OwnTransfersPanel({ clientId, refresh }: { clientId?: string; re
   return (
     <div className="v2-card" style={{ padding: 14, marginBottom: 16 }} data-testid="own-transfers">
       <button className="bx-btn bx-sm" onClick={() => setOpenList((o) => !o)} aria-expanded={openList}>
-        {rows.length} transfer{rows.length === 1 ? "" : "s"} between the client's own accounts set aside {openList ? "▾" : "▸"}
+        {rows.length} pair{rows.length === 1 ? "" : "s"} set aside automatically ({rows.filter((r) => r.kind !== "reversal").length} own-account transfers, {rows.filter((r) => r.kind === "reversal").length} reversed payments) {openList ? "▾" : "▸"}
       </button>
-      <span style={{ fontSize: 12.5, color: V.muted, marginLeft: 10 }}>Equal amounts, opposite directions, within two days, with a shared reference. Not income or expense.</span>
+      <span style={{ fontSize: 12.5, color: V.muted, marginLeft: 10 }}>Each pair nets to nothing: a transfer between the client's own accounts, or a payment the bank gave back. Not income or expense. Undo any of them.</span>
       {openList && (
         <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
           {rows.slice(0, 50).map((r) => (

@@ -436,6 +436,7 @@ export function aiWhy(hasClient: boolean, calls: AiCallRecord[]): { text: string
   if (!last) return { text: "The AI reader was not asked (its daily safety limit may have been reached).", retryable: true };
   const raw = String(last.error);
   const clean = raw.replace(/(AIza[0-9A-Za-z_-]{10,}|sk-[0-9A-Za-z_-]{10,}|key=[^&\s]+)/g, "[key]").replace(/\s+/g, " ").slice(0, 160);
+  if (/\b402\b|prepayment|credits? (are )?depleted|billing|payment required/i.test(raw)) return { text: `The AI provider refused because the project's billing has no credit left (${clean}). The owner needs to top up or link the project to the billing account that holds the credits.`, retryable: false };
   if (/\b(401|403)\b|api key|permission|unauthori[sz]ed|invalid.*key|PERMISSION_DENIED/i.test(raw)) return { text: `The AI provider rejected the key (${clean}). The owner needs to check the key in the deployment settings.`, retryable: false };
   if (/\b404\b|not found|model/i.test(raw) && !/timed? ?out/i.test(raw)) return { text: `The AI model name was not accepted (${clean}).`, retryable: false };
   if (/\b429\b|quota|rate|resource.?exhaust/i.test(raw)) return { text: `The AI provider is limiting requests right now (${clean}). It will be tried again.`, retryable: true };

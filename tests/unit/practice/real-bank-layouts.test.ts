@@ -28,3 +28,14 @@ describe("a bank that numbers its lines and prints an overdraft without a sign (
     expect(r.verifiedShare).toBe(1);
   });
 });
+
+describe("AI failure reasons for admins", () => {
+  it("names depleted billing, a rejected key and a rate limit differently", async () => {
+    const { aiWhy } = await import("@/lib/practice/extract/pipeline");
+    const call = (error: string) => [{ purpose: "extract_read_text", provider: "gemini", model: "m", input: "", output: null, latency_ms: 1, status: "error" as const, error }];
+    expect(aiWhy(true, call('402: {"error":{"message":"Your prepayment credits are depleted."}}')).text).toMatch(/billing has no credit/);
+    expect(aiWhy(true, call("400 Please pass a valid API key AIzaSyABCDEFGHIJKLMNOP")).text).not.toMatch(/AIza/);
+    expect(aiWhy(true, call("429 quota exceeded")).retryable).toBe(true);
+    expect(aiWhy(false, []).text).toMatch(/No AI key/);
+  });
+});

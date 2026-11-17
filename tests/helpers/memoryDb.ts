@@ -23,6 +23,8 @@ export function memoryDb(
     let head = false;
     let wantCount = false;
     let max = Infinity;
+    let offset = 0;
+    let aliases: { alias: string; col: string; path: string }[] = [];
     let afterWrite = false;
 
     const run = (): {
@@ -64,7 +66,9 @@ export function memoryDb(
         tables[name] = rows.filter((r) => !h.includes(r));
         return { data: h, error: null };
       }
-      const h = hit().slice(0, max);
+      const h = hit()
+        .slice(offset, offset + max)
+        .map((r) => (aliases.length ? { ...r, ...Object.fromEntries(aliases.map((a) => [a.alias, (r[a.col] as Row | undefined)?.[a.path] ?? null])) } : r));
       return {
         data: head ? null : h,
         error: null,
@@ -80,7 +84,9 @@ export function memoryDb(
         f();
         return q;
       };
-    q["select"] = (_cols?: string, o?: { count?: string; head?: boolean }) => {
+    q["select"] = (cols?: string, o?: { count?: string; head?: boolean }) => {
+      // PostgREST JSON paths with an alias ("acct:extracted->>account_no") add a computed field to each row.
+      aliases = [...(cols ?? "").matchAll(/(\w+):(\w+)->>?(\w+)/g)].map((m) => ({ alias: m[1]!, col: m[2]!, path: m[3]! }));
       if (op === "select") {
         head = !!o?.head;
         wantCount = !!o?.count;
@@ -148,7 +154,18 @@ export function memoryDb(
     };
     q["order"] = chain(() => undefined);
     q["limit"] = (n: number) => ((max = n), q);
-    q["range"] = chain(() => undefined);
+    // Paging: rows from..to inclusive, so a read of more than 1,000 rows (a Day Book) sees each row once.
+    q["range"] = (from: number, to: number) => ((offset = from), (max = to - from + 1), q);
+    // JSON and array containment, as Postgres' @> does.
+    q["contains"] = (k: string, v: unknown) => {
+      const has = (cell: unknown, want: unknown): boolean => {
+        if (Array.isArray(want)) return Array.isArray(cell) && want.every((w) => (cell as unknown[]).some((c) => has(c, w)));
+        if (want && typeof want === "object") return !!cell && typeof cell === "object" && Object.entries(want as Row).every(([kk, vv]) => has((cell as Row)[kk], vv));
+        return cell === want;
+      };
+      preds.push((r) => has(r[k], v));
+      return q;
+    };
     q["maybeSingle"] = async () => {
       const r = run();
       return {

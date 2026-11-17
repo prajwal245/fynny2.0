@@ -545,10 +545,13 @@ export function reconcile(
           ref !== "" &&
           normaliseRef(b.reference) === ref,
       ) ??
-      list.find(
-        (b) =>
-          !usedBook.has(b.id) && ref === "" && normaliseRef(b.reference) === "",
-      );
+      (() => {
+        const free = list.filter((b) => !usedBook.has(b.id) && ref === "" && normaliseRef(b.reference) === "");
+        // Several entries with this amount and date: take the one whose party agrees, not simply the first, so two receipts of the
+        // same amount from different customers are not swapped.
+        if (free.length < 2) return free[0];
+        return free.reduce((best, b) => (fuzzyScore(t, b, cfg, aliases).score > fuzzyScore(t, best, cfg, aliases).score ? b : best), free[0]!);
+      })();
     if (!pick) continue;
     usedBank.add(t.id);
     usedBook.add(pick.id);
@@ -592,6 +595,69 @@ export function reconcile(
       score: gap === 0 ? 1 : Math.max(0.9, s.score),
       explanation: { ...s.explanation, note: "Only entry with this amount within 2 days" },
     });
+  }
+
+  // Stage 1b+ — identical amounts. When the same amount appears more than once (EMIs, salaries, daily receipts, two FDR credits), no
+  // line has a *unique* partner, so the stages above skip all of them. Money-wise any one-to-one pairing of identical amounts is right,
+  // so they are paired here: the bank lines and book entries of one direction and amount, within two days of one another, are taken
+  // as a group. With equal numbers on each side every line is paired; with unequal numbers only lines of the same date are, and the
+  // surplus stays an exception that says so. Within a group the pairing follows the party (so two receipts of ₹50,000 from different
+  // customers are not swapped), then the date.
+  {
+    const GROUP_WINDOW = 2;
+    for (const [key, allBank] of bankByAmount) {
+      const freeBank = allBank.filter((t) => !usedBank.has(t.id));
+      const freeBooks = (booksByAmount.get(key) ?? []).filter((b) => !usedBook.has(b.id));
+      if (!freeBank.length || !freeBooks.length || freeBank.length + freeBooks.length < 3) continue;
+      // Clusters of lines close in time, both sides together.
+      const items = [
+        ...freeBank.map((t) => ({ t, side: "bank" as const })),
+        ...freeBooks.map((t) => ({ t, side: "books" as const })),
+      ].sort((x, y) => (x.t.txn_date < y.t.txn_date ? -1 : x.t.txn_date > y.t.txn_date ? 1 : x.t.id < y.t.id ? -1 : 1));
+      const clusters: (typeof items)[] = [];
+      for (const it of items) {
+        const cur = clusters[clusters.length - 1];
+        if (cur && daysBetween(cur[cur.length - 1]!.t.txn_date, it.t.txn_date) <= GROUP_WINDOW) cur.push(it);
+        else clusters.push([it]);
+      }
+      for (const cl of clusters) {
+        const cb = cl.filter((x) => x.side === "bank").map((x) => x.t);
+        const ck = cl.filter((x) => x.side === "books").map((x) => x.t);
+        if (!cb.length || !ck.length) continue;
+        const equal = cb.length === ck.length;
+        // Candidate pairs, best first: party agreement, then nearest date, then order.
+        const cand: { t: ReconTxn; b: ReconTxn; score: number; gap: number }[] = [];
+        for (const t of cb)
+          for (const b of ck) {
+            const gap = daysBetween(t.txn_date, b.txn_date);
+            // Unequal numbers: which line the entry belongs to is a guess unless the party agrees, so a pair needs the same date AND the party.
+            if (!equal && (gap !== 0 || counterpartyScore(t, b, aliases) < 0.6)) continue;
+            cand.push({ t, b, score: fuzzyScore(t, b, cfg, aliases).score, gap });
+          }
+        cand.sort((x, y) => y.score - x.score || x.gap - y.gap || (x.t.id < y.t.id ? -1 : x.t.id > y.t.id ? 1 : x.b.id < y.b.id ? -1 : 1));
+        let made = 0;
+        for (const c of cand) {
+          if (usedBank.has(c.t.id) || usedBook.has(c.b.id)) continue;
+          usedBank.add(c.t.id);
+          usedBook.add(c.b.id);
+          made++;
+          const s = fuzzyScore(c.t, c.b, cfg, aliases);
+          matches.push({
+            bank_txn_id: c.t.id,
+            book_txn_ids: [c.b.id],
+            stage: c.gap === 0 ? "exact" : "fuzzy",
+            score: c.gap === 0 ? 1 : Math.max(0.9, s.score),
+            explanation: {
+              ...s.explanation,
+              note: equal
+                ? `One of ${cb.length} identical entries (same amount and direction within two days). Paired by party, then by date: any pairing gives the same total.`
+                : `${cb.length} bank lines and ${ck.length} book entries have this amount on this date; this is one of the ${Math.min(cb.length, ck.length)} that can be paired. The rest stay open.`,
+            },
+          });
+        }
+        void made;
+      }
+    }
   }
 
   // Stage 1c — booked a few days late. Books are often written up days after the bank

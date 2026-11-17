@@ -5,6 +5,7 @@
  * a bank line can be in only one live match, and each transaction has at most
  * one open exception which is updated in place.
  */
+import { isBankLedgerName } from "./extract/tally";
 import { isDistinctiveName } from "./memory";
 import {
   PracticeError,
@@ -129,6 +130,8 @@ export interface ReconSummary {
   message: string;
   /** Transfers between the client's own accounts that were paired and set aside this run. */
   own_transfers?: number;
+  /** Book entries for a bank account whose statement has not been uploaded; they wait for it. */
+  awaiting_statement?: number;
 }
 
 /** "7 already matched; this run matched 5 more of 12 (4 same amount and date, 1 part payment). 2 need a decision." */
@@ -160,7 +163,10 @@ export async function runRecon(
   const transfers = await pairAccountTransfers(db, ctx, businessId, period).catch(() => [] as TransferPair[]);
   const pairedIds = new Set(transfers.flatMap((t) => [t.out.id, t.in.id]));
   const bank = scope.filter((t) => t.side === "bank" && !pairedIds.has(t.id));
-  const books = scope.filter((t) => t.side === "books");
+  // A Day Book has a line for every bank account of the client, including accounts whose statement has not been uploaded (a CC account,
+  // a loan, another bank). Those entries wait for their statement; they are not exceptions and do not compete with the accounts that
+  // can be reconciled now. An entry whose bank ledger names no account digits is kept.
+  const { books, awaiting } = await splitAwaitingStatement(db, ctx.firmId, businessId, scope.filter((t) => t.side === "books"));
   const { count: alreadyMatched } = await db
     .from("ca_txns")
     .select("id", { count: "exact", head: true })
@@ -393,8 +399,9 @@ export async function runRecon(
     exceptions: decisionCount(outcome.exceptions),
     matched_by_stage: outcome.stats.matched_by_stage,
     exceptions_by_reason: outcome.stats.exceptions_by_reason,
-    message: reconMessage(written, bank.length, alreadyMatched ?? 0, outcome.stats.matched_by_stage, decisionCount(outcome.exceptions)) + (transfers.length ? ` ${transfers.length} transfer${transfers.length === 1 ? "" : "s"} between the client's own accounts paired and set aside.` : ""),
+    message: reconMessage(written, bank.length, alreadyMatched ?? 0, outcome.stats.matched_by_stage, decisionCount(outcome.exceptions)) + (transfers.length ? ` ${transfers.length} transfer${transfers.length === 1 ? "" : "s"} between the client's own accounts paired and set aside.` : "") + (awaiting ? ` ${awaiting} book entr${awaiting === 1 ? "y" : "ies"} for bank accounts with no statement yet ${awaiting === 1 ? "is" : "are"} waiting for it.` : ""),
     own_transfers: transfers.length,
+    awaiting_statement: awaiting,
   };
   await db
     .from("ca_recon_runs")
@@ -415,6 +422,34 @@ export async function runRecon(
 
 const shiftDay = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 const OWN_TAG = "own_account:";
+
+/**
+ * The last 4 digits of the bank account a book line names: the first bracketed bank ledger with digits, because the Day Book reader
+ * writes "Party (Indian bank CA 7856871247)" and any narration follows it. "Payment (Indian bank CA 7856871247) rent" gives "1247".
+ */
+export function ledgerTail(description: string | null | undefined): string | null {
+  for (const m of String(description ?? "").matchAll(/\(([^()]*)\)/g)) {
+    const group = m[1]!;
+    const run = [...group.matchAll(/\d{4,}/g)].pop()?.[0];
+    if (run && isBankLedgerName(group)) return run.slice(-4);
+  }
+  return null;
+}
+
+async function splitAwaitingStatement(db: Db, firmId: string, businessId: string, books: TxnRow[]): Promise<{ books: TxnRow[]; awaiting: number }> {
+  const { data } = await db.from("ca_document_extractions").select("id, acct:extracted->>account_no").eq("ca_firm_id", firmId).eq("business_id", businessId).eq("side", "bank");
+  const known = new Set((data ?? []).map((d: { acct: string | null }) => String(d.acct ?? "").replace(/\D/g, "").slice(-4)).filter((t: string) => t.length === 4));
+  // With no statement that names its account there is nothing to compare an account with: leave every entry in.
+  if (!known.size) return { books, awaiting: 0 };
+  const keep: TxnRow[] = [];
+  let awaiting = 0;
+  for (const b of books) {
+    const t = ledgerTail(b.description);
+    if (t && !known.has(t)) awaiting++;
+    else keep.push(b);
+  }
+  return { books: keep, awaiting };
+}
 
 /**
  * Finds transfers between the client's own bank accounts and sets both legs aside (ignored, tagged with the other leg). Only a

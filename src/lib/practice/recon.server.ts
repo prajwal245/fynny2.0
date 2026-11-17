@@ -174,7 +174,12 @@ export async function runRecon(
   // A Day Book has a line for every bank account of the client, including accounts whose statement has not been uploaded (a CC account,
   // a loan, another bank). Those entries wait for their statement; they are not exceptions and do not compete with the accounts that
   // can be reconciled now. An entry whose bank ledger names no account digits is kept.
-  const { books, awaiting } = await splitAwaitingStatement(db, ctx.firmId, businessId, scope.filter((t) => t.side === "books"));
+  const split = await splitAwaitingStatement(db, ctx.firmId, businessId, scope.filter((t) => t.side === "books"));
+  const awaiting = split.awaiting;
+  // The Day Book records a transfer between two bank accounts as two legs (a contra). When the statements prove the transfer, its two
+  // book legs are set aside with it, so they do not wait as book-side exceptions.
+  const contraIds = await pairContraBookLegs(db, split.books, transfers).catch(() => new Set<string>());
+  const books = split.books.filter((b) => !contraIds.has(b.id));
   const { count: alreadyMatched } = await db
     .from("ca_txns")
     .select("id", { count: "exact", head: true })
@@ -546,6 +551,43 @@ export async function pairAccountTransfers(db: Db, ctx: FirmContext, businessId:
   if (done.length)
     await logActivity(db, ctx.firmId, businessId, "recon", `Paired ${done.length} transfer${done.length === 1 ? "" : "s"} between the client's own accounts: ${done.slice(0, 5).map((p) => `₹${p.out.amount.toLocaleString("en-IN")} on ${p.out.date}`).join("; ")}${done.length > 5 ? "; and more" : ""}. Each pair has the same amount, opposite directions, dates within two days and a shared reference or an account named.`.slice(0, 1900));
   return done;
+}
+
+/**
+ * The two book legs of a contra entry (a bank ledger whose counter-ledger is another bank ledger, same amount, opposite directions,
+ * within two days) that a proven bank transfer of the same amount accounts for. Returns the ids set aside; undone with unpairOwnTransfer.
+ */
+export async function pairContraBookLegs(db: Db, books: TxnRow[], transfers: TransferPair[]): Promise<Set<string>> {
+  const set = new Set<string>();
+  if (!transfers.length) return set;
+  const DAY = 86_400_000;
+  const cents = (n: number) => Math.round(n * 100);
+  const party = (d: string | null) => String(d ?? "").replace(/\s*\(.*$/s, "");
+  const tailOf = (text: string) => ledgerTail(`(${text})`);
+  const legs = books.filter((b) => {
+    const p = party(b.description);
+    return isBankLedgerName(p) && ledgerTail(b.description);
+  });
+  for (const tr of transfers) {
+    const near = (b: TxnRow) => cents(b.amount) === cents(tr.out.amount) && Math.abs(Date.parse(String(b.txn_date)) - Date.parse(tr.out.date)) <= 4 * DAY;
+    const pool = legs.filter((b) => !set.has(b.id) && near(b));
+    for (const a of pool) {
+      if (set.has(a.id)) continue;
+      const mate = pool.find((b) => b.id !== a.id && !set.has(b.id) && b.direction !== a.direction && tailOf(party(b.description)) === ledgerTail(a.description) && tailOf(party(a.description)) === ledgerTail(b.description));
+      if (!mate) continue;
+      const x = await db.from("ca_txns").update({ match_status: "ignored", recon_tag: `${OWN_TAG}${mate.id}` }).eq("id", a.id).in("match_status", ["unmatched", "exception"]).select("id");
+      const y = await db.from("ca_txns").update({ match_status: "ignored", recon_tag: `${OWN_TAG}${a.id}` }).eq("id", mate.id).in("match_status", ["unmatched", "exception"]).select("id");
+      if (!x.data?.length || !y.data?.length) {
+        if (x.data?.length) await db.from("ca_txns").update({ match_status: "unmatched", recon_tag: null }).eq("id", a.id);
+        if (y.data?.length) await db.from("ca_txns").update({ match_status: "unmatched", recon_tag: null }).eq("id", mate.id);
+        continue;
+      }
+      await db.from("ca_exceptions").update({ status: "resolved", resolution_action: "own_account_transfer", resolution_note: "Contra entry in the books for a transfer the bank statements prove.", resolved_at: new Date().toISOString() }).in("txn_id", [a.id, mate.id]).eq("status", "open");
+      set.add(a.id); set.add(mate.id);
+      break;
+    }
+  }
+  return set;
 }
 
 /**

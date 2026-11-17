@@ -1,0 +1,135 @@
+{
+ "data": {
+  "gstin": "37ABCDE1234F1ZZ",
+  "rtnprd": "092026",
+  "docdata": {
+   "b2b": [
+    {
+     "ctin": "37SUNON1234M1ZS",
+     "trdnm": "Sunon Modular India Private Limited",
+     "inv": [
+      {
+       "inum": "SM/2026/041",
+       "dt": "05-10-2026",
+       "val": 944000.0,
+       "pos": "37",
+       "itcavl": "Y",
+       "itms": [
+        {
+         "itm_det": {
+          "txval": 800000,
+          "camt": 72000.0,
+          "samt": 72000.0,
+          "iamt": 0,
+          "csamt": 0,
+          "rt": 18
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "ctin": "37GOPIM1234K1ZV",
+     "trdnm": "Gopi Machinery",
+     "inv": [
+      {
+       "inum": "GM-118",
+       "dt": "05-10-2026",
+       "val": 147500.0,
+       "pos": "37",
+       "itcavl": "Y",
+       "itms": [
+        {
+         "itm_det": {
+          "txval": 125000,
+          "camt": 11250.0,
+          "samt": 11250.0,
+          "iamt": 0,
+          "csamt": 0,
+          "rt": 18
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "ctin": "37LAKSH1234S1ZT",
+     "trdnm": "Lakshmi Suppliers",
+     "inv": [
+      {
+       "inum": "LS/0907",
+       "dt": "05-10-2026",
+       "val": 75815.0,
+       "pos": "37",
+       "itcavl": "Y",
+       "itms": [
+        {
+         "itm_det": {
+          "txval": 64250,
+          "camt": 5782.5,
+          "samt": 5782.5,
+          "iamt": 0,
+          "csamt": 0,
+          "rt": 18
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "ctin": "37VASUD1234B1ZA",
+     "trdnm": "Vasudeva Builders",
+     "inv": [
+      {
+       "inum": "VB-77",
+       "dt": "05-10-2026",
+       "val": 89798.0,
+       "pos": "37",
+       "itcavl": "Y",
+       "itms": [
+        {
+         "itm_det": {
+          "txval": 76100,
+          "camt": 6849.0,
+          "samt": 6849.0,
+          "iamt": 0,
+          "csamt": 0,
+          "rt": 18
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "ctin": "37RAVIA1234G1ZS",
+     "trdnm": "Ravi Agencies",
+     "inv": [
+      {
+       "inum": "RA-5521",
+       "dt": "05-10-2026",
+       "val": 107380.0,
+       "pos": "37",
+       "itcavl": "Y",
+       "itms": [
+        {
+         "itm_det": {
+          "txval": 91000,
+          "camt": 8190.0,
+          "samt": 8190.0,
+          "iamt": 0,
+          "csamt": 0,
+          "rt": 18
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ }
+}

@@ -44,6 +44,7 @@ import { TALLY_XML_NO_VOUCHERS, unsupportedReport } from "./unsupported";
 import { chooseSheet } from "./sheets";
 import { rowsFromPositioned, type PosItem } from "./pdfTable";
 import { readBankSummary, type BankSummary } from "./bankSummary";
+import { looksLikeLoanStatement, summariseLoanStatement } from "./loanStatement";
 import { failureRecords } from "../aiBilled";
 import {
   passwordNeededMessage,
@@ -775,6 +776,20 @@ export async function runExtract(
       ? text.replace(/\s/g, "").length >=
         80 * Math.max(1, Math.min(pdf.pages, 3))
       : false;
+    // A loan statement is a loan account, not a bank account: kept with a summary, never reconciled line by line.
+    if (pdf && text && looksLikeLoanStatement(text)) {
+      const sum = summariseLoanStatement(text);
+      return {
+        kind,
+        rows: [],
+        duplicateRows: 0,
+        sourceText: text.slice(0, 200_000),
+        aiCalls: calls,
+        documentKind: "loan_statement",
+        register: { kind: "loan_statement", label: REGISTER_LABELS.loan_statement, entries: sum.entries, totals: sum.totals, note: sum.note },
+        error: null,
+      };
+    }
     if (textRich) {
       sourceText = text.slice(0, MAX_TEXT_CHARS);
       // First choice: read the table by where the text sits. It keeps wrapped narrations whole, takes each amount from its own

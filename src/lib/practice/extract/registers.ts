@@ -28,7 +28,8 @@ export type RegisterKind =
   | "payroll"
   | "gateway_settlement"
   | "tally_masters"
-  | "tally_party_ledger";
+  | "tally_party_ledger"
+  | "loan_statement";
 
 export const REGISTER_LABELS: Record<RegisterKind, string> = {
   gst_sales_register: "GST sales register",
@@ -40,6 +41,7 @@ export const REGISTER_LABELS: Record<RegisterKind, string> = {
   gateway_settlement: "Payment gateway settlement report",
   tally_masters: "Tally ledger masters",
   tally_party_ledger: "Tally customer or supplier ledger",
+  loan_statement: "Loan statement",
 };
 
 export interface RegisterSummary {

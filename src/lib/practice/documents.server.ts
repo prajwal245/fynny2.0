@@ -898,6 +898,20 @@ export async function removeDocument(db: Db, ctx: FirmContext, extractionId: str
   return { filename, lines: lines.length, matchesReversed: reversed };
 }
 
+/** What is in each sheet of a stored Excel file, so a person can choose which one to read. */
+export async function previewDocumentSheets(db: Db, ctx: FirmContext, extractionId: string) {
+  const { data: doc } = await db.from("ca_document_extractions").select("id, business_id, storage_path, side, original_filename, extracted").eq("id", extractionId).eq("ca_firm_id", ctx.firmId).maybeSingle();
+  if (!doc || !doc.storage_path) throw new PracticeError("not_found", "File not found.");
+  const bytes = await download(db, String(doc.storage_path));
+  const sheets = (await loadSheetsReader())(bytes);
+  const { data: client } = doc.business_id ? await db.from("ca_clients").select("client_name").eq("ca_firm_id", ctx.firmId).eq("business_id", doc.business_id).maybeSingle() : { data: null };
+  const { describeSheets } = await import("./extract/sheets");
+  const { REGISTER_LABELS } = await import("./extract/registers");
+  const side = doc.side === "bank" || doc.side === "books" ? (doc.side as "bank" | "books") : undefined;
+  const chosen = ((doc.extracted ?? {}) as { sheet_name?: string }).sheet_name ?? null;
+  return { sheets: describeSheets(sheets, (client?.client_name as string | undefined) ?? null, side, (k) => (REGISTER_LABELS as Record<string, string>)[k] ?? k), chosen };
+}
+
 const CHASE_HINTS: { re: RegExp; side: Side | null }[] = [
   { re: /bank/i, side: "bank" },
   { re: /invoice|bill|tally|ledger|books|purchase|sales/i, side: "books" },

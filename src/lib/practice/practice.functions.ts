@@ -1603,3 +1603,11 @@ export const removePracticeDocument = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) =>
     withFirm(context.userId, async (db, ctx) => (await import("./documents.server")).removeDocument(db, ctx, data.id)),
   );
+
+/** What each sheet of a stored Excel file contains, to choose which one to read. */
+export const previewPracticeDocumentSheets = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: uuid }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./documents.server")).previewDocumentSheets(db, ctx, data.id)),
+  );

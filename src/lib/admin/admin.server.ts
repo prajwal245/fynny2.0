@@ -733,8 +733,8 @@ export async function systemHealth(ctx: AdminCtx) {
   const aiCalls = await ctx.db.from("ca_ai_calls").select("ca_firm_id, purpose, provider, model, status, error, created_at").gte("created_at", since).order("created_at", { ascending: false }).limit(2000);
   const allCalls = (aiCalls.data ?? []) as { ca_firm_id: string | null; purpose: string; provider: string | null; model: string | null; status: string; error: string | null; created_at: string }[];
   // WhatsApp faults share the table but are not AI calls: kept apart so they never move the AI reader's status.
-  const waFaults = allCalls.filter((r) => r.purpose === "whatsapp_send");
-  const aiRows = allCalls.filter((r) => r.purpose !== "whatsapp_send");
+  const waFaults = allCalls.filter((r) => r.purpose === "whatsapp_send" || r.purpose === "whatsapp_inbound");
+  const aiRows = allCalls.filter((r) => r.purpose !== "whatsapp_send" && r.purpose !== "whatsapp_inbound");
   // A step that ran out of its own time budget and carried on with rules is slow, not broken: counted apart from real failures.
   const isSlow = (r: { error: string | null }) => /took too long; rules used/i.test(String(r.error ?? ""));
   const aiSlow = aiRows.filter((r) => r.status === "error" && isSlow(r));
@@ -754,9 +754,9 @@ export async function systemHealth(ctx: AdminCtx) {
   {
     const last = waFaults[0];
     checks.push({
-      key: "whatsapp_send", name: "WhatsApp sending (last 24 hours)",
+      key: "whatsapp_send", name: "WhatsApp sending and receiving (last 24 hours)",
       status: waFaults.length ? "warn" : "ok",
-      detail: waFaults.length ? `${waFaults.length} send failure${waFaults.length === 1 ? "" : "s"}. Latest: ${String(last!.error ?? "").slice(0, 220)}` : "No send failures recorded",
+      detail: waFaults.length ? `${waFaults.length} problem${waFaults.length === 1 ? "" : "s"} (sends not delivered, or messages from numbers not linked to a firm). Latest: ${String(last!.error ?? "").slice(0, 220)}` : "No send failures recorded",
     });
   }
   const [runs, stuck, failedRuns, queue, lastWebhook, lastSchedule] = await Promise.all([

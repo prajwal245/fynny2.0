@@ -632,6 +632,9 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
           .eq("ca_firm_id", f)
           .eq("business_id", businessId)
           .eq("status", "open")
+          // A decision a person has already explained (accepted as timing) is not one still needed: the same rule as the queue and Close.
+          .neq("work_status", "accepted_timing")
+          .neq("work_status", "resolved")
           .gte("period_start", p.start)
           .lte("period_end", p.end),
       ]);

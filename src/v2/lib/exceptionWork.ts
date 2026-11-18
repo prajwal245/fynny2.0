@@ -83,11 +83,11 @@ export function useExceptionWork(refresh: () => Promise<void>, patch?: (ids: str
     saveRemark: (id: string, patch: { remark?: string; dueDate?: string | null }) => run(() => setPracticeExceptionRemark({ data: { id, remark: patch.remark, due_date: patch.dueDate } }), "Saved.", { ids: [id], patch: { ...(patch.remark !== undefined ? { remark: patch.remark } : {}), ...(patch.dueDate !== undefined ? { dueDate: patch.dueDate } : {}) } }),
     review: (id: string, action: "send" | "return" | "approve", o: { reviewerId?: string; note?: string } = {}) =>
       run(() => reviewPracticeException({ data: { id, action, reviewer_id: o.reviewerId, note: o.note } }), action === "send" ? "Sent for review." : action === "return" ? "Returned with your note." : "Approved."),
-    timeline: async (id: string): Promise<TimelineEvent[]> => {
+    timeline: async (id: string): Promise<TimelineEvent[] | "error"> => {
       try {
         return (await getPracticeExceptionTimeline({ data: { id } })) as TimelineEvent[];
       } catch {
-        return [];
+        return "error";
       }
     },
   };

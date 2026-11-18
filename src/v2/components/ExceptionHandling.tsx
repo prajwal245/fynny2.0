@@ -77,7 +77,8 @@ const EVENT_TEXT: Record<string, (e: TimelineEvent) => string> = {
   reopened: (e) => `${e.by} reopened it`,
 };
 
-function Timeline({ events }: { events: TimelineEvent[] | null }) {
+function Timeline({ events }: { events: TimelineEvent[] | null | "error" }) {
+  if (events === "error") return <div style={{ fontSize: 13, color: V.maroon }} role="alert">The history could not be loaded just now. Reopen this exception in a moment. Nothing has been lost.</div>;
   if (events === null) return <div style={{ fontSize: 13, color: V.muted }}>Loading history…</div>;
   if (!events.length) return <div style={{ fontSize: 13, color: V.muted }}>No history yet. Every assignment, status change and note will appear here, and cannot be edited.</div>;
   return (
@@ -98,7 +99,7 @@ function Timeline({ events }: { events: TimelineEvent[] | null }) {
 
 /** Inside an exception: what kind it is, who has it, where it stands, the remark, senior review, and its whole history. */
 export function HandlingPanel({ ex, work, role }: { ex: Exception; work: Work; role: string }) {
-  const [events, setEvents] = useState<TimelineEvent[] | null>(null);
+  const [events, setEvents] = useState<TimelineEvent[] | null | "error">(null);
   const [remark, setRemark] = useState(ex.remark ?? "");
   const [note, setNote] = useState("");
   const [timingReason, setTimingReason] = useState("");

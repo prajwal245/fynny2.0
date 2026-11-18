@@ -179,3 +179,12 @@ describe("opening a link", () => {
     expect(await linkInfo(db as never, "short")).toMatchObject({ ok: false, reason: "invalid" });
   });
 });
+
+describe("a link from a template whose button address holds the variable twice", () => {
+  it("still opens: the leftover {{1}} is not part of the token, plain or encoded", async () => {
+    links.length = 0;
+    const l = await createUploadLink(db as never, { firmId: "f1", businessId: "b1", requestId: "r1" });
+    for (const t of [`{{1}}${l!.token}`, `%7B%7B1%7D%7D${l!.token}`, `{{ 1 }}${l!.token}`, `{{1}}{{1}}${l!.token}`]) expect(await linkInfo(db as never, t)).toMatchObject({ ok: true });
+    expect(await linkInfo(db as never, "{{1}}")).toMatchObject({ ok: false, reason: "invalid" });
+  });
+});

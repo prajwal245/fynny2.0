@@ -15,6 +15,11 @@ describe("where the template's Upload button goes", () => {
     expect(p).toMatch(/opens https:\/\/fynhelp.com\/upload\/<link>/);
     expect(p).toMatch(/https:\/\/fynhelp.com\/u\/\{\{1\}\}/);
   });
+  it("catches the variable typed twice, the mistake behind \"This link is not valid\"", () => {
+    const p = uploadLinkProblem(tpl("https://www.fynhelp.com/u/{{1}}{{1}}"), "https://fynhelp.com");
+    expect(p).toMatch(/variable twice/);
+    expect(p).toMatch(/not valid/);
+  });
   it("has nothing to say about a template with no Upload button", () => {
     expect(uploadLinkProblem(tpl(), "https://fynhelp.com")).toBeNull();
     expect(uploadLinkProblem(undefined, "https://fynhelp.com")).toBeNull();

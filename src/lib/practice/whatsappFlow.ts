@@ -384,6 +384,9 @@ export function uploadLinkProblem(t: Pick<MetaTemplate, "components"> | undefine
   const bar = (t?.components ?? []).find((c) => c.type === "BUTTONS");
   const url = bar?.buttons?.find((b) => b.type === "URL")?.url;
   if (!url) return null;
+  // The commonest mistake in Meta's form: the variable typed into the address AND added as a variable, so it appears twice.
+  if ((url.match(/\{\{\s*1\s*\}\}/g) ?? []).length > 1)
+    return `its Upload button address has the variable twice (${url}), so clients open ${appOrigin.replace(/\/+$/, "")}/u/{{1}}<code> and see "This link is not valid". Create the template again: in the button's URL field type only ${appOrigin.replace(/\/+$/, "")}/u/ and add the variable once (Dynamic).`;
   const norm = (u: string) => u.trim().replace(/^https?:\/\//i, "").replace(/^www\./i, "").toLowerCase();
   const want = `${norm(appOrigin).replace(/\/+$/, "")}/u/{{1}}`;
   if (norm(url) === want) return null;

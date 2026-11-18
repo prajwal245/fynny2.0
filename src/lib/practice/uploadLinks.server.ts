@@ -66,7 +66,16 @@ interface LinkRow {
 
 async function findLink(db: Db, token: string): Promise<LinkRow | null> {
   // A link pasted or opened from chat apps can carry trailing punctuation or a tracking suffix: take the token itself.
-  const clean = /^[A-Za-z0-9_-]{20,64}/.exec(String(token ?? "").trim())?.[0];
+  // A WhatsApp template whose button address holds the variable twice (".../u/{{1}}{{1}}") sends clients to ".../u/{{1}}<token>":
+  // the leftover placeholder, plain or URL-encoded, is not part of the token. Links already sent that way keep working.
+  let raw = String(token ?? "").trim();
+  try {
+    raw = decodeURIComponent(raw);
+  } catch {
+    /* already plain */
+  }
+  raw = raw.replace(/^(?:\{\{\s*1\s*\}\})+/, "");
+  const clean = /^[A-Za-z0-9_-]{20,64}/.exec(raw)?.[0];
   if (!clean) return null;
   token = clean;
   const { data } = await db

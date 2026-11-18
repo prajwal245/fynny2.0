@@ -134,6 +134,9 @@ export interface PostingView {
   } | null;
 }
 
+/** Bank lines the posting list shows at once. More than this is said, not hidden. */
+export const WORKBENCH_LINES = 500;
+
 export async function workbench(db: Db, ctx: FirmContext, businessId: string, documentId?: string | null) {
   const co = await companyFor(db, ctx, businessId);
   if (!co) return { linked: false as const };
@@ -157,8 +160,13 @@ export async function workbench(db: Db, ctx: FirmContext, businessId: string, do
     .eq("business_id", businessId)
     .eq("side", "bank")
     .in("match_status", ["unmatched", "exception"])
+    // Statement order within a date (file, then line), so the list is the same on every load.
     .order("txn_date")
-    .limit(500);
+    .order("extraction_id")
+    .order("row_index")
+    .limit(WORKBENCH_LINES + 1);
+  const moreLines = (txns ?? []).length > WORKBENCH_LINES;
+  if (moreLines) txns!.length = WORKBENCH_LINES;
   const ids = (txns ?? []).map((t) => t.id as string);
   const { data: posts } = ids.length
     ? await db
@@ -224,6 +232,7 @@ export async function workbench(db: Db, ctx: FirmContext, businessId: string, do
     // What the connector last said was wrong with Tally itself (company closed, not reachable): shown instead of a silent wait.
     connectorProblem: (con?.last_error as string | null) ?? null,
     lastSyncedAt: co.last_synced_at,
+    moreLines,
     ledgers,
     bankLedgers: bankNames,
     lines,
@@ -474,6 +483,8 @@ export async function claimPostings(db: Db, c: ConnectorRow) {
     .eq("ca_firm_id", c.ca_firm_id)
     .eq("status", "queued")
     .in("company_id", [...byId.keys()])
+    // Oldest transaction first, so Tally's own voucher numbers follow the dates; entries on one date go in the order they were approved.
+    .order("txn_date")
     .order("approved_at")
     .limit(MAX_CLAIM);
   const out: { id: string; company: string; xml: string; bankLedger: string; skipCheck: boolean }[] = [];

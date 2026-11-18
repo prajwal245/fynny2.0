@@ -285,6 +285,8 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
     for (const r of stuckRuns) Object.assign(r, { status: "failed", error: "Stopped: the server cut this run off after 60 seconds.", summary: "Timed out" });
   }
 
+  // Which documents hold a saved (encrypted) password; only the fact, never the password.
+  const withPassword = await (await import("./filePasswords.server")).documentsWithPassword(db, f, (xRes.data ?? []).map((d) => d.id));
   const docName = new Map<string, string>();
   const docs = (xRes.data ?? []).map((r) => {
     const ex = (r.extracted ?? {}) as {
@@ -332,6 +334,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       subject: r.gmail_subject ?? undefined,
       register: ex.register ?? undefined,
       statementCheck: ex.statement_check ?? undefined,
+      passwordSaved: withPassword.has(r.id) || undefined,
       sheetNames: ex.sheet_names,
       sheetChoice: ex.sheet_name,
     };

@@ -252,6 +252,26 @@ export const retryDuePracticeDocuments = createServerFn({ method: "POST" })
     }),
   );
 
+/** A partner or manager reads the saved password of a locked file the client sent. Every reading is logged with who did it. */
+export const revealFilePassword = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: uuid }).parse(d))
+  .handler(async ({ data, context }) =>
+    withWork(context.userId, async (db, ctx) => {
+      if (!["owner", "admin", "partner", "manager"].includes(ctx.role)) throw new Error("Only a partner or manager can see a client's file password.");
+      const { data: doc } = await db.from("ca_document_extractions").select("id, business_id, original_filename").eq("id", data.id).eq("ca_firm_id", ctx.firmId).maybeSingle();
+      if (!doc) throw new Error("Document not found.");
+      const { getFilePassword } = await import("./filePasswords.server");
+      const password = await getFilePassword(db, data.id);
+      if (!password) throw new Error("No password is saved for this file.");
+      const { logActivity } = await import("./db.server");
+      const { actorName } = await import("./close/close.server");
+      const who = await actorName(db, ctx.userId);
+      await logActivity(db, ctx.firmId, doc.business_id as string | null, "team", `${who} viewed the password of ${doc.original_filename ?? "a locked file"}.`);
+      return { password };
+    }),
+  );
+
 /**
  * A statement was held because it looks like another client's. A partner or manager says it does belong to this client: the
  * statement is read again and filed.

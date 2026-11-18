@@ -235,7 +235,7 @@ function PasswordAsk({ item, onSubmit }: { item: Item; onSubmit: (password: stri
       <label style={{ fontSize: 12.5, color: CA.muted, display: "flex", gap: 6, alignItems: "center" }}>
         <input type="checkbox" checked={show} onChange={(e) => setShow(e.target.checked)} /> Show the password
       </label>
-      <div style={{ fontSize: 12, color: CA.faint }}>Used once to open this file. It is not saved.</div>
+      <div style={{ fontSize: 12, color: CA.faint }}>Your accountant's team uses it to open this file. It is stored encrypted and only a partner or manager can see it.</div>
     </form>
   );
 }

@@ -2,7 +2,7 @@ import { txnType, txnDirection } from "@/lib/practice/txnType";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { SheetPicker } from "../components/SheetPicker";
-import { acceptPracticeStatement, chooseDocumentSheet, confirmStatementOwner, removePracticeDocument } from "@/lib/practice/practice.functions";
+import { acceptPracticeStatement, chooseDocumentSheet, revealFilePassword, confirmStatementOwner, removePracticeDocument } from "@/lib/practice/practice.functions";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertTriangle,
@@ -182,6 +182,7 @@ export default function DocumentsPage({
     openDocument,
     period,
     refresh,
+    canSignOff,
   } = useV2();
   const [tab, setTab] = useState("All");
   const [holdBusy, setHoldBusy] = useState(false);
@@ -671,6 +672,8 @@ export default function DocumentsPage({
               </div>
             )}
 
+            {active.passwordSaved && <SavedPassword id={active.id} allowed={canSignOff} />}
+
             {active.status === "Queued" && (
               <div style={{ background: V.gray, borderRadius: 14, padding: 14, fontSize: 13, color: V.body }}>
                 Received and waiting for the Extract agent. It reads on the next sync, or you can read it now.
@@ -977,3 +980,38 @@ export default function DocumentsPage({
 }
 
 
+
+
+/** A locked file the client sent with its password. The partner or manager can show it to open the original; each viewing is logged. */
+function SavedPassword({ id, allowed }: { id: string; allowed: boolean }) {
+  const [pw, setPw] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const show = async () => {
+    setBusy(true);
+    try {
+      setPw((await revealFilePassword({ data: { id } })).password);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not show the password.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div style={{ background: V.gray, borderRadius: 14, padding: 14, fontSize: 13, color: V.body, display: "grid", gap: 8 }} data-testid="saved-password">
+      <div><b>Password-protected file.</b> The client typed its password when sending it. It is stored encrypted and FynHelp uses it to read the file. To open the original yourself, show the password below. Each time it is shown is recorded.</div>
+      {allowed ? (
+        pw === null ? (
+          <div><button className="v2-btn v2-btn-ghost" disabled={busy} onClick={() => void show()}>{busy ? "Showing…" : "Show password"}</button></div>
+        ) : (
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <code style={{ fontSize: 15, padding: "4px 8px", background: V.card, borderRadius: 8, wordBreak: "break-all" }}>{pw}</code>
+            <button className="v2-btn v2-btn-ghost" onClick={() => { void navigator.clipboard?.writeText(pw).then(() => toast.success("Copied")); }}>Copy</button>
+            <button className="v2-btn v2-btn-ghost" onClick={() => setPw(null)}>Hide</button>
+          </div>
+        )
+      ) : (
+        <div style={{ color: V.muted }}>A partner or manager can show it.</div>
+      )}
+    </div>
+  );
+}

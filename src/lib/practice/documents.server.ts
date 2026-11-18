@@ -357,11 +357,13 @@ export async function processExtraction(
         .limit(1)
         .maybeSingle()
     : { data: null };
+  // The password typed for this read, or the one saved (encrypted) when the client sent the file through the upload link.
+  const password = opts.password ?? (await (await import("./filePasswords.server")).getFilePassword(db, doc.id)) ?? undefined;
   // A locked workbook is opened here (the spreadsheet reader cannot decrypt); a locked PDF is opened by pdfText below.
   let readBytes = bytes;
   if (kind === "xlsx") {
     try {
-      readBytes = await unlockWorkbook(bytes, opts.password);
+      readBytes = await unlockWorkbook(bytes, password);
     } catch (e) {
       if (e instanceof PdfPasswordError)
         return failWith(e.reason === "wrong" ? passwordWrongMessage(e.what) : passwordNeededMessage(e.what), e.reason === "wrong" ? "password_wrong" : "password_protected");
@@ -393,8 +395,8 @@ export async function processExtraction(
     {
       llm: (await withinAiCap(db, doc.ca_firm_id)) ? practiceLlm({ timeoutMs: 50_000, budgetMs: 52_000 }) : null,
       ocr: practiceOcr(),
-      pdfText: (b) => pdfText(b, opts.password),
-      pdfItems: (b) => pdfItems(b, opts.password),
+      pdfText: (b) => pdfText(b, password),
+      pdfItems: (b) => pdfItems(b, password),
       sheetRows: kind === "xlsx" ? await loadSheetReader() : undefined,
       sheetsAll: kind === "xlsx" ? await loadSheetsReader() : undefined,
     },

@@ -101,6 +101,8 @@ export type Doc = {
   txnCount?: number;
   /** The file has more lines than are shown here. Reconciliation still uses all of them. */
   rowsTruncated?: boolean;
+  /** The client sent this locked file with its password, kept encrypted; a partner or manager can show it. */
+  passwordSaved?: boolean;
   reviewCount?: number;
   duplicateCount?: number;
   sender?: string;

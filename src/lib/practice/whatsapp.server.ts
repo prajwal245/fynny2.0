@@ -402,6 +402,24 @@ export async function handleButton(
   return rule.stop ? "client opted out (button)" : `client tapped ${parsed.action}`;
 }
 
+/**
+ * A person writes to FynHelp's shared number but is not linked to any firm (no client has this phone, and no JOIN code was sent).
+ * Dropping the message silently leaves them thinking it arrived. Instead: say once what to do, and keep a record for the admin so a
+ * "my file never arrived" report can be answered at once. At most one reply per number every 6 hours.
+ */
+export async function tellUnlinkedSender(db: Db, m: WaMessage, sayBack: (text: string) => Promise<unknown>) {
+  const tail = phoneTail(m.from);
+  const key = `inbound:${tail ?? "unknown"}`;
+  const since = new Date(Date.now() - 6 * 3_600_000).toISOString();
+  const { count } = await db.from("ca_ai_calls").select("id", { count: "exact", head: true }).eq("purpose", "whatsapp_inbound").eq("model", key).gte("created_at", since);
+  await db.from("ca_ai_calls").insert({
+    ca_firm_id: null, purpose: "whatsapp_inbound", provider: "meta", model: key, input: "", output: null, latency_ms: null, status: "error", created_at: new Date().toISOString(),
+    error: `A ${m.type} message from a number ending ${tail ?? "?"} was not delivered to any firm: no client has this phone and it has not sent a JOIN code. The sender was ${count ? "already told" : "told"} how to link.`,
+  });
+  if (count) return;
+  await sayBack("Hello, this is FynHelp. We could not tell which accountant your message is for, so it was not received. Please ask your accountant for their FynHelp join code and send it here (it looks like JOIN ABC123). Then send your file again.");
+}
+
 export async function handleWhatsappWebhook(payload: {
   entry?: { changes?: WaChange[] }[];
 }) {
@@ -472,6 +490,7 @@ export async function handleWhatsappWebhook(payload: {
             // Not a client of any firm: it may be a person FynHelp wrote to, answering.
             const sayBack = (text: string) => (token ? sendPlainText({ phoneNumberId, token }, m.from, text) : Promise.resolve(false));
             const hit = await (await import("./touchpoints/whatsapp.server")).noteTouchReply(db, m, sayBack).catch(() => false);
+            if (!hit) await tellUnlinkedSender(db, m, sayBack).catch((e) => console.error(`[fyn:whatsapp] unlinked sender: ${(e as Error).message}`));
             results.push({ message: m.id, status: hit ? "reply logged on a FynHelp follow-up" : "sender not linked to a firm on the shared number" });
             continue;
           }
@@ -541,6 +560,7 @@ export async function handleWhatsappWebhook(payload: {
           continue;
         }
         if (!token) {
+          await db.from("ca_ai_calls").insert({ ca_firm_id: channel.ca_firm_id, purpose: "whatsapp_inbound", provider: "meta", model: null, input: "", output: null, latency_ms: null, status: "error", error: "A file arrived on WhatsApp but WHATSAPP_ACCESS_TOKEN is not set, so it cannot be downloaded from Meta." }).then(() => undefined, () => undefined);
           results.push({
             message: m.id,
             status: "WHATSAPP_ACCESS_TOKEN not set",
@@ -616,6 +636,8 @@ export async function handleWhatsappWebhook(payload: {
           });
         } catch (e) {
           console.error(`[fyn:whatsapp] ${m.id}: ${(e as Error).message}`);
+          // A file that was received but could not be saved is recorded where the admin reads, with the real reason.
+          await db.from("ca_ai_calls").insert({ ca_firm_id: channel.ca_firm_id, purpose: "whatsapp_inbound", provider: "meta", model: null, input: "", output: null, latency_ms: null, status: "error", error: `A ${m.type} from a number ending ${phoneTail(m.from) ?? "?"} could not be saved: ${(e as Error).message}`.slice(0, 500) }).then(() => undefined, () => undefined);
           results.push({
             message: m.id,
             status: `failed: ${(e as Error).message}`,

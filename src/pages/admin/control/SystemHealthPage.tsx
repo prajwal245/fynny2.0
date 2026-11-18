@@ -79,9 +79,9 @@ export default function SystemHealthPage() {
               </Table>
             )}
           </Panel>
-          <Panel title="WhatsApp send failures">
+          <Panel title="WhatsApp problems (sends that failed, messages that did not reach a firm)">
             {d.waFailures.length === 0 ? (
-              <Empty>No WhatsApp send failures in the last 24 hours.</Empty>
+              <Empty>No WhatsApp problems in the last 24 hours.</Empty>
             ) : (
               <Table head={["When", "Firm", "Reason (admins only)"]}>
                 {d.waFailures.map((r, i) => (

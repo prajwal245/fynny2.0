@@ -230,7 +230,11 @@ export async function exceptionTimeline(db: Db, ctx: FirmContext, id: string): P
     .eq("exception_id", id)
     .order("created_at", { ascending: true })
     .limit(200);
-  if (error) return [];
+  // A failed read must not look like an empty history: say so, and keep the reason in the server log.
+  if (error) {
+    console.error(`[exceptions] history could not be read for ${id}: ${error.message}`);
+    throw new PracticeError("db_error", "The history could not be loaded just now.");
+  }
   return (data ?? []).map((r) => ({ id: r.id, type: r.event_type, at: r.created_at, by: r.actor_name ?? "FynHelp", from: r.from_value, to: r.to_value, note: r.note }));
 }
 

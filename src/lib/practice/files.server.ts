@@ -6,6 +6,21 @@
 import { PdfPasswordError } from "./extract/pipeline";
 import { columnMarks, findColumns, type PdfTextItem, type StatementColumns } from "./extract/pdfColumns";
 
+/** Opens a PDF only far enough to know whether it is locked: throws PdfPasswordError ("needed" or "wrong"), reads nothing else. */
+export async function checkPdfPassword(bytes: Uint8Array, password?: string): Promise<void> {
+  const { getDocumentProxy } = await import("unpdf");
+  try {
+    await getDocumentProxy(new Uint8Array(bytes), password ? { password } : {});
+  } catch (e) {
+    const err = e as { name?: string; code?: number; message?: string };
+    if (err.name === "PasswordException" || /password/i.test(String(err.message))) {
+      const wrong = err.code === 2 || /incorrect/i.test(String(err.message));
+      throw new PdfPasswordError(wrong ? "wrong" : "needed", "PDF");
+    }
+    // Any other trouble with the file is for the reader to report later, not a reason to refuse the upload here.
+  }
+}
+
 /**
  * The text of a PDF. A locked PDF needs `password`; the reader tells "no password" (code 1) from "wrong password" (code 2).
  * The password is used once to open the file in memory and is not kept anywhere.

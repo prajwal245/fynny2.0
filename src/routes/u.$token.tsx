@@ -17,14 +17,15 @@ export const Route = createFileRoute("/u/$token")({
 
 type Info =
   | { ok: true; firmName: string; clientName: string | null; items: string[]; filesLeft: number; expiresAt: string; resolved: boolean }
-  | { ok: false; reason: "invalid" | "expired" | "full" };
+  | { ok: false; reason: "invalid" | "expired" | "full" | "unavailable" };
 
-type Item = { id: number; name: string; size: number; state: "uploading" | "done" | "error"; pct: number; message?: string; duplicate?: boolean };
+type Item = { id: number; name: string; size: number; state: "uploading" | "done" | "error" | "password"; pct: number; message?: string; duplicate?: boolean; file?: File };
 
 const WHY: Record<string, { title: string; hint: string }> = {
   invalid: { title: "This link is not valid", hint: "Please ask your accountant to send you a new one." },
   expired: { title: "This link has expired", hint: "Links last 14 days. Ask your accountant to send you a new one." },
   full: { title: "This link has reached its limit", hint: "Ask your accountant to send you a new link." },
+  unavailable: { title: "We could not open this link just now", hint: "This is usually a weak connection or a busy moment, not a problem with the link. Please wait a minute and open it again." },
 };
 const kb = (n: number) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 
@@ -40,33 +41,42 @@ function UploadPage() {
   useEffect(() => {
     let alive = true;
     fetch(`/api/public/upload-link?token=${encodeURIComponent(token)}`)
-      .then((r) => r.json() as Promise<Info>)
+      .then(async (r) => {
+        // Only a real answer from the server can say a link is not valid. A busy server or a dropped connection must not.
+        const d = (await r.json().catch(() => null)) as Info | null;
+        if (d && typeof d.ok === "boolean" && (d.ok || (d.reason && d.reason in WHY))) return d;
+        return { ok: false, reason: "unavailable" } as Info;
+      })
       .then((d) => alive && setInfo(d))
-      .catch(() => alive && setInfo({ ok: false, reason: "invalid" }));
+      .catch(() => alive && setInfo({ ok: false, reason: "unavailable" }));
     return () => {
       alive = false;
     };
   }, [token]);
 
   const send = useCallback(
-    (file: File) => {
-      const id = next.current++;
-      setItems((p) => [...p, { id, name: file.name || "photo", size: file.size, state: "uploading", pct: 0 }]);
+    (file: File, existing?: number, password?: string) => {
+      const id = existing ?? next.current++;
+      if (existing === undefined) setItems((p) => [...p, { id, name: file.name || "photo", size: file.size, state: "uploading", pct: 0 }]);
+      else setItems((p) => p.map((x) => (x.id === id ? { ...x, state: "uploading", pct: 0, message: undefined } : x)));
       const patch = (o: Partial<Item>) => setItems((p) => p.map((x) => (x.id === id ? { ...x, ...o } : x)));
       const form = new FormData();
       form.append("token", token);
       form.append("file", file);
+      if (password) form.append("password", password);
       const xhr = new XMLHttpRequest();
       xhr.open("POST", "/api/public/upload-link");
       xhr.upload.onprogress = (e) => e.lengthComputable && patch({ pct: Math.round((e.loaded / e.total) * 100) });
       xhr.onload = () => {
-        let body: { ok?: boolean; message?: string; duplicate?: boolean } = {};
+        let body: { ok?: boolean; message?: string; duplicate?: boolean; reason?: string } = {};
         try {
           body = JSON.parse(xhr.responseText);
         } catch {
           /* fall through to the generic message */
         }
-        if (xhr.status === 200 && body.ok) patch({ state: "done", pct: 100, duplicate: body.duplicate });
+        if (xhr.status === 200 && body.ok) patch({ state: "done", pct: 100, duplicate: body.duplicate, file: undefined });
+        // A locked file: the same page asks for its password, once, for this file only.
+        else if (body.reason === "password" || body.reason === "password_wrong") patch({ state: "password", pct: 0, message: body.message, file });
         else patch({ state: "error", message: body.message ?? "We could not save that file. Please try again." });
       };
       xhr.onerror = () => patch({ state: "error", message: "No connection. Check your internet and try again." });
@@ -77,7 +87,7 @@ function UploadPage() {
 
   const add = (files: FileList | null) => {
     if (!files) return;
-    Array.from(files).forEach(send);
+    Array.from(files).forEach((f) => send(f));
     if (pick.current) pick.current.value = "";
     if (cam.current) cam.current.value = "";
   };
@@ -163,7 +173,8 @@ function UploadPage() {
                       </div>
                     )}
                     {it.state === "error" && <div style={{ color: CA.red, fontSize: 12.5, marginTop: 4 }}>{it.message}</div>}
-                    {it.state !== "error" && <div style={{ color: CA.faint, fontSize: 12, marginTop: 2 }}>{kb(it.size)}</div>}
+                    {it.state === "password" && it.file && <PasswordAsk item={it} onSubmit={(pw) => send(it.file!, it.id, pw)} />}
+                    {it.state !== "error" && it.state !== "password" && <div style={{ color: CA.faint, fontSize: 12, marginTop: 2 }}>{kb(it.size)}</div>}
                   </li>
                 ))}
               </ul>
@@ -187,6 +198,45 @@ function UploadPage() {
         <p style={{ textAlign: "center", color: CA.faint, fontSize: 11.5, marginTop: 8 }}>Prepared with FynHelp</p>
       </div>
     </main>
+  );
+}
+
+/** Shown under a file that is locked. The password goes to the server with this one file, opens it, and is not kept. */
+function PasswordAsk({ item, onSubmit }: { item: Item; onSubmit: (password: string) => void }) {
+  const [pw, setPw] = useState("");
+  const [show, setShow] = useState(false);
+  const wrong = /did not open/i.test(item.message ?? "");
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (pw) onSubmit(pw);
+      }}
+      style={{ marginTop: 10, display: "grid", gap: 8 }}
+      data-testid="upload-password"
+    >
+      <div style={{ fontSize: 13.5, color: wrong ? CA.red : CA.ink, lineHeight: 1.5 }}>{wrong ? item.message : "This file is password protected. Type its password so your accountant can open it."}</div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <input
+          type={show ? "text" : "password"}
+          value={pw}
+          onChange={(e) => setPw(e.target.value)}
+          autoComplete="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          aria-label={`Password for ${item.name}`}
+          placeholder="File password"
+          style={{ flex: "1 1 180px", minHeight: 44, padding: "0 12px", borderRadius: 10, border: `1px solid ${CA.line}`, fontSize: 15, fontFamily: CA.sans }}
+        />
+        <button type="submit" disabled={!pw} style={{ ...btn(true), opacity: pw ? 1 : 0.5 }}>
+          Open and send
+        </button>
+      </div>
+      <label style={{ fontSize: 12.5, color: CA.muted, display: "flex", gap: 6, alignItems: "center" }}>
+        <input type="checkbox" checked={show} onChange={(e) => setShow(e.target.checked)} /> Show the password
+      </label>
+      <div style={{ fontSize: 12, color: CA.faint }}>Used once to open this file. It is not saved.</div>
+    </form>
   );
 }
 

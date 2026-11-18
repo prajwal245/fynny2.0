@@ -4,6 +4,7 @@
  * If Meta cannot be asked (no account id, no token, network), the older behaviour applies: the template
  * named in the settings, and buttons only when WHATSAPP_CHASE_BUTTONS says so.
  */
+import { uploadLinkProblem } from "./whatsappFlow";
 import {
   buttonLayoutOf,
   pickTemplate,
@@ -142,7 +143,10 @@ export async function stagesView(sender: Pick<Sender, "wabaId" | "token"> | null
                 : st === "paused"
                   ? `Meta has paused "${wanted}" because of low quality. ${picked ? `"${picked.name}" is used meanwhile.` : ""}`
                   : `"${wanted}" does not exist in WhatsApp Manager yet.${picked ? ` "${picked.name}" is used meanwhile.` : ""}`;
-    return { stage, label: LABEL[stage], using: picked?.name ?? null, status: st, buttons: Boolean(picked?.layout), note };
+    // The template actually used: does its Upload button go to this app's upload page?
+    const usedT = picked ? list.find((t) => t.name === picked.name && t.language === picked.language) : undefined;
+    const linkProblem = picked?.layout ? uploadLinkProblem(usedT, (process.env["PUBLIC_APP_URL"] || "https://fynhelp.com").replace(/\/+$/, "")) : null;
+    return { stage, label: LABEL[stage], using: picked?.name ?? null, status: st, buttons: Boolean(picked?.layout), note: linkProblem ? `${note} Warning: "${picked!.name}" ${linkProblem}` : note, linkProblem };
   });
 }
 

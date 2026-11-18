@@ -675,6 +675,17 @@ export function rowsFromPositioned(
     k = e + 1;
   }
 
+  // The first line has no line before it, so its sign is read from the line after it: when its balance only fits the next line as
+  // an overdrawn amount (Kotak: 51,289.00 less 5,00,000.00 printed as "4,48,711.00"), it is negative.
+  {
+    const a = chrono[0];
+    const b = chrono[1];
+    if (a && b && a.balance !== null && b.balance !== null && a.balance > 0) {
+      const step = (x: number) => Math.abs(toPaise(b.balance!) - toPaise(x));
+      if (step(a.balance) !== toPaise(amountOf(b)) && step(-a.balance) === toPaise(amountOf(b))) a.balance = -a.balance;
+    }
+  }
+
   // ICICI also prints some negative balances without their minus. A balance whose sign is the only thing keeping it from following the
   // line before it (to the paisa) is read with the other sign.
   chrono.forEach((r, k) => {

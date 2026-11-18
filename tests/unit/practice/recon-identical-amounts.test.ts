@@ -149,3 +149,31 @@ describe("each bank account is matched against its own ledger", () => {
     expect(r.exceptions.filter((e) => e.side === "books").map((e) => e.txn_id)).toEqual(["k9"]);
   });
 });
+
+describe("chains of days with identical UPI amounts", () => {
+  it("pairs each day's equal-count lines even when every neighbouring day also has some and the narrations share no party", () => {
+    const days = ["2025-05-06", "2025-05-07", "2025-05-08", "2025-05-09"];
+    const counts = [3, 2, 4, 1];
+    const bank: ReconTxn[] = [];
+    const books: ReconTxn[] = [];
+    days.forEach((d, i) => {
+      for (let n = 0; n < counts[i]!; n++) {
+        bank.push(tx(`b${i}${n}`, "bank", d, 1000, { description: `UPIAR/${i}${n}9876/DR/Chh`, counterparty: "UPIAR" }));
+        books.push(tx(`k${i}${n}`, "books", d, 1000, { description: "MESS EXPENSES", counterparty: "MESS EXPENSES" }));
+      }
+    });
+    const r = reconcile(bank, books);
+    expect(r.matches).toHaveLength(10);
+    expect(r.exceptions).toHaveLength(0);
+  });
+});
+
+describe("one more bank line than book entries on a date", () => {
+  it("pairs as many as there are entries when each side is uniform, and leaves the extra line open", () => {
+    const bank = ["b1", "b2", "b3", "b4"].map((id, n) => tx(id, "bank", "2025-05-10", 1000, { description: `UPIAR/${n}1234/DR/Ph`, counterparty: "UPIAR" }));
+    const books = ["k1", "k2", "k3"].map((id) => tx(id, "books", "2025-05-10", 1000, { description: "SITE EXPENSES", counterparty: "SITE EXPENSES" }));
+    const r = reconcile(bank, books);
+    expect(r.matches).toHaveLength(3);
+    expect(r.exceptions).toHaveLength(1);
+  });
+});

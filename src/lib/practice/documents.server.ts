@@ -276,7 +276,7 @@ export async function processExtraction(
 
   // A temporary failure (AI provider down, storage hiccup) is retried with
   // backoff by the schedule; a permanent one (password, unsupported file) is not.
-  const failWith = async (message: string, code?: string) => {
+  const failWith = async (message: string, code?: string, adminNote?: string) => {
     const retryAt = isRetryable({ code, message })
       ? nextAttemptAt(attempt)
       : null;
@@ -301,7 +301,7 @@ export async function processExtraction(
       status: "failed",
       summary: `Could not read ${filename}`,
       error: message,
-      detail: { code: code ?? null, retry_at: retryAt?.toISOString() ?? null },
+      detail: { code: code ?? null, retry_at: retryAt?.toISOString() ?? null, ...(adminNote ? { admin_note: adminNote } : {}) },
     });
     return {
       status: "failed",
@@ -400,7 +400,7 @@ export async function processExtraction(
     },
   );
   await logAiCalls(db, doc.ca_firm_id, doc.id, outcome.aiCalls);
-  if (outcome.error) return failWith(outcome.error.message, outcome.error.code);
+  if (outcome.error) return failWith(outcome.error.message, outcome.error.code, outcome.error.adminNote);
   if (outcome.side && outcome.side !== side) {
     // The content decides: a Tally ledger is the books even when its name says "bank".
     side = outcome.side;

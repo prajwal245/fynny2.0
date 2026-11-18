@@ -81,9 +81,13 @@ export function deriveSteps(period: string, f: CloseFacts): StepState[] {
 
   auto(
     get("docs_received"),
-    s.expected > 0 && s.received >= s.expected,
-    s.expected === 0 ? "No expected bank statements are set up for this client. Add them so this can be checked." : `${s.received} of ${plural(s.expected, "expected statement")} received.`,
-    s.expected === 0,
+    s.expected > 0 ? s.received >= s.expected : s.received > 0,
+    s.expected > 0
+      ? `${s.received} of ${plural(s.expected, "expected statement")} received.`
+      : s.received > 0
+        ? `${plural(s.received, "statement")} received for the month. No expected accounts are set up, so a missing account cannot be flagged. Add the expected accounts to be told.`
+        : "No statement has been received for the month yet.",
+    false,
   );
   const verifiedAll = s.received > 0 && s.verified >= s.received && s.held === 0 && s.failed === 0;
   auto(

@@ -13,6 +13,17 @@ const SENIOR = new Set(["owner", "admin", "partner", "manager"]);
 
 const initials = (n: string) => n.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
 
+/** Why a difference is only timing. The reason goes into the history with the person's own words. */
+export const TIMING_REASONS = [
+  "Cheque issued, not yet presented",
+  "Cheque deposited, not yet cleared",
+  "Booked in the next month",
+  "Booked in the previous month",
+  "Bank charge or interest not yet booked",
+  "Rounding difference",
+  "Other (explain in the note)",
+] as const;
+
 /** Who has it: a small avatar and a name, or a plain "Unassigned". */
 export function OwnerChip({ name, you }: { name: string | null; you?: boolean }) {
   if (!name) return <span style={{ color: V.muted, fontSize: 12.5 }}>Unassigned</span>;
@@ -90,6 +101,7 @@ export function HandlingPanel({ ex, work, role }: { ex: Exception; work: Work; r
   const [events, setEvents] = useState<TimelineEvent[] | null>(null);
   const [remark, setRemark] = useState(ex.remark ?? "");
   const [note, setNote] = useState("");
+  const [timingReason, setTimingReason] = useState("");
   const [reviewer, setReviewer] = useState("");
   const [busy, setBusy] = useState(false);
   const status = (ex.workStatus ?? "open") as WorkStatus;
@@ -155,15 +167,23 @@ export function HandlingPanel({ ex, work, role }: { ex: Exception; work: Work; r
           <WorkBadge e={ex} />
           {moves.map((m) => (
             <button key={m} className="bx-btn bx-sm" disabled={busy} onClick={() => {
-              if (m === "accepted_timing" && !note.trim()) return void toast.info("Write why it is only a timing difference in the note below first.");
-              void act(() => work.setStatus(ex.id, m, note.trim() || undefined)).then((ok) => { if (ok) setNote(""); });
+              if (m === "accepted_timing" && !timingReason) return void toast.info("Pick why it is only a timing difference first.");
+              if (m === "accepted_timing" && timingReason.startsWith("Other") && !note.trim()) return void toast.info("Explain it in the note, since you picked Other.");
+              const text = m === "accepted_timing" ? `${timingReason}${note.trim() ? `: ${note.trim()}` : ""}` : note.trim() || undefined;
+              void act(() => work.setStatus(ex.id, m, text)).then((ok) => { if (ok) { setNote(""); setTimingReason(""); } });
             }}>
               {busy ? "Saving…" : m === "query_sent" ? "Mark query sent" : m === "answered" ? "Mark answered" : m === "accepted_timing" ? "Accept as timing" : "Reopen handling"}
             </button>
           ))}
         </div>
         {moves.includes("accepted_timing") && (
-          <input className="v2-input" style={{ marginTop: 8 }} placeholder="Note for the history, for example: cheque 4512 clears on 3 Nov" value={note} onChange={(e) => setNote(e.target.value)} aria-label="Note for the status change" />
+          <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+            <select className="v2-input" value={timingReason} onChange={(e) => setTimingReason(e.target.value)} aria-label="Why it is only a timing difference">
+              <option value="">Why is this only timing?</option>
+              {TIMING_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
+            <input className="v2-input" placeholder="Note for the history, for example: cheque 4512 clears on 3 Nov" value={note} onChange={(e) => setNote(e.target.value)} aria-label="Note for the status change" />
+          </div>
         )}
       </div>
 

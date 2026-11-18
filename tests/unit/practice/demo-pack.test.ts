@@ -33,7 +33,7 @@ async function run(files: { f: string; side: "bank" | "books" }[], reconcile = t
   }
   const txns = (tables["ca_txns"] ?? []) as Row[];
   const exceptions = (tables["ca_exceptions"] ?? []) as Row[];
-  return { results, summary, txns, exceptions, docs: tables["ca_document_extractions"] as Row[], tables };
+  return { results, summary, txns, exceptions, docs: tables["ca_document_extractions"] as Row[], tables, db };
 }
 const check = (d: Row) => (d["extracted"] as { statement_check?: { status: string; lines: number; bankTie?: { tied: boolean | null; source: string }; headline: string; checks: { ok: boolean | null; label: string; detail: string }[] } }).statement_check!;
 
@@ -89,5 +89,52 @@ describe.skipIf(!present)("the demo pack", () => {
     console.log("GST:", g.matched.length, "matched", g.mismatched.length, "mismatch", g.missingInPortal.map((i) => `${i.party} ${i.taxable}`), "atRisk", g.totals.itcAtRisk, "diff", g.totals.mismatchTaxDiff, "unbooked", g.missingInBooks.length);
     expect(g.missingInPortal.length).toBe(1);
     expect(g.mismatched.length).toBe(1);
+  });
+});
+
+describe.skipIf(!present)("the demo pack: the whole 20-minute script, in order", () => {
+  it("statements, recon, handling, close ticks and the activity trail", async () => {
+    const r = await run([{ f: "01_HDFC_Current_Sep2026.pdf", side: "bank" }, { f: "02_ICICI_Current_Sep2026.pdf", side: "bank" }, { f: "04_Tally_DayBook_Sep2026.xlsx", side: "books" }]);
+    const { clientClose } = await import("@/lib/practice/close/close.server");
+    const { setWorkStatus } = await import("@/lib/practice/exceptionWork.server");
+    const ctx = { firmId: FIRM, firmName: "Firm", firmEmail: null, userId: "u1", role: "owner" as const };
+    const db = (r as unknown as { db: never }).db;
+    const step = (c: Awaited<ReturnType<typeof clientClose>>, k: string) => c!.steps.find((s) => s.key === k)!;
+
+    const before = await clientClose(db, ctx, BUSINESS, "2026-09");
+    expect(step(before, "docs_received").status).toBe("done");
+    expect(step(before, "statements_verified").status).toBe("done");
+    expect(step(before, "recon_done").status).toBe("done");
+    expect(step(before, "exceptions_explained")).toMatchObject({ status: "pending", detail: "3 exceptions still need a decision." });
+
+    // The three decisions, each explained by a person with a reason.
+    const open = (r.tables["ca_exceptions"] as Row[]).filter((e) => e["status"] === "open");
+    expect(open.length).toBe(4); // Kaveri's bank line and book entry are one decision
+    for (const e of open) await setWorkStatus(db, ctx, String(e["id"]), "accepted_timing", "Cheque issued, not yet presented: clears 3 Oct");
+
+    const after = await clientClose(db, ctx, BUSINESS, "2026-09");
+    expect(step(after, "exceptions_explained").status).toBe("done");
+    expect(after!.steps.filter((s) => s.kind === "auto" && s.status === "done").length).toBe(4);
+    expect(after!.state).toBe("bank_books_closed");
+
+    const log = (r.tables["ca_activity_log"] ?? []) as Row[];
+    expect(log.some((l) => /moved an exception from "Open" to "Accepted as timing": Cheque issued, not yet presented/.test(String(l["description"])))).toBe(true);
+  });
+  it("a held statement blocks 'statements verified' until a person accepts it", async () => {
+    const r = await run([{ f: "03_HDFC_Current_Sep2026_one_line_missing.pdf", side: "bank" }], false);
+    const { clientClose } = await import("@/lib/practice/close/close.server");
+    const ctx = { firmId: FIRM, firmName: "Firm", firmEmail: null, userId: "u1", role: "owner" as const };
+    const c = await clientClose((r as unknown as { db: never }).db, ctx, BUSINESS, "2026-09");
+    expect(c!.steps.find((s) => s.key === "statements_verified")).toMatchObject({ status: "blocked" });
+  });
+});
+
+describe.skipIf(!present)("the demo pack: GST files saved as the client's documents", () => {
+  it("the GSTR-2B JSON and the purchase register are kept as registers, so they survive a reload", async () => {
+    const r = await run([{ f: "06_Purchase_Register_Sep2026.xlsx", side: "books" }, { f: "07_GSTR2B_Sep2026.json", side: "books" }], false);
+    const kinds = r.docs.map((d) => (d["extracted"] as { register?: { kind: string; entries: number } }).register);
+    expect(kinds[0]).toMatchObject({ kind: "gst_purchase_register", entries: 6 });
+    expect(kinds[1]).toMatchObject({ kind: "gstr2b", entries: 5 });
+    expect(r.txns.length).toBe(0);
   });
 });

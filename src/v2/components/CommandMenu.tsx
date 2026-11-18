@@ -52,6 +52,8 @@ export function CommandMenu({ open, onClose }: { open: boolean; onClose: () => v
       { id: "nav:documents", group: "Go to", label: "Documents", hint: "Uploads and unassigned inbox", run: go("/app/documents") },
       { id: "nav:review", group: "Go to", label: "Review Queue", run: go("/app/review") },
       { id: "nav:exceptions", group: "Go to", label: "Exception Queue", run: go("/app/exceptions") },
+      { id: "nav:close", group: "Go to", label: "Month-end close", run: go("/app/close") },
+      { id: "nav:gst", group: "Go to", label: "GST reconciliation", hint: "GSTR-2B against the purchase register", run: go("/app/gst") },
       { id: "nav:chaser", group: "Go to", label: "Chaser", run: go("/app/chaser") },
       { id: "nav:reports", group: "Go to", label: "MIS and Reports", run: go("/app/reports") },
       ...(canSignOff ? [{ id: "nav:settings", group: "Go to", label: "Settings", run: go("/app/settings") } as Command] : []),

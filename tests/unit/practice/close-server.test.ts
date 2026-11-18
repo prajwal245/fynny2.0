@@ -62,7 +62,7 @@ describe("portfolio close", () => {
     expect(acme.state).toBe("in_progress");
     // A client with nothing yet is not started and is told what to set up.
     expect(all[1]).toMatchObject({ state: "not_started" });
-    expect(all[1]!.steps.find((s) => s.key === "docs_received")!.detail).toMatch(/No expected bank statements/);
+    expect(all[1]!.steps.find((s) => s.key === "docs_received")!.detail).toMatch(/No statement has been received/);
   });
   it("holds the month when a statement failed verification, until a person accepts it", async () => {
     tables = base();

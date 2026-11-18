@@ -319,6 +319,10 @@ export const adminSystemHealth = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => (await import("./admin.server")).systemHealth(await gate(context, "ops.view")));
 
+export const adminAiReaderCheck = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => (await import("./admin.server")).aiReaderCheck(await gate(context, "ops.view")));
+
 export const adminApiUsage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ days: z.number().int().min(1).max(365), basis: z.enum(["ist", "pacific"]).optional() }).parse(d))

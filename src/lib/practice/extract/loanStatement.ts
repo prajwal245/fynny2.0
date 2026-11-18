@@ -19,8 +19,20 @@ const MARKERS: [string, RegExp][] = [
 /** The wording a loan statement uses about ITSELF, which a bank statement does not: "loan account", "loan A/c no", "statement of loan". */
 const SELF = /\b(loan\s*(account|a\/c|acct|no\.?|number|statement|schedule)|statement\s+of\s+(the\s+)?loan|loan\s+outstanding|term\s+loan\s+account)\b/i;
 
+/**
+ * Banks name the product, not the word "loan": Indian Bank prints "Product: MSME_GECLS 1.0", "MSME-TL-RISE-BSD", "IBVL-F022", while
+ * a cash-credit account says "Product type: OCC ...". The product code carries a loan token (GECL, TL, VL, IBVL, term, vehicle, CV,
+ * mortgage, LAP). Read from the header lines only, never from a narration.
+ */
+const PRODUCT_LINE = /\bproduct\s*(?:type)?\s*:\s*([^\n]*?)(?:\s{2,}|$)/im;
+const LOAN_TOKEN = /(^|[^a-z])(gecl\w*|tl|vl|ibvl\w*|loan|term|vehicle|cv|mortgage|lap|hl)([^a-z]|$)/i;
+/** Wording only a loan account's own lines use: principal repayments, rate-change entries, instalments. */
+const LOAN_BODY = /(o\.?\s?s\.?\s*principal|principal\s+repa|\brt\s+\d+\.\d+\s+to\s+\d+\.\d+\s*%|\bemi\b|instal+ment|repayment received)/i;
+
 export function looksLikeLoanStatement(text: string): boolean {
   const head = text.slice(0, 6_000);
+  const product = PRODUCT_LINE.exec(head)?.[1] ?? "";
+  if (product && LOAN_TOKEN.test(product) && (LOAN_BODY.test(text) || /int(erest)?\s*rate\s*:/i.test(head))) return true;
   const hits = MARKERS.filter(([, re]) => re.test(head)).map(([k]) => k);
   // The statement must call itself a loan account AND carry instalment or principal wording. A bank statement that merely shows loan
   // EMIs in its narrations never describes itself that way.

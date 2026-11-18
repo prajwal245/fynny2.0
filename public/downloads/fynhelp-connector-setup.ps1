@@ -32,21 +32,23 @@ try {
   Step 2 "Downloading the FynHelp Connector"
   Invoke-WebRequest "$server/downloads/fynhelp-tally-connector.mjs" -OutFile $js -UseBasicParsing
 
-  Step 3 "Your connector token"
-  Write-Host "In FynHelp, open Settings, TallyPrime, Add connector, and copy the token it shows."
-  $token = (Read-Host "Paste the token here (it starts with fyn_tc_)").Trim()
-  if ($token -notmatch '^fyn_tc_[A-Za-z0-9_-]{40,60}$') { throw "That does not look like a FynHelp token. Copy it again from FynHelp and run this setup again." }
+  Step 3 "Pairing with FynHelp"
+  Write-Host "In FynHelp, open Settings, TallyPrime, Get a pairing code. It looks like 7K2QM-X9HTD and works once for 15 minutes."
+  $code = (Read-Host "Type the pairing code here").Trim()
+  & $nodePath $js --pair $code --config $cfg --server $server
+  if ($LASTEXITCODE -ne 0) { throw "FynHelp did not accept the code. Ask for a new code in FynHelp and run this setup again." }
 
   $write = (Read-Host "Let FynHelp write entries your team has approved into Tally? You can change this later. (y/N)").Trim().ToLower()
   $allowWrite = ($write -eq "y" -or $write -eq "yes")
-  $config = [ordered]@{ token = $token; allowWrite = $allowWrite }
-  # Windows PowerShell 5 adds a byte-order mark with -Encoding UTF8; write the file without one.
+  # The pairing step saved the token. Add the writing choice without losing it (and without a byte-order mark).
+  $config = Get-Content $cfg -Raw | ConvertFrom-Json
+  $config | Add-Member -NotePropertyName allowWrite -NotePropertyValue $allowWrite -Force
   [System.IO.File]::WriteAllText($cfg, ($config | ConvertTo-Json), (New-Object System.Text.UTF8Encoding($false)))
 
   Step 4 "Checking TallyPrime and FynHelp"
   Write-Host "In TallyPrime: F1 (Help), Settings, Connectivity, Client/Server: TallyPrime acts as Both, port 9000. Keep your company open."
   & $nodePath $js --check --config $cfg
-  if ($LASTEXITCODE -ne 0) { throw "FynHelp did not accept the token. Copy it again from FynHelp and run this setup again." }
+  if ($LASTEXITCODE -ne 0) { throw "FynHelp did not accept the connection. Ask for a new pairing code in FynHelp and run this setup again." }
 
   # An older connector wrote its log as UTF-16, which Notepad shows as garbled symbols. Keep it aside so the new log starts clean.
   if (Test-Path $log) {

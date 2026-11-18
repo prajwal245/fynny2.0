@@ -23,6 +23,7 @@ import {
 import { isPartyGroup, versionAtLeast } from "./tallyConnector";
 import { pagesForDocument } from "./billing/pageCredits";
 import { suggestLedger } from "./tallyLedgerSuggest";
+import { applyLearned, ledgerPattern, learnChoice, type LedgerRule } from "./ledgerLearning";
 import { CREATABLE_GROUPS } from "./tallyLedgerCreate";
 
 /** A claimed line not reported back within this time is treated as interrupted. */
@@ -176,6 +177,9 @@ export async function workbench(db: Db, ctx: FirmContext, businessId: string, do
       };
   const byTxn = new Map((posts ?? []).map((p) => [p.txn_id as string, p]));
   const names = ledgers.map((l) => l.name);
+  // What this client's team chose before for the same kind of line.
+  const { data: mem } = await db.from("ca_agent_memory").select("pattern, lesson, times_taught").eq("business_id", businessId).eq("kind", "ledger_choice").limit(2000);
+  const rules = new Map<string, LedgerRule>(((mem ?? []) as { pattern: string; lesson: { ledger?: string }; times_taught: number }[]).filter((m) => m.lesson?.ledger).map((m) => [m.pattern, { pattern: m.pattern, ledger: String(m.lesson.ledger), taught: m.times_taught }]));
   const bankNames = ledgers
     .filter((l) => /bank|cash/i.test(l.parent ?? ""))
     .map((l) => l.name);
@@ -189,15 +193,19 @@ export async function workbench(db: Db, ctx: FirmContext, businessId: string, do
       counterparty: (t.counterparty as string | null) ?? null,
       description: (t.description as string | null) ?? null,
       reference: (t.reference as string | null) ?? null,
-      suggestion: suggestLedger(
-        {
-          counterparty: t.counterparty as string | null,
-          description: t.description as string | null,
-          reference: t.reference as string | null,
-          direction: t.direction as "in" | "out",
-        },
+      suggestion: applyLearned(
+        suggestLedger(
+          {
+            counterparty: t.counterparty as string | null,
+            description: t.description as string | null,
+            reference: t.reference as string | null,
+            direction: t.direction as "in" | "out",
+          },
+          names,
+          bankNames[0],
+        ),
+        rules.get(ledgerPattern({ direction: t.direction as "in" | "out", counterparty: t.counterparty as string | null, description: t.description as string | null })),
         names,
-        bankNames[0],
       ),
       posting: p
         ? {
@@ -377,6 +385,8 @@ export async function approvePosting(
       );
     throw new PracticeError("db_error", error.message);
   }
+  // Remember the choice for the next line like this. Never blocks the approval.
+  if (!line.kind && !line.splits) await teachLedger(db, ctx, t.business_id as string, { direction: line.direction, counterparty: (t.counterparty as string | null) ?? null, description: (t.description as string | null) ?? null }, exact(line.partyLedger)).catch(() => undefined);
   await logActivity(
     db,
     ctx.firmId,
@@ -385,6 +395,18 @@ export async function approvePosting(
     `Approved for Tally: ${line.direction === "in" ? "receipt" : "payment"} of ₹${line.amount.toLocaleString("en-IN")} to "${exact(line.partyLedger)}".`,
   );
   return { id: data.id as string, status: "queued" };
+}
+
+/** Stores the ledger a person chose for this kind of line. A table that does not yet allow the kind simply learns nothing. */
+export async function teachLedger(db: Db, ctx: FirmContext, businessId: string, line: { direction: "in" | "out"; counterparty: string | null; description: string | null }, ledger: string) {
+  const pattern = ledgerPattern(line);
+  if (!pattern) return;
+  const { data: row } = await db.from("ca_agent_memory").select("id, lesson, times_taught").eq("business_id", businessId).eq("kind", "ledger_choice").eq("pattern", pattern).maybeSingle();
+  const before = row ? { ledger: String((row.lesson as { ledger?: string }).ledger ?? ""), taught: Number(row.times_taught ?? 1), other: (row.lesson as { other?: { ledger: string; taught: number } }).other } : null;
+  const next = learnChoice(before && before.ledger ? before : null, ledger);
+  const now = new Date().toISOString();
+  if (row) await db.from("ca_agent_memory").update({ lesson: next, times_taught: next.taught, updated_at: now }).eq("id", row.id);
+  else await db.from("ca_agent_memory").insert({ ca_firm_id: ctx.firmId, business_id: businessId, kind: "ledger_choice", pattern, lesson: next, example: String(line.description ?? line.counterparty ?? "").slice(0, 300), created_by: ctx.userId });
 }
 
 /** A line whose earlier posting was cancelled or failed needs a fresh REMOTEID so Tally cannot confuse the two. */

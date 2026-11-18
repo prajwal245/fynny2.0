@@ -154,11 +154,11 @@ export function classifyUserPrompt(rows: ExtractedRow[], side: Side): string {
 /* ── AI reading of unstructured text (PDF / OCR / image) ── */
 
 export const READ_SYSTEM_PROMPT = `You read Indian financial documents (bank statements, tax invoices, bills, receipts) and list every transaction or invoice in them.
-Return STRICT JSON: {"document_kind":"bank_statement"|"invoice"|"bill"|"receipt"|"other","rows":[{"date":"YYYY-MM-DD","amount":<positive number>,"direction":"in"|"out","description":<string>,"counterparty":<string or null>,"reference":<string or null>,"category":<one of ${TXN_CATEGORIES.join("|")}>,"currency":"INR" or ISO code,"source_text":<the exact line(s) you read this from>,"confidence":<0..1>,"reason":<string>}]}
+Return STRICT JSON: {"document_kind":"bank_statement"|"invoice"|"bill"|"receipt"|"other","rows":[{"date":"YYYY-MM-DD","amount":<positive number>,"direction":"in"|"out","description":<string>,"counterparty":<string or null>,"reference":<string or null>,"balance":<the running balance printed after this line, negative if overdrawn, or null when the document prints none>,"category":<one of ${TXN_CATEGORIES.join("|")}>,"currency":"INR" or ISO code,"source_text":<the exact line(s) you read this from>,"confidence":<0..1>,"reason":<string>}]}
 Rules:
 - Only list values that are printed in the document. Never invent or compute amounts or dates.
 - For invoices use the invoice total (including tax) as amount; direction "in" for a sales invoice issued by the client, "out" for a purchase bill.
-- Skip opening/closing balance lines and totals.
+- Skip opening/closing balance lines and totals. For a bank statement, copy the printed running balance of each line into "balance" exactly as printed (it is used to prove no line is missing or wrong); use null when none is printed, and never compute one.
 - Parse Indian dates (DD/MM/YYYY) into YYYY-MM-DD.
 - If a value is unclear (blurry, handwritten), lower confidence below 0.75 and say why in reason.
 - If there is nothing to extract return {"document_kind":"other","rows":[]}.
@@ -174,6 +174,7 @@ export interface AiReadRow {
   reference?: string | null;
   category?: string;
   currency?: string;
+  balance?: number | string | null;
   source_text?: string;
   confidence?: number;
   reason?: string;
@@ -264,7 +265,11 @@ export function rowsFromAiRead(
       reference: r.reference ?? null,
       category,
       currency,
-      balance: null,
+      balance: ((): number | null => {
+        if (r.balance === null || r.balance === undefined || r.balance === "") return null;
+        const raw = typeof r.balance === "number" ? r.balance : Number(String(r.balance).replace(/[^0-9.\-]/g, ""));
+        return Number.isFinite(raw) ? round2(raw) : null;
+      })(),
       parse_confidence: confidence,
       parse_issues: issues,
     });

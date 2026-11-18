@@ -17,6 +17,10 @@ import {
   looksLikeToken,
   monthsToPull,
   newConnectorToken,
+  newPairingCode,
+  normalizePairingCode,
+  pairingExpired,
+  pairingHash,
   validMonth,
   voucherCount,
 } from "./tallyConnector";
@@ -240,6 +244,44 @@ export async function createConnector(db: Db, ctx: FirmContext, name: string) {
     .single();
   if (error) throw new PracticeError("db_error", error.message);
   return { id: data.id as string, name: clean, token };
+}
+
+/**
+ * A person asks for a pairing code. The connector row is created now but is not active (it has no usable token yet); redeeming the
+ * code activates it with a real token. Pending codes that were never used are cleared first, so they do not pile up.
+ */
+export async function createPairing(db: Db, ctx: FirmContext, name: string) {
+  const clean = name.replace(/\s+/g, " ").trim().slice(0, 60) || "Office PC";
+  const cutoff = new Date(Date.now() - 24 * 3_600_000).toISOString();
+  await db.from("ca_tally_connectors").delete().eq("ca_firm_id", ctx.firmId).eq("is_active", false).eq("host_name", "pairing").lt("created_at", cutoff);
+  const { count } = await db.from("ca_tally_connectors").select("id", { count: "exact", head: true }).eq("ca_firm_id", ctx.firmId).eq("is_active", true);
+  if ((count ?? 0) >= 10) throw new PracticeError("limit", "A firm can have up to 10 active connectors. Remove one first.");
+  const code = newPairingCode();
+  const { error } = await db
+    .from("ca_tally_connectors")
+    .insert({ ca_firm_id: ctx.firmId, name: clean, token_hash: await pairingHash(normalizePairingCode(code)!), is_active: false, host_name: "pairing", created_by: ctx.userId });
+  if (error) throw new PracticeError("db_error", error.message);
+  return { code, name: clean, expiresInMinutes: 15 };
+}
+
+/** The connector redeems a code: it gets its real token once, and the code stops working. */
+export async function redeemPairing(db: Db, rawCode: string, host?: string, version?: string) {
+  const code = normalizePairingCode(rawCode);
+  if (!code) return { ok: false as const, status: 400, error: "That is not a pairing code. It looks like 7K2QM-X9HTD." };
+  const { data: row } = await db.from("ca_tally_connectors").select("id, name, created_at, is_active, host_name").eq("token_hash", await pairingHash(code)).maybeSingle();
+  if (!row || row.is_active || row.host_name !== "pairing") return { ok: false as const, status: 404, error: "That code is not valid, or it was already used. Ask for a new one in FynHelp." };
+  if (pairingExpired(row.created_at)) return { ok: false as const, status: 410, error: "That code has expired (codes last 15 minutes). Ask for a new one in FynHelp." };
+  const token = newConnectorToken();
+  // One winner: the update only applies while the row is still the pending one.
+  const { data: won } = await db
+    .from("ca_tally_connectors")
+    .update({ token_hash: await hashToken(token), is_active: true, host_name: String(host ?? "").slice(0, 80) || null, agent_version: String(version ?? "").slice(0, 20) || null, last_seen_at: new Date().toISOString() })
+    .eq("id", row.id)
+    .eq("is_active", false)
+    .eq("host_name", "pairing")
+    .select("id");
+  if (!won?.length) return { ok: false as const, status: 404, error: "That code was just used. Ask for a new one in FynHelp." };
+  return { ok: true as const, token, name: String(row.name) };
 }
 
 export async function revokeConnector(db: Db, ctx: FirmContext, id: string) {

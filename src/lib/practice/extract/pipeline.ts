@@ -45,6 +45,7 @@ import { chooseSheet } from "./sheets";
 import { rowsFromPositioned, type PosItem } from "./pdfTable";
 import { readBankSummary, type BankSummary } from "./bankSummary";
 import { looksLikeLoanStatement, summariseLoanStatement } from "./loanStatement";
+import { readGstr2bJson } from "../gst/invoices";
 import { failureRecords } from "../aiBilled";
 import {
   passwordNeededMessage,
@@ -60,7 +61,7 @@ import {
 import { rowsFromStatementText } from "./textStatement";
 
 export type FileKind =
-  "csv" | "xlsx" | "tally_xml" | "pdf" | "image" | "unsupported";
+  "csv" | "xlsx" | "tally_xml" | "pdf" | "image" | "json" | "unsupported";
 
 export interface LlmJsonRequest {
   purpose: string;
@@ -151,7 +152,7 @@ export interface ExtractOutcome {
   note?: string;
   /** The control figures the bank printed on the statement (counts, totals, line numbers, page count), when it printed any. */
   bankSummary?: BankSummary | null;
-  error: { code: string; message: string } | null;
+  error: { code: string; message: string; /** For admins only: the technical reason (never shown to a firm's users). */ adminNote?: string } | null;
 }
 
 export class PdfPasswordError extends Error {
@@ -201,6 +202,8 @@ export function detectKind(
   )
     return "tally_xml";
   if (/\.(xml)$/.test(name)) return "tally_xml";
+  // The GSTR-2B the portal lets you download is JSON.
+  if (/\.json$/.test(name) || mime === "application/json" || (head.startsWith("{") && /"(gstin|b2b|docdata)"/i.test(head))) return "json";
   if (
     /\.(csv|tsv|txt)$/.test(name) ||
     mime?.includes("csv") ||
@@ -408,6 +411,7 @@ function fail(
   code: string,
   message: string,
   calls: AiCallRecord[] = [],
+  adminNote?: string,
 ): ExtractOutcome {
   return {
     kind,
@@ -416,7 +420,7 @@ function fail(
     sourceText: "",
     aiCalls: calls,
     documentKind: null,
-    error: { code, message },
+    error: { code, message, ...(adminNote ? { adminNote } : {}) },
   };
 }
 
@@ -424,6 +428,25 @@ function fail(
 const MIN_OCR_CHARS = 40;
 /** Lines read from a scan never outrank a person's glance unless the balances verify. */
 const OCR_CONFIDENCE_CAP = 0.8;
+
+/**
+ * Says what actually happened when the AI reader did not give an answer, from the calls made: no key at all, a key the provider
+ * rejected, a quota or rate limit, a timeout. Provider text is trimmed and never carries a key.
+ */
+export function aiWhy(hasClient: boolean, calls: AiCallRecord[]): { text: string; retryable: boolean } {
+  if (!hasClient) return { text: "No AI key is set for this deployment, so nothing was sent to the AI reader.", retryable: false };
+  const last = [...calls].reverse().find((c) => c.status === "error" && c.error);
+  if (!last) return { text: "The AI reader was not asked (its daily safety limit may have been reached).", retryable: true };
+  const raw = String(last.error);
+  const clean = raw.replace(/(AIza[0-9A-Za-z_-]{10,}|sk-[0-9A-Za-z_-]{10,}|key=[^&\s]+)/g, "[key]").replace(/\s+/g, " ").slice(0, 160);
+  if (/\b402\b|prepayment|credits? (are )?depleted|billing|payment required/i.test(raw)) return { text: `The AI provider refused because the project's billing has no credit left (${clean}). The owner needs to top up or link the project to the billing account that holds the credits.`, retryable: false };
+  if (/API_KEY_SERVICE_BLOCKED|are blocked|API restrictions?|SERVICE_DISABLED|has not been used in project/i.test(raw)) return { text: `The key is valid but its project does not allow the Generative Language API (${clean}). In Google Cloud, enable that API for the project and add it to the key's API restrictions.`, retryable: false };
+  if (/\b(401|403)\b|api key|permission|unauthori[sz]ed|invalid.*key|PERMISSION_DENIED/i.test(raw)) return { text: `The AI provider rejected the key (${clean}). The owner needs to check the key in the deployment settings.`, retryable: false };
+  if (/\b404\b|not found|model/i.test(raw) && !/timed? ?out/i.test(raw)) return { text: `The AI model name was not accepted (${clean}).`, retryable: false };
+  if (/\b429\b|quota|rate|resource.?exhaust/i.test(raw)) return { text: `The AI provider is limiting requests right now (${clean}). It will be tried again.`, retryable: true };
+  if (/timed? ?out|took too long|abort/i.test(raw)) return { text: "The AI reader took too long to answer. It will be tried again.", retryable: true };
+  return { text: `The AI reader did not answer (${clean}).`, retryable: true };
+}
 
 /** Says why a photo could not be read, from what the OCR and AI calls actually did. */
 function photoFailureMessage(calls: AiCallRecord[], ocrOn: boolean): string {
@@ -578,6 +601,30 @@ export async function runExtract(
   let documentKind: string | null = null;
   let note = "";
   let aiReadUsed = false;
+
+  if (kind === "json") {
+    // A GSTR-2B from the portal is kept as a register for GST reconciliation; any other JSON is not something we read.
+    try {
+      const read = readGstr2bJson(JSON.parse(decodeText(input.bytes)));
+      if (read.invoices.length) {
+        const taxable = Math.round(read.invoices.reduce((n, i) => n + i.taxable, 0) * 100) / 100;
+        const tax = Math.round(read.invoices.reduce((n, i) => n + i.igst + i.cgst + i.sgst + i.cess, 0) * 100) / 100;
+        return {
+          kind,
+          rows: [],
+          duplicateRows: 0,
+          sourceText: "",
+          aiCalls: calls,
+          documentKind: "gstr2b",
+          register: { kind: "gstr2b", label: REGISTER_LABELS.gstr2b, entries: read.invoices.length, totals: [{ label: "Taxable value", amount: taxable }, { label: "Tax", amount: tax }], note: `GSTR-2B${read.period ? ` for ${read.period}` : ""} kept for GST reconciliation. Not used in bank reconciliation.` },
+          error: null,
+        };
+      }
+    } catch {
+      /* not JSON we can read: said below */
+    }
+    return fail(kind, "unsupported_type", "This JSON file is not a GSTR-2B download. Use the GSTR-2B JSON from the GST portal (Returns, GSTR-2B, Download), or its Excel.");
+  }
 
   if (kind === "unsupported") {
     return fail(
@@ -809,7 +856,13 @@ export async function runExtract(
           positioned = null; // fall back to the text readers below
         }
       }
-      const statement = positioned && positioned.rows.length >= 3 && positioned.verifiedShare >= 0.7 ? positioned : rowsFromStatementText(sourceText);
+      // Two deterministic readers, and the one that recovers more of the statement wins: a column reader that finds a few lines
+      // must not beat a text reader that finds the whole statement (a bank that numbers its lines, for example).
+      const byText = rowsFromStatementText(sourceText);
+      const positionedOk = Boolean(positioned && positioned.rows.length >= 3 && positioned.verifiedShare >= 0.7);
+      const textOk = byText.rows.length >= 3 && byText.verifiedShare >= 0.7;
+      const preferText = positionedOk && positioned ? textOk && byText.rows.length > positioned.rows.length * 1.3 : true;
+      const statement = positionedOk && positioned && !preferText ? positioned : byText;
       if (statement === positioned && positioned) {
         parsed = positioned.rows;
         documentKind = "bank_statement";
@@ -834,8 +887,9 @@ export async function runExtract(
           return fail(
             kind,
             "needs_ai",
-            "The PDF has text but no statement layout was recognised, and the AI reader is not configured.",
+            "This statement's layout could not be read automatically right now. It will be tried again shortly. Uploading the bank's Excel or CSV version also works.",
             calls,
+            `Text PDF, no rule layout matched. ${aiWhy(Boolean(deps.llm), calls).text}`,
           );
         }
       }
@@ -869,8 +923,9 @@ export async function runExtract(
           kind,
           "needs_ai",
           // Said to the firm in plain words; Settings → Integrations tells the owner what to switch on.
-          "This PDF is a scan, and reading scans isn't switched on yet. Upload the statement your bank lets you download (Excel, CSV or PDF) instead, or try again later.",
+          "This PDF is a scan and could not be read right now. It will be tried again shortly, or you can upload the statement your bank lets you download (Excel, CSV or PDF).",
           calls,
+          `Scanned PDF. ${deps.ocr || deps.llm ? aiWhy(Boolean(deps.llm), calls).text : "Neither the scan reader nor the AI reader is switched on."}`,
         );
       if (read) {
         aiReadUsed = true;

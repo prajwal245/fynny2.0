@@ -24,7 +24,7 @@ export function memoryDb(
     let wantCount = false;
     let max = Infinity;
     let offset = 0;
-    let aliases: { alias: string; col: string; path: string }[] = [];
+    let aliases: { alias: string; col: string; path: string[] }[] = [];
     let afterWrite = false;
 
     const run = (): {
@@ -68,7 +68,7 @@ export function memoryDb(
       }
       const h = hit()
         .slice(offset, offset + max)
-        .map((r) => (aliases.length ? { ...r, ...Object.fromEntries(aliases.map((a) => [a.alias, (r[a.col] as Row | undefined)?.[a.path] ?? null])) } : r));
+        .map((r) => (aliases.length ? { ...r, ...Object.fromEntries(aliases.map((a) => [a.alias, a.path.reduce<unknown>((o, k) => (o as Row | undefined)?.[k], r[a.col]) ?? null])) } : r));
       return {
         data: head ? null : h,
         error: null,
@@ -86,7 +86,7 @@ export function memoryDb(
       };
     q["select"] = (cols?: string, o?: { count?: string; head?: boolean }) => {
       // PostgREST JSON paths with an alias ("acct:extracted->>account_no") add a computed field to each row.
-      aliases = [...(cols ?? "").matchAll(/(\w+):(\w+)->>?(\w+)/g)].map((m) => ({ alias: m[1]!, col: m[2]!, path: m[3]! }));
+      aliases = [...(cols ?? "").matchAll(/(\w+):(\w+)((?:->>?\w+)+)/g)].map((m) => ({ alias: m[1]!, col: m[2]!, path: [...m[3]!.matchAll(/->>?(\w+)/g)].map((x) => x[1]!) }));
       if (op === "select") {
         head = !!o?.head;
         wantCount = !!o?.count;
@@ -102,7 +102,9 @@ export function memoryDb(
     );
     q["update"] = (p: Row) => ((op = "update"), (payload = p), q);
     q["delete"] = () => ((op = "delete"), q);
-    q["eq"] = (k: string, v: unknown) => (preds.push((r) => r[k] === v), q);
+    // A PostgREST JSON path ("extracted->statement_check->>last") reads inside a JSON column.
+    const val = (r: Row, k: string): unknown => (k.includes("->") ? k.split(/->>?/).reduce<unknown>((o, key, i) => (i === 0 ? r[key] : (o as Row | undefined)?.[key]), undefined as unknown) : r[k]);
+    q["eq"] = (k: string, v: unknown) => (preds.push((r) => val(r, k) === v), q);
     q["neq"] = (k: string, v: unknown) => (preds.push((r) => r[k] !== v), q);
     q["is"] = (k: string, v: unknown) => (
       preds.push((r) => (v === null ? r[k] == null : r[k] === v)),
@@ -119,11 +121,11 @@ export function memoryDb(
       q
     );
     q["gte"] = (k: string, v: string | number) => (
-      preds.push((r) => (r[k] as string | number) >= v),
+      preds.push((r) => (val(r, k) as string | number) >= v),
       q
     );
     q["lte"] = (k: string, v: string | number) => (
-      preds.push((r) => (r[k] as string | number) <= v),
+      preds.push((r) => (val(r, k) as string | number) <= v),
       q
     );
     q["gt"] = (k: string, v: string | number) => (

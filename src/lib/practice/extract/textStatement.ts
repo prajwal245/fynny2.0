@@ -9,8 +9,12 @@
 import { parseMoneyCell } from "@/lib/bankAmount";
 import { parseDate, round2, toPaise, type ExtractedRow } from "../core";
 
+/**
+ * A line starts with a date. Some banks (Kotak) number every line first ("12  30 Jun 2025 ..."): a serial number is allowed in front
+ * of a date, and only in front of one, so it is never mistaken for part of the date.
+ */
 const DATE_AT_START =
-  /^\s*(\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}|\d{1,2}[-\s][A-Za-z]{3}[-\s]\d{2,4}|\d{4}-\d{2}-\d{2})\b/;
+  /^\s*(?:\d{1,5}\s+(?=\d{1,2}[-\s][A-Za-z]{3}[-\s]\d{2,4}\b|\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}\b))?(\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}|\d{1,2}[-\s][A-Za-z]{3}[-\s]\d{2,4}|\d{4}-\d{2}-\d{2})\b/;
 const MONEY = /(?:\(?-?[\d,]+\.\d{2}\)?(?:\s?(?:Cr|Dr|CR|DR))?)/g;
 /** Marks of a pen note beside a printed line ("paid? check w/ Ramesh !!", "personal ->") rather than a wrapped narration. */
 const ANNOTATION = /[?!]|->|=>|<-|~|\bw\/|\bpls\b|\bcheck\b/i;
@@ -77,11 +81,21 @@ export function rowsFromStatementText(text: string): TextStatementResult {
       const p = parseMoneyCell(m);
       return p.sign === -1 ? -p.value : p.value;
     });
-    const balance = monies.length >= 2 ? values[values.length - 1] : null;
+    let balance = monies.length >= 2 ? values[values.length - 1] : null;
     const amount = Math.abs(
       monies.length >= 2 ? values[values.length - 2] : values[0],
     );
     if (!amount) return;
+    // An overdrawn balance is sometimes printed without its sign (a savings account with a sweep-in FD: "4,48,711.00" after
+    // 51,289.00 less 5,00,000.00). When the printed balance only follows from the last one with its sign flipped, that is what it is.
+    let unsigned = false;
+    if (balance !== null && prevBalance !== null && balance > 0) {
+      const fits = (b: number) => Math.abs(toPaise(b) - toPaise(prevBalance as number)) === toPaise(amount);
+      if (!fits(balance) && fits(-balance)) {
+        balance = -balance;
+        unsigned = true;
+      }
+    }
 
     let description = line.slice(dm[0].length);
     for (const m of monies) description = description.replace(m, " ");
@@ -92,6 +106,7 @@ export function rowsFromStatementText(text: string): TextStatementResult {
     description = description.replace(DATE_AT_START, "").trim();
 
     const issues: string[] = [];
+    if (unsigned) issues.push("The printed balance has no minus sign; it follows from the last balance as an overdrawn amount");
     let direction: "in" | "out" | null = null;
     let confidence = 0.55;
     if (balance !== null && prevBalance !== null) {

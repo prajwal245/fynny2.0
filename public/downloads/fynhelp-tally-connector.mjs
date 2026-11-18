@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * FynHelp Connector for TallyPrime (version 1.5.1)
+ * FynHelp Connector for TallyPrime (version 1.6.0)
  *
  * Runs on the PC where TallyPrime is open. It asks Tally (on this PC) for each linked company's
  * Day Book and sends it to FynHelp over HTTPS. It only makes outbound connections, never opens a
@@ -24,15 +24,21 @@
  *     then arrive by themselves. To keep it running after a restart, add it to Windows Task
  *     Scheduler ("At log on", action: node with this file) or install it as a service with NSSM.
  *
+ * PAIRING (no token to copy): in FynHelp, Settings -> TallyPrime -> Get a pairing code, then run
+ *        node fynhelp-tally-connector.mjs --pair 7K2QM-X9HTD
+ *      The connector exchanges the code for its token once and saves fynhelp-connector.json by itself. Run with no
+ *      config at a terminal and it asks for the code.
+ *
  * Flags: --check (test Tally and FynHelp, then exit)   --once (one round, then exit)
+ *        --pair <code> (connect this PC with a pairing code)
  *        --config <file> (use another config file)
  */
-import { readFileSync, existsSync, appendFileSync } from "node:fs";
+import { readFileSync, existsSync, appendFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { hostname } from "node:os";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-export const VERSION = "1.5.1";
+export const VERSION = "1.6.0";
 
 /* ── Tally XML helpers (pure; tested) ───────────────────────── */
 
@@ -536,6 +542,67 @@ function thisFolder() {
   }
 }
 
+/** Exchanges a pairing code for this connector's token. Nothing is saved here; the caller writes the config. */
+export async function pairWithCode(server, code, fetchImpl = fetch, host = hostname()) {
+  const clean = String(code ?? "").toUpperCase().replace(/[\s-]/g, "");
+  if (clean.length !== 10) throw new Error("A pairing code has 10 letters and numbers, like 7K2QM-X9HTD.");
+  let res;
+  try {
+    res = await fetchImpl(`${normaliseServer(server)}/api/public/tally-pair`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code: clean, host_name: host, agent_version: VERSION }),
+    });
+  } catch (e) {
+    throw new Error(`Could not reach FynHelp (${e.message}). Check this PC's internet connection and try again.`);
+  }
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || !/^fyn_tc_[A-Za-z0-9_-]{40,60}$/.test(body.token ?? "")) throw new Error(body.error || `FynHelp did not accept the code (status ${res.status}).`);
+  return { token: body.token, name: body.name };
+}
+
+/** Keeps what the person already set (server, port, writing) and adds the new token. */
+export function mergeConfig(existingText, token, server) {
+  let base = {};
+  try {
+    base = existingText ? JSON.parse(String(existingText).replace(/^\uFEFF/, "")) : {};
+  } catch {
+    base = {};
+  }
+  const out = { ...base, token };
+  if (server && normaliseServer(server) !== "https://www.fynhelp.com") out.server = normaliseServer(server);
+  return JSON.stringify(out, null, 2);
+}
+
+async function askLine(question) {
+  const { createInterface } = await import("node:readline/promises");
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    return (await rl.question(question)).trim();
+  } finally {
+    rl.close();
+  }
+}
+
+/** --pair <code>, or a prompt when there is no config and a person is at the terminal. Returns true when a config was written. */
+export async function pairIfAsked(argv, cwd = process.cwd(), here = thisFolder()) {
+  const pi = argv.indexOf("--pair");
+  const ci = argv.indexOf("--config");
+  const file = ci >= 0 && argv[ci + 1] ? resolve(argv[ci + 1]) : [join(cwd, "fynhelp-connector.json"), join(here, "fynhelp-connector.json")].find((f) => existsSync(f)) ?? join(cwd, "fynhelp-connector.json");
+  const si = argv.indexOf("--server");
+  const server = si >= 0 ? argv[si + 1] : undefined;
+  let code = pi >= 0 ? argv[pi + 1] : null;
+  if (!code) {
+    if (existsSync(file) || !process.stdin.isTTY) return false;
+    console.log("This PC is not connected to FynHelp yet. In FynHelp open Settings, TallyPrime, Get a pairing code.");
+    code = await askLine("Pairing code: ");
+  }
+  const { token, name } = await pairWithCode(server, code);
+  writeFileSync(file, mergeConfig(existsSync(file) ? readFileSync(file, "utf8") : "", token, server));
+  console.log(`Paired${name ? ` as "${name}"` : ""}. Saved ${file}.`);
+  return true;
+}
+
 export function loadConfig(argv, cwd = process.cwd(), here = thisFolder()) {
   const i = argv.indexOf("--config");
   const candidates = i >= 0 && argv[i + 1] ? [resolve(argv[i + 1])] : [join(cwd, "fynhelp-connector.json"), join(here, "fynhelp-connector.json")];
@@ -724,6 +791,13 @@ export async function main() {
   if (li >= 0 && argv[li + 1]) setLogFile(resolve(argv[li + 1]));
   if (argv.includes("--version")) {
     console.log(VERSION);
+    return;
+  }
+  try {
+    await pairIfAsked(argv);
+  } catch (e) {
+    console.error(e.message);
+    process.exitCode = 2;
     return;
   }
   let cfg;

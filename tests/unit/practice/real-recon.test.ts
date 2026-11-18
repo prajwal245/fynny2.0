@@ -56,7 +56,7 @@ export async function reconCase(client: string, bankFiles: string[], bookFiles: 
   for (const b of openBooks) { const m = /\(([^()]*\d{4}[^()]*)\)/.exec(String(b["description"])); const k = m ? m[1]! : "(no bank ledger)"; byLedger.set(k, (byLedger.get(k) ?? 0) + 1); }
   const bookLeft = [...byLedger.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, n]) => `${n} × ${k}`);
   const noLedger = openBooks.filter((b) => !/\(([^()]*\d{4}[^()]*)\)/.test(String(b["description"]))).slice(0, 6).map((b) => `${String(b["txn_date"]).slice(0, 10)} ${b["direction"]} ${Number(b["amount"]).toFixed(2)} ${String(b["description"]).slice(0, 70)}`);
-  return { noLedger, bookLeft, left, summary, bank: bank.length, books: books.length, matched: bank.filter((t) => t["match_status"] === "matched").length, open: open.length, pairable, ignored: bank.filter((t) => t["match_status"] === "ignored").length };
+  return { txns, noLedger, bookLeft, left, summary, bank: bank.length, books: books.length, matched: bank.filter((t) => t["match_status"] === "matched").length, open: open.length, pairable, ignored: bank.filter((t) => t["match_status"] === "ignored").length };
 }
 
 describe.skipIf(!REAL || !existsSync(REAL ?? ""))("reconciliation on real statements and Tally books", { timeout: 600_000 }, () => {

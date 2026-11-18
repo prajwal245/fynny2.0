@@ -121,7 +121,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       db
         .from("ca_recon_runs")
         .select(
-          "business_id, period, matched, unmatched, total_items, run_at, created_at, snapshot",
+          "business_id, period, matched, unmatched, total_items, run_at, created_at",
         )
         .eq("ca_firm_id", f)
         .order("run_at", { ascending: false })
@@ -159,6 +159,18 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
         .limit(1000),
     ]);
 
+  // An archived client leaves the workspace with everything it owns: its documents, review items and exceptions must not
+  // turn up as "Unassigned" on the Documents page. They come back on restore.
+  const { data: archivedRows } = await db.from("ca_clients").select("business_id").eq("ca_firm_id", f).eq("client_status", "archived");
+  const archived = new Set((archivedRows ?? []).map((r: { business_id: string | null }) => r.business_id).filter((x): x is string => Boolean(x)));
+  if (archived.size) {
+    const live = <T extends { business_id?: string | null }>(rows: T[] | null) => (rows ?? []).filter((r) => !r.business_id || !archived.has(r.business_id));
+    xRes.data = live(xRes.data as never) as never;
+    rvRes.data = live(rvRes.data as never) as never;
+    eRes.data = live(eRes.data as never) as never;
+    rRes.data = live(rRes.data as never) as never;
+  }
+
   const clients = (cRes.data ?? []).map((r) => {
     const meta = clientMeta(r.notes);
     return {
@@ -175,7 +187,9 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
   });
 
   // Transactions for the listed documents (capped per document for the drawer).
-  const docIds = (xRes.data ?? []).map((d) => d.id);
+  // Only documents that hold transactions need them read: a held, failed or still-queued file has none, and a large firm's
+  // workspace should not wait on pages of rows for files that have nothing to show.
+  const docIds = (xRes.data ?? []).filter((d) => d.extract_status !== "failed" && d.extract_status !== "queued" && (d.txn_count ?? 1) > 0).map((d) => d.id);
   const txnsByDoc = new Map<
     string,
     {

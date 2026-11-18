@@ -32,10 +32,12 @@ describe("month-end close", () => {
     const open = deriveSteps("2026-10", facts({ exceptions: { open: 5, explained: 3 } }));
     expect(by(open, "exceptions_explained").detail).toBe("2 exceptions still need a decision.");
   });
-  it("says when no expected statements are set up, instead of passing", () => {
+  it("with no expected accounts set up, a received statement counts, and the step says what it cannot check", () => {
     const s = deriveSteps("2026-10", facts({ statements: { expected: 0, received: 1, verified: 1, held: 0, failed: 0, notAvailable: 0 } }));
-    expect(by(s, "docs_received").status).toBe("blocked");
-    expect(by(s, "docs_received").detail).toMatch(/Add them/);
+    expect(by(s, "docs_received").status).toBe("done");
+    expect(by(s, "docs_received").detail).toMatch(/No expected accounts are set up/);
+    const none = deriveSteps("2026-10", facts({ statements: { expected: 0, received: 0, verified: 0, held: 0, failed: 0, notAvailable: 0 } }));
+    expect(by(none, "docs_received").status).toBe("pending");
   });
   it("never marks GST, TDS or provisions done without a person", () => {
     const s = deriveSteps("2026-10", facts());

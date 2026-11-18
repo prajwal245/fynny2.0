@@ -107,6 +107,12 @@ describe.skipIf(!present)("the demo pack: the whole 20-minute script, in order",
     expect(step(before, "recon_done").status).toBe("done");
     expect(step(before, "exceptions_explained")).toMatchObject({ status: "pending", detail: "3 exceptions still need a decision." });
 
+    // The value card agrees with a hand count of the demo month: 32 bank lines, 4 set aside, 26 matched of the 28 that were real work, 3 decisions.
+    const { periodValue } = await import("@/lib/practice/value.server");
+    const value = await periodValue(db, ctx, "September 2026");
+    expect(value).toMatchObject({ bankLines: 32, setAside: 4, workLines: 28, autoMatched: 26, manualMatched: 0, decisionsLeft: 3, autoPct: 92.9 });
+    expect(value.sentence).toContain("92.9% of 28 bank lines matched automatically (26)");
+
     // The three decisions, each explained by a person with a reason.
     const open = (r.tables["ca_exceptions"] as Row[]).filter((e) => e["status"] === "open");
     expect(open.length).toBe(4); // Kaveri's bank line and book entry are one decision

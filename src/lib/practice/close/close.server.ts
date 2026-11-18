@@ -179,7 +179,7 @@ export async function clientClose(db: Db, ctx: FirmContext, businessId: string, 
   return (await portfolioClose(db, ctx, periodKey, businessId))[0] ?? null;
 }
 
-async function actorName(db: Db, userId: string): Promise<string> {
+export async function actorName(db: Db, userId: string): Promise<string> {
   try {
     const { data } = await db.auth.admin.getUserById(userId);
     const meta = data?.user?.user_metadata as { full_name?: string } | undefined;

@@ -21,6 +21,7 @@ import {
 } from "../components/Today";
 import AddClientModal from "../components/AddClientModal";
 import { openExceptionsIn } from "../lib/exceptions";
+import { ValueCard } from "../components/ValueCard";
 
 const PANEL_KEY = "fynhelp.v2.homepanel";
 
@@ -149,6 +150,8 @@ export default function PortfolioPage() {
       />
 
       <AgentStrip live={live} last={lastRun} />
+
+      {clients.length > 0 && <ValueCard period={period} />}
 
       {clients.length === 0 ? (
         <PinwheelCard

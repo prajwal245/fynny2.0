@@ -218,7 +218,11 @@ export async function acceptUpload(
     const { logActivity } = await import("./db.server");
     await logActivity(db, link.ca_firm_id, link.business_id, "extract", `${baseName} uploaded by the client through a secure link.`).catch(() => undefined);
     // A file the client unlocked is read now, while the password is at hand. It is used for this one read and then forgotten.
-    if (password && !res.duplicate) await processExtraction(db, res.extraction_id, { trigger: "channel", password }).catch(() => undefined);
+    if (password && !res.duplicate) {
+      // Kept encrypted so the firm can open the original and re-read it later; shown only to a partner or manager, and logged.
+      await (await import("./filePasswords.server")).saveFilePassword(db, link.ca_firm_id, res.extraction_id, password);
+      await processExtraction(db, res.extraction_id, { trigger: "channel", password }).catch(() => undefined);
+    }
     return { ok: true, duplicate: res.duplicate, filesLeft: Math.max(0, link.max_files - link.files_uploaded - 1) };
   } catch (e) {
     console.error(`[upload-link] ${(e as Error).message}`);

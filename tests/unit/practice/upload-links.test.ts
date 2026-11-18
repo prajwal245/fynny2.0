@@ -15,6 +15,12 @@ vi.mock("@/lib/practice/documents.server", () => ({
   },
 }));
 vi.mock("@/lib/practice/db.server", () => ({ logActivity: async () => undefined }));
+const savedPasswords: { extraction: string; password: string }[] = [];
+vi.mock("@/lib/practice/filePasswords.server", () => ({
+  saveFilePassword: async (_db: unknown, _f: string, extraction: string, password: string) => (savedPasswords.push({ extraction, password }), true),
+  getFilePassword: async () => null,
+  documentsWithPassword: async () => new Set(),
+}));
 
 import { acceptUpload, createUploadLink, hashToken, linkInfo, MAX_FILE_BYTES } from "@/lib/practice/uploadLinks.server";
 
@@ -152,6 +158,8 @@ describe("a locked file sent through the link", () => {
     expect(r).toMatchObject({ ok: true });
     expect(registered).toHaveLength(1);
     expect(processed).toEqual([{ id: "x1", password: "secret123" }]);
+    // It is kept (encrypted, by the vault) so the firm can open the original later.
+    expect(savedPasswords).toEqual([{ extraction: "x1", password: "secret123" }]);
     // The password is never written into what is stored about the document.
     expect(JSON.stringify(registered)).not.toContain("secret123");
   });

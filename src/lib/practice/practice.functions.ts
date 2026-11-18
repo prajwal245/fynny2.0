@@ -252,6 +252,14 @@ export const retryDuePracticeDocuments = createServerFn({ method: "POST" })
     }),
   );
 
+/** What FynHelp handled in a month: percent matched automatically, decisions left, estimated hours saved. Firm-wide or one client. */
+export const getPracticeValue = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ period, business_id: uuid.optional() }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => (await import("./value.server")).periodValue(db, ctx, data.period, data.business_id ?? null)),
+  );
+
 /** A partner or manager reads the saved password of a locked file the client sent. Every reading is logged with who did it. */
 export const revealFilePassword = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

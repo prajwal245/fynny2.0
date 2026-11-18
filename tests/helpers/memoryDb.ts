@@ -128,6 +128,11 @@ export function memoryDb(
       preds.push((r) => (val(r, k) as string | number) <= v),
       q
     );
+    q["like"] = (k: string, pattern: string) => {
+      const re = new RegExp(`^${pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/%/g, ".*").replace(/_/g, ".")}$`);
+      preds.push((r) => typeof val(r, k) === "string" && re.test(val(r, k) as string));
+      return q;
+    };
     q["gt"] = (k: string, v: string | number) => (
       preds.push((r) => (r[k] as string | number) > v),
       q

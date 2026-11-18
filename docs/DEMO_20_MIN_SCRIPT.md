@@ -97,7 +97,7 @@ Be honest: "Client query messages are copy-ready templates today. The system doe
 ## 15:30 to 17:00  Month-end close
 
 Do: Close, September.
-Say: "Ten steps. Documents received, statements verified, reconciliation done and exceptions explained tick automatically from what it has proven. With the three exceptions still open, the fourth waits; once you accepted or resolved them it ticks. GST, TDS and provisions are ticked by a person with the right role. The partner signs off last."
+Say: "Ten steps. Documents received, statements verified, reconciliation done and exceptions explained tick automatically from what it has proven. With the three exceptions still open, the fourth waits; once you accepted or resolved them it ticks, and the month reads **Bank and Books Closed**. It becomes Fully Closed after GST, TDS, provisions, the MIS review and the partner's sign-off. GST, TDS and provisions are ticked by a person with the right role. The partner signs off last."
 Do: show auto steps ticked, manual steps open, the due-days chip.
 
 ## 17:00 to 18:00  GST (only if they said GST matters in Q3 or Q6)

@@ -92,20 +92,40 @@ describe.skipIf(!present)("the demo pack", () => {
   });
 });
 
-describe.skipIf(!present)("the demo pack: Close checklist and handling", () => {
-  it("ticks documents received from the statements uploaded, and exceptions explained once each decision is explained", async () => {
+describe.skipIf(!present)("the demo pack: the whole 20-minute script, in order", () => {
+  it("statements, recon, handling, close ticks and the activity trail", async () => {
     const r = await run([{ f: "01_HDFC_Current_Sep2026.pdf", side: "bank" }, { f: "02_ICICI_Current_Sep2026.pdf", side: "bank" }, { f: "04_Tally_DayBook_Sep2026.xlsx", side: "books" }]);
     const { clientClose } = await import("@/lib/practice/close/close.server");
     const { setWorkStatus } = await import("@/lib/practice/exceptionWork.server");
     const ctx = { firmId: FIRM, firmName: "Firm", firmEmail: null, userId: "u1", role: "owner" as const };
     const db = (r as unknown as { db: never }).db;
+    const step = (c: Awaited<ReturnType<typeof clientClose>>, k: string) => c!.steps.find((s) => s.key === k)!;
+
     const before = await clientClose(db, ctx, BUSINESS, "2026-09");
-    const step = (c: typeof before, k: string) => c!.steps.find((s) => s.key === k)!;
-    console.log("CLOSE before", step(before, "docs_received").status, "|", step(before, "docs_received").detail, "||", step(before, "exceptions_explained").status, "|", step(before, "exceptions_explained").detail);
+    expect(step(before, "docs_received").status).toBe("done");
+    expect(step(before, "statements_verified").status).toBe("done");
+    expect(step(before, "recon_done").status).toBe("done");
+    expect(step(before, "exceptions_explained")).toMatchObject({ status: "pending", detail: "3 exceptions still need a decision." });
+
+    // The three decisions, each explained by a person with a reason.
     const open = (r.tables["ca_exceptions"] as Row[]).filter((e) => e["status"] === "open");
-    for (const e of open) await setWorkStatus(db, ctx, String(e["id"]), "accepted_timing", "Cheque not yet presented");
+    expect(open.length).toBe(4); // Kaveri's bank line and book entry are one decision
+    for (const e of open) await setWorkStatus(db, ctx, String(e["id"]), "accepted_timing", "Cheque issued, not yet presented: clears 3 Oct");
+
     const after = await clientClose(db, ctx, BUSINESS, "2026-09");
-    console.log("CLOSE after ", step(after, "exceptions_explained").status, "|", step(after, "exceptions_explained").detail, "| open rows", open.length);
+    expect(step(after, "exceptions_explained").status).toBe("done");
+    expect(after!.steps.filter((s) => s.kind === "auto" && s.status === "done").length).toBe(4);
+    expect(after!.state).toBe("bank_books_closed");
+
+    const log = (r.tables["ca_activity_log"] ?? []) as Row[];
+    expect(log.some((l) => /moved an exception from "Open" to "Accepted as timing": Cheque issued, not yet presented/.test(String(l["description"])))).toBe(true);
+  });
+  it("a held statement blocks 'statements verified' until a person accepts it", async () => {
+    const r = await run([{ f: "03_HDFC_Current_Sep2026_one_line_missing.pdf", side: "bank" }], false);
+    const { clientClose } = await import("@/lib/practice/close/close.server");
+    const ctx = { firmId: FIRM, firmName: "Firm", firmEmail: null, userId: "u1", role: "owner" as const };
+    const c = await clientClose((r as unknown as { db: never }).db, ctx, BUSINESS, "2026-09");
+    expect(c!.steps.find((s) => s.key === "statements_verified")).toMatchObject({ status: "blocked" });
   });
 });
 

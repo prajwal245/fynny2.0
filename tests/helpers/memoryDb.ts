@@ -102,7 +102,9 @@ export function memoryDb(
     );
     q["update"] = (p: Row) => ((op = "update"), (payload = p), q);
     q["delete"] = () => ((op = "delete"), q);
-    q["eq"] = (k: string, v: unknown) => (preds.push((r) => r[k] === v), q);
+    // A PostgREST JSON path ("extracted->statement_check->>last") reads inside a JSON column.
+    const val = (r: Row, k: string): unknown => (k.includes("->") ? k.split(/->>?/).reduce<unknown>((o, key, i) => (i === 0 ? r[key] : (o as Row | undefined)?.[key]), undefined as unknown) : r[k]);
+    q["eq"] = (k: string, v: unknown) => (preds.push((r) => val(r, k) === v), q);
     q["neq"] = (k: string, v: unknown) => (preds.push((r) => r[k] !== v), q);
     q["is"] = (k: string, v: unknown) => (
       preds.push((r) => (v === null ? r[k] == null : r[k] === v)),
@@ -119,11 +121,11 @@ export function memoryDb(
       q
     );
     q["gte"] = (k: string, v: string | number) => (
-      preds.push((r) => (r[k] as string | number) >= v),
+      preds.push((r) => (val(r, k) as string | number) >= v),
       q
     );
     q["lte"] = (k: string, v: string | number) => (
-      preds.push((r) => (r[k] as string | number) <= v),
+      preds.push((r) => (val(r, k) as string | number) <= v),
       q
     );
     q["gt"] = (k: string, v: string | number) => (

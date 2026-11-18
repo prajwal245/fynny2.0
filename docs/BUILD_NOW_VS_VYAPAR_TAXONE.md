@@ -29,7 +29,7 @@
 | 7 | **Exception to entry**: for every "in the bank, not in the books" line, propose a voucher from the firm's rules, approve in bulk, send to Tally (or export the import file). Always approved by a person, always undoable | They post everything and leave checking to the clerk; we propose only what the bank proves is missing, a small list that is quick to verify |
 | 8 | **Narration to ledger learning**: every correction teaches a firm-specific rule ("PHONEPE/RAMESH" goes to Staff Welfare), shown and editable | Their "AI ledger mapping" is the sales story; ours improves per firm and is inspectable |
 | 9 | **Sales and purchase invoice reading checked against GSTR-2B** (two-sided) | Single-sided OCR is where "100% accuracy" claims fail; the portal is an independent check |
-| 10 | **WhatsApp sending** through the official Business API, with a client upload link per client and "missing documents" reminders | They have it on one page and "coming soon" on another; shipping it reliably is parity and then an edge |
+| 10 | **WhatsApp**: document reminders already send through the official Business API (client upload link, consent, daily cap, daytime window). Add **exception questions** to the client from the queue, and supplier follow-ups from the GST page, through the same sender with a Meta-approved Utility template | They have WhatsApp on one page and "coming soon" on another; ours is live for reminders, and questions are the next edge |
 | 11 | **Scanned PDF and image reading** with every result tied out the same way as text statements | Parity with their three formats, with proof they lack |
 
 ### C. Differentiate where they are silent (weeks 6 to 12)

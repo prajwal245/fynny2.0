@@ -92,7 +92,7 @@ Do: open the three exceptions.
 
 Do: on the cheque choose **Accept as timing**, pick the reason "Cheque issued, not yet presented", add "clears 3 Oct". Assign the Rs 25,000 to the teammate you invited and set Query sent. Add a note on Kaveri. Then open the client's **Activity**: every one of these actions is listed with the person's name.
 Say: "Every change is logged and cannot be edited afterwards. Your assistant works it, the manager reviews."
-Be honest: "Client query messages are copy-ready templates today. The system does not send them yet."
+Be honest: "Document reminders already go out to clients by WhatsApp and email, with a daily cap, a daytime window and consent. A question about one exception is still written by your team (copy it, or send it from your own WhatsApp); sending those from FynHelp is next."
 
 ## 15:30 to 17:00  Month-end close
 
@@ -127,7 +127,7 @@ Close with one concrete next step and a date. Send the follow-up within an hour:
 - A question you cannot answer: "I do not know yet. I will find out and reply today." Then do.
 
 ## What not to claim
-No GST filing, no posting back into Tally, no automatic sending of client queries, no senior-review flow until the firm has a second partner seat, and no claim of proven accuracy on scanned statements.
+No GST filing, no posting back into Tally, no automatic sending of exception questions to clients (document reminders do send), no senior-review flow until the firm has a second partner seat, and no claim of proven accuracy on scanned statements.
 
 ## After the call (two minutes)
 Note: firm size, tools, the pain quote, decision maker, objections, agreed pilot client and date. Mark the lead Strong, Possible or Weak using the Q1 to Q6 rules above.

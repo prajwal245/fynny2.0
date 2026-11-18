@@ -143,20 +143,30 @@ async function callProvider(
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(p.url, {
-      method: "POST",
-      signal: ctrl.signal,
-      headers: {
-        Authorization: `Bearer ${p.key}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: p.model,
-        messages: buildMessages(req),
-        temperature: 0.1,
-        response_format: { type: "json_object" },
-      }),
-    });
+    // Reading a statement is transcription, not reasoning: Gemini's default thinking makes a page take 40 seconds or more and bills
+    // for the thinking. A low effort keeps the answer and cuts the time. A provider that refuses the field is asked again without it.
+    const effort = p.name.startsWith("gemini") ? (env("GEMINI_REASONING_EFFORT") ?? "low") : null;
+    const send = (withEffort: boolean) =>
+      fetch(p.url, {
+        method: "POST",
+        signal: ctrl.signal,
+        headers: {
+          Authorization: `Bearer ${p.key}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: p.model,
+          messages: buildMessages(req),
+          temperature: 0.1,
+          response_format: { type: "json_object" },
+          ...(withEffort && effort && effort !== "default" ? { reasoning_effort: effort } : {}),
+        }),
+      });
+    let res = await send(true);
+    if (res.status === 400 && effort) {
+      const text = await res.clone().text().catch(() => "");
+      if (/reasoning|effort|thinking/i.test(text)) res = await send(false);
+    }
     if (res.status === 429 || res.status >= 500)
       throw new RetryableError(`${p.name} ${res.status}`);
     if (!res.ok)

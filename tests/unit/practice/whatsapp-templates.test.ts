@@ -76,9 +76,24 @@ describe("reading Meta's templates", () => {
     expect(pickTemplate(list, templateCandidates("final", {}), "en")).toEqual({ name: "document_followup_v1", layout: "url_first", language: "en" });
   });
 
-  it("never picks a Marketing template, and returns null when nothing is approved", () => {
+  it("uses an approved Marketing template for a chase (the firm's decision), and returns null when nothing is approved", () => {
     const list = [t("_fh_doc_request", "APPROVED", { category: "MARKETING" }), t("document_request_v2", "REJECTED")];
-    expect(pickTemplate(list, ["_fh_doc_request", "document_request_v2"], "en")).toBeNull();
+    expect(pickTemplate(list, ["_fh_doc_request", "document_request_v2"], "en")?.name).toBe("_fh_doc_request");
+    expect(pickTemplate([t("document_request_v2", "REJECTED"), t("x", "PENDING")], ["document_request_v2", "x"], "en")).toBeNull();
+  });
+  it("can be switched back to Utility only", () => {
+    process.env["WHATSAPP_CHASE_ALLOW_MARKETING"] = "0";
+    try {
+      const list = [t("_fh_doc_request", "APPROVED", { category: "MARKETING" })];
+      expect(pickTemplate(list, ["_fh_doc_request"], "en")).toBeNull();
+    } finally {
+      delete process.env["WHATSAPP_CHASE_ALLOW_MARKETING"];
+    }
+  });
+  it("falls past a template with an unusable layout to the next approved one, Marketing included", () => {
+    const bad = t("document_followup_v2", "APPROVED", { components: [{ type: "BODY", text: "Hello {{1}} {{2}} {{3}} {{4}}" }, { type: "BUTTONS", buttons: [{ type: "QUICK_REPLY", text: "a" }] }] });
+    const ok = t("document_request_v2", "APPROVED", { category: "MARKETING" });
+    expect(pickTemplate([bad, ok], ["document_followup_v2", "document_request_v2"], "en")?.name).toBe("document_request_v2");
   });
 });
 

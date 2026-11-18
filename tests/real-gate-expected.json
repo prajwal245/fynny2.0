@@ -1,0 +1,38 @@
+{
+  "satkaarika_fy": {
+    "bank": 43,
+    "matched": 42,
+    "open": 1
+  },
+  "satkaarika_all": {
+    "bank": 48,
+    "matched": 44,
+    "open": 2
+  },
+  "sssl_may": {
+    "bank": 882,
+    "matched": 799,
+    "open": 11,
+    "pairable": 4
+  },
+  "kotak_3368": {
+    "lines": 31,
+    "parsed": true,
+    "failedCheck": false
+  },
+  "loan_gecl": {
+    "isLoan": true,
+    "bankLines": 0
+  },
+  "loan_term": {
+    "isLoan": true,
+    "bankLines": 0
+  },
+  "loan_vehicle": {
+    "isLoan": true,
+    "bankLines": 0
+  },
+  "cc_not_loan": {
+    "isLoan": false
+  }
+}

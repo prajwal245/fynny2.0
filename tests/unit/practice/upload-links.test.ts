@@ -2,8 +2,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const registered: Record<string, unknown>[] = [];
+const processed: { id: string; password?: string }[] = [];
 vi.mock("@/lib/practice/documents.server", () => ({
   BUCKET: "bucket",
+  processExtraction: async (_db: unknown, id: string, o: { password?: string }) => {
+    processed.push({ id, password: o.password });
+    return { status: "parsed" };
+  },
   registerDocument: async (_db: unknown, _ctx: unknown, input: Record<string, unknown>) => {
     registered.push(input);
     return { extraction_id: "x1", duplicate: false };
@@ -114,5 +119,63 @@ describe("upload links", () => {
     expect(await acceptUpload(db, l.token, file(), now)).toMatchObject({ ok: false, reason: "full" });
     expect(await acceptUpload(db, l.token, file(), new Date("2027-01-01T00:00:00Z"))).toMatchObject({ ok: false, reason: "expired" });
     expect(uploads).toHaveLength(2);
+  });
+});
+
+
+import { readFileSync } from "node:fs";
+
+describe("a locked file sent through the link", () => {
+  const f = (n: string) => new Uint8Array(readFileSync(`${process.cwd()}/tests/fixtures/locked/${n}`));
+  const fresh = async () => {
+    links.length = 0; registered.length = 0; uploads.length = 0; processed.length = 0;
+    const l = await createUploadLink(db as never, { firmId: "f1", businessId: "b1", requestId: "r1" });
+    return l!.token;
+  };
+  it("asks for the password, keeps nothing and takes no slot", async () => {
+    const token = await fresh();
+    const r = await acceptUpload(db as never, token, { name: "HDFC.pdf", mime: "application/pdf", bytes: f("locked.pdf") });
+    expect(r).toMatchObject({ ok: false, reason: "password" });
+    expect(registered).toHaveLength(0);
+    expect(processed).toHaveLength(0);
+  });
+  it("refuses a wrong password in its own words, and still keeps nothing", async () => {
+    const token = await fresh();
+    const r = await acceptUpload(db as never, token, { name: "HDFC.pdf", mime: "application/pdf", bytes: f("locked.pdf"), password: "nope" });
+    expect(r).toMatchObject({ ok: false, reason: "password_wrong" });
+    expect((r as { message: string }).message).toMatch(/did not open/);
+    expect(registered).toHaveLength(0);
+  });
+  it("accepts the right password, stores the file, and reads it once with that password", async () => {
+    const token = await fresh();
+    const r = await acceptUpload(db as never, token, { name: "HDFC.pdf", mime: "application/pdf", bytes: f("locked.pdf"), password: "secret123" });
+    expect(r).toMatchObject({ ok: true });
+    expect(registered).toHaveLength(1);
+    expect(processed).toEqual([{ id: "x1", password: "secret123" }]);
+    // The password is never written into what is stored about the document.
+    expect(JSON.stringify(registered)).not.toContain("secret123");
+  });
+  it("a locked Excel file is handled the same way", async () => {
+    const token = await fresh();
+    const mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    const none = await acceptUpload(db as never, token, { name: "books.xlsx", mime, bytes: f("locked.xlsx") });
+    expect(none).toMatchObject({ ok: false, reason: "password" });
+    const ok = await acceptUpload(db as never, token, { name: "books.xlsx", mime, bytes: f("locked.xlsx"), password: "secret123" });
+    expect(ok).toMatchObject({ ok: true });
+  });
+  it("a file that is not locked is never asked for a password and is not read here", async () => {
+    const token = await fresh();
+    const r = await acceptUpload(db as never, token, { name: "plain.pdf", mime: "application/pdf", bytes: f("plain.pdf") });
+    expect(r).toMatchObject({ ok: true });
+    expect(processed).toHaveLength(0);
+  });
+});
+
+describe("opening a link", () => {
+  it("tolerates trailing punctuation or a tracking suffix on the token", async () => {
+    links.length = 0;
+    const l = await createUploadLink(db as never, { firmId: "f1", businessId: "b1", requestId: "r1" });
+    for (const tail of [".", ")", "?utm=wa", "&x=1"]) expect(await linkInfo(db as never, `${l!.token}${tail}`)).toMatchObject({ ok: true });
+    expect(await linkInfo(db as never, "short")).toMatchObject({ ok: false, reason: "invalid" });
   });
 });

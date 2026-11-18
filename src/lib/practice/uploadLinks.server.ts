@@ -8,7 +8,10 @@
  */
 import { createHash, randomBytes } from "node:crypto";
 import type { Db } from "./db.server";
-import { BUCKET, registerDocument } from "./documents.server";
+import { BUCKET, processExtraction, registerDocument } from "./documents.server";
+import { checkPdfPassword, unlockWorkbook } from "./files.server";
+import { PdfPasswordError } from "./extract/pipeline";
+import { cleanPassword, passwordNeededMessage, passwordWrongMessage } from "./passwordFile";
 import { PracticeError } from "./core";
 
 export const LINK_DAYS = 14;
@@ -62,7 +65,10 @@ interface LinkRow {
 }
 
 async function findLink(db: Db, token: string): Promise<LinkRow | null> {
-  if (!/^[A-Za-z0-9_-]{20,64}$/.test(token)) return null;
+  // A link pasted or opened from chat apps can carry trailing punctuation or a tracking suffix: take the token itself.
+  const clean = /^[A-Za-z0-9_-]{20,64}/.exec(String(token ?? "").trim())?.[0];
+  if (!clean) return null;
+  token = clean;
   const { data } = await db
     .from("ca_upload_links")
     .select("id, ca_firm_id, business_id, request_id, expires_at, files_uploaded, max_files, revoked_at")
@@ -118,7 +124,8 @@ export function looksLike(mime: string, b: Uint8Array): boolean {
     case "image/heic":
       return b.length > 12 && String.fromCharCode(...b.slice(4, 8)) === "ftyp";
     case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
-      return starts(0x50, 0x4b);
+      // A zip, or the older container a password-protected workbook is saved in.
+      return starts(0x50, 0x4b) || starts(0xd0, 0xcf, 0x11, 0xe0);
     case "application/vnd.ms-excel":
       return starts(0xd0, 0xcf, 0x11, 0xe0) || b.length > 0;
     case "text/csv":
@@ -128,7 +135,9 @@ export function looksLike(mime: string, b: Uint8Array): boolean {
   }
 }
 
-export type UploadResult = { ok: true; duplicate: boolean; filesLeft: number } | { ok: false; reason: "invalid" | "expired" | "full" | "type" | "size" | "empty" | "failed"; message: string };
+export type UploadResult =
+  | { ok: true; duplicate: boolean; filesLeft: number }
+  | { ok: false; reason: "invalid" | "expired" | "full" | "type" | "size" | "empty" | "failed" | "password" | "password_wrong"; message: string };
 
 const MESSAGES = {
   invalid: "This link is not valid. Ask your accountant to send a new one.",
@@ -138,13 +147,15 @@ const MESSAGES = {
   size: "That file is larger than 15 MB. Please send a smaller or compressed copy.",
   empty: "That file is empty.",
   failed: "We could not save that file. Please try again.",
+  password: "",
+  password_wrong: "",
 } as const;
 
 /** Takes one file from the page. Every check happens here, on the server. */
 export async function acceptUpload(
   db: Db,
   token: string,
-  file: { name: string; mime: string; bytes: Uint8Array },
+  file: { name: string; mime: string; bytes: Uint8Array; /** The password of a locked PDF or Excel file, typed by the client. Used once to open the file; never stored or logged. */ password?: string | null },
   now: Date = new Date(),
 ): Promise<UploadResult> {
   const fail = (reason: keyof typeof MESSAGES): UploadResult => ({ ok: false, reason, message: MESSAGES[reason] });
@@ -156,6 +167,22 @@ export async function acceptUpload(
   if (!ALLOWED[mime] || !looksLike(mime, file.bytes)) return fail("type");
   if (file.bytes.length === 0) return fail("empty");
   if (file.bytes.length > MAX_FILE_BYTES) return fail("size");
+
+  // A locked PDF or Excel file: ask for its password here, on the page the client is already on, before anything is kept.
+  const password = cleanPassword(file.password) ?? undefined;
+  const isExcel = mime.includes("spreadsheetml") || mime === "application/vnd.ms-excel";
+  if (mime === "application/pdf" || isExcel) {
+    try {
+      if (mime === "application/pdf") await checkPdfPassword(file.bytes, password);
+      else await unlockWorkbook(file.bytes, password);
+    } catch (e) {
+      if (e instanceof PdfPasswordError) {
+        const what = mime === "application/pdf" ? "PDF" : "Excel file";
+        return e.reason === "wrong" ? { ok: false, reason: "password_wrong", message: passwordWrongMessage(what) } : { ok: false, reason: "password", message: passwordNeededMessage(what) };
+      }
+      // Anything else about the file is for the reader to report; it must not stop the upload.
+    }
+  }
 
   const { data: took } = await db.rpc("ca_upload_link_take", { p_link: link.id });
   if (!took) return fail("full");
@@ -181,6 +208,8 @@ export async function acceptUpload(
     );
     const { logActivity } = await import("./db.server");
     await logActivity(db, link.ca_firm_id, link.business_id, "extract", `${baseName} uploaded by the client through a secure link.`).catch(() => undefined);
+    // A file the client unlocked is read now, while the password is at hand. It is used for this one read and then forgotten.
+    if (password && !res.duplicate) await processExtraction(db, res.extraction_id, { trigger: "channel", password }).catch(() => undefined);
     return { ok: true, duplicate: res.duplicate, filesLeft: Math.max(0, link.max_files - link.files_uploaded - 1) };
   } catch (e) {
     console.error(`[upload-link] ${(e as Error).message}`);

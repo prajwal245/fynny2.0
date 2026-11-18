@@ -48,6 +48,7 @@ export const Route = createFileRoute("/api/public/upload-link")({
           name: file.name,
           mime: file.type,
           bytes: new Uint8Array(await file.arrayBuffer()),
+          password: typeof form.get("password") === "string" ? (form.get("password") as string) : null,
         });
         return json(result, result.ok ? 200 : 400);
       },

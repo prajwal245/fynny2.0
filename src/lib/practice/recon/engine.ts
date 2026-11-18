@@ -608,13 +608,24 @@ export function reconcile(
     /** Pairs the lines of one cluster, best party agreement first, then nearest date. */
     const pairCluster = (cb: ReconTxn[], ck: ReconTxn[]) => {
       const equal = cb.length === ck.length;
+      // A same-date group is "uniform" when it really is a group (two or more on a side) and each side looks alike: the bank lines
+      // share one kind of narration, the entries share one ledger. Then no line is distinguishable, so pairing is safe.
+      const norm = (x: ReconTxn) => String(x.counterparty ?? "").toLowerCase().replace(/[^a-z]/g, "");
+      const uniformOnDate = (d: string) => {
+        const bs = cb.filter((x) => x.txn_date === d);
+        const ks = ck.filter((x) => x.txn_date === d);
+        if (bs.length < 2 && ks.length < 2) return false;
+        return new Set(bs.map(norm)).size <= 1 && new Set(ks.map(norm)).size <= 1;
+      };
       const cand: { t: ReconTxn; b: ReconTxn; score: number; gap: number }[] = [];
       for (const t of cb)
         for (const b of ck) {
           if (usedBank.has(t.id) || usedBook.has(b.id)) continue;
           const gap = daysBetween(t.txn_date, b.txn_date);
           // Unequal numbers: which line the entry belongs to is a guess unless the party agrees, so a pair needs the same date AND the party.
-          if (!equal && (gap !== 0 || counterpartyScore(t, b, aliases) < 0.6)) continue;
+          // On one date with identical amounts, which of the lines is the extra one is unknowable from the narrations (a UPI line never
+          // carries the ledger's name), but the total is not: as many pairs as there are entries are made, and the surplus stays open.
+          if (!equal && !(gap === 0 && uniformOnDate(t.txn_date))) continue;
           cand.push({ t, b, score: fuzzyScore(t, b, cfg, aliases).score, gap });
         }
       cand.sort((x, y) => y.score - x.score || x.gap - y.gap || (x.t.id < y.t.id ? -1 : x.t.id > y.t.id ? 1 : x.b.id < y.b.id ? -1 : 1));
@@ -632,7 +643,7 @@ export function reconcile(
             ...s.explanation,
             note: equal
               ? `One of ${cb.length} identical entries (same amount and direction within two days). Paired by party, then by date: any pairing gives the same total.`
-              : `${cb.length} bank lines and ${ck.length} book entries have this amount on this date; this is one of the ${Math.min(cb.length, ck.length)} that can be paired. The rest stay open.`,
+              : `${cb.length} bank lines and ${ck.length} book entries have this amount on this date; ${Math.min(cb.length, ck.length)} are paired and the ${Math.abs(cb.length - ck.length)} left over stay open. The total is right; which line is the extra one is a guess.`,
           },
         });
       }

@@ -167,3 +167,19 @@ describe("chains of days with identical UPI amounts", () => {
     expect(r.exceptions).toHaveLength(0);
   });
 });
+
+describe("one more bank line than book entries on a date", () => {
+  it("pairs as many as there are entries when each side is uniform, and leaves the extra line open", () => {
+    const bank = ["b1", "b2", "b3", "b4"].map((id, n) => tx(id, "bank", "2025-05-10", 1000, { description: `UPIAR/${n}1234/DR/Ph`, counterparty: "UPIAR" }));
+    const books = ["k1", "k2", "k3"].map((id) => tx(id, "books", "2025-05-10", 1000, { description: "SITE EXPENSES", counterparty: "SITE EXPENSES" }));
+    const r = reconcile(bank, books);
+    expect(r.matches).toHaveLength(3);
+    expect(r.exceptions).toHaveLength(1);
+    expect(r.matches[0]!.explanation.note).toMatch(/3 are paired and the 1 left over stay open/);
+  });
+  it("does not pair when the names on one side differ", () => {
+    const bank = ["b1", "b2"].map((id) => tx(id, "bank", "2025-05-10", 1000, { counterparty: id === "b1" ? "Alpha" : "Gamma" }));
+    const books = [tx("k1", "books", "2025-05-10", 1000, { counterparty: "Omega" })];
+    expect(reconcile(bank, books).matches).toHaveLength(0);
+  });
+});

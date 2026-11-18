@@ -182,6 +182,8 @@ export function explainWaError(code: number | undefined, raw: string | undefined
     case 132000:
     case 132012:
       return ours(true, "The template's fields do not match what FynHelp sends: four body fields and, when buttons are on, the four buttons.");
+    case 131049:
+      return { permanent: false, message: "WhatsApp did not deliver this reminder to this person right now (a limit on promotional-type messages per person). It will be tried again later. Send it by email meanwhile." };
     case 131056:
     case 130429:
     case 131048:
@@ -354,9 +356,18 @@ export function bodyVariables(t: Pick<MetaTemplate, "components">): number | nul
   return new Set(body.text.match(/\{\{\s*\d+\s*\}\}/g) ?? []).size;
 }
 
+/**
+ * Chase reminders may use a Marketing-category template. The firm's own decision: the approved templates it has are used whatever
+ * Meta calls them. (Meta charges Marketing at a higher rate and may refuse a message to a person who has had many; that failure is
+ * reported in plain words, see explainWaError 131049.) Set WHATSAPP_CHASE_ALLOW_MARKETING=0 to go back to Utility only.
+ */
+export const chaseAllowsMarketing = () => !(typeof process !== "undefined" && process.env?.["WHATSAPP_CHASE_ALLOW_MARKETING"] === "0");
+
 /** templateStatus, plus the check that a chase template really takes the four variables we fill in. */
-export function chaseTemplateStatus(t: MetaTemplate | undefined): TemplateStatus {
-  const s = templateStatus(t);
+export function chaseTemplateStatus(t: MetaTemplate | undefined, allowMarketing: boolean = chaseAllowsMarketing()): TemplateStatus {
+  let s = templateStatus(t);
+  // A Marketing template that is otherwise approved is used for a chase: its category is not what decides.
+  if (s === "marketing" && allowMarketing && t) s = buttonLayoutOf(t) === "other" ? "unsupported" : "approved";
   if (s === "approved" && t) {
     const n = bodyVariables(t);
     if (n !== null && n !== 4) return "unsupported";

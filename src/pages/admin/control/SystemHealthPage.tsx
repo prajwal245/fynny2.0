@@ -79,6 +79,21 @@ export default function SystemHealthPage() {
               </Table>
             )}
           </Panel>
+          <Panel title="WhatsApp send failures">
+            {d.waFailures.length === 0 ? (
+              <Empty>No WhatsApp send failures in the last 24 hours.</Empty>
+            ) : (
+              <Table head={["When", "Firm", "Reason (admins only)"]}>
+                {d.waFailures.map((r, i) => (
+                  <tr key={`${r.at}-${i}`}>
+                    <Td>{when(r.at)}</Td>
+                    <Td>{r.firm}</Td>
+                    <Td className="max-w-[560px] break-words">{r.error}</Td>
+                  </tr>
+                ))}
+              </Table>
+            )}
+          </Panel>
           <Panel title="Failures in the last 24 hours">
             {d.recentFailures.length === 0 ? (
               <Empty>No agent failures in the last 24 hours.</Empty>

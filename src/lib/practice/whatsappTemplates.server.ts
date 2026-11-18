@@ -128,9 +128,9 @@ export async function stagesView(sender: Pick<Sender, "wabaId" | "token"> | null
     const usingWanted = picked?.name === wanted;
     const note =
       st === "approved" && usingWanted
-        ? picked?.layout
+        ? `${picked?.layout
           ? "Ready. Clients get the Upload documents button and three quick replies."
-          : "Ready. This template has no buttons yet, so clients reply with text."
+          : "Ready. This template has no buttons yet, so clients reply with text."}${(wantedT?.category ?? "").toUpperCase() === "MARKETING" ? " Meta bills it as Marketing." : ""}`
         : st === "review"
           ? `"${wanted}" is in review with Meta. ${picked ? `Until it is approved, "${picked.name}" is used.` : "Nothing can be sent as a template until a template is approved."}`
           : st === "rejected"

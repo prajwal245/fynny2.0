@@ -243,6 +243,19 @@ export async function bindRoute(db: Db, phoneKey: string, firmId: string, via: "
  * "qr_first" if the three quick replies come first) the template carries the buttons of
  * "document_request_v2": Upload documents, Sending today, Need more time, Stop reminders.
  */
+/**
+ * A WhatsApp fault that is FynHelp's to fix (token, template, number setup) is kept where admins read it: System Health. It is stored
+ * with the AI calls table as purpose "whatsapp_send" (that table already has an error column and is admin-only), so no new table is
+ * needed. Firms see the plain message only. Never throws.
+ */
+async function recordWaFault(db: Db, firmId: string, text: string) {
+  try {
+    await db.from("ca_ai_calls").insert({ ca_firm_id: firmId, purpose: "whatsapp_send", provider: "meta", model: null, input: "", output: null, latency_ms: null, status: "error", error: text.slice(0, 500) });
+  } catch {
+    /* logging must never break a send */
+  }
+}
+
 export async function sendChaseWhatsapp(
   db: Db,
   firmId: string,
@@ -287,7 +300,10 @@ export async function sendChaseWhatsapp(
         // A bad token will fail the template too; any other failure (window closed, odd text rejection) falls back to it.
         else if (t.body.error?.code === 190 && !windowClosed(t.body.error.code)) {
           const why = explainWaError(190, t.body.error.message);
-          if (why.internal) console.error(`[whatsapp] platform fault: ${why.internal}`);
+          if (why.internal) {
+            console.error(`[whatsapp] platform fault: ${why.internal}`);
+            await recordWaFault(db, firmId, why.internal);
+          }
           return { ok: false, unconfigured: false, permanent: why.permanent, error: why.message };
         }
       }
@@ -295,6 +311,7 @@ export async function sendChaseWhatsapp(
         // No approved template: say so plainly, before a credit is taken, instead of letting WhatsApp refuse it.
         if (template.none) {
           console.error("[whatsapp] platform fault: no approved reminder template is available, so reminders cannot go out");
+          await recordWaFault(db, firmId, `No approved reminder template was found for the number that sends (${sender.shared ? "FynHelp's shared number" : "this firm's number"}${test ? ", Meta's test number" : ""}). Create and get approved the template named by WHATSAPP_CHASE_TEMPLATE in the WhatsApp account that owns this number, in language ${chaseTemplateLang()}.`);
           return { ok: false, unconfigured: false, permanent: false, error: PLATFORM_FAILURE_MESSAGE };
         }
         // Only a template costs a credit.
@@ -306,7 +323,10 @@ export async function sendChaseWhatsapp(
         const r = await post(sender, buildTemplateMessage(to, template.name, template.language || chaseTemplateLang(), params, buttons));
         if (!r.ok) {
           const why = explainWaError(r.body.error?.code, r.body.error?.error_data?.details ?? r.body.error?.message);
-          if (why.internal) console.error(`[whatsapp] platform fault: ${why.internal}`);
+          if (why.internal) {
+            console.error(`[whatsapp] platform fault: ${why.internal}`);
+            await recordWaFault(db, firmId, `${why.internal} (template ${template.name}, language ${template.language || chaseTemplateLang()}${test ? ", Meta's test number" : ""})`);
+          }
           return { ok: false, unconfigured: false, permanent: why.permanent, error: why.message };
         }
         sent = { wamid: r.body.messages![0].id, mode: "template" };

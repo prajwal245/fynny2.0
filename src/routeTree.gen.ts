@@ -126,6 +126,7 @@ import { Route as ApiPublicTallyHelloRouteImport } from './routes/api/public/tal
 import { Route as ApiPublicTallyLedgerRouteImport } from './routes/api/public/tally-ledger'
 import { Route as ApiPublicTallyLedgersRouteImport } from './routes/api/public/tally-ledgers'
 import { Route as ApiPublicTallyOutboxRouteImport } from './routes/api/public/tally-outbox'
+import { Route as ApiPublicTallyPairRouteImport } from './routes/api/public/tally-pair'
 import { Route as ApiPublicTallyResultRouteImport } from './routes/api/public/tally-result'
 import { Route as ApiPublicUploadLinkRouteImport } from './routes/api/public/upload-link'
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp-webhook'
@@ -834,6 +835,11 @@ const ApiPublicTallyLedgersRoute = ApiPublicTallyLedgersRouteImport.update({
 const ApiPublicTallyOutboxRoute = ApiPublicTallyOutboxRouteImport.update({
   id: '/api/public/tally-outbox',
   path: '/api/public/tally-outbox',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicTallyPairRoute = ApiPublicTallyPairRouteImport.update({
+  id: '/api/public/tally-pair',
+  path: '/api/public/tally-pair',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicTallyResultRoute = ApiPublicTallyResultRouteImport.update({
@@ -1564,6 +1570,7 @@ export interface FileRoutesByFullPath {
   '/api/public/tally-ledger': typeof ApiPublicTallyLedgerRoute
   '/api/public/tally-ledgers': typeof ApiPublicTallyLedgersRoute
   '/api/public/tally-outbox': typeof ApiPublicTallyOutboxRoute
+  '/api/public/tally-pair': typeof ApiPublicTallyPairRoute
   '/api/public/tally-result': typeof ApiPublicTallyResultRoute
   '/api/public/upload-link': typeof ApiPublicUploadLinkRoute
   '/api/public/whatsapp-webhook': typeof ApiPublicWhatsappWebhookRoute
@@ -1780,6 +1787,7 @@ export interface FileRoutesByTo {
   '/api/public/tally-ledger': typeof ApiPublicTallyLedgerRoute
   '/api/public/tally-ledgers': typeof ApiPublicTallyLedgersRoute
   '/api/public/tally-outbox': typeof ApiPublicTallyOutboxRoute
+  '/api/public/tally-pair': typeof ApiPublicTallyPairRoute
   '/api/public/tally-result': typeof ApiPublicTallyResultRoute
   '/api/public/upload-link': typeof ApiPublicUploadLinkRoute
   '/api/public/whatsapp-webhook': typeof ApiPublicWhatsappWebhookRoute
@@ -2007,6 +2015,7 @@ export interface FileRoutesById {
   '/api/public/tally-ledger': typeof ApiPublicTallyLedgerRoute
   '/api/public/tally-ledgers': typeof ApiPublicTallyLedgersRoute
   '/api/public/tally-outbox': typeof ApiPublicTallyOutboxRoute
+  '/api/public/tally-pair': typeof ApiPublicTallyPairRoute
   '/api/public/tally-result': typeof ApiPublicTallyResultRoute
   '/api/public/upload-link': typeof ApiPublicUploadLinkRoute
   '/api/public/whatsapp-webhook': typeof ApiPublicWhatsappWebhookRoute
@@ -2230,6 +2239,7 @@ export interface FileRouteTypes {
     | '/api/public/tally-ledger'
     | '/api/public/tally-ledgers'
     | '/api/public/tally-outbox'
+    | '/api/public/tally-pair'
     | '/api/public/tally-result'
     | '/api/public/upload-link'
     | '/api/public/whatsapp-webhook'
@@ -2446,6 +2456,7 @@ export interface FileRouteTypes {
     | '/api/public/tally-ledger'
     | '/api/public/tally-ledgers'
     | '/api/public/tally-outbox'
+    | '/api/public/tally-pair'
     | '/api/public/tally-result'
     | '/api/public/upload-link'
     | '/api/public/whatsapp-webhook'
@@ -2672,6 +2683,7 @@ export interface FileRouteTypes {
     | '/api/public/tally-ledger'
     | '/api/public/tally-ledgers'
     | '/api/public/tally-outbox'
+    | '/api/public/tally-pair'
     | '/api/public/tally-result'
     | '/api/public/upload-link'
     | '/api/public/whatsapp-webhook'
@@ -2819,6 +2831,7 @@ export interface RootRouteChildren {
   ApiPublicTallyLedgerRoute: typeof ApiPublicTallyLedgerRoute
   ApiPublicTallyLedgersRoute: typeof ApiPublicTallyLedgersRoute
   ApiPublicTallyOutboxRoute: typeof ApiPublicTallyOutboxRoute
+  ApiPublicTallyPairRoute: typeof ApiPublicTallyPairRoute
   ApiPublicTallyResultRoute: typeof ApiPublicTallyResultRoute
   ApiPublicUploadLinkRoute: typeof ApiPublicUploadLinkRoute
   ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
@@ -3646,6 +3659,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/tally-outbox'
       fullPath: '/api/public/tally-outbox'
       preLoaderRoute: typeof ApiPublicTallyOutboxRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/tally-pair': {
+      id: '/api/public/tally-pair'
+      path: '/api/public/tally-pair'
+      fullPath: '/api/public/tally-pair'
+      preLoaderRoute: typeof ApiPublicTallyPairRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/tally-result': {
@@ -4927,6 +4947,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicTallyLedgerRoute: ApiPublicTallyLedgerRoute,
   ApiPublicTallyLedgersRoute: ApiPublicTallyLedgersRoute,
   ApiPublicTallyOutboxRoute: ApiPublicTallyOutboxRoute,
+  ApiPublicTallyPairRoute: ApiPublicTallyPairRoute,
   ApiPublicTallyResultRoute: ApiPublicTallyResultRoute,
   ApiPublicUploadLinkRoute: ApiPublicUploadLinkRoute,
   ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,
@@ -4937,6 +4958,7 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
 
 import type { getRouter } from './router.tsx'
 import type { startInstance } from './start.ts'

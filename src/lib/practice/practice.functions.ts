@@ -1362,6 +1362,17 @@ export const tallyConnectorCreate = createServerFn({ method: "POST" })
     }),
   );
 
+/** A short one-time pairing code for the connector, shown to the person at the PC. */
+export const tallyConnectorPair = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ name: z.string().max(60).optional() }).parse(d ?? {}))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      await asPartner(ctx, "connect Tally");
+      return (await import("./tallyConnector.server")).createPairing(db, ctx, data.name ?? "");
+    }),
+  );
+
 export const tallyConnectorRevoke = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ id: uuid }).parse(d))

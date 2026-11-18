@@ -9,6 +9,7 @@ import { Copy, RefreshCw, Trash2 } from "lucide-react";
 import {
   tallyCompanyMap,
   tallyConnectorCreate,
+  tallyConnectorPair,
   tallyConnectorRevoke,
   tallyConnectors,
   tallySyncNow,
@@ -38,6 +39,7 @@ export function TallyConnector({ onChange }: { onChange?: (state: TallyLink) => 
   const [month, setMonth] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [fresh, setFresh] = useState<{ name: string; token: string } | null>(null);
+  const [pair, setPair] = useState<{ name: string; code: string; at: number } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -79,6 +81,23 @@ export function TallyConnector({ onChange }: { onChange?: (state: TallyLink) => 
         Install the FynHelp Connector on the PC where TallyPrime is open. It reads Tally on that PC and sends each month's Day Book to FynHelp over the internet.
         Nothing is installed in Tally and no port is opened to the internet. Reading is automatic. Writing approved entries into Tally is off until the person at that PC turns it on in the connector's settings, and FynHelp only writes lines your team has approved.
       </div>
+
+      {pair && (
+        <div style={{ background: "rgba(31,90,70,.07)", border: "1px solid rgba(31,90,70,.25)", borderRadius: 12, padding: 14, display: "grid", gap: 8, fontSize: 13 }} data-testid="pairing">
+          <b>Pairing code for "{pair.name}". It works once, for 15 minutes.</b>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <code style={{ fontSize: 26, letterSpacing: ".12em", fontWeight: 700 }}>{pair.code}</code>
+            <button className="v2-btn v2-btn-ghost" onClick={() => copy(pair.code)}><Copy size={14} /> Copy</button>
+          </div>
+          <ol style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
+            <li>On the PC where TallyPrime is open, <a href="/downloads/fynhelp-connector-setup.cmd" download style={{ color: V.maroon, fontWeight: 600 }}>download the setup</a> and double-click it.</li>
+            <li>When it asks, type the code above. It finds Tally on this PC (port 9000), connects, and starts by itself.</li>
+            <li>This page shows the connector as Online within a minute. Then link each Tally company to a client below.</li>
+          </ol>
+          <div style={{ color: V.muted, fontSize: 12 }}>If TallyPrime does not answer, press F1 (Help) → Settings → Connectivity → Client/Server configuration, and set TallyPrime acts as: Both, port 9000.</div>
+          <div><button className="v2-btn v2-btn-ghost" onClick={() => setPair(null)}>Done</button></div>
+        </div>
+      )}
 
       {fresh && (
         <div style={{ background: "rgba(31,90,70,.07)", border: "1px solid rgba(31,90,70,.25)", borderRadius: 12, padding: 14, display: "grid", gap: 8, fontSize: 13 }}>
@@ -167,9 +186,13 @@ export function TallyConnector({ onChange }: { onChange?: (state: TallyLink) => 
       {canSignOff ? (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <input className="v2-input" style={{ flex: "1 1 220px" }} placeholder="Name this connector, e.g. Office PC" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
-          <button className="v2-btn v2-btn-primary" disabled={!name.trim() || busy === "create"}
+          <button className="v2-btn v2-btn-primary" disabled={busy === "pair"} data-testid="get-pairing-code"
+            onClick={() => run("pair", async () => { const r = await tallyConnectorPair({ data: { name } }); setPair({ name: r.name, code: r.code, at: Date.now() }); setName(""); })}>
+            Get a pairing code
+          </button>
+          <button className="v2-btn v2-btn-ghost" disabled={!name.trim() || busy === "create"} title="Advanced: a token to paste into the connector's config file"
             onClick={() => run("create", async () => { const r = await tallyConnectorCreate({ data: { name } }); setFresh({ name: r.name, token: r.token }); setName(""); })}>
-            Add connector
+            Use a token instead
           </button>
         </div>
       ) : (

@@ -121,3 +121,28 @@ export function versionAtLeast(
 /** The Tally group a party ledger sits under. Sundry Debtors and Sundry Creditors are the parties Tally flags in a voucher. */
 export const isPartyGroup = (parent: string | null | undefined): boolean =>
   /^sundry\s+(debtors|creditors)$/i.test((parent ?? "").trim());
+
+/* ── Pairing code ─────────────────────────────────────────────
+ * A person at the PC types a short code instead of copying a 50-character token. The code is single-use and lives 15 minutes.
+ * Letters that look alike (I, L, O, U, 0, 1) are left out, so a code read aloud or from a screen is typed right.
+ */
+export const PAIRING_MINUTES = 15;
+const PAIR_ALPHABET = "23456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+/** A new pairing code such as "7K2QM-X9HTD" (10 characters, about 49 bits). */
+export function newPairingCode(bytes: Uint8Array = crypto.getRandomValues(new Uint8Array(10))): string {
+  let s = "";
+  for (const b of bytes) s += PAIR_ALPHABET[b % PAIR_ALPHABET.length];
+  return `${s.slice(0, 5)}-${s.slice(5, 10)}`;
+}
+
+/** What a person typed, made comparable: upper case, no spaces or dashes, look-alikes mapped (O to 0 is not allowed, so they are rejected). */
+export function normalizePairingCode(raw: string | null | undefined): string | null {
+  const c = String(raw ?? "").toUpperCase().replace(/[\s-]/g, "");
+  return c.length === 10 && [...c].every((ch) => PAIR_ALPHABET.includes(ch)) ? c : null;
+}
+
+/** The stored form of a pairing code. It is a lookup key only: a code is useless without being redeemed within its time. */
+export const pairingHash = (normalized: string) => hashToken(`pair:${normalized}`);
+
+export const pairingExpired = (createdAt: string | Date, now = Date.now()) => now - new Date(createdAt).getTime() > PAIRING_MINUTES * 60_000;

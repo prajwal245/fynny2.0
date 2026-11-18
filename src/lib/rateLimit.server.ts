@@ -49,6 +49,8 @@ export const POLICIES = {
   /** Tally connector uploads, per connector token. */
   connector: { name: "connector", limit: 600, windowSec: 3600 },
   connectorHello: { name: "connector_hello", limit: 180, windowSec: 3600 },
+  /** Pairing codes: a handful of tries per address per 15 minutes. */
+  connectorPair: { name: "connector_pair", limit: 12, windowSec: 900 },
 } as const satisfies Record<string, Policy>;
 
 export interface Decision {

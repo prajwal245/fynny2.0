@@ -731,8 +731,14 @@ export async function systemHealth(ctx: AdminCtx) {
   // The AI reader: which providers this deployment can reach, and what the last day's calls actually did. The reason a call failed
   // is for admins only; firms see a plain message.
   const aiCalls = await ctx.db.from("ca_ai_calls").select("ca_firm_id, purpose, provider, model, status, error, created_at").gte("created_at", since).order("created_at", { ascending: false }).limit(2000);
-  const aiRows = (aiCalls.data ?? []) as { ca_firm_id: string | null; purpose: string; provider: string | null; model: string | null; status: string; error: string | null; created_at: string }[];
-  const aiFailed = aiRows.filter((r) => r.status === "error");
+  const allCalls = (aiCalls.data ?? []) as { ca_firm_id: string | null; purpose: string; provider: string | null; model: string | null; status: string; error: string | null; created_at: string }[];
+  // WhatsApp faults share the table but are not AI calls: kept apart so they never move the AI reader's status.
+  const waFaults = allCalls.filter((r) => r.purpose === "whatsapp_send");
+  const aiRows = allCalls.filter((r) => r.purpose !== "whatsapp_send");
+  // A step that ran out of its own time budget and carried on with rules is slow, not broken: counted apart from real failures.
+  const isSlow = (r: { error: string | null }) => /took too long; rules used/i.test(String(r.error ?? ""));
+  const aiSlow = aiRows.filter((r) => r.status === "error" && isSlow(r));
+  const aiFailed = aiRows.filter((r) => r.status === "error" && !isSlow(r));
   {
     const keyed = Boolean(process.env["GEMINI_API_KEY"] || process.env["GOOGLE_API_KEY"] || process.env["GOOGLE_GENERATIVE_AI_API_KEY"] || process.env["GEMINI_KEY"] || process.env["GROQ_API_KEY"] || process.env["LOVABLE_API_KEY"]);
     const edge = Boolean((process.env["SUPABASE_URL"] ?? process.env["NEXT_PUBLIC_SUPABASE_URL"]) && process.env["SUPABASE_SERVICE_ROLE_KEY"]) && process.env["PRACTICE_AI_DISABLED"] !== "1";
@@ -740,9 +746,17 @@ export async function systemHealth(ctx: AdminCtx) {
     const last = aiFailed[0]?.error ? String(aiFailed[0].error).replace(/(AIza[0-9A-Za-z_-]{10,}|sk-[0-9A-Za-z_-]{10,}|key=[^&\s]+)/g, "[key]").slice(0, 200) : null;
     checks.push({
       key: "ai", name: "AI reader (document reading)",
-      status: !keyed && !edge ? "down" : rate > 0.5 && aiRows.length >= 3 ? "down" : rate > 0.2 ? "warn" : "ok",
+      status: !keyed && !edge ? "down" : rate > 0.5 && aiRows.length >= 3 ? "down" : rate > 0.2 || aiSlow.length / Math.max(1, aiRows.length) > 0.5 ? "warn" : "ok",
       detail: !keyed && !edge ? "No AI key is visible to the server. Set GEMINI_API_KEY for Production and redeploy."
-        : `${keyed ? "A provider key is set" : "No provider key; using the built-in fallback"}. Last 24 hours: ${aiRows.length} calls, ${aiFailed.length} failed${last ? `. Last error: ${last}` : ""}`,
+        : `${keyed ? "A provider key is set" : "No provider key; using the built-in fallback"}. Last 24 hours: ${aiRows.length} calls, ${aiFailed.length} failed${aiSlow.length ? `, ${aiSlow.length} ran out of time and used rules (documents still read)` : ""}${last ? `. Last error: ${last}` : ""}`,
+    });
+  }
+  {
+    const last = waFaults[0];
+    checks.push({
+      key: "whatsapp_send", name: "WhatsApp sending (last 24 hours)",
+      status: waFaults.length ? "warn" : "ok",
+      detail: waFaults.length ? `${waFaults.length} send failure${waFaults.length === 1 ? "" : "s"}. Latest: ${String(last!.error ?? "").slice(0, 220)}` : "No send failures recorded",
     });
   }
   const [runs, stuck, failedRuns, queue, lastWebhook, lastSchedule] = await Promise.all([
@@ -765,7 +779,7 @@ export async function systemHealth(ctx: AdminCtx) {
     detail: total ? `${total} runs, ${byStatus["failed"] ?? 0} failed, ${stuck.count ?? 0} stuck` : "No runs in the last 24 hours",
   });
   const names = await firmNames(ctx, (failedRuns.data ?? []).map((r) => r.ca_firm_id));
-  const aiNames = await firmNames(ctx, aiFailed.slice(0, 15).map((r) => r.ca_firm_id).filter((x): x is string => Boolean(x)));
+  const aiNames = await firmNames(ctx, [...aiFailed.slice(0, 15), ...waFaults.slice(0, 15)].map((r) => r.ca_firm_id).filter((x): x is string => Boolean(x)));
   return {
     checkedAt: new Date().toISOString(),
     checks,
@@ -774,6 +788,7 @@ export async function systemHealth(ctx: AdminCtx) {
     lastWebhook: lastWebhook.data ?? null,
     lastScheduledRun: lastSchedule.data?.started_at ?? null,
     recentFailures: (failedRuns.data ?? []).map((r) => ({ id: r.id, agent: r.agent, error: r.error, started_at: r.started_at, firm: names.get(r.ca_firm_id) ?? "—", adminNote: ((r.detail ?? {}) as { admin_note?: string }).admin_note ?? null })),
+    waFailures: waFaults.slice(0, 15).map((r) => ({ at: r.created_at, firm: r.ca_firm_id ? (aiNames.get(r.ca_firm_id) ?? "—") : "—", error: String(r.error ?? "").slice(0, 400) })),
     aiFailures: aiFailed.slice(0, 15).map((r) => ({ at: r.created_at, firm: r.ca_firm_id ? (aiNames.get(r.ca_firm_id) ?? "—") : "—", purpose: r.purpose, provider: r.provider ?? "—", model: r.model ?? "—", error: String(r.error ?? "").replace(/(AIza[0-9A-Za-z_-]{10,}|sk-[0-9A-Za-z_-]{10,}|key=[^&\s]+)/g, "[key]").slice(0, 300) })),
   };
 }

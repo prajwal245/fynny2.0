@@ -361,7 +361,7 @@ async function aiClassify(
   // second opinion, and never for long: a slow provider must not keep a
   // 20-line statement waiting a minute. Rules carry on when time is up.
   const eligible = rows.filter((r) => r.amount && r.date).slice(0, limit);
-  const deadline = Date.now() + (deps.aiBudgetMs ?? 8_000);
+  const deadline = Date.now() + (deps.aiBudgetMs ?? 15_000);
   for (let i = 0; i < eligible.length; i += BATCH) {
     const left = deadline - Date.now();
     if (left < 1_500) break;

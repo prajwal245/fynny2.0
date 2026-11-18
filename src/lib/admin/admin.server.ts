@@ -723,6 +723,9 @@ export async function systemHealth(ctx: AdminCtx) {
     const stages = await stagesView(sender);
     const names = stages.map((s) => `${s.label}: ${s.using ? (s.status === "approved" ? "ready" : `using ${s.using}`) : s.status}`).join(" · ");
     if (!stages.some((s) => s.using)) return `No reminder can be sent. ${names}`;
+    // Ready, but a button that opens the wrong page makes the link "not valid" for the client: that is an admin problem, said here.
+    const wrong = stages.find((s) => (s as { linkProblem?: string | null }).linkProblem);
+    if (wrong) return `Upload button problem: "${wrong.using}" ${(wrong as { linkProblem?: string }).linkProblem}`;
     return null;
   });
 

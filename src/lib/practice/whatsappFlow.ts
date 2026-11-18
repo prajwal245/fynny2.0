@@ -375,6 +375,21 @@ export function chaseTemplateStatus(t: MetaTemplate | undefined, allowMarketing:
   return s;
 }
 
+/**
+ * Where a template's Upload button really goes. The address is fixed inside the template at Meta, so a template made for another
+ * deployment (an old domain, "upload" instead of "u") sends clients to a page that does not know the token: "This link is not valid".
+ * Returns a plain sentence when the button does not point at this app's upload page, otherwise null.
+ */
+export function uploadLinkProblem(t: Pick<MetaTemplate, "components"> | undefined, appOrigin: string): string | null {
+  const bar = (t?.components ?? []).find((c) => c.type === "BUTTONS");
+  const url = bar?.buttons?.find((b) => b.type === "URL")?.url;
+  if (!url) return null;
+  const norm = (u: string) => u.trim().replace(/^https?:\/\//i, "").replace(/^www\./i, "").toLowerCase();
+  const want = `${norm(appOrigin).replace(/\/+$/, "")}/u/{{1}}`;
+  if (norm(url) === want) return null;
+  return `its Upload button opens ${url.replace(/\{\{1\}\}/, "<link>")}, but uploads are at ${appOrigin.replace(/\/+$/, "")}/u/<link>. Clients who tap it see "This link is not valid". Create the template again with the button URL ${appOrigin.replace(/\/+$/, "")}/u/{{1}} (type Dynamic).`;
+}
+
 /** The first usable candidate, with the button layout to send it with. Null when none is approved. */
 export function pickTemplate(templates: MetaTemplate[], candidates: string[], language: string): { name: string; layout: ButtonLayout | null; /** The language code Meta approved it in, which is the one a send must use ("en" and "en_US" are different to Meta). */ language: string } | null {
   for (const name of candidates) {

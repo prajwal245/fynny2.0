@@ -9,6 +9,13 @@ Principles for the whole call
 - Be plain about limits. A CA firm trusts the founder who says "that is not built yet" more than the one who says yes to everything.
 - Talk about their month end, not our features.
 
+## Before the call (10 minutes, once)
+
+1. Use a fresh firm with no Sunrise client, and the seven files in one folder (https://www.fynhelp.com/samples).
+2. **Invite one teammate** in Settings, so you can assign an exception to a real person during the demo. Alone you can only assign to yourself.
+3. After you add Sunrise, set its **expected bank accounts** (HDFC 5678 and ICICI 4411) so the "all expected statements received" step can also flag a missing account. Without this the step still ticks from the statements uploaded.
+4. Open the app once to warm it, then sign out and in again so the first screen is clean.
+
 Timing at a glance
 | Time | Block |
 |------|-------|
@@ -57,24 +64,24 @@ Say before moving on:
 
 ## 5:00 to 7:30  Add the client and a statement that proves itself
 
-Do: Clients, Add client, "Sunrise Traders Private Limited". Documents, upload `01_HDFC_Current_Sep2026.pdf` as Bank.
+Do: Clients, Add client, "Sunrise Traders Private Limited". Documents, upload `01_HDFC_Current_Sep2026.pdf`. You do not choose a type: FynHelp reads the content and files it as Bank or Books itself, and says which.
 Say: "One client is one workspace: documents, reconciliation, exceptions, the close checklist, GST."
 When it finishes: "26 lines. It did not just say done. It checked the running balance line by line and tied to the bank's own printed totals: 14 debits, 12 credits. That check is the part you can sign under."
 
 ## 7:30 to 9:00  A statement that is refused
 
-Do: upload `03_HDFC_Current_Sep2026_one_line_missing.pdf` as Bank.
-Say: "Same statement with one line dropped, the way a scan or an AI can silently do. It is held. It says the bank prints 14 debits and we read 13, and the totals are Rs 3,10,000 short. Nothing downstream uses it until a partner accepts it with a written reason."
+Do: upload `03_HDFC_Current_Sep2026_one_line_missing.pdf`.
+Say: "Same statement with one line dropped, the way a scan or an AI can silently do. It shows **Held**. It says the bank prints 14 debits and we read 13, and the totals are Rs 3,10,000 short. Nothing downstream uses it until a partner accepts it with a written reason."
 Do: open the held card, point at the reason box, then remove file 03.
 Land it: "That is the difference between an AI demo and something a firm can rely on."
 If they raised errors or liability in Q3 or Q4, pause here and ask: "Is this the kind of safeguard your partners would want?"
 
 ## 9:00 to 13:30  Reconciliation and three decisions
 
-Do: upload `02_ICICI_Current_Sep2026.pdf` as Bank and `04_Tally_DayBook_Sep2026.xlsx` as Books. Optionally `05_Axis_Loan_Account_Statement.pdf` to show a loan statement is recognised and kept out of bank lines.
-Do: Reconciliation, September 2026.
+Do: upload `02_ICICI_Current_Sep2026.pdf` and `04_Tally_DayBook_Sep2026.xlsx`. Optionally `05_Axis_Loan_Account_Statement.pdf` to show a loan statement is recognised and kept out of bank lines.
+Do: stay on September 2026. Reconciliation **starts by itself** once the books are in; there is no Run button to press (there is a "Start over" button, used below).
 Say: "32 bank lines. 26 matched on their own. Four are set aside, and I can show you why."
-Do: open the set-aside list. Show the Rs 5,00,000 own-account transfer (HDFC to ICICI, same reference), the reversed UPI payment, and say the two contra legs in the Day Book were set aside with it. Click Undo once to show nothing is hidden, then run again.
+Do: open the set-aside list. Show the Rs 5,00,000 own-account transfer (HDFC to ICICI, same reference), the reversed UPI payment, and say the two contra legs in the Day Book were set aside with it. Click Undo once on the transfer pair to show nothing is hidden. For "undo everything", use **Start over** on the client's Recon tab: it clears the automatic matches and set-asides for the month and matches again, and keeps anything a person matched by hand.
 Say: "Three identical Rs 42,500 EMIs, two Rs 50,000 receipts on the same day from different parties, and a payment with Rs 29.21 of bank charges. These usually break reconciliation tools. They matched."
 Do: open the three exceptions.
 1. Kaveri Fashions: bank Rs 1,00,000, books Rs 98,000. "A genuine Rs 2,000 difference. It does not guess, it asks."
@@ -83,19 +90,19 @@ Do: open the three exceptions.
 
 ## 13:30 to 15:30  Work the exceptions like a team
 
-Do: mark the cheque Accepted as timing difference. Assign the Rs 25,000 to a team member and set Query sent. Add a note on Kaveri.
+Do: on the cheque choose **Accept as timing**, pick the reason "Cheque issued, not yet presented", add "clears 3 Oct". Assign the Rs 25,000 to the teammate you invited and set Query sent. Add a note on Kaveri. Then open the client's **Activity**: every one of these actions is listed with the person's name.
 Say: "Every change is logged and cannot be edited afterwards. Your assistant works it, the manager reviews."
 Be honest: "Client query messages are copy-ready templates today. The system does not send them yet."
 
 ## 15:30 to 17:00  Month-end close
 
 Do: Close, September.
-Say: "Ten steps. Documents received, statements verified, reconciliation done and exceptions explained tick automatically from what it has proven. GST, TDS and provisions are ticked by a person with the right role. The partner signs off last."
+Say: "Ten steps. Documents received, statements verified, reconciliation done and exceptions explained tick automatically from what it has proven. With the three exceptions still open, the fourth waits; once you accepted or resolved them it ticks. GST, TDS and provisions are ticked by a person with the right role. The partner signs off last."
 Do: show auto steps ticked, manual steps open, the due-days chip.
 
 ## 17:00 to 18:00  GST (only if they said GST matters in Q3 or Q6)
 
-Do: GST reconciliation, upload `06_Purchase_Register_Sep2026.xlsx` and `07_GSTR2B_Sep2026.json`.
+Do: menu **GST reconciliation**, choose the client Sunrise, upload `06_Purchase_Register_Sep2026.xlsx` and `07_GSTR2B_Sep2026.json`, then **Save to client**. The files go into Sunrise's Documents and the result into its Activity; reload the page and choose Sunrise again to show they come back.
 Say: "4 matched, one differs by Rs 1,800 of tax, and Kaveri Packers is not on the portal, so Rs 7,560 of ITC is at risk. The vendor follow-up message is ready to copy."
 If GST did not matter to them, skip this and use the minute for questions.
 

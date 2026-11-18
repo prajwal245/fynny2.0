@@ -210,6 +210,19 @@ export const reprocessPracticeDocument = createServerFn({ method: "POST" })
     }),
   );
 
+/** Records a GST reconciliation result in the client's Activity. The files themselves are kept as the client's documents. */
+export const saveGstResult = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ business_id: uuid, summary: z.string().min(3).max(900) }).parse(d))
+  .handler(async ({ data, context }) =>
+    withWork(context.userId, async (db, ctx) => {
+      const { assertClient, logActivity } = await import("./db.server");
+      await assertClient(db, ctx, data.business_id);
+      await logActivity(db, ctx.firmId, data.business_id, "gst", data.summary);
+      return { ok: true };
+    }),
+  );
+
 /**
  * Reads again the documents of this firm whose automatic retry time has passed. The retry never depends on an outside scheduler:
  * an open workspace asks for it. A few at a time, so one call stays well inside the server's time limit.

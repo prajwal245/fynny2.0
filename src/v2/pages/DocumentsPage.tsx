@@ -155,10 +155,12 @@ function DocStatus({ d }: { d: Doc }) {
         <div style={{ fontSize: 11.5, color: V.muted, marginTop: 3 }}>{d.duplicateCount} duplicate{d.duplicateCount === 1 ? "" : "s"} skipped</div>
       </span>
     );
+  // A statement whose figures do not tie is held until a partner accepts it: say "Held", the word the check card uses.
+  if (d.status === "Needs review" && d.statementCheck?.hold) return <Badge tone="bad">Held</Badge>;
   return <Badge tone={TONE[d.status]}>{d.status}</Badge>;
 }
 const SOURCES = ["All sources", "Manual", "Gmail", "WhatsApp", "Zoho Books"] as const;
-const ACCEPT = ".csv,.tsv,.txt,.xml,.pdf,.xlsx,.xls,.jpg,.jpeg,.png,.webp";
+const ACCEPT = ".csv,.tsv,.txt,.xml,.json,.pdf,.xlsx,.xls,.jpg,.jpeg,.png,.webp";
 
 /**
  * Documents. Firm-wide inbox when used as a page; the client's Documents tab
@@ -603,7 +605,7 @@ export default function DocumentsPage({
         {active && (
           <div style={{ display: "grid", gap: 18 }}>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <Badge tone={TONE[active.status]}>{active.status}</Badge>
+              <Badge tone={active.status === "Needs review" && active.statementCheck?.hold ? "bad" : TONE[active.status]}>{active.status === "Needs review" && active.statementCheck?.hold ? "Held" : active.status}</Badge>
               <Badge>
                 {active.clientId ? clientName(active.clientId) : "Unassigned"}
               </Badge>

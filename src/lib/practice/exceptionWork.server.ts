@@ -6,7 +6,7 @@
  * status and is changed only by resolving or ignoring it. Nothing is deleted. Until the database change is applied each call says so
  * plainly instead of failing half way.
  */
-import type { Db, FirmContext } from "./db.server";
+import { logActivity, type Db, type FirmContext } from "./db.server";
 import { PracticeError } from "./core";
 import { WORK_LABEL, isExplained, nextStatuses, type WorkStatus } from "./exceptionKinds";
 
@@ -103,6 +103,19 @@ async function event(
     meta: o.meta ?? {},
   });
   if (error) throw new PracticeError("db_error", error.message);
+  // What people did sits in the client's Activity beside what the agents did. A remark or a due date is housekeeping, not activity.
+  const said: Record<string, string> = {
+    assigned: `assigned an exception to ${o.to ?? "a teammate"}`,
+    handover: `handed an exception from ${o.from ?? "someone"} to ${o.to ?? "a teammate"}`,
+    status: `moved an exception from "${o.from}" to "${o.to}"`,
+    review_sent: `sent an exception to ${o.to ?? "a senior"} for review`,
+    review_returned: `returned an exception to ${o.to ?? "its owner"}`,
+    review_approved: "approved an exception's handling",
+    resolved: "resolved an exception",
+    ignored: "set an exception aside",
+    reopened: "reopened an exception",
+  };
+  if (said[type]) await logActivity(db, ctx.firmId, e.business_id, "team", `${actor} ${said[type]}${o.note?.trim() ? `: ${o.note.trim().slice(0, 200)}` : ""}.`.slice(0, 1900)).catch(() => undefined);
 }
 
 const touch = (ctx: FirmContext) => ({ updated_by: ctx.userId, updated_at: new Date().toISOString() });
@@ -133,14 +146,15 @@ export async function setWorkStatus(db: Db, ctx: FirmContext, id: string, to: Wo
   await assertReady(db);
   const [e] = await load(db, ctx, [id]);
   if (!e) throw new PracticeError("not_found", "Exception not found.");
-  if (e.work_status === to) return { status: to };
-  if (!nextStatuses(e.work_status).includes(to)) throw new PracticeError("invalid", `It cannot go from "${WORK_LABEL[e.work_status]}" to "${WORK_LABEL[to]}" from here.`);
+  const from: WorkStatus = e.work_status ?? "open";
+  if (from === to) return { status: to };
+  if (!nextStatuses(from).includes(to)) throw new PracticeError("invalid", `It cannot go from "${WORK_LABEL[from]}" to "${WORK_LABEL[to]}" from here.`);
   if (to === "accepted_timing" && !note?.trim()) throw new PracticeError("invalid", "Say why this is only a timing difference, so the next person can see it.");
   const members = await assignableMembers(db, ctx);
   const actor = members.find((m) => m.isYou)?.name ?? "A team member";
   const { error } = await db.from("ca_exceptions").update({ work_status: to, ...touch(ctx) }).eq("id", id).eq("ca_firm_id", ctx.firmId);
   if (error) throw new PracticeError("db_error", error.message);
-  await event(db, ctx, actor, e, "status", { from: WORK_LABEL[e.work_status], to: WORK_LABEL[to], note });
+  await event(db, ctx, actor, e, "status", { from: WORK_LABEL[from], to: WORK_LABEL[to], note });
   return { status: to };
 }
 

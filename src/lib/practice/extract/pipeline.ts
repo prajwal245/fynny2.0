@@ -45,6 +45,7 @@ import { chooseSheet } from "./sheets";
 import { rowsFromPositioned, type PosItem } from "./pdfTable";
 import { readBankSummary, type BankSummary } from "./bankSummary";
 import { looksLikeLoanStatement, summariseLoanStatement } from "./loanStatement";
+import { readGstr2bJson } from "../gst/invoices";
 import { failureRecords } from "../aiBilled";
 import {
   passwordNeededMessage,
@@ -60,7 +61,7 @@ import {
 import { rowsFromStatementText } from "./textStatement";
 
 export type FileKind =
-  "csv" | "xlsx" | "tally_xml" | "pdf" | "image" | "unsupported";
+  "csv" | "xlsx" | "tally_xml" | "pdf" | "image" | "json" | "unsupported";
 
 export interface LlmJsonRequest {
   purpose: string;
@@ -201,6 +202,8 @@ export function detectKind(
   )
     return "tally_xml";
   if (/\.(xml)$/.test(name)) return "tally_xml";
+  // The GSTR-2B the portal lets you download is JSON.
+  if (/\.json$/.test(name) || mime === "application/json" || (head.startsWith("{") && /"(gstin|b2b|docdata)"/i.test(head))) return "json";
   if (
     /\.(csv|tsv|txt)$/.test(name) ||
     mime?.includes("csv") ||
@@ -598,6 +601,30 @@ export async function runExtract(
   let documentKind: string | null = null;
   let note = "";
   let aiReadUsed = false;
+
+  if (kind === "json") {
+    // A GSTR-2B from the portal is kept as a register for GST reconciliation; any other JSON is not something we read.
+    try {
+      const read = readGstr2bJson(JSON.parse(decodeText(input.bytes)));
+      if (read.invoices.length) {
+        const taxable = Math.round(read.invoices.reduce((n, i) => n + i.taxable, 0) * 100) / 100;
+        const tax = Math.round(read.invoices.reduce((n, i) => n + i.igst + i.cgst + i.sgst + i.cess, 0) * 100) / 100;
+        return {
+          kind,
+          rows: [],
+          duplicateRows: 0,
+          sourceText: "",
+          aiCalls: calls,
+          documentKind: "gstr2b",
+          register: { kind: "gstr2b", label: REGISTER_LABELS.gstr2b, entries: read.invoices.length, totals: [{ label: "Taxable value", amount: taxable }, { label: "Tax", amount: tax }], note: `GSTR-2B${read.period ? ` for ${read.period}` : ""} kept for GST reconciliation. Not used in bank reconciliation.` },
+          error: null,
+        };
+      }
+    } catch {
+      /* not JSON we can read: said below */
+    }
+    return fail(kind, "unsupported_type", "This JSON file is not a GSTR-2B download. Use the GSTR-2B JSON from the GST portal (Returns, GSTR-2B, Download), or its Excel.");
+  }
 
   if (kind === "unsupported") {
     return fail(

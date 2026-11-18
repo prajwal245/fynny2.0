@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { FileSpreadsheet, ShieldCheck, Upload, Copy, Download, MessageCircle, X, CheckCircle2 } from "lucide-react";
@@ -9,6 +9,7 @@ import { readGstFile, toCsv } from "@/lib/practice/gst/files";
 import type { ReadInvoices } from "@/lib/practice/gst/invoices";
 import { reconcileGstr2b, vendorMessage, type Gstr2bRecon } from "@/lib/practice/gst/reconcile";
 import { runValidations, type ValidationRun } from "@/lib/practice/gst/validations";
+import { getPracticeDocumentUrl, saveGstResult } from "@/lib/practice/practice.functions";
 
 const inr = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 type Loaded = { name: string; read: ReadInvoices } | null;
@@ -61,18 +62,56 @@ const downloadCsv = (name: string, csv: string) => {
 
 /** GST. GSTR-2B against the purchase books, and the checks that catch a notice before it happens. Read-only: nothing is filed. */
 export default function GstPage() {
-  const { firm } = useV2();
+  const { firm, clients, docs, addDoc } = useV2();
   const firmName = firm?.name ?? "our firm";
   const [books, setBooks] = useState<Loaded>(null);
   const [portal, setPortal] = useState<Loaded>(null);
   const [busy, setBusy] = useState<"books" | "portal" | null>(null);
   const [tab, setTab] = useState("vendors");
+  // The client this reconciliation belongs to. Saved files come back when the page is opened again.
+  const [clientId, setClientId] = useState("");
+  const [files, setFiles] = useState<{ books: File | null; portal: File | null }>({ books: null, portal: null });
+  const [saving, setSaving] = useState(false);
+  const [restored, setRestored] = useState<string | null>(null);
+  useEffect(() => {
+    if (!clientId && clients.length === 1) setClientId(clients[0]!.id);
+  }, [clients, clientId]);
+  const saved = useMemo(() => {
+    const mine = docs.filter((d) => d.clientId === clientId && d.register);
+    const pick = (kinds: string[]) => mine.find((d) => kinds.includes(d.register!.kind));
+    return { books: pick(["gst_purchase_register", "invoice_register"]), portal: pick(["gstr2b"]) };
+  }, [docs, clientId]);
+  // Opening a client with saved GST files loads them, unless files were just added by hand.
+  useEffect(() => {
+    if (!clientId || books || portal) return;
+    const fetchAs = async (id: string, name: string) => {
+      const { url } = await getPracticeDocumentUrl({ data: { id } });
+      const blob = await (await fetch(url)).blob();
+      return new File([blob], name);
+    };
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [b, p] = await Promise.all([saved.books ? fetchAs(saved.books.id, saved.books.name) : null, saved.portal ? fetchAs(saved.portal.id, saved.portal.name) : null]);
+        if (cancelled) return;
+        if (b) setBooks({ name: b.name, read: await readGstFile(b) });
+        if (p) setPortal({ name: p.name, read: await readGstFile(p) });
+        if (b || p) setRestored(clients.find((c) => c.id === clientId)?.name ?? "this client");
+      } catch {
+        /* the saved files could not be fetched: the page works with new files */
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId, saved.books?.id, saved.portal?.id]);
 
   const load = async (which: "books" | "portal", file: File) => {
     setBusy(which);
     const read = await readGstFile(file);
     setBusy(null);
     (which === "books" ? setBooks : setPortal)({ name: file.name, read });
+    setFiles((f) => ({ ...f, [which]: file }));
+    setRestored(null);
     if (!read.invoices.length) toast.error(read.notes[0] ?? "No invoices found in that file.");
   };
 
@@ -89,12 +128,40 @@ export default function GstPage() {
     try { await navigator.clipboard.writeText(text); toast.success("Message copied"); } catch { toast.error("Could not copy. Select the text and copy it."); }
   };
 
+  const saveToClient = async () => {
+    if (!clientId || !recon) return;
+    setSaving(true);
+    try {
+      if (files.books) addDoc(files.books.name, clientId, "Manual", files.books);
+      if (files.portal) addDoc(files.portal.name, clientId, "Manual", files.portal);
+      const who = clients.find((c) => c.id === clientId)?.name ?? "the client";
+      await saveGstResult({ data: { business_id: clientId, summary: `GST reconciliation${recon.period ? ` for ${recon.period}` : ""}: ${recon.matched.length} matched, ${recon.mismatched.length} with different amounts, ${recon.missingInPortal.length} not on GSTR-2B (ITC at risk ${inr(recon.totals.itcAtRisk)}), ${recon.missingInBooks.length} not in the books.` } });
+      toast.success(`Saved to ${who}. The files are in its Documents and the result is in its Activity.`);
+      setFiles({ books: null, portal: null });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div>
-      <PageHeader title="GST" subtitle="Match your purchase books to GSTR-2B and find the input tax credit that is at risk. Read-only: nothing is filed or changed, and the files stay in your browser." />
+      <PageHeader title="GST reconciliation" subtitle="Match your purchase books to GSTR-2B and find the input tax credit that is at risk. Nothing is filed or changed. Choose a client to keep the files and the result with it." />
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
+        <label className="v2-label" htmlFor="gst-client" style={{ margin: 0 }}>Client</label>
+        <select id="gst-client" className="v2-input" style={{ maxWidth: 320 }} value={clientId} onChange={(e) => { setClientId(e.target.value); setBooks(null); setPortal(null); setFiles({ books: null, portal: null }); setRestored(null); }}>
+          <option value="">No client (files stay in this browser)</option>
+          {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        {restored && <Badge tone="info">Loaded from {restored}'s saved files</Badge>}
+        {recon && clientId && (files.books || files.portal) && (
+          <button className="v2-btn v2-btn-primary" disabled={saving} onClick={() => void saveToClient()} data-testid="gst-save">{saving ? "Saving…" : "Save to client"}</button>
+        )}
+      </div>
       <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", marginBottom: 20 }}>
-        <Drop title="Purchase register (your books)" hint="Drop an Excel or CSV purchase register, from Tally, Zoho, Busy or your own sheet." accept=".xlsx,.xls,.csv" loaded={books} busy={busy === "books"} onFile={(f) => load("books", f)} onClear={() => setBooks(null)} />
-        <Drop title="GSTR-2B (from the portal)" hint="Drop the GSTR-2B JSON (Returns → GSTR-2B → Download) or its Excel." accept=".json,.xlsx,.xls,.csv" loaded={portal} busy={busy === "portal"} onFile={(f) => load("portal", f)} onClear={() => setPortal(null)} />
+        <Drop title="Purchase register (your books)" hint="Drop an Excel or CSV purchase register, from Tally, Zoho, Busy or your own sheet." accept=".xlsx,.xls,.csv" loaded={books} busy={busy === "books"} onFile={(f) => load("books", f)} onClear={() => { setBooks(null); setFiles((f) => ({ ...f, books: null })); }} />
+        <Drop title="GSTR-2B (from the portal)" hint="Drop the GSTR-2B JSON (Returns → GSTR-2B → Download) or its Excel." accept=".json,.xlsx,.xls,.csv" loaded={portal} busy={busy === "portal"} onFile={(f) => load("portal", f)} onClear={() => { setPortal(null); setFiles((f) => ({ ...f, portal: null })); }} />
       </div>
 
       {!books && !portal && (

@@ -82,13 +82,13 @@ export async function portfolioClose(db: Db, ctx: FirmContext, periodKey: string
         .limit(5000),
     ),
     safe(() => db.from("ca_recon_runs").select("business_id, total_items, period, recon_type").eq("ca_firm_id", f).eq("period", p.label).limit(5000)),
-    safe(() => db.from("ca_exceptions").select("business_id, status, work_status").eq("ca_firm_id", f).eq("status", "open").gte("period_start", p.start).lte("period_end", p.end).limit(20000)),
+    safe(() => db.from("ca_exceptions").select("business_id, status, work_status, txn_id, txn_side, candidates").eq("ca_firm_id", f).eq("status", "open").gte("period_start", p.start).lte("period_end", p.end).limit(20000)),
     safe(() => db.from("ca_reports_log").select("business_id, signed_off_at, signed_off_by").eq("ca_firm_id", f).eq("period", p.label).limit(5000)),
     safe(() => db.from("ca_close_steps").select("business_id, step_key, confirmed_by_name, confirmed_at, note").eq("ca_firm_id", f).eq("period", p.key).limit(20000)),
   ]);
   // Exceptions without the team-work column still count; they are just not "explained".
   let excRows = excs.data;
-  if (excs.error && /work_status/.test(excs.error)) excRows = (await safe(() => db.from("ca_exceptions").select("business_id, status").eq("ca_firm_id", f).eq("status", "open").gte("period_start", p.start).lte("period_end", p.end).limit(20000))).data;
+  if (excs.error && /work_status/.test(excs.error)) excRows = (await safe(() => db.from("ca_exceptions").select("business_id, status, txn_id, txn_side, candidates").eq("ca_firm_id", f).eq("status", "open").gte("period_start", p.start).lte("period_end", p.end).limit(20000))).data;
 
   const group = <T extends Row>(rows: T[]) => {
     const m = new Map<string, T[]>();
@@ -135,7 +135,11 @@ export async function portfolioClose(db: Db, ctx: FirmContext, periodKey: string
     const rcv = expected > 0 ? received : statements.length;
     const verified = counted.filter((s) => countsAsVerified(s.verification)).length;
 
-    const open = excBy.get(id) ?? [];
+    // A bank line and its book entry that point at each other are one decision, counted once exactly as the Exception Queue and the
+    // Recon log count them, so this step never says 4 where everything else says 3.
+    const allOpen = excBy.get(id) ?? [];
+    const bankFirst = new Map(allOpen.filter((e) => e.txn_side !== "books").map((e) => [String(e.txn_id), (e.candidates as { txn_id?: string }[] | null)?.[0]?.txn_id]));
+    const open = allOpen.filter((e) => !(e.txn_side === "books" && (e.candidates as { txn_id?: string }[] | null)?.[0]?.txn_id && bankFirst.get(String((e.candidates as { txn_id: string }[])[0]!.txn_id)) === String(e.txn_id)));
     const run = runBy.get(id)?.[0];
     const bankOnly = run ? (runBy.get(id) ?? []).every((r) => r.recon_type === "bank_only") : false;
     const confirmed: CloseFacts["confirmed"] = {};

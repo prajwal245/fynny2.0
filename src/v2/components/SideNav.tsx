@@ -34,7 +34,7 @@ export const NAV_GROUPS: Group[] = [
       { to: "/app/review", label: "Review Queue", icon: ListChecks },
       { to: "/app/exceptions", label: "Exception Queue", icon: AlertTriangle },
       { to: "/app/close", label: "Month-end close", icon: CalendarCheck },
-      { to: "/app/gst", label: "GST", icon: Receipt },
+      { to: "/app/gst", label: "GST reconciliation", icon: Receipt },
     ],
   },
   { id: "chaser", label: "Chaser", icon: Send, items: [{ to: "/app/chaser", label: "Chaser", icon: Send }] },

@@ -676,6 +676,12 @@ export function TallyPosting({ clientId, documentId }: { clientId: string; docum
         <div style={{ fontSize: 13.5, color: V.body }}>Every bank line is already matched to an entry in Tally. Nothing to post.</div>
       )}
 
+      {(linked as { moreLines?: boolean }).moreLines && (
+        <div style={{ fontSize: 12.5, color: V.body, background: V.gray, borderRadius: 10, padding: "8px 12px" }} data-testid="more-lines">
+          This list shows the first 500 open bank lines, oldest first. Approve or match some and the rest appear.
+        </div>
+      )}
+
       <ReconView
         linked={linked}
         bank={bank}

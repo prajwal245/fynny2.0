@@ -3,7 +3,7 @@ import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-route
 import {
   LayoutGrid, Users, FileText, ListChecks, AlertTriangle, Send, BarChart3, Settings, Menu, X, LogOut,
   BookOpen,
-  Search, Sun, Moon, LifeBuoy,
+  Search, Sun, Moon, LifeBuoy, ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { V, V2_STYLES, useV2Theme } from "./ui";
@@ -176,7 +176,7 @@ function ShellBody() {
           <header
             style={{
               position: "sticky", top: 0, zIndex: 40, background: "var(--v2-head)", backdropFilter: "blur(14px)",
-              borderBottom: `1px solid ${V.line}`, padding: "14px 24px",
+              borderBottom: `1px solid ${V.line}`, padding: "0 24px", minHeight: 56,
               display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", alignItems: "center", gap: 14,
             }}
           >
@@ -184,15 +184,15 @@ function ShellBody() {
               <button className="v2-btn v2-btn-ghost v2-mobile-only" onClick={() => setOpen(true)} style={{ padding: "8px 10px" }}>
                 <Menu size={16} />
               </button>
-              <h2 className="truncate" style={{ fontSize: 16, fontWeight: 600 }}>{title}</h2>
+              <h2 className="truncate v2-crumb" style={{ fontSize: 13, fontWeight: 400, letterSpacing: 0 }}><span className="v2-hide-sm" style={{ color: V.muted }}>{firm?.name || "Workspace"}</span><ChevronRight size={13} className="v2-hide-sm" style={{ color: V.muted, flex: "none" }} aria-hidden="true" /><b className="truncate">{title}</b></h2>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, whiteSpace: "nowrap" }}>
               <button
-                className="v2-btn v2-btn-ghost v2-btn-sm v2-hide-sm"
+                className="v2-btn v2-btn-ghost v2-btn-sm v2-hide-sm v2-search"
                 onClick={() => command.setOpen(true)}
                 aria-label="Open command menu"
                 title="Search or run an agent (⌘K)"
-                style={{ color: V.muted, gap: 10 }}
+                style={{ gap: 8 }}
               >
                 <Search size={14} /> <span className="v2-hide-md">Search or run an agent…</span> <span className="v2-kbd">⌘K</span>
               </button>
@@ -221,7 +221,7 @@ function ShellBody() {
                 <div style={{ fontSize: 12.5, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>{session?.name || session?.email || ""}</div>
                 <div style={{ fontSize: 11, color: V.muted, overflow: "hidden", textOverflow: "ellipsis" }} data-testid="firm-role">{firmRole ? firmRole[0].toUpperCase() + firmRole.slice(1) : role}{canSignOff && role === "Junior" ? " · viewing as Junior" : ""} · {firm?.name || "Your firm"}</div>
               </div>
-              <div style={{ width: 34, height: 34, borderRadius: 999, background: V.beige, display: "grid", placeItems: "center", fontSize: 12.5, fontWeight: 700 }}>{(session?.name || "F").split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()}</div>
+              <div style={{ width: 32, height: 32, borderRadius: 999, background: V.beige, display: "grid", placeItems: "center", fontSize: 12.5, fontWeight: 700 }}>{(session?.name || "F").split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()}</div>
             </div>
           </header>
 

@@ -61,7 +61,7 @@ export default function AboutPage() {
           </div>
         </div>
         <p style={{ fontSize: 13.5, color: C.muted, margin: "14px 0 0", maxWidth: 760 }}>
-          FynHelp is operated by {COMPANY.entity} (CIN {COMPANY.cin}), whose registered office is at {COMPANY.address}.
+          FynHelp is operated by {COMPANY.entity} (CIN {COMPANY.cin}).
         </p>
       </div>
 

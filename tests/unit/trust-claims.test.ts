@@ -46,6 +46,10 @@ describe("public security claims match reality", () => {
     }
   });
 
+  it("shows no street address or care-of name anywhere, only city and state on the legal pages", () => {
+    expect(COMPANY.address).not.toMatch(/c\/o|\d{6}|nagar|road|street/i);
+    for (const f of ["src/pages/AboutPage.tsx", "src/pages/ContactPage.tsx", "src/components/site/SiteShell.tsx"]) expect(text(f), f).not.toMatch(/COMPANY\.address/);
+  });
   it("fills the legal entity so the policy is not 'to be published'", () => {
     expect(COMPANY.entity).toMatch(/PRIVATE LIMITED$/);
     expect(COMPANY.cin).toMatch(/^[UL]\d{5}[A-Z]{2}\d{4}[A-Z]{3}\d{6}$/);

@@ -8,8 +8,8 @@ export const COMPANY = {
   entity: "FIVENTO AI PRIVATE LIMITED",
   /** CIN or LLPIN. */
   cin: "U62013AP2026PTC126138",
-  /** Registered office address, one line. */
-  address: "C/O Adireddy Prasad, Vinayaka Nagar, Pedagantyada, Visakhapatnam - 530044, Andhra Pradesh",
+  /** Registered office, shown on the legal pages only. City and state, not a street address: the firm has no public office. */
+  address: "Visakhapatnam, Andhra Pradesh",
   /** Grievance Officer's full name. */
   officer: "",
   /** Grievance Officer's telephone, e.g. "+91 80 1234 5678". */

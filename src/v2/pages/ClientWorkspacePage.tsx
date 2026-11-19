@@ -105,6 +105,10 @@ export default function ClientWorkspacePage() {
   // The last run only describes this card when it was for the month on screen.
   const result = recon[client.id]?.period && recon[client.id]?.period !== period ? undefined : recon[client.id];
   const periodEx = cEx.filter((e) => !range || (e.date >= range.start && e.date <= range.end));
+  // "Unmatched" counts every bank line without a match; "to decide" counts only what still needs a person. The rest are explained (accepted
+  // as timing), set aside, or waiting for the bank statement of another account, so the two numbers must never be shown as if they disagreed.
+  const unmatchedN = bankSide.length - matchedBank - ignoredBank;
+  const openN = periodEx.length;
 
   // "All clear" only once this month has documents and nothing is open.
   const reading = cDocs.some((d) => d.status === "Uploading" || d.status === "Processing" || d.status === "Queued");
@@ -229,10 +233,10 @@ export default function ClientWorkspacePage() {
             <Stat label="Bank transactions" value={<AnimatedCounter value={bankSide.length} />} hint={`Dated in ${period}`} />
             <Stat label="Book transactions" value={<AnimatedCounter value={bookSide.length} />} hint={`Dated in ${period}`} />
             <Stat label="Matched" value={<AnimatedCounter value={matchedBank} />} tone="good" hint={result ? `Last run ${formatDate(result.at)}` : matchedBank ? `Matched in ${period}` : "Run recon to match"} />
-            <Stat label="Unmatched" value={<AnimatedCounter value={bankSide.length - matchedBank - ignoredBank} />} tone={bankSide.length - matchedBank - ignoredBank ? "bad" : "neutral"} hint={`${periodEx.length} open exception${periodEx.length === 1 ? "" : "s"} in ${period}`} onClick={() => setTab("exceptions")} />
+            <Stat label="Unmatched" value={<AnimatedCounter value={bankSide.length - matchedBank - ignoredBank} />} tone={bankSide.length - matchedBank - ignoredBank ? "bad" : "neutral"} hint={unmatchedN > openN ? `${openN} to decide, ${unmatchedN - openN} explained or waiting for a statement` : `${openN} open exception${openN === 1 ? "" : "s"} in ${period}`} onClick={() => setTab("exceptions")} />
           </div>
           {/* A bare "0 open exceptions" beside unmatched lines would look like nothing is wrong: say what is going on and what to press. */}
-          {bankSide.length - matchedBank - ignoredBank > 0 && periodEx.length === 0 && !reconRunning && (
+          {unmatchedN > 0 && periodEx.length === 0 && !result && !reconRunning && (
             <div role="status" data-testid="unmatched-without-exceptions" style={{ background: "rgba(176,120,30,.10)", border: "1px solid rgba(176,120,30,.35)", borderRadius: 12, padding: "10px 14px", marginBottom: 14, fontSize: 13.5, color: V.body }}>
               <b>{bankSide.length - matchedBank - ignoredBank} bank line{bankSide.length - matchedBank - ignoredBank === 1 ? " is" : "s are"} not matched yet</b>, and none is listed as an exception. Recon has not looked at them since they arrived or changed.{" "}
               <button className="v2-btn v2-btn-quiet" onClick={startRecon}>Run recon now</button>

@@ -83,3 +83,13 @@ describe("compact statement read and guardrails", () => {
     expect(r).toBeNull();
   });
 });
+
+describe("loan statements printed as an instalment schedule", () => {
+  it("recognises Axis and HDFC CV loan statements that never say loan account", async () => {
+    const { looksLikeLoanStatement } = await import("@/lib/practice/extract/loanStatement");
+    const sched = ["Due For Instalment 1", "Pmnt Rcvd Vide Cheque", "Due For Instalment 2", "Pmnt Rcvd Vide PDC", "Due For Instalment 3"].join("\n");
+    expect(looksLikeLoanStatement(`AXIS BANK LTD.\n${sched}`)).toBe(true);
+    expect(looksLikeLoanStatement("Due for Instalment Amount 1\nDue for Instalment Amount 2\nDue for Instalment Amount 3")).toBe(true);
+    expect(looksLikeLoanStatement("HDFC BANK\n01/09/26 NEFT CR Due for Instalment 1 salary\n02/09/26 UPI")).toBe(false);
+  });
+});

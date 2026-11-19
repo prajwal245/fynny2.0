@@ -9,6 +9,7 @@ import { readGstFile, toCsv } from "@/lib/practice/gst/files";
 import type { ReadInvoices } from "@/lib/practice/gst/invoices";
 import { reconcileGstr2b, vendorMessage, type Gstr2bRecon } from "@/lib/practice/gst/reconcile";
 import { runValidations, type ValidationRun } from "@/lib/practice/gst/validations";
+import GstReturnsCheck from "../components/GstReturnsCheck";
 import { getPracticeDocumentUrl, saveGstResult } from "@/lib/practice/practice.functions";
 
 const inr = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
@@ -68,6 +69,7 @@ export default function GstPage() {
   const [portal, setPortal] = useState<Loaded>(null);
   const [busy, setBusy] = useState<"books" | "portal" | null>(null);
   const [tab, setTab] = useState("vendors");
+  const [mode, setMode] = useState<"recon" | "returns">("recon");
   // The client this reconciliation belongs to. Saved files come back when the page is opened again.
   const [clientId, setClientId] = useState("");
   const [files, setFiles] = useState<{ books: File | null; portal: File | null }>({ books: null, portal: null });
@@ -145,9 +147,19 @@ export default function GstPage() {
     }
   };
 
+  const modeTabs = <Tabs items={[{ value: "recon", label: "GSTR-2B against purchases" }, { value: "returns", label: "Returns check: GSTR-1, 3B, ITC, RCM" }]} value={mode} onChange={(v) => setMode(v as "recon" | "returns")} />;
+  if (mode === "returns")
+    return (
+      <div>
+        <PageHeader title="GST reconciliation" subtitle="Check your sales against GSTR-1, GSTR-1 against GSTR-3B, the credit claimed against GSTR-2B, and reverse charge. Nothing is filed or changed." />
+        {modeTabs}
+        <GstReturnsCheck />
+      </div>
+    );
   return (
     <div>
       <PageHeader title="GST reconciliation" subtitle="Match your purchase books to GSTR-2B and find the input tax credit that is at risk. Nothing is filed or changed. Choose a client to keep the files and the result with it." />
+      {modeTabs}
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
         <label className="v2-label" htmlFor="gst-client" style={{ margin: 0 }}>Client</label>
         <select id="gst-client" className="v2-input" style={{ maxWidth: 320 }} value={clientId} onChange={(e) => { setClientId(e.target.value); setBooks(null); setPortal(null); setFiles({ books: null, portal: null }); setRestored(null); }}>

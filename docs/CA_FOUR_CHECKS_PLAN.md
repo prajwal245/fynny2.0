@@ -52,8 +52,15 @@ Party-wise open bills with age buckets (0-30, 31-60, 61-90, 90+) from Tally bill
 
 We do not promise dates here. Phase 1 is a small build (a read, a comparison and a Close step) and can be in the CA's hands first. The CA tests each phase on Satkaarika or SSSL as it lands. Phases 3 and 4 depend on real GSTR-1/3B files and Tally bill allocations; until we have a sample of each we cannot give an honest estimate.
 
+## CA answers, and what changed in the plan
+
+- **Audited closing arrives as a signed PDF.** Phase 1 reads it with the AI in the compact format and proves it the way statements are proved: the schedule's debits and credits must total what the document itself prints; anything that does not tie is held for a person. Signed PDFs often have no text layer, so scanned ones go through the vision reader with the same tie-out.
+- **GST can be tested on any month, but FynHelp holds no sales data.** Sales come in as a sales register (Excel or CSV from Tally, Zoho or Busy), which the reader already understands. A later step derives sales from the Tally Day Book's sales vouchers so no upload is needed.
+
+**Built (Phase 3, first slice):** GST reconciliation page, tab "Returns check". Upload sales register, GSTR-1 JSON, GSTR-3B JSON, GSTR-2B and the purchase register. It runs four checks, each with both figures, their sources and the difference, and says which file is missing when it cannot run: sales register against GSTR-1 (invoice by invoice); GSTR-1 against GSTR-3B outward tax; ITC available (2B) against ITC claimed (3B); RCM in the books against GSTR-3B 3.1(d) and the credit taken. Covered by synthetic-file tests; not yet run on a real GSTR-1 or 3B because we have none.
+
 ## Questions for the CA that change the design
 
-1. Audited closing: is it usually an Excel trial balance or the signed PDF schedule?
-2. Which month of GSTR-1 and 3B can we test with?
+1. Please send one month of GSTR-1 JSON, GSTR-3B JSON, GSTR-2B and the sales and purchase registers for the same client, so the checks run on a real month.
+2. Please send one signed audited closing PDF (any client) for Phase 1.
 3. For ageing: bill-wise in Tally for all parties, or only debtors?

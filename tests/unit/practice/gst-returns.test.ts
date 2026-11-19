@@ -82,3 +82,13 @@ describe("return checks", () => {
     expect(c[0]!.summary).toMatch(/sales register and the GSTR-1/);
   });
 });
+
+describe("sales from a Day Book with no GSTIN", () => {
+  it("matches GSTR-1 invoices on their number", () => {
+    const books = { ...read([inv("S-1", "", 10000), inv("S-2", "", 5000), inv("S-9", "", 7000)]), notes: [] };
+    const s = checkReturns({ salesBooks: books, gstr1: readGstr1Json(G1) }).find((x) => x.id === "sales")!;
+    expect(s.invoiceRecon!.matched.map((p) => p.books.no)).toEqual(["S-1"]);
+    expect(s.invoiceRecon!.missingInPortal.map((i) => i.no).sort()).toEqual(["S-2", "S-9"]);
+    expect(s.summary).toMatch(/B2C/);
+  });
+});

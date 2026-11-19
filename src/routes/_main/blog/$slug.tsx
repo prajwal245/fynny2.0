@@ -1,6 +1,7 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import BlogArticlePage from "@/pages/BlogArticlePage";
-import { faqFromHtml, fetchPost, fetchRelated, postDescription } from "@/lib/blog";
+import { articleBodyHtml, faqFromHtml, fetchPost, fetchRelated, postDescription } from "@/lib/blog";
+import { wordCount } from "@/lib/articleStructure";
 import { articleLd, breadcrumbLd, faqLd, seo } from "@/lib/seo";
 
 export const Route = createFileRoute("/_main/blog/$slug")({
@@ -18,7 +19,8 @@ export const Route = createFileRoute("/_main/blog/$slug")({
     const title = (post.seo_title || post.title).trim();
     const image = post.og_image || post.cover_image_url || undefined;
     const faqs = faqFromHtml(post.content);
-    return seo({
+    const words = wordCount(articleBodyHtml(post));
+    const head = seo({
       // Long headlines stand alone; short ones get the brand.
       title,
       rawTitle: title.length > 50,
@@ -39,6 +41,8 @@ export const Route = createFileRoute("/_main/blog/$slug")({
           authorName: post.author_name,
           section: post.category,
           tags: post.tags,
+          wordCount: words,
+          minutes: post.reading_time_minutes,
         }),
         breadcrumbLd([
           { name: "Blog", path: "/blog" },
@@ -47,6 +51,7 @@ export const Route = createFileRoute("/_main/blog/$slug")({
         ...(faqs.length ? [faqLd(faqs)] : []),
       ],
     });
+    return { ...head, links: [...head.links, { rel: "alternate", type: "application/rss+xml", title: "The FynHelp blog", href: "/blog/rss.xml" }] };
   },
   component: RouteComponent,
 });

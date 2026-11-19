@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "@/lib/router-compat";
+import { Search } from "lucide-react";
+import { SIGNUP_URL, trackCta } from "@/components/site/cta";
 import Layout from "@/components/Layout";
 import { listExcerpt, type ListPost } from "@/lib/blog";
 
@@ -12,6 +14,7 @@ const formatDate = (d: string | null) =>
 const BlogPage = ({ posts }: { posts: ListPost[] }) => {
   // Category chips filter in place; there are no ?category= URLs to index twice.
   const [activeCat, setActiveCat] = useState<string>("All");
+  const [query, setQuery] = useState("");
 
   const categories = useMemo(() => {
     const set = new Set<string>();
@@ -19,10 +22,12 @@ const BlogPage = ({ posts }: { posts: ListPost[] }) => {
     return ["All", ...Array.from(set)];
   }, [posts]);
 
-  const filtered = useMemo(
-    () => (activeCat === "All" ? posts : posts.filter((p) => p.category === activeCat)),
-    [posts, activeCat],
-  );
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return posts
+      .filter((p) => activeCat === "All" || p.category === activeCat)
+      .filter((p) => !q || `${p.title} ${p.category ?? ""} ${p.excerpt ?? ""}`.toLowerCase().includes(q));
+  }, [posts, activeCat, query]);
 
   const featured = filtered.find((p) => p.is_featured) ?? filtered[0];
   const rest = filtered.filter((p) => p.id !== featured?.id);
@@ -35,7 +40,15 @@ const BlogPage = ({ posts }: { posts: ListPost[] }) => {
         .bl-eyebrow { font-family: Inter, sans-serif; font-size: 11.5px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: ${RED}; margin-bottom: 14px; }
         .bl-h1 { font-family: 'Clash Display', Georgia, serif; font-weight: 700; font-size: 46px; line-height: 1.08; letter-spacing: -0.025em; color: ${INK}; margin: 0 0 14px; }
         .bl-sub { font-family: 'Satoshi', Inter, sans-serif; font-size: 16.5px; color: rgba(23,18,8,0.62); max-width: 620px; margin: 0; }
-        .bl-chips { display: flex; flex-wrap: wrap; gap: 9px; margin: 34px 0 40px; }
+        .bl-chips { display: flex; flex-wrap: wrap; gap: 9px; margin: 18px 0 36px; }
+        .bl-search { display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid rgba(23,18,8,0.12); border-radius: 12px; padding: 0 14px; margin-top: 30px; max-width: 560px; color: rgba(23,18,8,0.5); }
+        .bl-search:focus-within { border-color: ${RED}; }
+        .bl-search input { flex: 1; border: 0; outline: none; background: transparent; padding: 13px 0; font-family: Inter, sans-serif; font-size: 15px; color: ${INK}; min-width: 0; }
+        .bl-search span { font-family: Inter, sans-serif; font-size: 12.5px; white-space: nowrap; }
+        .bl-band { margin-top: 56px; background: ${INK}; color: #fff; border-radius: 18px; padding: 32px 36px; display: flex; gap: 24px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+        .bl-band h2 { font-family: 'Clash Display', Georgia, serif; font-weight: 600; font-size: 24px; margin: 0 0 6px; letter-spacing: -0.02em; }
+        .bl-band p { margin: 0; font-family: Inter, sans-serif; font-size: 14.5px; color: rgba(255,255,255,0.72); max-width: 560px; line-height: 1.55; }
+        .bl-band a { background: ${RED}; color: #fff; text-decoration: none; font-family: Inter, sans-serif; font-weight: 600; font-size: 14px; padding: 12px 24px; border-radius: 9px; }
         .bl-chip { font-family: Inter, sans-serif; font-size: 13px; font-weight: 600; color: rgba(23,18,8,0.7); background: #fff; border: 1px solid rgba(23,18,8,0.12); border-radius: 100px; padding: 8px 17px; cursor: pointer; transition: all .18s ease; }
         .bl-chip:hover { border-color: rgba(196,30,30,0.4); color: ${RED}; }
         .bl-chip.on { background: rgba(196,30,30,0.08); border-color: ${RED}; color: ${RED}; }
@@ -70,6 +83,12 @@ const BlogPage = ({ posts }: { posts: ListPost[] }) => {
           <div className="bl-eyebrow">Blog</div>
           <h1 className="bl-h1">Month-end close, reconciliation and MIS for CA firms</h1>
           <p className="bl-sub">Practical guides for chartered accountants in India: closing clients’ books faster, reconciling bank to Tally, producing MIS clients trust, and keeping GST on schedule.</p>
+
+          <div className="bl-search">
+            <Search size={16} aria-hidden="true" />
+            <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search articles: GST, reconciliation, MIS" aria-label="Search articles" />
+            <span aria-live="polite">{query || activeCat !== "All" ? `${filtered.length} article${filtered.length === 1 ? "" : "s"}` : ""}</span>
+          </div>
 
           {categories.length > 1 && (
             <div className="bl-chips">
@@ -132,6 +151,14 @@ const BlogPage = ({ posts }: { posts: ListPost[] }) => {
               </div>
             </>
           )}
+
+          <section className="bl-band" aria-label="Try FynHelp">
+            <div>
+              <h2>Close your clients' month-end faster</h2>
+              <p>FynHelp reads bank statements and Tally exports, proves what it read, matches bank to books and leaves you only the decisions. Nothing is posted without your approval.</p>
+            </div>
+            <Link to={SIGNUP_URL} onClick={() => trackCta("start", "blog-index")}>Start free trial</Link>
+          </section>
         </div>
       </div>
     </Layout>

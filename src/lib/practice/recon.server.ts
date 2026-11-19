@@ -6,6 +6,7 @@
  * one open exception which is updated in place.
  */
 import { isBankLedgerName } from "./extract/tally";
+import { statementAccount } from "./tallyReconView";
 import { isDistinctiveName } from "./memory";
 import {
   PracticeError,
@@ -220,6 +221,13 @@ export async function runRecon(
   // can be reconciled now. An entry whose bank ledger names no account digits is kept.
   const split = await splitAwaitingStatement(db, ctx.firmId, businessId, scope.filter((t) => t.side === "books"));
   const awaiting = split.awaiting;
+  // A line waiting for its bank statement is not an exception: it is not wrong, the statement has not arrived. Anything an earlier run
+  // marked as one is cleared, and it is looked at again by the run that has the statement.
+  for (let i = 0; i < split.awaitingIds.length; i += 300) {
+    const ids = split.awaitingIds.slice(i, i + 300);
+    await db.from("ca_exceptions").update({ status: "resolved", resolved_at: new Date().toISOString(), resolution_action: "awaiting_statement", resolution_note: "Waiting for the bank statement of this account" }).in("txn_id", ids).eq("status", "open");
+    await db.from("ca_txns").update({ match_status: "unmatched" }).in("id", ids).eq("match_status", "exception");
+  }
   // The Day Book records a transfer between two bank accounts as two legs (a contra). When the statements prove the transfer, its two
   // book legs are set aside with it, so they do not wait as book-side exceptions.
   const contraIds = await pairContraBookLegs(db, split.books, transfers).catch(() => new Set<string>());
@@ -539,46 +547,101 @@ export function ledgerTail(description: string | null | undefined): string | nul
   return null;
 }
 
-/** Which account a line belongs to: a bank line by its statement, a book entry by the bank ledger it names. Null when it does not say. */
-async function accountOfFn(db: Db, firmId: string, businessId: string): Promise<(t: { id: string; side: string; description?: string | null }) => string | null> {
-  const { data } = await db.from("ca_document_extractions").select("id, acct:extracted->>account_no").eq("ca_firm_id", firmId).eq("business_id", businessId).eq("side", "bank");
-  const tails = new Map<string, string>();
-  for (const d of (data ?? []) as { id: string; acct: string | null }[]) {
-    const t = String(d.acct ?? "").replace(/\D/g, "").slice(-4);
-    if (t.length === 4) tails.set(d.id, t);
-  }
-  return (t) => (t.side === "bank" ? (tails.get((t as unknown as TxnRow).extraction_id ?? "") ?? null) : ledgerTail(t.description));
+/**
+ * The account a bank statement belongs to, as the last 4 digits. Read from what was recorded at upload; for older uploads that never
+ * recorded it, from the statement's own text, then from the file name ("ICICI CA 110805501053 (1053) - Statement"). Without this an
+ * old upload has no account, every bank line is matched against every account's book entries in one pile, and the result is worse
+ * than the same files uploaded today.
+ */
+export function accountTailOf(d: { acct?: string | null; preview?: string | null; filename?: string | null }): string | null {
+  const t4 = (x: string | null | undefined) => {
+    const digits = String(x ?? "").replace(/\D/g, "");
+    return digits.length >= 4 ? digits.slice(-4) : null;
+  };
+  const direct = t4(d.acct);
+  if (direct) return direct;
+  const fromText = t4(statementAccount(d.preview ?? "", d.filename ?? "").accountNo);
+  if (fromText) return fromText;
+  const named = /(?<!\d)(\d{6,})(?!\d)/.exec(d.filename ?? "");
+  return named ? named[1]!.slice(-4) : null;
 }
 
-async function splitAwaitingStatement(db: Db, firmId: string, businessId: string, books: TxnRow[]): Promise<{ books: TxnRow[]; awaiting: number }> {
+export interface StatementAccount {
+  id: string;
+  tail: string | null;
+  first: string | null;
+  last: string | null;
+}
+
+/** Every bank statement of the client with its account. Where an old upload lacked it, what was found is saved, so this heals once. */
+export async function loadStatementAccounts(db: Db, firmId: string, businessId: string): Promise<StatementAccount[]> {
   const { data } = await db
     .from("ca_document_extractions")
-    .select("id, acct:extracted->>account_no, first:extracted->statement_check->>first, last:extracted->statement_check->>last")
+    .select("id, original_filename, acct:extracted->>account_no, preview:extracted->>text_preview, first:extracted->statement_check->>first, last:extracted->statement_check->>last")
     .eq("ca_firm_id", firmId)
     .eq("business_id", businessId)
     .eq("side", "bank");
+  const out: StatementAccount[] = [];
+  for (const d of (data ?? []) as { id: string; original_filename: string | null; acct: string | null; preview: string | null; first: string | null; last: string | null }[]) {
+    const tail = accountTailOf({ acct: d.acct, preview: d.preview, filename: d.original_filename });
+    let { first, last } = d;
+    // An older upload never recorded the dates the statement covers. Its own lines always carry them, so use those: a statement
+    // with no recorded dates must not be taken to cover every month.
+    if (!first || !last) {
+      const lo = await db.from("ca_txns").select("txn_date").eq("extraction_id", d.id).order("txn_date", { ascending: true }).limit(1);
+      const hi = await db.from("ca_txns").select("txn_date").eq("extraction_id", d.id).order("txn_date", { ascending: false }).limit(1);
+      first = first ?? (lo.data?.[0]?.txn_date ? String(lo.data[0].txn_date) : null);
+      last = last ?? (hi.data?.[0]?.txn_date ? String(hi.data[0].txn_date) : null);
+    }
+    out.push({ id: d.id, tail, first, last });
+    if (tail && !String(d.acct ?? "").replace(/\D/g, "")) {
+      // Save it on the document, best effort, so the next run needs no guessing.
+      try {
+        const found = statementAccount(d.preview ?? "", d.original_filename ?? "").accountNo ?? tail;
+        const { data: row } = await db.from("ca_document_extractions").select("extracted").eq("id", d.id).maybeSingle();
+        if (row) await db.from("ca_document_extractions").update({ extracted: { ...((row.extracted as Record<string, unknown>) ?? {}), account_no: found } }).eq("id", d.id);
+      } catch {
+        /* the guess still works for this run */
+      }
+    }
+  }
+  return out;
+}
+
+/** Which account a line belongs to: a bank line by its statement, a book entry by the bank ledger it names. Null when it does not say. */
+async function accountOfFn(db: Db, firmId: string, businessId: string): Promise<(t: { id: string; side: string; description?: string | null }) => string | null> {
+  const tails = new Map<string, string>();
+  for (const d of await loadStatementAccounts(db, firmId, businessId)) if (d.tail) tails.set(d.id, d.tail);
+  return (t) => (t.side === "bank" ? (tails.get((t as unknown as TxnRow).extraction_id ?? "") ?? null) : ledgerTail(t.description));
+}
+
+async function splitAwaitingStatement(db: Db, firmId: string, businessId: string, books: TxnRow[]): Promise<{ books: TxnRow[]; awaiting: number; awaitingIds: string[] }> {
+  const data = await loadStatementAccounts(db, firmId, businessId);
   // What each account's statements cover, by month. An account that has a statement for December but none for September is still
   // waiting for September's: waiting is per account and month, not per account.
   const cover = new Map<string, { from: string; to: string }[]>();
-  for (const d of (data ?? []) as { acct: string | null; first: string | null; last: string | null }[]) {
-    const t = String(d.acct ?? "").replace(/\D/g, "").slice(-4);
+  for (const d of data) {
+    const t = d.tail ?? "";
     if (t.length !== 4) continue;
     const list = cover.get(t) ?? cover.set(t, []).get(t)!;
     // A statement that does not say its dates covers everything (the earlier, safer reading).
     list.push({ from: d.first ? String(d.first).slice(0, 7) : "0000-00", to: d.last ? String(d.last).slice(0, 7) : "9999-99" });
   }
   // With no statement that names its account there is nothing to compare an account with: leave every entry in.
-  if (!cover.size) return { books, awaiting: 0 };
+  if (!cover.size) return { books, awaiting: 0, awaitingIds: [] };
   const keep: TxnRow[] = [];
   let awaiting = 0;
+  const awaitingIds: string[] = [];
   for (const b of books) {
     const t = ledgerTail(b.description);
     const month = String(b.txn_date).slice(0, 7);
     const spans = t ? cover.get(t) : null;
-    if (t && (!spans || !spans.some((c) => month >= c.from && month <= c.to))) awaiting++;
-    else keep.push(b);
+    if (t && (!spans || !spans.some((c) => month >= c.from && month <= c.to))) {
+      awaiting++;
+      awaitingIds.push(b.id);
+    } else keep.push(b);
   }
-  return { books: keep, awaiting };
+  return { books: keep, awaiting, awaitingIds };
 }
 
 /**
@@ -592,8 +655,7 @@ export async function pairAccountTransfers(db: Db, ctx: FirmContext, businessId:
   if (rows.length < 2) return [];
   const extIds = [...new Set(rows.map((r) => r.extraction_id as string))];
   if (extIds.length < 2) return []; // both legs are never on one statement
-  const { data: docs } = await db.from("ca_document_extractions").select("id, acct:extracted->>account_no").in("id", extIds);
-  const tails = new Map((docs ?? []).map((d: { id: string; acct: string | null }) => [d.id, String(d.acct ?? "").replace(/\D/g, "").slice(-4) || null]));
+  const tails = new Map((await loadStatementAccounts(db, ctx.firmId, businessId)).filter((d) => extIds.includes(d.id)).map((d) => [d.id, d.tail]));
   const pairs = pairOwnTransfers(
     rows.map((t) => ({ id: t.id, extractionId: t.extraction_id, direction: t.direction as "in" | "out", amount: t.amount, date: String(t.txn_date), reference: t.reference, description: t.description, accountTail: tails.get(t.extraction_id as string) ?? null })),
   ).filter((p) => p.out.date >= period.start && p.out.date <= period.end || p.in.date >= period.start && p.in.date <= period.end);

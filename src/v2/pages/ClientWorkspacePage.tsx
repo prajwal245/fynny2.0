@@ -231,6 +231,13 @@ export default function ClientWorkspacePage() {
             <Stat label="Matched" value={<AnimatedCounter value={matchedBank} />} tone="good" hint={result ? `Last run ${formatDate(result.at)}` : matchedBank ? `Matched in ${period}` : "Run recon to match"} />
             <Stat label="Unmatched" value={<AnimatedCounter value={bankSide.length - matchedBank - ignoredBank} />} tone={bankSide.length - matchedBank - ignoredBank ? "bad" : "neutral"} hint={`${periodEx.length} open exception${periodEx.length === 1 ? "" : "s"} in ${period}`} onClick={() => setTab("exceptions")} />
           </div>
+          {/* A bare "0 open exceptions" beside unmatched lines would look like nothing is wrong: say what is going on and what to press. */}
+          {bankSide.length - matchedBank - ignoredBank > 0 && periodEx.length === 0 && !reconRunning && (
+            <div role="status" data-testid="unmatched-without-exceptions" style={{ background: "rgba(176,120,30,.10)", border: "1px solid rgba(176,120,30,.35)", borderRadius: 12, padding: "10px 14px", marginBottom: 14, fontSize: 13.5, color: V.body }}>
+              <b>{bankSide.length - matchedBank - ignoredBank} bank line{bankSide.length - matchedBank - ignoredBank === 1 ? " is" : "s are"} not matched yet</b>, and none is listed as an exception. Recon has not looked at them since they arrived or changed.{" "}
+              <button className="v2-btn v2-btn-quiet" onClick={startRecon}>Run recon now</button>
+            </div>
+          )}
           <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap", alignItems: "center" }}>
             <button
               className="v2-btn v2-btn-primary"

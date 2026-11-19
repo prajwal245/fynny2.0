@@ -55,3 +55,31 @@ describe("reading a long statement with the model", () => {
     expect(await aiReadText({} as ExtractDeps, [], "x", statement(100))).toBeNull();
   });
 });
+
+describe("compact statement read and guardrails", () => {
+  const splitText = (n: number) => Array.from({ length: n }, (_, i) => `16/03\n/2026\n16/03\n/2026\n\nWITHDRAWAL\nNEFT ref ${i}\n\n${100 + i}.00 Dr  ${5000 - i}.0\n0DR`).join("\n");
+  it("never splits a two-line date row in the middle", async () => {
+    const { splitForAi } = await import("@/lib/practice/extract/pipeline");
+    const parts = splitForAi(splitText(60), 600);
+    expect(parts.length).toBeGreaterThan(1);
+    for (const p of parts) expect(p.startsWith("16/03\n/2026\n16/03\n/2026")).toBe(true);
+    expect(parts.join("\n")).toBe(splitText(60));
+  });
+  it("reads a statement with the compact format and maps rows and balances", async () => {
+    const { aiReadText } = await import("@/lib/practice/extract/pipeline");
+    const seen: string[] = [];
+    const llm = { async json(req: { system: string; user: string; maxTokens?: number }) { seen.push(req.system.slice(0, 20)); return { data: { k: "bank_statement", r: [["2026-03-16", 7009.66, "out", "NEFT TO X", -19007123.01]] }, provider: "t", model: "m", latency_ms: 1, raw: "{}" }; } };
+    const r = await aiReadText({ llm } as never, [], "extract_read_text", "short text");
+    expect(r?.rows[0]).toMatchObject({ date: "2026-03-16", amount: 7009.66, direction: "out", balance: -19007123.01 });
+    expect(seen.length).toBe(1);
+  });
+  it("stops making AI calls for one document after the per-document cap", async () => {
+    const { aiReadText } = await import("@/lib/practice/extract/pipeline");
+    let n = 0;
+    const llm = { async json() { n++; return { data: { k: "bank_statement", r: [] }, provider: "t", model: "m", latency_ms: 1, raw: "{}" }; } };
+    const calls = new Array(48).fill({ purpose: "x" });
+    const r = await aiReadText({ llm, maxAiCalls: 48 } as never, calls as never, "extract_read_text", "text");
+    expect(n).toBe(0);
+    expect(r).toBeNull();
+  });
+});

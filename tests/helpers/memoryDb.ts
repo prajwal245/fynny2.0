@@ -25,6 +25,7 @@ export function memoryDb(
     let max = Infinity;
     let offset = 0;
     let aliases: { alias: string; col: string; path: string[] }[] = [];
+    const orders: { k: string; asc: boolean }[] = [];
     let afterWrite = false;
 
     const run = (): {
@@ -66,7 +67,21 @@ export function memoryDb(
         tables[name] = rows.filter((r) => !h.includes(r));
         return { data: h, error: null };
       }
-      const h = hit()
+      // order("a").order("b", { ascending: false }): sorted by each key in turn, as the database would.
+      const ordered = orders.length
+        ? [...hit()].sort((x, y) => {
+            for (const o of orders) {
+              const a = val(x, o.k) as string | number | null | undefined;
+              const b = val(y, o.k) as string | number | null | undefined;
+              if (a === b) continue;
+              if (a == null) return 1;
+              if (b == null) return -1;
+              return (a < b ? -1 : 1) * (o.asc ? 1 : -1);
+            }
+            return 0;
+          })
+        : hit();
+      const h = ordered
         .slice(offset, offset + max)
         .map((r) => (aliases.length ? { ...r, ...Object.fromEntries(aliases.map((a) => [a.alias, a.path.reduce<unknown>((o, k) => (o as Row | undefined)?.[k], r[a.col]) ?? null])) } : r));
       return {
@@ -159,7 +174,7 @@ export function memoryDb(
       preds.push((r) => parts.some((m) => m && String(r[m[1]!]) === m[2]));
       return q;
     };
-    q["order"] = chain(() => undefined);
+    q["order"] = (k: string, o?: { ascending?: boolean }) => (orders.push({ k, asc: o?.ascending !== false }), q);
     q["limit"] = (n: number) => ((max = n), q);
     // Paging: rows from..to inclusive, so a read of more than 1,000 rows (a Day Book) sees each row once.
     q["range"] = (from: number, to: number) => ((offset = from), (max = to - from + 1), q);

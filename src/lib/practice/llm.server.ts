@@ -159,6 +159,7 @@ async function callProvider(
           messages: buildMessages(req),
           temperature: 0.1,
           response_format: { type: "json_object" },
+          max_tokens: req.maxTokens ?? (Number(env("PRACTICE_AI_MAX_OUTPUT_TOKENS") ?? "") || 16_000),
           ...(withEffort && effort && effort !== "default" ? { reasoning_effort: effort } : {}),
         }),
       });
@@ -315,6 +316,17 @@ export async function withinAiCap(
   if ((count ?? 0) >= cap) {
     console.warn(`[ai] firm ${firmId} reached the daily AI cap (${cap}); using rules only`);
     return false;
+  }
+  // Token budget as well as call count: a few very large calls cost more than many small ones. Checked only for a firm with real volume,
+  // so an ordinary day costs one count query and nothing more.
+  if ((count ?? 0) >= 300) {
+    const tokenCap = Number(env("PRACTICE_AI_DAILY_TOKENS") ?? "") || 40_000_000;
+    const { data } = await db.from("ca_ai_calls").select("input_tokens, output_tokens").eq("ca_firm_id", firmId).gte("created_at", since).limit(5000);
+    const used = ((data ?? []) as { input_tokens: number | null; output_tokens: number | null }[]).reduce((n, r) => n + (r.input_tokens ?? 0) + (r.output_tokens ?? 0), 0);
+    if (used >= tokenCap) {
+      console.warn(`[ai] firm ${firmId} used ${used} AI tokens in 24 hours (limit ${tokenCap}); using rules only`);
+      return false;
+    }
   }
   return true;
 }

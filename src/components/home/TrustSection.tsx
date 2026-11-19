@@ -1,25 +1,26 @@
 import { useScrollReveal } from "@/hooks/useScrollReveal";
+import { COMPANY } from "@/content/legal/company";
 
 const blocks = [
   {
     icon: "🔒",
-    title: "AES-256 encryption at rest, TLS 1.3 in transit",
-    desc: "Every transaction, every invoice, every GST figure stored in FynHelp is encrypted using the same standard used by India's largest banks. Your GSTIN, PAN, and bank account details are additionally encrypted at the application layer. Even our own engineers cannot read them in plaintext.",
+    title: "Encrypted in transit and at rest",
+    desc: "Every connection uses HTTPS. The database and file storage are encrypted at rest by our hosting provider, and secrets such as Gmail tokens and locked-file passwords are encrypted again by FynHelp before they are stored.",
   },
   {
-    icon: "🇮🇳",
-    title: "Your data never leaves India",
-    desc: "All FynHelp data is stored on AWS ap-south-1 (Mumbai) servers. We comply with India's Digital Personal Data Protection Act (DPDP) 2023 and will be among the first fintech platforms to achieve DPDP compliance certification.",
+    icon: "🌐",
+    title: "Where your data lives, stated plainly",
+    desc: `Database and files are hosted on Supabase (${COMPANY.region}). Moving data to an Indian region is planned, and this page will change the day it is done. Our privacy policy follows the IT Act section 43A, the SPDI Rules and the DPDP Act, and lists every provider that handles your data.`,
   },
   {
     icon: "🛡️",
-    title: "CFO Fynny never sees your personal information",
-    desc: "When CFO Fynny reasons about your business, she works with anonymised metrics. Customer names appear as 'Customer_01', vendors as 'Vendor_03'. Real names, GSTINs, and account numbers are masked before any AI call. This is an architectural constraint, not a policy.",
+    title: "AI reads, code proves, people approve",
+    desc: "To read a document, its relevant text is sent to our AI providers for that task only. Figures such as totals, matches and GST checks are computed by fixed rules, and anything the engine cannot prove becomes an exception for a person to decide. We do not train models on your clients' data.",
   },
   {
     icon: "✓",
-    title: "You own your data. Completely.",
-    desc: "Export everything in Excel or JSON format anytime. If you cancel, your data is available for 90 days then permanently deleted. Your Account Aggregator consent can be revoked from your bank app in 30 seconds. We never sell or share your data.",
+    title: "Yours to take, yours to delete",
+    desc: "Write to us from the firm owner's email and we export or delete the firm's documents and data. Self-serve export and deletion are being built. We never sell your data.",
   },
 ];
 

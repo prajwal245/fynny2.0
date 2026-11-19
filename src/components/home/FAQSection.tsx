@@ -27,7 +27,7 @@ const FAQS: Record<string, QA[]> = {
     { q: "Is there a free trial?", a: "Yes — 14 days free from signup, no credit card required." },
   ],
   "Security & Privacy": [
-    { q: "Is my financial data secure?", a: "Bank-grade encryption (AES-256), SOC 2 compliant infrastructure, data hosted in India (AWS Mumbai). We never sell or share your data." },
+    { q: "Is my financial data secure?", a: "Data is encrypted in transit and at rest, and each firm's data is walled off with row-level security. It is hosted on Supabase in Sydney today; moving to an Indian region is planned. We hold no certifications yet and say so on our security page. We never sell your data." },
     { q: "Does FynHelp replace my CA?", a: "No. FynHelp gives you intelligence between CA visits. Your CA handles compliance — Fynny handles daily financial clarity. Many CAs love it because clients come to meetings better prepared." },
   ],
   "CA Partners": [

@@ -17,11 +17,11 @@ import {
   ChevronRight,
   Cloud,
   FileSearch,
-  HardDrive,
   type LucideIcon,
 } from "lucide-react";
 import { Link } from "@/lib/router-compat";
 import { useEffect, useRef, useState } from "react";
+import { COMPANY } from "@/content/legal/company";
 
 type Card = {
   icon: LucideIcon;
@@ -32,18 +32,18 @@ type Card = {
 };
 
 const CARDS: Card[] = [
-  { icon: Shield,        label: "ENCRYPTION STANDARD", title: "Bank-level encryption protects every byte of your data.", desc: "AES-256 encryption for data at rest. TLS 1.3 for data in transit. Same security standards used by HDFC, ICICI, and Axis Bank." },
-  { icon: Lock,          label: "DATABASE SECURITY",   title: "Row-level security ensures zero data leakage.",            desc: "PostgreSQL RLS policies isolate your business data at database level. Zero cross-contamination between accounts. Your data stays yours." },
-  { icon: Key,           label: "PRIVACY ARCHITECTURE",title: "We can't see your data. By design.",                       desc: "Your financial data is encrypted before reaching our servers. Zero-knowledge architecture means we cannot decrypt or access your raw transaction data." },
-  { icon: Database,      label: "DATA RESIDENCY",      title: "Your data never leaves India.",                            desc: "All data stored in Mumbai AWS data centers. Compliant with RBI data localization regulations. No international data transfer. Period." },
-  { icon: Activity,      label: "ACCURACY PROMISE",    title: "99.9% calculation accuracy. Auditable by your CA.",        desc: "Real-time calculations validated against CA standards. Deterministic algorithms, not AI guesswork. Every number is verifiable.", stat: { value: "99.9%", caption: "Accuracy Rate" } },
-  { icon: Eye,           label: "TRANSPARENCY CORE",   title: "Every calculation shows its source. No black boxes.",      desc: "Every insight shows its formula. Every number shows its source data. No hidden AI making decisions you can't verify or challenge." },
-  { icon: UserX,         label: "DATA ETHICS",         title: "Your data will never train our AI. Ever.",                 desc: "We never use your financial data to train Fynny or any AI models. Your business intelligence remains confidential forever. Zero exceptions." },
-  { icon: FileCheck,     label: "COMPLIANCE READY",    title: "Enterprise-grade audits without enterprise cost.",         desc: "Annual third-party security audits. Quarterly vulnerability assessments. Bi-annual penetration testing by certified firms. SOC 2 compliance ready." },
-  { icon: Clock,         label: "AUDIT SYSTEM",        title: "Complete forensic trail for every action.",                desc: "Every data import, every change, every access logged with timestamp and user ID. Full audit trail for compliance, tax filing, and dispute resolution." },
-  { icon: AlertTriangle, label: "THREAT DETECTION",    title: "Real-time protection against suspicious activity.",        desc: "Automatic rate limiting. Instant suspicious activity alerts. IP-based access controls. Enterprise security infrastructure at startup pricing." },
-  { icon: Users,         label: "ACCESS CONTROL",      title: "Granular permissions for every team member.",              desc: "Role-based access control. Your CA sees tax data only. Your CFO sees everything. You decide who sees what. Complete access audit log." },
-  { icon: Download,      label: "DATA FREEDOM",        title: "Export everything. Delete everything. Anytime.",           desc: "One-click data export in CSV or Excel format. No vendor lock-in. Your data is portable and deletable. We don't hold your data hostage." },
+  { icon: Shield,        label: "ENCRYPTION",          title: "Encrypted in transit and at rest.",                         desc: "Every connection uses HTTPS. The database and file storage are encrypted at rest by our hosting provider. Secrets such as Gmail tokens and locked-file passwords are encrypted again by FynHelp before they are stored." },
+  { icon: Lock,          label: "DATABASE SECURITY",   title: "Each firm's data is walled off in the database.",           desc: "Row-level security on every table that holds client data means one firm cannot read another firm's rows, even through a bug in the app." },
+  { icon: Key,           label: "FILE ACCESS",         title: "Documents open only through short-lived links.",            desc: "Uploaded statements and registers sit in private storage. A file opens through a signed link that expires after five minutes." },
+  { icon: Database,      label: "DATA RESIDENCY",      title: "Where your data lives, stated plainly.",                    desc: `Database and files are hosted on Supabase (${COMPANY.region}) and the app is served by Vercel. Moving data to an Indian region is planned; this page changes the day it is done.` },
+  { icon: Activity,      label: "HOW FIGURES ARE MADE", title: "Figures come from code, not AI guesswork.",                desc: "Totals, matches and GST checks are computed by fixed rules. AI only reads documents, and what it reads must tie to the totals the document itself prints, or it is held for a person." },
+  { icon: Eye,           label: "TRANSPARENCY",        title: "Every figure shows its source.",                            desc: "Each match and each difference shows both amounts, the document each came from and the rule applied, so your team can check it." },
+  { icon: UserX,         label: "DATA ETHICS",         title: "We do not train models on your clients' data.",             desc: "To read a document or draft an MIS note, the relevant text is sent to our AI providers through their APIs for that task. We never use your clients' data to train models, and we list every provider in our privacy policy." },
+  { icon: FileCheck,     label: "CERTIFICATIONS",      title: "No certifications yet, and we say so.",                     desc: "We will publish a certification only after it is independently verified. Meanwhile our privacy policy follows the IT Act section 43A, the SPDI Rules and the DPDP Act, and we sign a data processing agreement with firms that ask." },
+  { icon: Clock,         label: "AUDIT TRAIL",         title: "An append-only trail of who did what.",                     desc: "Every match, ignore, sign-off and correction is logged with who did it, when, and the note they left. Logged events cannot be edited or deleted from the app." },
+  { icon: AlertTriangle, label: "ABUSE PROTECTION",    title: "Rate limits and a hardened admin area.",                    desc: "Sensitive endpoints are rate limited. Internal admin access is protected by a separate session, an optional network allow-list and two-step sign-in." },
+  { icon: Users,         label: "ACCESS CONTROL",      title: "Partner and junior roles, checked on the server.",          desc: "Settings, Gmail and WhatsApp connections, what the agents remember and MIS sign-off are partner-only. The server checks the role on every request, not just on the screen." },
+  { icon: Download,      label: "YOUR DATA",           title: "Yours to take, yours to delete.",                           desc: "Ask us in writing from the firm owner's email and we export or delete the firm's documents and data. Self-serve export and deletion are being built." },
 ];
 
 const N = CARDS.length;
@@ -465,12 +465,12 @@ type Badge = {
 };
 
 const BADGES: Badge[] = [
-  { micro: "INFRASTRUCTURE", icon: Cloud,      label: "AWS Mumbai",     sub: "Enterprise Cloud" },
-  { micro: "ENCRYPTION",     icon: Shield,     label: "256-bit AES",    sub: "Bank-Grade" },
-  { micro: "DATABASE",       icon: Database,   label: "PostgreSQL",     sub: "Enterprise Security" },
-  { micro: "COMPLIANCE",     icon: FileSearch, label: "Audit Trail",    sub: "Complete Logging" },
-  { micro: "PRIVACY",        icon: Lock,       label: "Zero-Knowledge", sub: "Architecture" },
-  { micro: "BACKUP",         icon: HardDrive,  label: "Daily Backups",  sub: "Automated" },
+  { micro: "INFRASTRUCTURE", icon: Cloud,      label: "Supabase",       sub: COMPANY.region.split(/[,(]/)[0]!.trim() },
+  { micro: "ENCRYPTION",     icon: Shield,     label: "Encrypted",      sub: "In transit, at rest" },
+  { micro: "DATABASE",       icon: Database,   label: "PostgreSQL",     sub: "Row-level security" },
+  { micro: "COMPLIANCE",     icon: FileSearch, label: "Audit Trail",    sub: "Append-only" },
+  { micro: "FILES",          icon: Lock,       label: "Private Files",  sub: "Short-lived links" },
+  { micro: "ACCESS",         icon: Users,      label: "Roles",          sub: "Partner and junior" },
 ];
 
 function useWidth() {

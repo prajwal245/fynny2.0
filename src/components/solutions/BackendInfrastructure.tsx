@@ -16,7 +16,7 @@ const CARDS: TechCard[] = [
     Icon: Database,
     name: "Supabase Backend",
     description: "PostgreSQL database with Edge Functions, real-time subscriptions, and row-level security for data protection",
-    tags: ["21 Edge Functions", "Row-level security", "Mumbai region"],
+    tags: ["21 Edge Functions", "Row-level security", "Hosted in Sydney, India region planned"],
   },
   {
     Icon: Brain,

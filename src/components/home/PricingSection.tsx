@@ -72,7 +72,7 @@ const plans: Plan[] = [
       "Everything in Pro, plus:",
       "Bank API white label deployment",
       "Custom vertical intelligence modules",
-      "ISO 27001 + SOC 2 compliance",
+      "Security questionnaire and data processing agreement",
       "On site implementation support",
       "Custom integrations (HRMS, ERP)",
       "Unlimited users + API access",

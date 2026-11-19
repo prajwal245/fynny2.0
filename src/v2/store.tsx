@@ -779,10 +779,16 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
     };
     // A document whose automatic retry time has passed is read again from here: the retry does not wait for an outside scheduler.
     let retrying = false;
+    let staleTries = 0;
     const retryDue = async () => {
       if (retrying || document.visibilityState !== "visible") return;
       const now = Date.now();
-      if (!docsRef.current.some((d) => d.status === "Failed" && d.retryAt && Date.parse(d.retryAt) <= now)) return;
+      const due = docsRef.current.some((d) => d.status === "Failed" && d.retryAt && Date.parse(d.retryAt) <= now);
+      // Failed or held documents are also offered to the current reader once (it may now read what an older one could not). The server
+      // does each document once per reader version, so a few calls per visit are enough.
+      const stuck = docsRef.current.some((d) => d.status === "Failed" || d.status === "Needs review");
+      if (!due && !(stuck && staleTries < 6)) return;
+      if (!due) staleTries++;
       retrying = true;
       try {
         await retryDuePracticeDocuments();

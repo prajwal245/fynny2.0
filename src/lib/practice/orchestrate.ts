@@ -7,6 +7,11 @@
 import { parsePeriod, previousPeriod } from "./core";
 
 export const MAX_EXTRACT_ATTEMPTS = 3;
+/**
+ * Bumped when the reader learns to read something it could not before (a new loan layout, a new statement format). A document that was
+ * left failed or in review by an older reader is read once more by the new one, automatically, so nobody has to press "Read again".
+ */
+export const READER_VERSION = 5;
 /** Wait before attempt 2, attempt 3. */
 export const RETRY_BACKOFF_MS = [2 * 60_000, 10 * 60_000];
 

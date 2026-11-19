@@ -19,6 +19,7 @@ import { Route as GuideRouteImport } from './routes/guide'
 import { Route as LaunchRouteImport } from './routes/launch'
 import { Route as SamplesRouteImport } from './routes/samples'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as BlogRssDotxmlRouteImport } from './routes/blog.rss[.]xml'
 import { Route as MainIndexRouteImport } from './routes/_main/index'
 import { Route as MainAboutRouteImport } from './routes/_main/about'
 import { Route as MainCaFirmsRouteImport } from './routes/_main/ca-firms'
@@ -278,6 +279,11 @@ const SamplesRoute = SamplesRouteImport.update({
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
   path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BlogRssDotxmlRoute = BlogRssDotxmlRouteImport.update({
+  id: '/blog/rss.xml',
+  path: '/blog/rss.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MainIndexRoute = MainIndexRouteImport.update({
@@ -1468,6 +1474,7 @@ export interface FileRoutesByFullPath {
   '/launch': typeof LaunchRoute
   '/samples': typeof SamplesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/blog/rss.xml': typeof BlogRssDotxmlRoute
   '/about': typeof MainAboutRoute
   '/ca-firms': typeof MainCaFirmsRoute
   '/community': typeof MainCommunityRoute
@@ -1689,6 +1696,7 @@ export interface FileRoutesByTo {
   '/launch': typeof LaunchRoute
   '/samples': typeof SamplesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/blog/rss.xml': typeof BlogRssDotxmlRoute
   '/about': typeof MainAboutRoute
   '/ca-firms': typeof MainCaFirmsRoute
   '/community': typeof MainCommunityRoute
@@ -1912,6 +1920,7 @@ export interface FileRoutesById {
   '/launch': typeof LaunchRoute
   '/samples': typeof SamplesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/blog/rss.xml': typeof BlogRssDotxmlRoute
   '/_main/about': typeof MainAboutRoute
   '/_main/ca-firms': typeof MainCaFirmsRoute
   '/_main/community': typeof MainCommunityRoute
@@ -2137,6 +2146,7 @@ export interface FileRouteTypes {
     | '/launch'
     | '/samples'
     | '/sitemap.xml'
+    | '/blog/rss.xml'
     | '/about'
     | '/ca-firms'
     | '/community'
@@ -2358,6 +2368,7 @@ export interface FileRouteTypes {
     | '/launch'
     | '/samples'
     | '/sitemap.xml'
+    | '/blog/rss.xml'
     | '/about'
     | '/ca-firms'
     | '/community'
@@ -2580,6 +2591,7 @@ export interface FileRouteTypes {
     | '/launch'
     | '/samples'
     | '/sitemap.xml'
+    | '/blog/rss.xml'
     | '/_main/about'
     | '/_main/ca-firms'
     | '/_main/community'
@@ -2808,6 +2820,7 @@ export interface RootRouteChildren {
   LaunchRoute: typeof LaunchRoute
   SamplesRoute: typeof SamplesRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  BlogRssDotxmlRoute: typeof BlogRssDotxmlRoute
   DemoSplatRoute: typeof DemoSplatRoute
   UTokenRoute: typeof UTokenRoute
   DemoIndexRoute: typeof DemoIndexRoute
@@ -2910,6 +2923,13 @@ declare module '@tanstack/react-router' {
       path: '/sitemap.xml'
       fullPath: '/sitemap.xml'
       preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/blog/rss.xml': {
+      id: '/blog/rss.xml'
+      path: '/blog/rss.xml'
+      fullPath: '/blog/rss.xml'
+      preLoaderRoute: typeof BlogRssDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_main/': {
@@ -4923,6 +4943,7 @@ const rootRouteChildren: RootRouteChildren = {
   LaunchRoute: LaunchRoute,
   SamplesRoute: SamplesRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  BlogRssDotxmlRoute: BlogRssDotxmlRoute,
   DemoSplatRoute: DemoSplatRoute,
   UTokenRoute: UTokenRoute,
   DemoIndexRoute: DemoIndexRoute,

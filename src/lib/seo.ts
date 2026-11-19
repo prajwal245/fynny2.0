@@ -276,10 +276,18 @@ export function articleLd(p: {
   authorName?: string | null;
   section?: string | null;
   tags?: string[] | null;
+  wordCount?: number;
+  /** Reading time in minutes, for timeRequired. */
+  minutes?: number;
 }): JsonLd {
   return {
     "@context": "https://schema.org",
     "@type": "BlogPosting",
+    // Tells voice and answer engines which parts to read aloud or quote: the headline and the short answer at the top.
+    speakable: { "@type": "SpeakableSpecification", cssSelector: ["h1", "[data-speakable]"] },
+    isPartOf: { "@type": "Blog", "@id": absoluteUrl("/blog"), name: "The FynHelp blog", url: absoluteUrl("/blog") },
+    ...(p.wordCount ? { wordCount: p.wordCount } : {}),
+    ...(p.minutes ? { timeRequired: `PT${Math.max(1, Math.round(p.minutes))}M` } : {}),
     headline: p.title.slice(0, 110),
     description: p.description,
     mainEntityOfPage: { "@type": "WebPage", "@id": absoluteUrl(p.path) },

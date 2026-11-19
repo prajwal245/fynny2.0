@@ -5,6 +5,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
 import Underline from "@tiptap/extension-underline";
+import { TableKit } from "@/lib/tiptapTable";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { uploadBlogImage, validateImageFile, IMAGE_ACCEPT } from "@/lib/blogImageUpload";
@@ -105,6 +106,7 @@ export default function AdminBlogEditorPage() {
       Underline,
       Link.configure({ openOnClick: false }),
       Image,
+      ...TableKit,
     ],
     content: "",
     onUpdate: ({ editor: ed }) => {
@@ -404,6 +406,7 @@ export default function AdminBlogEditorPage() {
               />
             </div>
             <div style={{ minHeight: 280, padding: "14px 16px", overflowY: "auto", lineHeight: 1.85, fontFamily: BODY, fontSize: 14 }}>
+              <style>{`.ProseMirror table{border-collapse:collapse;width:100%;margin:12px 0}.ProseMirror th,.ProseMirror td{border:1px solid rgba(23,18,8,.18);padding:6px 9px;vertical-align:top;text-align:left}.ProseMirror th{background:rgba(23,18,8,.05);font-weight:700}.ProseMirror td p,.ProseMirror th p{margin:0}`}</style>
               <EditorContent editor={editor} />
             </div>
             <div style={{ display: "flex", gap: 16, padding: "8px 16px", borderTop: "0.5px solid " + BORDER, fontSize: 11, color: "rgba(23,18,8,0.55)" }}>

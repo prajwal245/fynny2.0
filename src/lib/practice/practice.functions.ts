@@ -211,6 +211,18 @@ export const reprocessPracticeDocument = createServerFn({ method: "POST" })
   );
 
 /** Records a GST reconciliation result in the client's Activity. The files themselves are kept as the client's documents. */
+/** Sales and purchase registers read from a client's Tally Day Books, for the GST returns check. */
+export const getTallyGstBooks = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ business_id: uuid, month: z.string().regex(/^\d{4}-\d{2}$/) }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      const { assertClient } = await import("./db.server");
+      await assertClient(db, ctx, data.business_id);
+      return (await import("./gstTally.server")).tallyGstBooks(db, ctx, data.business_id, data.month);
+    }),
+  );
+
 export const saveGstResult = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ business_id: uuid, summary: z.string().min(3).max(900) }).parse(d))

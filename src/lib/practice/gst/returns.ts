@@ -9,7 +9,7 @@
  * Pure code. Every line states both figures, where each came from and the difference. A check whose files are missing says which file
  * it needs; it never shows a partial answer as complete. Nothing is filed or changed.
  */
-import { isoDate, money, readGstr2bJson, type GstInvoice, type ReadInvoices } from "./invoices";
+import { isoDate, money, normInvoiceNo, readGstr2bJson, type GstInvoice, type ReadInvoices } from "./invoices";
 import { reconcileGstr2b, type Gstr2bRecon } from "./reconcile";
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -159,14 +159,21 @@ export function checkReturns(input: ReturnsInput): Check[] {
   else {
     const reg = sumInvoices(salesBooks.invoices);
     const filed = add(sumInvoices(gstr1.invoices), gstr1.b2c);
-    const withGstin = salesBooks.invoices.filter((i) => i.gstin);
-    const recon = reconcileGstr2b(withGstin, gstr1.invoices, { period: gstr1.period });
+    // A Tally Day Book has no buyer GSTIN. Take it from the GSTR-1 invoice with the same number (when exactly one has it), so the
+    // invoice-level match still runs. Sales with no number match are listed; B2C sales (not on GSTR-1 by invoice) may appear among them.
+    const byNo = new Map<string, GstInvoice[]>();
+    for (const g of gstr1.invoices) (byNo.get(normInvoiceNo(g.no)) ?? byNo.set(normInvoiceNo(g.no), []).get(normInvoiceNo(g.no))!).push(g);
+    const noGstinSource = salesBooks.invoices.every((i) => !i.gstin);
+    const forMatch = noGstinSource
+      ? salesBooks.invoices.map((i) => { const hit = byNo.get(normInvoiceNo(i.no)); return hit?.length === 1 ? { ...i, gstin: hit[0]!.gstin, party: i.party || hit[0]!.party } : { ...i, gstin: "UNKNOWN-BUYER" }; })
+      : salesBooks.invoices.filter((i) => i.gstin);
+    const recon = reconcileGstr2b(forMatch, gstr1.invoices, { period: gstr1.period });
     const lines = [line("Taxable value", "Sales register", reg.taxable, "GSTR-1", filed.taxable), line("Tax", "Sales register", taxOf(reg), "GSTR-1", taxOf(filed))];
     const bad = recon.missingInPortal.length + recon.missingInBooks.length + recon.mismatched.length;
     out.push({
       id: "sales", title: "Sales register against GSTR-1", status: overall(lines) === "agree" && !bad ? "agree" : "differs", lines, invoiceRecon: recon,
       summary: bad
-        ? `${recon.missingInPortal.length} sales invoice${recon.missingInPortal.length === 1 ? " is" : "s are"} in the books but not in GSTR-1, ${recon.missingInBooks.length} in GSTR-1 but not in the books, ${recon.mismatched.length} with different amounts.`
+        ? `${recon.missingInPortal.length} sales invoice${recon.missingInPortal.length === 1 ? " is" : "s are"} in the books but not in GSTR-1${noGstinSource ? " by invoice number (B2C sales are reported as totals, so they can appear here)" : ""}, ${recon.missingInBooks.length} in GSTR-1 but not in the books, ${recon.mismatched.length} with different amounts.`
         : lines[0]!.status === "agree" && lines[1]!.status === "agree" ? "Every sale in the register is in GSTR-1 and the totals agree." : `Totals differ: tax in the register is ${fmt(lines[1]!.diff)} ${lines[1]!.diff > 0 ? "more" : "less"} than GSTR-1.`,
     });
   }

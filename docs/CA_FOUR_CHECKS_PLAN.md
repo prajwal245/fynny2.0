@@ -64,3 +64,9 @@ We do not promise dates here. Phase 1 is a small build (a read, a comparison and
 1. Please send one month of GSTR-1 JSON, GSTR-3B JSON, GSTR-2B and the sales and purchase registers for the same client, so the checks run on a real month.
 2. Please send one signed audited closing PDF (any client) for Phase 1.
 3. For ageing: bill-wise in Tally for all parties, or only debtors?
+
+## Update after the CA's Satkaarika December 2025 files
+
+**Built and run on the real files.** GST Returns check: one drop for the Tally registers (sales, purchase, debit note, journals with GST) and the GSTR-1, GSTR-2B and GSTR-3B Excel reports (JSON also accepted, so JSON is not required). Reads purchases and reverse charge booked as journals. Opening balances: signed Balance Sheet and P&L PDFs are read by code and proved (they must add up and the reserves must roll forward by the year's profit) before any comparison with Tally's opening balances. Ageing engine: bill-wise where bill references exist, FIFO where they do not, per party, with the method named and the closing proved against the ledger.
+
+**Still needed from the CA:** Tally masters export as at 1-Apr-2025 (for the opening-balance comparison and for ageing openings); and for ageing, whether to age from invoice date or due date.

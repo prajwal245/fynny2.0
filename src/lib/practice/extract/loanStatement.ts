@@ -29,7 +29,15 @@ const LOAN_TOKEN = /(^|[^a-z])(gecl\w*|tl|vl|ibvl\w*|loan|term|vehicle|cv|mortga
 /** Wording only a loan account's own lines use: principal repayments, rate-change entries, instalments. */
 const LOAN_BODY = /(o\.?\s?s\.?\s*principal|principal\s+repa|\brt\s+\d+\.\d+\s+to\s+\d+\.\d+\s*%|\bemi\b|instal+ment|repayment received)/i;
 
+/**
+ * An instalment schedule: "Due For Instalment 7" / "Due for Instalment Amount 7" repeated, with "Pmnt Rcvd Vide ..." or "Payment Received"
+ * under it. Axis and HDFC commercial-vehicle loan statements are printed this way and may never say "loan account". A bank statement has
+ * no such lines, so three of them are proof enough.
+ */
+const SCHEDULE_LINE = /due\s+for\s+instal+ment(?:\s+amount)?\s+\d+/gi;
+
 export function looksLikeLoanStatement(text: string): boolean {
+  if ((text.match(SCHEDULE_LINE) ?? []).length >= 3) return true;
   const head = text.slice(0, 6_000);
   const product = PRODUCT_LINE.exec(head)?.[1] ?? "";
   if (product && LOAN_TOKEN.test(product) && (LOAN_BODY.test(text) || /int(erest)?\s*rate\s*:/i.test(head))) return true;

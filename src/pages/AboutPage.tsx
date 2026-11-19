@@ -3,6 +3,8 @@ import { ArrowRight, Check } from "lucide-react";
 import SiteShell, { PageHero, Section, CtaBand, Reveal } from "@/components/site/SiteShell";
 import { CTA_DEMO, CTA_START, SIGNUP_URL, trackCta } from "@/components/site/cta";
 import { DemoLink } from "@/components/site/BookDemo";
+import { COMPANY } from "@/content/legal/company";
+import { C } from "@/components/site/siteTheme";
 
 const BELIEFS = [
   {
@@ -52,12 +54,15 @@ export default function AboutPage() {
       <div className="fh-wrap">
         <div className="fh-strip">
           <div className="fh-strip-grid">
-            <div><div className="v num">2024</div><div className="l">founded in Bengaluru</div></div>
+            <div><div className="v num">2024</div><div className="l">FynHelp began in Bengaluru</div></div>
             <div><div className="v num">4</div><div className="l">agents: Extract, Recon, Narrate, Chaser</div></div>
             <div><div className="v num">1</div><div className="l">workspace for the whole firm</div></div>
             <div><div className="v num">India</div><div className="l">first, by design</div></div>
           </div>
         </div>
+        <p style={{ fontSize: 13.5, color: C.muted, margin: "14px 0 0", maxWidth: 760 }}>
+          FynHelp is operated by {COMPANY.entity} (CIN {COMPANY.cin}), whose registered office is at {COMPANY.address}.
+        </p>
       </div>
 
       <Section

@@ -95,7 +95,7 @@ export default function ContactPage() {
             <Reveal delay={140}>
               <div className="fh-ccard">
                 <h3>Office</h3>
-                <p>{COMPANY.entity || "FynHelp"}. Our hosting region and every provider that handles your data are listed on the security page.</p>
+                <p>FynHelp is operated by {COMPANY.entity}, registered office {COMPANY.address}. The team works from Bengaluru. Our hosting region and every provider that handles your data are listed on the security page.</p>
               </div>
             </Reveal>
             <Reveal delay={210}>

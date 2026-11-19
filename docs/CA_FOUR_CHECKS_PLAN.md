@@ -65,14 +65,19 @@ We do not promise dates here. Phase 1 is a small build (a read, a comparison and
 2. Please send one signed audited closing PDF (any client) for Phase 1.
 3. For ageing: bill-wise in Tally for all parties, or only debtors?
 
-## Update 19 Nov 2026: real files from the CA, and what they changed
+## Update after the CA's Satkaarika December 2025 files
 
-The CA's folder held, for one real client, the GSTR-1 workbook, the GSTR-3B annual report and the GSTR-2B (all Excel, none JSON), the Tally sales and purchase registers, and the audited balance sheet and profit and loss (signed PDFs). Reading them showed three things the synthetic tests had hidden:
+**Built and run on the real files.** GST Returns check: one drop for the Tally registers (sales, purchase, debit note, journals with GST) and the GSTR-1, GSTR-2B and GSTR-3B Excel reports (JSON also accepted, so JSON is not required). Reads purchases and reverse charge booked as journals. Opening balances: signed Balance Sheet and P&L PDFs are read by code and proved (they must add up and the reserves must roll forward by the year's profit) before any comparison with Tally's opening balances. Ageing engine: bill-wise where bill references exist, FIFO where they do not, per party, with the method named and the closing proved against the ledger.
 
-1. **The portal files are Excel, and the shapes differ from the JSON.** The GSTR-1 workbook is one invoice list for the year with dates written month first (4/22/2025). The old reader read day first, so a May 9 invoice became September 5 without any warning. Dates are now read by what the column proves, and a month-first file is noted as such. The same workbook has both "Document Type" (B2B, Credit Note) and "Invoice Type" (Regular); the reader took the wrong one, so credit notes were not recognised. Fixed.
-2. **The GSTR-3B annual report** is one workbook with twelve column blocks. It is now read, and cut to the month being checked (`gst/portalExcel.ts`).
-3. **A Tally register has no taxable-value column.** Taxable value is spread over the ledger columns of each voucher. `gst/tallyRegister.ts` adds them up, ties every voucher to its gross total, names the ones that do not tie, reads purchases by the supplier's invoice number and keeps the booking date, reads Debit Note Registers as credit notes, and lists input credit taken through journals outside the purchase register.
+**Still needed from the CA:** Tally masters export as at 1-Apr-2025 (for the opening-balance comparison and for ageing openings); and for ageing, whether to age from invoice date or due date.
 
-On that client's December 2025 files the engine now shows what a CA wants: GSTR-1 and GSTR-3B agree with each other, and the Tally sales register is short by exactly one invoice (named), which accounts for the whole difference in tax. New rule `booked_late` flags purchases booked more than 90 days after the supplier's invoice date. Purchases with GST charged but no supplier GSTIN, and the same amount twice from one supplier on one day, were already caught by existing rules and now fire on the real register layout.
+## Update 19 Nov 2026 (second session): fixes found on the real files
 
-Tested on masked copies of these layouts (`tests/helpers/gstRealLayouts.ts`, no client data). Not yet run on the real files in the repository's real-file gate; those stay outside git. Still open: the GSTR-2B Excel for the year (shape not yet read), the audited-balance-sheet comparison (Phase 1 of this plan), and bill allocations for Phase 4.
+Two reader bugs were found while testing the CA's GSTR-1 workbook, and are fixed in the general invoice reader (`gst/invoices.ts`):
+
+1. **Month-first dates.** The portal workbook writes dates as 4/22/2025. The reader took day first, so 9 May (5/9/2025) became 5 September without a warning. The order is now decided by what the column proves (a first part above 12 means day first, a second part above 12 means month first), defaults to day first, and a month-first read is said in the file's notes.
+2. **Credit notes.** The workbook carries both "Document Type" (B2B, Credit Note) and "Invoice Type" (Regular). The reader used the second, so credit notes were not recognised as notes. "Document Type" now comes first.
+
+New rule `booked_late` (purchases booked more than 90 days after the supplier's invoice date), fed by the Tally register reader, which now keeps the voucher date beside the supplier's invoice date. Tests: `tests/unit/practice/gst-dates-and-notes.test.ts`.
+
+Not built yet: saved results with a hash of their inputs (so a changed file marks a result stale), a named-person decision on each opening-balance difference, and a Close step for opening balances.

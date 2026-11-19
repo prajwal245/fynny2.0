@@ -10,7 +10,7 @@ Operated by FIVENTO AI PRIVATE LIMITED.
 | --- | --- |
 | `src/routes`, `src/pages` | The public site and the signed-in app, built with TanStack Start and React |
 | `src/lib/practice` | The product's logic: extraction, reconciliation, GST checks, month-end close, billing |
-| `src/lib/practice/verify` | The Verify checks and their shared result shape |
+| `src/lib/practice/gst`, `audited.ts`, `ageing.ts` | GST invoice rules and return checks, the audited-statement comparison, and bill ageing |
 | `supabase/migrations` | The database schema, including row-level security |
 | `tests` | Unit, integration and database tests, and the real-file regression gate |
 | `docs` | Plans, release notes and the architecture blueprint (`architecture-blueprint.html`) |

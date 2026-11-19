@@ -3,8 +3,6 @@
  * The file never leaves the machine; the page works on what this returns.
  */
 import { readGstr2bJson, readInvoiceRows, type ReadInvoices } from "./invoices";
-import { isGstr1Workbook, readGstr3bAnnualRows, type Gstr3bAnnual } from "./portalExcel";
-import { readTallyRegisterWorkbook } from "./tallyRegister";
 
 function readAs<T>(file: Blob, how: "text" | "buffer"): Promise<T> {
   // Blob.text()/arrayBuffer() are missing in some older browsers; FileReader works everywhere.
@@ -21,12 +19,7 @@ function readAs<T>(file: Blob, how: "text" | "buffer"): Promise<T> {
 
 const empty = (note: string): ReadInvoices => ({ invoices: [], period: null, ownGstin: null, notes: [note] });
 
-/** `kind` says which register a Tally workbook is wanted for, because one workbook can hold the sales and the purchase register. */
-export interface ReadOptions {
-  kind?: "sales" | "purchase";
-}
-
-export async function readGstFile(file: File, opts: ReadOptions = {}): Promise<ReadInvoices> {
+export async function readGstFile(file: File): Promise<ReadInvoices> {
   const name = file.name.toLowerCase();
   if (file.size > 25 * 1024 * 1024) return empty("This file is larger than 25 MB. Split it by month and try again.");
   try {
@@ -34,22 +27,11 @@ export async function readGstFile(file: File, opts: ReadOptions = {}): Promise<R
     const XLSX = await import("xlsx");
     const wb = XLSX.read(await readAs<ArrayBuffer>(file, "buffer"), { type: "array", cellDates: true, raw: false });
     // The portal's GSTR-2B workbook has one sheet per section: take the invoice sheets (B2B, then credit notes), else the first sheet that reads.
-    // A Tally register workbook (Sales Register, Purchase Register, Debit Note Register, Journals with GST) has no taxable-value column:
-    // its own reader adds up the ledger columns. It is tried first, and only a workbook that names those registers is taken.
-    const sheets = wb.SheetNames.map((name) => ({ name, rows: XLSX.utils.sheet_to_json<string[]>(wb.Sheets[name]!, { header: 1, raw: false, defval: "" }) }));
-    const tally = readTallyRegisterWorkbook(sheets);
-    if (tally) {
-      const want = opts.kind ?? (tally.purchases ? "purchase" : "sales");
-      const got = want === "sales" ? tally.sales : tally.purchases;
-      if (got) return got;
-      return empty(`This Tally workbook has no ${want} register sheet. Export the ${want} register from Tally (Display, Account Books, ${want === "sales" ? "Sales" : "Purchase"} Register) and try again.`);
-    }
     const order = [...wb.SheetNames].sort((a, b) => rank(a) - rank(b));
     const all: ReadInvoices = { invoices: [], period: null, ownGstin: null, notes: [] };
     for (const sheet of order) {
       const rows = XLSX.utils.sheet_to_json<string[]>(wb.Sheets[sheet]!, { header: 1, raw: false, defval: "" });
-      // The GSTR-1 workbook writes dates month first (4/22/2025); everything else here is day first.
-      const r = readInvoiceRows(rows, { sheet: wb.SheetNames.length > 1 ? sheet : undefined, ...(isGstr1Workbook(rows) ? { dateOrder: "mdy" as const } : {}) });
+      const r = readInvoiceRows(rows, { sheet: wb.SheetNames.length > 1 ? sheet : undefined });
       if (!r.invoices.length) continue;
       all.invoices.push(...r.invoices);
       all.period = all.period ?? r.period;
@@ -62,24 +44,6 @@ export async function readGstFile(file: File, opts: ReadOptions = {}): Promise<R
     return all;
   } catch (e) {
     return empty(`This file could not be read (${(e as Error).message}). Save it as .xlsx, .csv or the GSTR-2B .json and try again.`);
-  }
-}
-
-/** The GSTR-3B annual report (Excel): twelve months in one workbook. */
-export async function readGstr3bFile(file: File): Promise<Gstr3bAnnual> {
-  const none = (note: string): Gstr3bAnnual => ({ startYear: null, months: [], notes: [note] });
-  if (file.size > 25 * 1024 * 1024) return none("This file is larger than 25 MB.");
-  try {
-    const XLSX = await import("xlsx");
-    const wb = XLSX.read(await readAs<ArrayBuffer>(file, "buffer"), { type: "array", cellDates: true, raw: false });
-    for (const name of wb.SheetNames) {
-      const rows = XLSX.utils.sheet_to_json<string[]>(wb.Sheets[name]!, { header: 1, raw: false, defval: "" });
-      const r = readGstr3bAnnualRows(rows);
-      if (r.months.length) return r;
-    }
-    return none("This does not look like the GSTR-3B annual report. Download it from the GST portal (Returns, Annual, GSTR-3B) or send the monthly JSON.");
-  } catch (e) {
-    return none(`This file could not be read (${(e as Error).message}). Save it as .xlsx and try again.`);
   }
 }
 

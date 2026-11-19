@@ -139,6 +139,8 @@ export interface ReturnsInput {
   gstr3b?: Gstr3bRead | null;
   gstr2b?: ReadInvoices | null;
   purchaseBooks?: ReadInvoices | null;
+  /** Reverse charge liability booked in the month outside the purchase register (journals to the RCM payable ledgers). */
+  rcmBooks?: TaxSplit | null;
 }
 
 const line = (label: string, aName: string, a: number, bName: string, b: number): CheckLine => {
@@ -150,7 +152,7 @@ const overall = (lines: CheckLine[]): CheckStatus => (lines.every((l) => l.statu
 const need = (id: Check["id"], title: string, what: string): Check => ({ id, title, status: "needs", summary: `Add ${what} to run this check.`, lines: [] });
 
 export function checkReturns(input: ReturnsInput): Check[] {
-  const { salesBooks, gstr1, gstr3b, gstr2b, purchaseBooks } = input;
+  const { salesBooks, gstr1, gstr3b, gstr2b, purchaseBooks, rcmBooks } = input;
   const out: Check[] = [];
 
   // 1. Sales register against GSTR-1. The register holds every sale, GSTR-1 holds registered buyers (invoices) and B2C totals, so the
@@ -196,11 +198,12 @@ export function checkReturns(input: ReturnsInput): Check[] {
   }
 
   // 4. Reverse charge.
-  if (!purchaseBooks?.invoices.length || !gstr3b) out.push(need("rcm", "Reverse charge: books against GSTR-3B", !purchaseBooks?.invoices.length && !gstr3b ? "the purchase register and GSTR-3B" : !gstr3b ? "the GSTR-3B JSON" : "the purchase register"));
+  if ((!purchaseBooks?.invoices.length && !rcmBooks) || !gstr3b) out.push(need("rcm", "Reverse charge: books against GSTR-3B", !purchaseBooks?.invoices.length && !gstr3b ? "the purchase register and GSTR-3B" : !gstr3b ? "the GSTR-3B JSON" : "the purchase register"));
   else {
-    const rcmBooks = sumInvoices(purchaseBooks.invoices.filter((i) => i.reverseCharge));
-    const lines = [line("RCM tax liability", "Purchase register (reverse charge)", taxOf(rcmBooks), "GSTR-3B 3.1(d)", taxOf(gstr3b.rcm)), line("ITC taken on RCM", "GSTR-3B 4(A) reverse charge", taxOf(gstr3b.itcOnRcm), "RCM tax paid, GSTR-3B 3.1(d)", taxOf(gstr3b.rcm))];
-    const flagged = purchaseBooks.invoices.some((i) => i.reverseCharge);
+    const rcmReg = sumInvoices((purchaseBooks?.invoices ?? []).filter((i) => i.reverseCharge));
+    const rcmTotal = add(rcmReg, rcmBooks ?? {});
+    const lines = [line("RCM tax liability", rcmBooks ? "Books (reverse charge journals and register)" : "Purchase register (reverse charge)", taxOf(rcmTotal), "GSTR-3B 3.1(d)", taxOf(gstr3b.rcm)), line("ITC taken on RCM", "GSTR-3B 4(A) reverse charge", taxOf(gstr3b.itcOnRcm), "RCM tax paid, GSTR-3B 3.1(d)", taxOf(gstr3b.rcm))];
+    const flagged = Boolean(rcmBooks && taxOf(rcmBooks)) || (purchaseBooks?.invoices ?? []).some((i) => i.reverseCharge);
     out.push({ id: "rcm", title: "Reverse charge: books against GSTR-3B", lines, status: overall(lines), summary: !flagged && !taxOf(gstr3b.rcm) ? "No reverse charge purchases in the register and none in GSTR-3B." : overall(lines) === "agree" ? "RCM liability in GSTR-3B agrees to the books, and the credit taken equals the tax paid." : `RCM liability differs by ${fmt(lines[0]!.diff)} from the register${!flagged ? " (the register has no purchase marked reverse charge, so check the column is present)" : ""}${Math.abs(lines[1]!.diff) > TOLERANCE ? `; credit taken differs from the tax paid by ${fmt(lines[1]!.diff)}` : ""}.` });
   }
   return out;

@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
  */
 import { ReactNode, CSSProperties, useEffect, useId, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence, useIsPresent } from "framer-motion";
-import { Activity, AlertCircle, CheckCircle2, ArrowDown, ArrowUp, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Maximize2, Minimize2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Maximize2, Minimize2, X } from "lucide-react";
 import { LIQUID_BUTTON_CSS } from "@/lib/liquidButton";
 
 /** Palette: red #D92B2B and #8E1B1F, cream #EADBC8, ink #141210, mist #FAF7F2. Green and amber are for status only. */
@@ -38,8 +38,8 @@ export const V = {
 };
 
 const THEME_VARS = `
-:root { --v2-bg:#F7F8FA; --v2-card:#FFFFFF; --v2-ink:#111318; --v2-body:#4B5563; --v2-muted:#8C93A0; --v2-line:#EAECEF; --v2-blue:#EEF2FF; --v2-beige:#E8EBF0; --v2-gray:#F3F4F6; --v2-maroon:#8E1B1F; --v2-coral:#D92B2B; --v2-green:#15803D; --v2-brand:#D92B2B; --v2-brandBright:#D92B2B; --v2-brandDeep:#4338CA; --v2-cream:#F1F5F9; --v2-warnBg:#FEF3C7; --v2-warnFg:#B45309; --v2-side:#FBFBFC; --v2-head:rgba(247,248,250,.86); --v2-overlay:rgba(20,20,20,.34); --v2-pop:#FFFFFF; --v2-sticky:#FFFFFF; --v2-sticky-hover:#F7F5F1; --v2-input:#FFFFFF; --v2-seg:#FFFFFF; --v2-tab:#FFFFFF; --v2-tab-shadow:0 1px 2px rgba(20,20,20,.08), 0 6px 14px -8px rgba(20,20,20,.25); --v2-good-bg:#DCFCE7; --v2-dash:rgba(20,20,20,.2); --v2-switch:rgba(20,20,20,.14); --v2-shine:#FFFFFF; --v2-card-shadow:0 2px 10px rgba(13,11,10,.03); --v2-btn-bg:#18181B; --v2-btn-fg:#FFFFFF; --v2-btn-hover:#27272A; --v2-focus:#6366F1; --v2-hair:#E2E5EC; --v2-row:#F1F3F6; --v2-th:#F9FAFB; --v2-row-hover:#FAFBFC; --v2-pill:#EEF2FF; --v2-chip:#FFFFFF; --v2-glow:none; --v2-bad-bg:#FEE2E2; --v2-bad-fg:#B91C1C; --v2-wash1:linear-gradient(135deg,#E0F2FE 0%,#EEF2FF 48%,#FFFFFF 100%); --v2-wash2:linear-gradient(135deg,#CCFBF1 0%,#FFEDD5 48%,#FFFFFF 100%); --v2-wash3:linear-gradient(135deg,#FCE7F3 0%,#FEF3C7 48%,#FFFFFF 100%); --v2-badge:rgba(255,255,255,.75); --v2-scheme:light; --v2-ag-extract-tint:#FDE8E3; --v2-ag-extract-ink:#9E241D; --v2-ag-extract-dot:#E4302A; --v2-ag-recon-tint:#F8E1DA; --v2-ag-recon-ink:#6E1712; --v2-ag-recon-dot:#B42424; --v2-ag-narrate-tint:#FCEEE4; --v2-ag-narrate-ink:#7A3420; --v2-ag-narrate-dot:#C8553D; --v2-ag-chaser-tint:#F4E4DF; --v2-ag-chaser-ink:#3A0E0A; --v2-ag-chaser-dot:#8A1E18; --v2-btn-a:#D92B2B; --v2-btn-b:#8E1B1F; --v2-btn-ha:#C42626; --v2-btn-hb:#701519; --v2-lq:#EADBC8; --v2-lq-ink:#8E1B1F; }
-:root[data-v2-theme="dark"] { --v2-bg:#141210; --v2-card:rgba(255,255,255,0.045); --v2-ink:#FAF7F2; --v2-body:rgba(250,247,242,0.74); --v2-muted:rgba(250,247,242,0.50); --v2-line:rgba(255,255,255,0.09); --v2-blue:rgba(217,43,43,0.16); --v2-beige:rgba(234,219,200,0.12); --v2-gray:rgba(255,255,255,0.06); --v2-maroon:#FF8A80; --v2-coral:#8E1B1F; --v2-green:#5BD39A; --v2-brand:#D92B2B; --v2-brandBright:#D92B2B; --v2-brandDeep:#EADBC8; --v2-cream:rgba(234,219,200,0.07); --v2-warnBg:rgba(234,219,200,0.12); --v2-warnFg:#EADBC8; --v2-side:rgba(20,18,16,.72); --v2-head:rgba(20,18,16,.72); --v2-overlay:rgba(0,0,0,.62); --v2-pop:#1B1816; --v2-sticky:#1C1917; --v2-sticky-hover:#26221F; --v2-input:rgba(255,255,255,.05); --v2-seg:rgba(217,43,43,.22); --v2-tab:linear-gradient(180deg, rgba(217,43,43,.28), rgba(217,43,43,.14)); --v2-tab-shadow:0 1px 0 rgba(255,255,255,.14) inset, 0 8px 18px -10px rgba(217,43,43,.7); --v2-good-bg:rgba(91,211,154,.16); --v2-dash:rgba(255,255,255,.25); --v2-switch:rgba(255,255,255,.18); --v2-shine:rgba(255,255,255,.12); --v2-card-shadow:0 1px 0 rgba(255,255,255,.05) inset, 0 18px 40px -28px rgba(0,0,0,.8); --v2-btn-bg:#F4F4F5; --v2-btn-fg:#18181B; --v2-btn-hover:#E4E4E7; --v2-focus:#818CF8; --v2-hair:rgba(255,255,255,.12); --v2-row:rgba(255,255,255,.06); --v2-th:rgba(255,255,255,.04); --v2-row-hover:rgba(255,255,255,.03); --v2-pill:rgba(129,140,248,.16); --v2-chip:rgba(255,255,255,.06); --v2-bad-bg:rgba(248,113,113,.16); --v2-bad-fg:#FCA5A5; --v2-wash1:linear-gradient(135deg,rgba(56,189,248,.14),rgba(129,140,248,.08) 55%,rgba(255,255,255,.02)); --v2-wash2:linear-gradient(135deg,rgba(45,212,191,.13),rgba(251,146,60,.08) 55%,rgba(255,255,255,.02)); --v2-wash3:linear-gradient(135deg,rgba(244,114,182,.13),rgba(251,191,36,.08) 55%,rgba(255,255,255,.02)); --v2-badge:rgba(255,255,255,.08); --v2-glow:radial-gradient(120% 70% at 100% 105%, rgba(217,43,43,.30) 0%, rgba(120,12,30,.16) 38%, transparent 70%), radial-gradient(70% 40% at 0% 0%, rgba(142,27,31,.07) 0%, transparent 70%); --v2-scheme:dark; --v2-ag-extract-tint:rgba(217,43,43,.18); --v2-ag-extract-ink:#FF9A8F; --v2-ag-extract-dot:#D92B2B; --v2-ag-recon-tint:rgba(142,27,31,.18); --v2-ag-recon-ink:#F0A27A; --v2-ag-recon-dot:#8E1B1F; --v2-ag-narrate-tint:rgba(234,219,200,.14); --v2-ag-narrate-ink:#EADBC8; --v2-ag-narrate-dot:#EADBC8; --v2-ag-chaser-tint:rgba(250,247,242,.12); --v2-ag-chaser-ink:#FAF7F2; --v2-ag-chaser-dot:#E0605A; --v2-btn-a:#E23A3A; --v2-btn-b:#A81F24; --v2-btn-ha:#EC4A4A; --v2-btn-hb:#C23030; --v2-lq:#EADBC8; --v2-lq-ink:#141210; }
+:root { --v2-bg:#F7F6F3; --v2-card:#FFFFFF; --v2-ink:#141210; --v2-body:rgba(20,18,16,0.74); --v2-muted:rgba(20,18,16,0.58); --v2-line:rgba(20,18,16,0.09); --v2-blue:#FBE6DC; --v2-beige:#EADBC8; --v2-gray:#F4F2EE; --v2-maroon:#8E1B1F; --v2-coral:#D92B2B; --v2-green:#2F6B4F; --v2-brand:#D92B2B; --v2-brandBright:#D92B2B; --v2-brandDeep:#8E1B1F; --v2-cream:#F3EADC; --v2-warnBg:#FCEBD9; --v2-warnFg:#7A3E0C; --v2-side:#FFFFFF; --v2-head:rgba(250,247,242,.86); --v2-overlay:rgba(20,20,20,.34); --v2-pop:#FFFFFF; --v2-sticky:#FFFFFF; --v2-sticky-hover:#F7F5F1; --v2-input:#FFFFFF; --v2-seg:#FFFFFF; --v2-tab:#FFFFFF; --v2-tab-shadow:0 1px 2px rgba(20,20,20,.08), 0 6px 14px -8px rgba(20,20,20,.25); --v2-good-bg:rgba(47,107,79,.11); --v2-dash:rgba(20,20,20,.2); --v2-switch:rgba(20,20,20,.14); --v2-shine:#FFFFFF; --v2-card-shadow:0 1px 2px rgba(20,18,16,.04), 0 12px 28px -22px rgba(20,18,16,.20); --v2-glow:none; --v2-scheme:light; --v2-ag-extract-tint:#FDE8E3; --v2-ag-extract-ink:#9E241D; --v2-ag-extract-dot:#E4302A; --v2-ag-recon-tint:#F8E1DA; --v2-ag-recon-ink:#6E1712; --v2-ag-recon-dot:#B42424; --v2-ag-narrate-tint:#FCEEE4; --v2-ag-narrate-ink:#7A3420; --v2-ag-narrate-dot:#C8553D; --v2-ag-chaser-tint:#F4E4DF; --v2-ag-chaser-ink:#3A0E0A; --v2-ag-chaser-dot:#8A1E18; --v2-btn-a:#D92B2B; --v2-btn-b:#8E1B1F; --v2-btn-ha:#C42626; --v2-btn-hb:#701519; --v2-lq:#EADBC8; --v2-lq-ink:#8E1B1F; }
+:root[data-v2-theme="dark"] { --v2-bg:#141210; --v2-card:rgba(255,255,255,0.045); --v2-ink:#FAF7F2; --v2-body:rgba(250,247,242,0.74); --v2-muted:rgba(250,247,242,0.50); --v2-line:rgba(255,255,255,0.09); --v2-blue:rgba(217,43,43,0.16); --v2-beige:rgba(234,219,200,0.12); --v2-gray:rgba(255,255,255,0.06); --v2-maroon:#FF8A80; --v2-coral:#8E1B1F; --v2-green:#5BD39A; --v2-brand:#D92B2B; --v2-brandBright:#D92B2B; --v2-brandDeep:#EADBC8; --v2-cream:rgba(234,219,200,0.07); --v2-warnBg:rgba(234,219,200,0.12); --v2-warnFg:#EADBC8; --v2-side:rgba(20,18,16,.72); --v2-head:rgba(20,18,16,.72); --v2-overlay:rgba(0,0,0,.62); --v2-pop:#1B1816; --v2-sticky:#1C1917; --v2-sticky-hover:#26221F; --v2-input:rgba(255,255,255,.05); --v2-seg:rgba(217,43,43,.22); --v2-tab:linear-gradient(180deg, rgba(217,43,43,.28), rgba(217,43,43,.14)); --v2-tab-shadow:0 1px 0 rgba(255,255,255,.14) inset, 0 8px 18px -10px rgba(217,43,43,.7); --v2-good-bg:rgba(91,211,154,.16); --v2-dash:rgba(255,255,255,.25); --v2-switch:rgba(255,255,255,.18); --v2-shine:rgba(255,255,255,.12); --v2-card-shadow:0 1px 0 rgba(255,255,255,.05) inset, 0 18px 40px -28px rgba(0,0,0,.8); --v2-glow:radial-gradient(120% 70% at 100% 105%, rgba(217,43,43,.30) 0%, rgba(120,12,30,.16) 38%, transparent 70%), radial-gradient(70% 40% at 0% 0%, rgba(142,27,31,.07) 0%, transparent 70%); --v2-scheme:dark; --v2-ag-extract-tint:rgba(217,43,43,.18); --v2-ag-extract-ink:#FF9A8F; --v2-ag-extract-dot:#D92B2B; --v2-ag-recon-tint:rgba(142,27,31,.18); --v2-ag-recon-ink:#F0A27A; --v2-ag-recon-dot:#8E1B1F; --v2-ag-narrate-tint:rgba(234,219,200,.14); --v2-ag-narrate-ink:#EADBC8; --v2-ag-narrate-dot:#EADBC8; --v2-ag-chaser-tint:rgba(250,247,242,.12); --v2-ag-chaser-ink:#FAF7F2; --v2-ag-chaser-dot:#E0605A; --v2-btn-a:#E23A3A; --v2-btn-b:#A81F24; --v2-btn-ha:#EC4A4A; --v2-btn-hb:#C23030; --v2-lq:#EADBC8; --v2-lq-ink:#141210; }
 `;
 
 export type ThemeMode = "light" | "dark";
@@ -214,66 +214,6 @@ ${LIQUID_BUTTON_CSS}
 .v2-nav a[data-status="active"] { background:rgba(217,43,43,.08); box-shadow:inset 2px 0 0 var(--v2-brand); font-weight:600; }
 .v2-page-header h1 { font-size:24px !important; }
 @media (prefers-reduced-motion:reduce){ .v2-btn, .v2-table tbody tr, .v2-input { transition:none; } }
-
-/* ── Refinement layer: calm alabaster canvas, obsidian actions, pastel states, breathable tables ───── */
-.v2 { font-size:14px; letter-spacing:0; -webkit-font-smoothing:antialiased; font-variant-numeric:tabular-nums; }
-.v2 h1 { letter-spacing:-0.02em; }
-.v2-card { border-radius:14px; border:1px solid var(--v2-line); box-shadow:var(--v2-card-shadow); }
-.v2-btn { height:34px; padding:0 14px; border-radius:8px; font-size:13px; font-weight:500; justify-content:center; transition:background .15s cubic-bezier(.16,1,.3,1), border-color .15s cubic-bezier(.16,1,.3,1), box-shadow .15s cubic-bezier(.16,1,.3,1), color .15s cubic-bezier(.16,1,.3,1), transform .12s cubic-bezier(.16,1,.3,1); }
-.v2-btn.v2-btn-lg { height:40px; padding:0 18px; font-size:14px; }
-.v2-btn.v2-btn-sm { height:30px; padding:0 11px; font-size:12.5px; }
-.v2-btn-primary { background:var(--v2-btn-bg); color:var(--v2-btn-fg); border-color:var(--v2-btn-bg); box-shadow:0 1px 2px rgba(17,19,24,.16); }
-.v2-btn-primary:hover { background:var(--v2-btn-hover); border-color:var(--v2-btn-hover); box-shadow:0 2px 6px rgba(17,19,24,.18); }
-.v2-btn-ghost { background:var(--v2-chip); color:var(--v2-ink); border-color:var(--v2-hair); box-shadow:none; }
-.v2-btn-ghost:hover { background:var(--v2-gray); border-color:var(--v2-hair); box-shadow:none; }
-.v2-btn-quiet { height:30px; background:transparent; border-color:transparent; color:var(--v2-body); }
-.v2-btn-quiet:hover { background:var(--v2-gray); }
-/* The liquid hover belongs to the marketing site; inside the product a button simply darkens. */
-.v2-btn-primary::after, .v2-btn-ghost::after { display:none !important; }
-.v2-btn-danger { border-color:var(--v2-bad-bg); color:var(--v2-bad-fg); }
-.v2-btn-danger:hover { background:var(--v2-bad-bg); }
-.v2-icon-btn { width:32px; height:32px; border-radius:999px; border:1px solid var(--v2-hair); background:var(--v2-chip); }
-.v2-btn:focus-visible, .v2-icon-btn:focus-visible, .v2-link:focus-visible, .v2-nav a:focus-visible { outline:2px solid var(--v2-focus); outline-offset:2px; }
-.v2-input, .v2 select.v2-input, .v2 textarea.v2-input { border-radius:8px; border-color:var(--v2-hair); box-shadow:none; background:var(--v2-input); }
-.v2-input:hover, .v2 select.v2-input:hover { border-color:#CBD0DA; }
-.v2-input:focus { border-color:var(--v2-focus); box-shadow:0 0 0 3px color-mix(in srgb, var(--v2-focus) 18%, transparent); }
-.v2-label { font-size:12px; letter-spacing:0; text-transform:none; font-weight:500; color:#6B7280; }
-.v2-kbd { background:#FFFFFF; border:1px solid #E5E7EB; border-bottom-width:1px; border-radius:5px; font-size:11px; padding:0 5px; }
-/* Tables */
-.v2-table th { background:var(--v2-th); height:40px; padding:0 16px; font-size:12px; font-weight:500; letter-spacing:0; text-transform:none; color:#6B7280; border-bottom:1px solid var(--v2-line); }
-.v2-table td { padding:15px 16px; font-size:13px; color:var(--v2-body); border-bottom:1px solid var(--v2-row); }
-.v2-table td strong, .v2-table td b { color:var(--v2-ink); font-weight:500; }
-.v2-table tbody tr.clickable:hover, .v2-table tbody tr:hover { background:var(--v2-row-hover); }
-.v2-scroll:has(> table) > table > thead > tr > th { background:var(--v2-th); }
-.v2 input[type="checkbox"] { width:16px; height:16px; border-radius:4px; accent-color:#18181B; }
-/* Summary tiles */
-.v2-stat { position:relative; padding:20px 24px; border-radius:16px; display:grid; gap:0; }
-.v2-stat-badge { display:inline-grid; place-items:center; width:28px; height:28px; border-radius:999px; background:var(--v2-badge); border:1px solid rgba(0,0,0,.06); color:var(--v2-ink); margin-bottom:16px; }
-.v2-stat-value { font-size:27px; font-weight:600; letter-spacing:-0.02em; font-variant-numeric:tabular-nums; line-height:1.1; }
-.v2-stat-label { margin-top:6px; font-size:13px; font-weight:500; color:var(--v2-ink); display:flex; flex-wrap:wrap; gap:4px 8px; align-items:baseline; }
-.v2-stat-hint { font-size:12px; font-weight:400; color:#6B7280; }
-.v2-stat.v2-lift:hover { box-shadow:0 4px 16px rgba(13,11,10,.06); }
-/* Navigation: soft tinted pills, no heavy blocks or accent bars */
-.v2 .v2-nav a, .v2 .v2-group { height:36px; padding:0 12px; border-radius:8px; font-size:13px; font-weight:500; gap:10px; margin-bottom:2px; transition:background .15s cubic-bezier(.16,1,.3,1), color .15s cubic-bezier(.16,1,.3,1); }
-.v2 .v2-nav a[data-status="active"] { background:var(--v2-pill); box-shadow:none; color:var(--v2-ink); font-weight:600; }
-.v2 .v2-nav a[data-status="active"] svg { color:var(--v2-ink); }
-.v2 .v2-group[data-active="true"] { background:transparent; color:var(--v2-ink); font-weight:600; }
-.v2 .v2-group[data-active="true"] > svg:first-child { color:var(--v2-ink); }
-.v2 .v2-nav .v2-sub a { height:32px; font-size:12.5px; }
-.v2 .v2-nav .v2-sub a[data-status="active"] { background:var(--v2-pill); }
-.v2 .v2-rail-btn[data-active="true"] { background:var(--v2-pill); color:var(--v2-ink); box-shadow:none; }
-.v2 .v2-rail-btn { border-radius:10px; }
-.v2 .v2-count { background:var(--v2-gray); color:var(--v2-body); font-weight:600; }
-.v2 .v2-side .v2-panel, .v2-side .v2-rail { background:var(--v2-side); border-right:1px solid #ECEEF2; backdrop-filter:none; }
-/* Top bar */
-.v2-top { min-height:56px; }
-.v2-crumb { font-size:13px; color:var(--v2-muted); display:inline-flex; align-items:center; gap:6px; min-width:0; }
-.v2-crumb b { color:var(--v2-ink); font-weight:500; }
-.v2-search { width:240px; height:34px; justify-content:flex-start !important; background:var(--v2-gray) !important; border-color:transparent !important; color:var(--v2-muted) !important; }
-.v2-search .v2-kbd { margin-left:auto; }
-.v2 .v2-page-header h1 { font-size:22px !important; font-weight:600; }
-@media (prefers-reduced-motion:reduce){ .v2-btn, .v2-nav a, .v2-group { transition:none; } }
-
 `;
 
 export function Card({ children, style, className = "", onClick, hover = false, ...rest }: { children: ReactNode; style?: CSSProperties; className?: string; onClick?: () => void; hover?: boolean; "data-testid"?: string }) {
@@ -408,7 +348,7 @@ const TONES: Record<Tone, { bg: string; fg: string }> = {
   neutral: { bg: V.gray, fg: V.body },
   good: { bg: "var(--v2-good-bg)", fg: V.green },
   warn: { bg: V.warnBg, fg: V.warnFg },
-  bad: { bg: "var(--v2-bad-bg)", fg: "var(--v2-bad-fg)" },
+  bad: { bg: "rgba(217,43,43,0.16)", fg: V.maroon },
   info: { bg: V.blue, fg: V.brandDeep },
 };
 
@@ -420,9 +360,9 @@ export function Badge({ tone = "neutral", children }: { tone?: Tone; children: R
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.2 }}
-      style={{ display: "inline-flex", alignItems: "center", gap: 6, background: t.bg, color: t.fg, borderRadius: 999, height: 24, padding: "0 10px", fontSize: 12, fontWeight: 500, letterSpacing: 0, whiteSpace: "nowrap" }}
+      style={{ display: "inline-flex", alignItems: "center", gap: 6, background: t.bg, color: t.fg, borderRadius: 999, padding: "3px 10px", fontSize: 11.5, fontWeight: 600, letterSpacing: ".005em", whiteSpace: "nowrap", boxShadow: "inset 0 0 0 1px color-mix(in srgb, currentColor 14%, transparent)" }}
     >
-      {tone !== "neutral" && <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: 999, background: "currentColor", opacity: 0.8, flex: "none" }} />}
+      {tone !== "neutral" && <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 999, background: "currentColor", opacity: 0.85, flex: "none" }} />}
       {children}
     </motion.span>
   );
@@ -438,8 +378,8 @@ export function PageHeader({ title, subtitle, action }: { title: string; subtitl
       style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 16, alignItems: "center", marginBottom: 22 }}
     >
       <div style={{ minWidth: 0 }}>
-        <h1 style={{ fontSize: 22 }}>{title}</h1>
-        {subtitle && <p style={{ margin: "4px 0 0", fontSize: 13, color: "#6B7280", lineHeight: 1.5 }}>{subtitle}</p>}
+        <h1 style={{ fontSize: 24 }}>{title}</h1>
+        {subtitle && <p style={{ margin: "6px 0 0", fontSize: 14, color: V.muted, lineHeight: 1.5 }}>{subtitle}</p>}
       </div>
       {action}
     </motion.header>
@@ -467,23 +407,13 @@ export function EmptyState({ icon, title, description, action }: { icon?: ReactN
   );
 }
 
-const STAT_WASH: Record<Tone, { wash: string; icon: ReactNode }> = {
-  neutral: { wash: "var(--v2-wash1)", icon: <Activity size={15} strokeWidth={1.75} /> },
-  info: { wash: "var(--v2-wash1)", icon: <Activity size={15} strokeWidth={1.75} /> },
-  warn: { wash: "var(--v2-wash2)", icon: <AlertCircle size={15} strokeWidth={1.75} /> },
-  bad: { wash: "var(--v2-wash2)", icon: <AlertCircle size={15} strokeWidth={1.75} /> },
-  good: { wash: "var(--v2-wash3)", icon: <CheckCircle2 size={15} strokeWidth={1.75} /> },
-};
-
-/** A summary tile: a soft colour wash for its state, a small icon badge, the figure, then its label and context. */
-export function Stat({ label, value, hint, tone = "neutral", onClick, icon }: { label: string; value: ReactNode; hint?: string; tone?: Tone; onClick?: () => void; icon?: ReactNode }) {
-  const w = STAT_WASH[tone];
+export function Stat({ label, value, hint, tone = "neutral", onClick }: { label: string; value: ReactNode; hint?: string; tone?: Tone; onClick?: () => void }) {
   return (
-    <div className={`v2-card v2-stat ${onClick ? "v2-lift" : ""}`} data-tone={tone} onClick={onClick} style={{ background: w.wash, cursor: onClick ? "pointer" : undefined }}>
-      <span className="v2-stat-badge" aria-hidden="true">{icon ?? w.icon}</span>
-      <div className="num v2-stat-value" style={{ color: tone === "bad" ? "var(--v2-bad-fg)" : tone === "good" ? V.green : V.ink }}>{value}</div>
-      <div className="v2-stat-label">{label}{hint && <span className="v2-stat-hint">{hint}</span>}</div>
-    </div>
+    <Card onClick={onClick} style={onClick ? { cursor: "pointer" } : undefined}>
+      <div style={{ fontSize: 11, letterSpacing: ".09em", textTransform: "uppercase", color: V.muted, fontWeight: 600 }}>{label}</div>
+      <div className="num" style={{ fontSize: 30, fontWeight: 600, marginTop: 10, color: tone === "bad" ? V.maroon : tone === "good" ? V.green : V.ink, letterSpacing: "-0.03em" }}>{value}</div>
+      {hint && <div style={{ fontSize: 12, color: V.muted, marginTop: 6 }}>{hint}</div>}
+    </Card>
   );
 }
 
@@ -660,7 +590,7 @@ export function Tabs({ items, value, onChange }: { items: { value: string; label
             key={i.value}
             onClick={() => onChange(i.value)}
             className="v2-btn"
-            style={{ background: active ? "var(--v2-btn-bg)" : V.card, color: active ? "var(--v2-btn-fg)" : V.body, borderColor: active ? "var(--v2-btn-bg)" : "var(--v2-hair)", padding: "0 14px", height: 32, fontSize: 12.5, fontWeight: 500 }}
+            style={{ background: active ? V.brand : V.card, color: active ? "#fff" : V.body, borderColor: active ? V.brand : V.line, padding: "8px 15px", fontSize: 13.5 }}
           >
             {i.label}
             {typeof i.count === "number" && <span style={{ opacity: 0.6 }}>{i.count}</span>}
@@ -690,7 +620,7 @@ export function formatDate(iso: string) {
 export function Segmented<T extends string>({ options, value, onChange, label }: { options: { value: T; label: string; count?: number }[]; value: T; onChange: (v: T) => void; label: string }) {
   const id = useId();
   return (
-    <div role="tablist" aria-label={label} style={{ display: "inline-flex", flexWrap: "wrap", gap: 2, padding: 3, borderRadius: 10, background: V.gray, border: `1px solid ${V.line}` }}>
+    <div role="tablist" aria-label={label} style={{ display: "inline-flex", flexWrap: "wrap", gap: 2, padding: 4, borderRadius: 999, background: V.gray, border: `1px solid ${V.line}` }}>
       {options.map((o) => {
         const on = o.value === value;
         return (
@@ -700,13 +630,13 @@ export function Segmented<T extends string>({ options, value, onChange, label }:
             role="tab"
             aria-selected={on}
             onClick={() => onChange(o.value)}
-            style={{ position: "relative", border: 0, background: "transparent", cursor: "pointer", font: "inherit", fontSize: 12, fontWeight: 500, padding: "6px 13px", borderRadius: 8, color: on ? "var(--v2-btn-fg)" : V.body, transition: "color .15s cubic-bezier(.16,1,.3,1)" }}
+            style={{ position: "relative", border: 0, background: "transparent", cursor: "pointer", font: "inherit", fontSize: 12.5, fontWeight: 600, padding: "7px 14px", borderRadius: 999, color: on ? "#fff" : V.body, transition: "color .25s ease" }}
           >
             {on && (
               <motion.span
                 layoutId={`seg-${id}`}
                 transition={{ type: "spring", stiffness: 480, damping: 34 }}
-                style={{ position: "absolute", inset: 0, borderRadius: 8, background: "var(--v2-btn-bg)", boxShadow: "0 1px 2px rgba(17,19,24,.18)" }}
+                style={{ position: "absolute", inset: 0, borderRadius: 999, background: `linear-gradient(180deg, var(--v2-btn-a), var(--v2-btn-b))`, boxShadow: "0 8px 18px -10px var(--v2-brand)" }}
               />
             )}
             <span style={{ position: "relative", display: "inline-flex", gap: 6, alignItems: "center" }}>

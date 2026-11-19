@@ -268,6 +268,13 @@ const RULES: Rule[] = [
     detail: (n) => `${n} purchase${n === 1 ? " is" : "s are"} so old that the ITC may be past its limit (30 November after the end of the financial year of the invoice). Confirm against the current rule before claiming.`,
   },
   {
+    id: "booked_late", group: "Period", label: "Purchases are booked close to the invoice date", severity: "warn", sides: ["purchase"],
+    // Only a register that carries both dates (a Tally register with the supplier's invoice date) can show this.
+    needs: (a) => a.some((i) => i.bookedOn && i.date),
+    find: (a) => a.filter((i) => i.bookedOn && i.date && i.docType !== "credit_note" && (Date.parse(i.bookedOn) - Date.parse(i.date)) / 86_400_000 > 90),
+    detail: (n) => `${n} purchase${n === 1 ? " was" : "s were"} booked more than 90 days after the supplier's invoice date. The credit may belong to an earlier month (or may be past its time limit), and the supplier may have filed it in a different return than the one you are matching. Check the invoice date and the month the credit was taken.`,
+  },
+  {
     id: "mixed_months", group: "Period", label: "One month in the register", severity: "info", sides: ["sales", "purchase"],
     needs: (a) => a.length >= 5,
     find: (a) => {

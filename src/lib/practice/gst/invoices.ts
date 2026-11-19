@@ -35,6 +35,8 @@ export interface GstInvoice {
   docType: "invoice" | "credit_note" | "debit_note";
   /** The filing period the supplier reported it in ("2026-09"), when known. */
   filedIn: string | null;
+  /** The date the firm booked it in its ledger, when that differs from the invoice date (a Tally voucher date). */
+  bookedOn?: string | null;
   /** First source row (1-based in the file), for messages. */
   row: number;
   /** How many source rows were added up into this invoice. */
@@ -75,8 +77,24 @@ export function money(raw: unknown): number | null {
   return Number(s);
 }
 
-/** dd-mm-yyyy, dd/mm/yyyy, yyyy-mm-dd, dd-Mon-yyyy, or an Excel serial number. */
-export function isoDate(raw: unknown): string | null {
+/**
+ * Which way round "4/5/2026" is written in a column. Indian files are day first; some portal workbooks are month first ("4/22/2025").
+ * One value with a first part above 12 proves day first, one with a second part above 12 proves month first. With neither, day first.
+ */
+export function detectDateOrder(values: unknown[]): "dmy" | "mdy" {
+  let dmy = false;
+  let mdy = false;
+  for (const v of values) {
+    const m = /^\s*(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})\s*$/.exec(String(v ?? ""));
+    if (!m) continue;
+    if (Number(m[1]) > 12) dmy = true;
+    if (Number(m[2]) > 12) mdy = true;
+  }
+  return mdy && !dmy ? "mdy" : "dmy";
+}
+
+/** dd-mm-yyyy, dd/mm/yyyy (or mm/dd/yyyy when `order` says so), yyyy-mm-dd, dd-Mon-yyyy, or an Excel serial number. */
+export function isoDate(raw: unknown, order: "dmy" | "mdy" = "dmy"): string | null {
   if (raw instanceof Date) return Number.isNaN(raw.getTime()) ? null : raw.toISOString().slice(0, 10);
   if (typeof raw === "number" && raw > 20000 && raw < 80000) return new Date(Math.round((raw - 25569) * 86400 * 1000)).toISOString().slice(0, 10);
   const s = String(raw ?? "").trim();
@@ -85,7 +103,8 @@ export function isoDate(raw: unknown): string | null {
   let m = /^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/.exec(s);
   if (m) {
     const y = m[3]!.length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
-    return validYmd(`${y}-${m[2]!.padStart(2, "0")}-${m[1]!.padStart(2, "0")}`);
+    const [d, mo] = order === "mdy" ? [m[2]!, m[1]!] : [m[1]!, m[2]!];
+    return validYmd(`${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`);
   }
   m = /^(\d{1,2})[-\s]([A-Za-z]{3})[a-z]*[-\s,]*(\d{2,4})$/.exec(s);
   if (m) {
@@ -140,7 +159,8 @@ const SYNONYMS: Record<Field, (string | RegExp)[]> = {
   irn: ["irn"],
   rcm: ["supply attract reverse charge", "reverse charge", "rcm"],
   itc: ["itc availability", "itc available", "eligible for itc", "itc"],
-  type: ["invoice type", "document type", "note type", "supply type", "type"],
+  // "Document type" first: the GSTR-1 workbook has both "Document Type" (B2B, Credit Note) and "Invoice Type" (Regular), and only the first says what the document is.
+  type: ["document type", "note type", "invoice type", "supply type", "type"],
   filed: ["gstr-1/iff/gstr-5 period", "gstr1 period", "gstr-1 period", "filing period", "return period"],
 };
 
@@ -186,7 +206,7 @@ function docTypeOf(raw: string, noRaw: string, headerHint: string): GstInvoice["
 }
 
 /** Reads an invoice table. `hint` says which way a note column such as "C" / "D" is to be read; leave it empty for a plain register. */
-export function readInvoiceRows(rowsIn: string[][], opts: { sheet?: string } = {}): ReadInvoices {
+export function readInvoiceRows(rowsIn: string[][], opts: { sheet?: string; dateOrder?: "dmy" | "mdy" } = {}): ReadInvoices {
   const notes: string[] = [];
   const rows = rowsIn.map((r) => r.map((c) => ((c as unknown) instanceof Date ? (c as unknown as Date).toISOString().slice(0, 10) : c)));
   const head = findInvoiceHeader(rows);
@@ -196,6 +216,8 @@ export function readInvoiceRows(rowsIn: string[][], opts: { sheet?: string } = {
   const missing = (["gstin", "date", "taxable"] as Field[]).filter((f) => m[f] === undefined);
   if (missing.length) notes.push(`No column found for: ${missing.map((f) => ({ gstin: "GSTIN", date: "invoice date", taxable: "taxable value" })[f as "gstin" | "date" | "taxable"]).join(", ")}. Those checks are skipped.`);
   if (opts.sheet) notes.push(`Read from the sheet "${opts.sheet}".`);
+  const dateOrder = opts.dateOrder ?? (m.date === undefined ? "dmy" : detectDateOrder(rows.slice(head.at + 1).map((r) => r[m.date!])));
+  if (dateOrder === "mdy" && !opts.dateOrder) notes.push("Dates in this file are written month first (4/22/2025), and were read that way.");
 
   const byKey = new Map<string, GstInvoice>();
   const totalsSeen = new Map<string, number[]>();
@@ -246,7 +268,7 @@ export function readInvoiceRows(rowsIn: string[][], opts: { sheet?: string } = {
       gstin,
       party: String(cell(r, "party") ?? "").trim(),
       no,
-      date: isoDate(cell(r, "date")),
+      date: isoDate(cell(r, "date"), dateOrder),
       pos: /^\d{2}/.test(posRaw) ? posRaw.slice(0, 2) : posRaw,
       ...amounts,
       total: null,

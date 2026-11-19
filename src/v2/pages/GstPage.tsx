@@ -96,7 +96,7 @@ export default function GstPage() {
       try {
         const [b, p] = await Promise.all([saved.books ? fetchAs(saved.books.id, saved.books.name) : null, saved.portal ? fetchAs(saved.portal.id, saved.portal.name) : null]);
         if (cancelled) return;
-        if (b) setBooks({ name: b.name, read: await readGstFile(b) });
+        if (b) setBooks({ name: b.name, read: await readGstFile(b, { kind: "purchase" }) });
         if (p) setPortal({ name: p.name, read: await readGstFile(p) });
         if (b || p) setRestored(clients.find((c) => c.id === clientId)?.name ?? "this client");
       } catch {
@@ -109,7 +109,7 @@ export default function GstPage() {
 
   const load = async (which: "books" | "portal", file: File) => {
     setBusy(which);
-    const read = await readGstFile(file);
+    const read = await readGstFile(file, which === "books" ? { kind: "purchase" } : {});
     setBusy(null);
     (which === "books" ? setBooks : setPortal)({ name: file.name, read });
     setFiles((f) => ({ ...f, [which]: file }));

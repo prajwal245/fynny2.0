@@ -64,3 +64,15 @@ We do not promise dates here. Phase 1 is a small build (a read, a comparison and
 1. Please send one month of GSTR-1 JSON, GSTR-3B JSON, GSTR-2B and the sales and purchase registers for the same client, so the checks run on a real month.
 2. Please send one signed audited closing PDF (any client) for Phase 1.
 3. For ageing: bill-wise in Tally for all parties, or only debtors?
+
+## Update 19 Nov 2026: real files from the CA, and what they changed
+
+The CA's folder held, for one real client, the GSTR-1 workbook, the GSTR-3B annual report and the GSTR-2B (all Excel, none JSON), the Tally sales and purchase registers, and the audited balance sheet and profit and loss (signed PDFs). Reading them showed three things the synthetic tests had hidden:
+
+1. **The portal files are Excel, and the shapes differ from the JSON.** The GSTR-1 workbook is one invoice list for the year with dates written month first (4/22/2025). The old reader read day first, so a May 9 invoice became September 5 without any warning. Dates are now read by what the column proves, and a month-first file is noted as such. The same workbook has both "Document Type" (B2B, Credit Note) and "Invoice Type" (Regular); the reader took the wrong one, so credit notes were not recognised. Fixed.
+2. **The GSTR-3B annual report** is one workbook with twelve column blocks. It is now read, and cut to the month being checked (`gst/portalExcel.ts`).
+3. **A Tally register has no taxable-value column.** Taxable value is spread over the ledger columns of each voucher. `gst/tallyRegister.ts` adds them up, ties every voucher to its gross total, names the ones that do not tie, reads purchases by the supplier's invoice number and keeps the booking date, reads Debit Note Registers as credit notes, and lists input credit taken through journals outside the purchase register.
+
+On that client's December 2025 files the engine now shows what a CA wants: GSTR-1 and GSTR-3B agree with each other, and the Tally sales register is short by exactly one invoice (named), which accounts for the whole difference in tax. New rule `booked_late` flags purchases booked more than 90 days after the supplier's invoice date. Purchases with GST charged but no supplier GSTIN, and the same amount twice from one supplier on one day, were already caught by existing rules and now fire on the real register layout.
+
+Tested on masked copies of these layouts (`tests/helpers/gstRealLayouts.ts`, no client data). Not yet run on the real files in the repository's real-file gate; those stay outside git. Still open: the GSTR-2B Excel for the year (shape not yet read), the audited-balance-sheet comparison (Phase 1 of this plan), and bill allocations for Phase 4.

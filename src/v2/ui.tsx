@@ -213,6 +213,13 @@ ${LIQUID_BUTTON_CSS}
 .v2-nav a { border-radius:10px; padding:9px 12px; font-size:14px; }
 .v2-nav a[data-status="active"] { background:rgba(217,43,43,.08); box-shadow:inset 2px 0 0 var(--v2-brand); font-weight:600; }
 .v2-page-header h1 { font-size:24px !important; }
+/* Light refinements: a little more air in tables, quieter hairlines, one easing curve. */
+.v2-table td { padding:15px 16px; border-bottom-color:rgba(20,18,16,.055); }
+.v2-table th { font-weight:600; }
+.v2-table tbody tr.clickable:hover { background:rgba(20,18,16,.022); }
+.v2-btn, .v2-nav a, .v2-input { transition-timing-function:cubic-bezier(.16,1,.3,1); }
+.v2-crumb { font-size:13px; color:var(--v2-muted); display:inline-flex; align-items:center; gap:6px; min-width:0; }
+.v2-crumb b { color:var(--v2-ink); font-weight:600; }
 @media (prefers-reduced-motion:reduce){ .v2-btn, .v2-table tbody tr, .v2-input { transition:none; } }
 `;
 
@@ -360,7 +367,7 @@ export function Badge({ tone = "neutral", children }: { tone?: Tone; children: R
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.2 }}
-      style={{ display: "inline-flex", alignItems: "center", gap: 6, background: t.bg, color: t.fg, borderRadius: 999, padding: "3px 10px", fontSize: 11.5, fontWeight: 600, letterSpacing: ".005em", whiteSpace: "nowrap", boxShadow: "inset 0 0 0 1px color-mix(in srgb, currentColor 14%, transparent)" }}
+      style={{ display: "inline-flex", alignItems: "center", gap: 6, background: t.bg, color: t.fg, borderRadius: 999, height: 24, padding: "0 10px", fontSize: 12, fontWeight: 500, letterSpacing: 0, whiteSpace: "nowrap" }}
     >
       {tone !== "neutral" && <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 999, background: "currentColor", opacity: 0.85, flex: "none" }} />}
       {children}
@@ -407,11 +414,19 @@ export function EmptyState({ icon, title, description, action }: { icon?: ReactN
   );
 }
 
+const STAT_TINT: Record<Tone, string> = {
+  neutral: "linear-gradient(135deg, color-mix(in srgb, var(--v2-beige) 38%, var(--v2-card)) 0%, var(--v2-card) 70%)",
+  info: "linear-gradient(135deg, color-mix(in srgb, var(--v2-beige) 38%, var(--v2-card)) 0%, var(--v2-card) 70%)",
+  warn: "linear-gradient(135deg, color-mix(in srgb, var(--v2-warnBg) 70%, var(--v2-card)) 0%, var(--v2-card) 70%)",
+  bad: "linear-gradient(135deg, color-mix(in srgb, var(--v2-coral) 9%, var(--v2-card)) 0%, var(--v2-card) 70%)",
+  good: "linear-gradient(135deg, color-mix(in srgb, var(--v2-green) 10%, var(--v2-card)) 0%, var(--v2-card) 70%)",
+};
+
 export function Stat({ label, value, hint, tone = "neutral", onClick }: { label: string; value: ReactNode; hint?: string; tone?: Tone; onClick?: () => void }) {
   return (
-    <Card onClick={onClick} style={onClick ? { cursor: "pointer" } : undefined}>
+    <Card onClick={onClick} style={{ background: STAT_TINT[tone], ...(onClick ? { cursor: "pointer" } : {}) }}>
       <div style={{ fontSize: 11, letterSpacing: ".09em", textTransform: "uppercase", color: V.muted, fontWeight: 600 }}>{label}</div>
-      <div className="num" style={{ fontSize: 30, fontWeight: 600, marginTop: 10, color: tone === "bad" ? V.maroon : tone === "good" ? V.green : V.ink, letterSpacing: "-0.03em" }}>{value}</div>
+      <div className="num" style={{ fontSize: 30, fontWeight: 600, marginTop: 10, color: tone === "bad" ? V.maroon : tone === "good" ? V.green : V.ink, letterSpacing: "-0.03em", fontVariantNumeric: "tabular-nums" }}>{value}</div>
       {hint && <div style={{ fontSize: 12, color: V.muted, marginTop: 6 }}>{hint}</div>}
     </Card>
   );

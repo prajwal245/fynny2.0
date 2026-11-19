@@ -211,6 +211,26 @@ export const reprocessPracticeDocument = createServerFn({ method: "POST" })
   );
 
 /** Records a GST reconciliation result in the client's Activity. The files themselves are kept as the client's documents. */
+/**
+ * Reads a signed audited Balance Sheet or Profit and Loss PDF (text layer) into figures. Code only: no AI is used, and the result is
+ * proved by the caller (the statements must add up) before it is compared with anything.
+ */
+export const readAuditedPdf = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ base64: z.string().min(100).max(12_000_000) }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async () => {
+      const { pdfText } = await import("./files.server");
+      const { readStatement } = await import("./audited");
+      const bytes = Uint8Array.from(Buffer.from(data.base64, "base64"));
+      const { text } = await pdfText(bytes);
+      if (text.replace(/\s/g, "").length < 200) return { ok: false as const, reason: "This PDF has no text layer (a scan). Upload the PDF the auditor signed digitally, or send the figures in Excel." };
+      const kind = /profit\s+and\s+loss/i.test(text) && !/balance\s+sheet\s+as\s+(on|at)/i.test(text.slice(0, 1500)) ? "profit_and_loss" : /balance\s+sheet/i.test(text) ? "balance_sheet" : /profit\s+and\s+loss/i.test(text) ? "profit_and_loss" : null;
+      if (!kind) return { ok: false as const, reason: "This does not look like a Balance Sheet or a Profit and Loss statement." };
+      return { ok: true as const, statement: readStatement(text, kind) };
+    }),
+  );
+
 /** Sales and purchase registers read from a client's Tally Day Books, for the GST returns check. */
 export const getTallyGstBooks = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

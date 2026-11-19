@@ -269,15 +269,17 @@ describe("pipeline", () => {
 
   it("uses AI verdicts but keeps going when the AI fails", async () => {
     let calls = 0;
+    let sentIndexes: number[] = [];
     const llm: LlmClient = {
-      async json() {
+      async json(req) {
         calls++;
         if (calls > 1) throw new Error("429 rate limited");
+        sentIndexes = [...req.user.matchAll(/"index":\s*(\d+)/g)].map((m) => Number(m[1]));
         return {
           data: {
             rows: [
               {
-                index: 5,
+                index: sentIndexes[0] ?? 5,
                 category: "receipt",
                 counterparty: "SUNDARA TEXTILES PVT LTD",
                 confidence: 0.6,
@@ -294,7 +296,7 @@ describe("pipeline", () => {
     };
     const out = await runExtract(
       {
-        bytes: enc(HDFC),
+        bytes: enc(HDFC.replace("05/09/26,SMS", "04/09/26,ZQX 77 KLM,,04/09/26,100.00,,\"5,07,401.00\"\n05/09/26,SMS")),
         filename: "hdfc.csv",
         mime: null,
         side: "bank",
@@ -302,7 +304,10 @@ describe("pipeline", () => {
       },
       { llm },
     );
-    const first = out.rows.find((r) => r.row_index === 5)!;
+    // Only the lines the rules are unsure about are sent to the model (tokens are billed per line).
+    expect(sentIndexes.length).toBeGreaterThan(0);
+    expect(sentIndexes.length).toBeLessThan(out.rows.length);
+    const first = out.rows.find((r) => r.row_index === sentIndexes[0])!;
     expect(first.route).toBe("review");
     expect(first.reason).toContain("Invoice number unclear");
     expect(out.aiCalls[0].status).toBe("success");

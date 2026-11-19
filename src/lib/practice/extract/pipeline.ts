@@ -13,6 +13,7 @@ import { dedupeKey, type ExtractedRow, type Side } from "../core";
 import {
   CLASSIFY_SYSTEM_PROMPT,
   CONFIDENCE_THRESHOLD,
+  READ_STATEMENT_PROMPT,
   READ_SYSTEM_PROMPT,
   applyHeuristics,
   classifyUserPrompt,
@@ -69,6 +70,8 @@ export interface LlmJsonRequest {
   user: string;
   /** Base64 file for vision models (scanned PDFs, photos). */
   attachment?: { mime: string; base64: string };
+  /** Hard ceiling on the answer, so a runaway generation cannot bill without limit. Providers default to a generous cap. */
+  maxTokens?: number;
 }
 
 export interface LlmJsonResult {
@@ -120,6 +123,8 @@ export interface ExtractDeps {
   threshold?: number;
   /** Rows sent to the AI classifier per document; the rest use rules only. */
   maxAiRows?: number;
+  /** Most AI calls one document may make in total (reads, parts and retries by us); past it the rules path carries on. Default 48. */
+  maxAiCalls?: number;
 }
 
 export interface ExtractInput {
@@ -254,14 +259,19 @@ async function aiRead(
   deps: ExtractDeps,
   calls: AiCallRecord[],
   req: LlmJsonRequest,
-): Promise<{ rows: AiReadRow[]; kind: string | null } | null> {
+  compact = false,
+): Promise<{ rows: AiReadRow[]; kind: string | null; compact?: unknown[] } | null> {
   if (!deps.llm) return null;
+  // Guardrail: one document never makes more than a fixed number of AI calls.
+  if (calls.length >= (deps.maxAiCalls ?? 48)) return null;
   const started = Date.now();
   try {
     const res = await deps.llm.json(req);
     const data = (res.data ?? {}) as {
       rows?: AiReadRow[];
       document_kind?: string;
+      k?: string;
+      r?: unknown[];
     };
     calls.push({
       purpose: req.purpose,
@@ -274,6 +284,7 @@ async function aiRead(
       error: null,
       ...usageFields(res),
     });
+    if (compact) return { rows: [], kind: data.k ?? null, compact: Array.isArray(data.r) ? data.r : [] };
     return {
       rows: Array.isArray(data.rows) ? data.rows : [],
       kind: data.document_kind ?? null,
@@ -288,6 +299,9 @@ async function aiRead(
 /** How much statement text one model call reads. A long statement is read in parts so no answer is cut off by the model's output size. */
 const CHUNK_CHARS = 12_000;
 const MAX_CHUNKS = 16;
+// The compact statement read answers about a tenth as much per line, so it can take smaller parts, which run side by side and finish sooner.
+const COMPACT_CHUNK_CHARS = 4_500;
+const MAX_COMPACT_CHUNKS = 40;
 
 /** Splits text at line boundaries, preferring the start of a dated line so a transaction's wrapped narration stays with it. */
 export function splitForAi(text: string, size = CHUNK_CHARS): string[] {
@@ -296,8 +310,12 @@ export function splitForAi(text: string, size = CHUNK_CHARS): string[] {
   const chunks: string[] = [];
   let cur: string[] = [];
   let len = 0;
-  const startsLine = (l: string) => /^\s*\d{1,2}[-\/. ][A-Za-z0-9]{1,3}[-\/. ]\d{2,4}/.test(l);
-  for (const l of lines) {
+  const dated = (l: string) => /^\s*\d{1,2}[-\/. ][A-Za-z0-9]{1,3}[-\/. ]\d{2,4}/.test(l);
+  // A date printed over two lines ("16/03" then "/2026"), as some card statements do. A row has two of them (value date, post date),
+  // so only the first, which is followed by the second, starts a row.
+  const splitDate = (i: number) => /^\s*\d{1,2}\/\d{2}\s*$/.test(lines[i] ?? "") && /^\s*\/\d{4}\s*$/.test(lines[i + 1] ?? "") && /^\s*\d{1,2}\/\d{2}\s*$/.test(lines[i + 2] ?? "");
+  for (const [i, l] of lines.entries()) {
+    const startsLine = (x: string) => dated(x) || splitDate(i);
     if (len + l.length + 1 > size && cur.length && startsLine(l)) {
       chunks.push(cur.join("\n"));
       cur = [];
@@ -315,6 +333,29 @@ export function splitForAi(text: string, size = CHUNK_CHARS): string[] {
   return chunks;
 }
 
+/** One part of a statement in the compact format, mapped to the rows the rest of the reader understands. Null when the model failed. */
+async function aiReadStatementPart(deps: ExtractDeps, calls: AiCallRecord[], purpose: string, user: string): Promise<{ rows: AiReadRow[]; kind: string | null } | null> {
+  const res = await aiRead(deps, calls, { purpose, system: READ_STATEMENT_PROMPT, user, maxTokens: 8_000 }, true);
+  if (!res) return null;
+  const rows: AiReadRow[] = [];
+  for (const r of res.compact ?? []) {
+    if (!Array.isArray(r) || r.length < 4) continue;
+    const [date, amount, direction, narration, balance, reference] = r as [unknown, unknown, unknown, unknown, unknown, unknown];
+    rows.push({
+      date: String(date ?? ""),
+      amount: typeof amount === "number" ? amount : String(amount ?? ""),
+      direction: direction === "in" || direction === "out" ? direction : undefined,
+      description: String(narration ?? ""),
+      reference: reference == null || reference === "null" ? null : String(reference),
+      currency: "INR",
+      balance: typeof balance === "number" || typeof balance === "string" ? balance : null,
+      source_text: String(narration ?? ""),
+      confidence: 0.9,
+    });
+  }
+  return { rows, kind: res.kind };
+}
+
 /**
  * Reads document text with the model. A long statement is read in parts, four at a time, and the rows joined in order. All or nothing:
  * if any part fails the whole read is declined, because a statement with a part missing would look complete. What comes back is then
@@ -327,23 +368,46 @@ export async function aiReadText(
   purpose: string,
   text: string,
 ): Promise<{ rows: AiReadRow[]; kind: string | null } | null> {
-  const parts = splitForAi(text);
-  if (parts.length === 1) return aiRead(deps, calls, { purpose, system: READ_SYSTEM_PROMPT, user: `Document text:\n${text}` });
-  if (parts.length > MAX_CHUNKS) return null;
-  const results: ({ rows: AiReadRow[]; kind: string | null } | null)[] = new Array(parts.length).fill(null);
+  const parts = splitForAi(text, COMPACT_CHUNK_CHARS);
+  if (parts.length > MAX_COMPACT_CHUNKS) return null;
+  // A bank statement is read in the compact format first (about a seventh of the output, so seconds instead of minutes). A document
+  // that is not a statement says so, and is read in full below.
+  {
+    const got: ({ rows: AiReadRow[]; kind: string | null } | null)[] = new Array(parts.length).fill(null);
+    let n = 0;
+    const work = async () => {
+      for (;;) {
+        const i = n++;
+        if (i >= parts.length) return;
+        got[i] = await aiReadStatementPart(deps, calls, purpose, parts.length === 1 ? `Document text:\n${parts[0]}` : `Document text, part ${i + 1} of ${parts.length}. Read only the transactions in this part; the other parts are read separately.\n${parts[i]}`);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(4, parts.length) }, work));
+    const notStatement = got.some((g) => g && g.kind && g.kind !== "bank_statement");
+    if (!notStatement) {
+      // A part that failed declines the whole read: a statement with a part missing would look complete.
+      if (got.some((g) => g === null)) return null;
+      const rows = got.flatMap((g) => g!.rows);
+      if (rows.length) return { rows, kind: "bank_statement" };
+    }
+  }
+  const fullParts = splitForAi(text);
+  if (fullParts.length > MAX_CHUNKS) return null;
+  if (fullParts.length === 1) return aiRead(deps, calls, { purpose, system: READ_SYSTEM_PROMPT, user: `Document text:\n${text}` });
+  const results: ({ rows: AiReadRow[]; kind: string | null } | null)[] = new Array(fullParts.length).fill(null);
   let next = 0;
   const worker = async () => {
     for (;;) {
       const i = next++;
-      if (i >= parts.length) return;
+      if (i >= fullParts.length) return;
       results[i] = await aiRead(deps, calls, {
         purpose,
         system: READ_SYSTEM_PROMPT,
-        user: `Document text, part ${i + 1} of ${parts.length}. Read only the transactions that are in this part; the other parts are read separately.\n${parts[i]}`,
+        user: `Document text, part ${i + 1} of ${fullParts.length}. Read only the transactions that are in this part; the other parts are read separately.\n${fullParts[i]}`,
       });
     }
   };
-  await Promise.all(Array.from({ length: Math.min(4, parts.length) }, worker));
+  await Promise.all(Array.from({ length: Math.min(4, fullParts.length) }, worker));
   if (results.some((r) => r === null)) return null;
   return { rows: results.flatMap((r) => r!.rows), kind: results.find((r) => r?.kind)?.kind ?? null };
 }
@@ -360,7 +424,11 @@ async function aiClassify(
   // A file with clear columns is already read in code; the AI only adds a
   // second opinion, and never for long: a slow provider must not keep a
   // 20-line statement waiting a minute. Rules carry on when time is up.
-  const eligible = rows.filter((r) => r.amount && r.date).slice(0, limit);
+  // Only the lines the rules are unsure about are sent: a line that rules already named (a known category) and read cleanly gains
+  // little from a second opinion, and the model is billed per line. Same result for the lines that matter, a fraction of the tokens.
+  const eligible = rows
+    .filter((r) => r.amount && r.date && (!r.category || r.category === "other" || r.category === "payment" || r.category === "receipt" || r.parse_confidence < CONFIDENCE_THRESHOLD || r.parse_issues.length > 0))
+    .slice(0, limit);
   const deadline = Date.now() + (deps.aiBudgetMs ?? 15_000);
   for (let i = 0; i < eligible.length; i += BATCH) {
     const left = deadline - Date.now();

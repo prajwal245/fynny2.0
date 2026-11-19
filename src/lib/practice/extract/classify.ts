@@ -165,6 +165,22 @@ Rules:
 
 ${INDIA_CONTEXT}`;
 
+/**
+ * The compact way to read a bank statement from its text. The general reading prompt asks for the exact source text, a reason, a
+ * category and a currency for every line, which is 150 to 200 tokens a line: a long statement takes minutes and is cut off. A statement
+ * needs only the date, amount, direction, a short narration and the printed balance, about 25 tokens a line. The balance is what lets
+ * the running-balance check prove every line, so no accuracy is given up.
+ */
+export const READ_STATEMENT_PROMPT = `You read Indian bank statements from their text. Return STRICT JSON only: {"k":"bank_statement"|"other","r":[["YYYY-MM-DD",<amount>,"in"|"out","<narration, at most 40 characters>",<balance>|null], ...]}
+Rules:
+- One entry per transaction, in the order printed. Each entry is an array of exactly five items, as shown.
+- Date: DD/MM/YYYY in the document becomes YYYY-MM-DD. A date split over two lines ("16/03" then "/2026") is one date.
+- Amount: a positive number, exactly as printed, with no currency symbol or commas. "in" is money received (credit, CR, deposit), "out" is money paid (debit, DR, withdrawal).
+- Balance: the running balance printed for that line as a number, negative when the account is overdrawn or the balance is marked Dr or DR. A balance whose last digit wraps onto the next line is one number. null when none is printed. Never compute or guess a balance.
+- Skip opening and closing balance lines, totals, page headers and footers, and the account details at the top.
+- If the document is not a bank statement return {"k":"other","r":[]}.
+${INDIA_CONTEXT}`;
+
 export interface AiReadRow {
   date?: string;
   amount?: number | string;

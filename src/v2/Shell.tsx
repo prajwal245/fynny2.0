@@ -3,7 +3,7 @@ import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-route
 import {
   LayoutGrid, Users, FileText, ListChecks, AlertTriangle, Send, BarChart3, Settings, Menu, X, LogOut,
   BookOpen,
-  Search, Sun, Moon, LifeBuoy,
+  Search, Sun, Moon, LifeBuoy, ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { V, V2_STYLES, useV2Theme } from "./ui";
@@ -184,7 +184,7 @@ function ShellBody() {
               <button className="v2-btn v2-btn-ghost v2-mobile-only" onClick={() => setOpen(true)} style={{ padding: "8px 10px" }}>
                 <Menu size={16} />
               </button>
-              <h2 className="truncate" style={{ fontSize: 16, fontWeight: 600 }}>{title}</h2>
+              <h2 className="truncate v2-crumb" style={{ fontSize: 13, fontWeight: 400, letterSpacing: 0 }}><span className="v2-hide-sm" style={{ color: V.muted }}>{firm?.name || "Workspace"}</span><ChevronRight size={13} className="v2-hide-sm" style={{ color: V.muted, flex: "none" }} aria-hidden="true" /><b className="truncate" style={{ fontSize: 15 }}>{title}</b></h2>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, whiteSpace: "nowrap" }}>
               <button

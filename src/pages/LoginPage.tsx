@@ -191,10 +191,10 @@ const LoginPage = () => {
           className="font-serif text-fyn-beige mt-8 mb-4"
           style={{ fontSize: "var(--fyn-type-h1)", lineHeight: 1.15 }}
         >
-          Your financial clarity starts here.
+          Sign in to your firm's workspace.
         </h2>
         <p className="text-fyn-beige/60" style={{ fontSize: "var(--fyn-type-body)" }}>
-          Connect your bank, payments, and accounting software. Get answers in seconds, not spreadsheets.
+          Collect client documents, reconcile bank to books, and sign off the monthly MIS, with every figure traced to its source.
         </p>
       </div>
 

@@ -2,6 +2,7 @@ import { useState } from "react";
 import SiteShell, { Section, Reveal } from "@/components/site/SiteShell";
 import { C } from "@/components/site/siteTheme";
 import { DemoLink } from "@/components/site/BookDemo";
+import { COMPANY } from "@/content/legal/company";
 
 /* ================================================================
    FynHelp — Contact
@@ -94,7 +95,7 @@ export default function ContactPage() {
             <Reveal delay={140}>
               <div className="fh-ccard">
                 <h3>Office</h3>
-                <p>FynHelp Technologies · Bengaluru, India. Data residency stays in India on every plan.</p>
+                <p>{COMPANY.entity || "FynHelp"}. Our hosting region and every provider that handles your data are listed on the security page.</p>
               </div>
             </Reveal>
             <Reveal delay={210}>

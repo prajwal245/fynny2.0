@@ -72,6 +72,7 @@ ${LIQUID_BUTTON_CSS}
 .v2 { background:${V.bg}; background-image:var(--v2-glow); background-attachment:fixed; color:${V.ink}; color-scheme:var(--v2-scheme); font-family:${V.font}; -webkit-font-smoothing:antialiased; font-size:15px; }
 .v2 *, .v2 *::before, .v2 *::after { box-sizing:border-box; }
 .v2 h1,.v2 h2,.v2 h3,.v2 h4 { font-family:${V.font}; margin:0; letter-spacing:-0.02em; font-weight:600; color:${V.ink}; }
+:where(.v2 a) { color:inherit; text-decoration:none; }
 .v2 p,.v2 span,.v2 a,.v2 li,.v2 td,.v2 th,.v2 button,.v2 input,.v2 select,.v2 textarea,.v2 label { font-family:${V.font}; }
 .v2 .num, .v2 .tabular-nums, .v2-table td, .v2-table th { font-variant-numeric:tabular-nums; }
 /* Identifiers and raw data (references, GSTIN/PAN, section codes, transaction ids). */

@@ -43,7 +43,7 @@ export function agePosting(
   party: string,
   postings: Posting[],
   asAt: string,
-  opts: { side: "debtor" | "creditor"; opening?: number; openingDate?: string } = { side: "debtor" },
+  opts: { side: "debtor" | "creditor"; opening?: number; openingDate?: string; /** Credit period: a bill is aged from its due date (bill date + this), and not at all before it. Without it, from the invoice date. */ creditDays?: number } = { side: "debtor" },
 ): PartyAgeing {
   // For a debtor a debit is a bill; for a creditor a credit is. Normalise so that a positive number is always a bill.
   const sign = opts.side === "debtor" ? 1 : -1;
@@ -72,7 +72,8 @@ export function agePosting(
     else if (v < 0) settle(-v, p.ref, p.billType === "against");
   }
   const live = open.filter((b) => b.amount > 0.004);
-  for (const b of live) b.age = b.date === "1900-01-01" ? 9999 : Math.max(0, days(b.date, asAt));
+  const grace = opts.creditDays ?? 0;
+  for (const b of live) b.age = b.date === "1900-01-01" ? 9999 : Math.max(0, days(b.date, asAt) - (b.origin === "opening" ? 0 : grace));
   const buckets = { current: 0, d31_60: 0, d61_90: 0, d90plus: 0 };
   for (const b of live) {
     if (b.age <= 30) buckets.current += b.amount; else if (b.age <= 60) buckets.d31_60 += b.amount; else if (b.age <= 90) buckets.d61_90 += b.amount; else buckets.d90plus += b.amount;
@@ -113,7 +114,7 @@ export function postingsFromDayBook(rows: string[][]): Map<string, Posting[]> {
   if (head < 0) return out;
   const h = rows[head]!.map((c) => String(c).trim().toLowerCase());
   const col = (re: RegExp, d: number) => { const i = h.findIndex((c) => re.test(c)); return i >= 0 ? i : d; };
-  const cD = col(/^date$/, 0), cP = col(/^particulars$/, 1), cT = col(/vch\s*type/, 4), cN = col(/vch\s*no/, 5), cDr = col(/^debit$/, 6), cCr = col(/^credit$/, 7);
+  const cD = col(/^date$/, 0), cP = col(/^particulars$/, 1), cT = col(/vch\s*type/, 4), cN = col(/vch\s*no/, 5), cDr = col(/^debit( amount)?$/, cN + 1), cCr = col(/^credit( amount)?$/, cN + 2);
   let date: string | null = null, vno = "", vtype = "";
   for (const r of rows.slice(head + 1)) {
     const name = String(r[cP] ?? "").trim();

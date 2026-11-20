@@ -27,7 +27,7 @@ export function readDayBookVouchers(rows: string[][]): Voucher[] {
   if (head < 0) return [];
   const h = rows[head]!.map((c) => String(c).trim().toLowerCase());
   const col = (re: RegExp, d: number) => { const i = h.findIndex((c) => re.test(c)); return i >= 0 ? i : d; };
-  const cD = col(/^date$/, 0), cP = col(/^particulars$/, 1), cT = col(/vch\s*type/, 4), cN = col(/vch\s*no/, 5), cDr = col(/^debit$/, 6), cCr = col(/^credit$/, 7);
+  const cD = col(/^date$/, 0), cP = col(/^particulars$/, 1), cT = col(/vch\s*type/, 4), cN = col(/vch\s*no/, 5), cDr = col(/^debit( amount)?$/, cN + 1), cCr = col(/^credit( amount)?$/, cN + 2);
   const out: Voucher[] = [];
   let cur: Voucher | null = null;
   rows.slice(head + 1).forEach((r, i) => {

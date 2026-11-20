@@ -75,7 +75,7 @@ describe.skipIf(!REAL || !existsSync(REAL ?? ""))("real-file gate", { timeout: 9
     const sssl = load("SSSL||BOOKS||DayBook.xlsx");
     // Every voucher is read, and each balances: debits equal credits.
     for (const v of [...sat, ...sssl]) expect(Math.abs(v.legs.reduce((n, l) => n + l.debit - l.credit, 0)), `${v.type} ${v.no} does not balance`).toBeLessThan(1);
-    expect(sat.length).toBe(4290);
+    expect(sat.length).toBe(4362);
     expect(sssl.length).toBe(10724);
     expect(reviewCash(sat).days.length).toBeGreaterThan(20);
     const adj = adjustmentRegister(sat);

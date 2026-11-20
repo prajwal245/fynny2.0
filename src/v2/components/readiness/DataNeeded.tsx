@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Drawer } from "../../ui";
+import { SidePanel } from "../kit/Kit";
 import { useV2 } from "../../store";
 import { getPracticeReadiness, markPracticeInput } from "@/lib/practice/practice.functions";
 import { INPUTS, PACKS, askable, composeRequest, requestPlan, type InputStates, type Pack } from "@/lib/practice/readiness/model";
@@ -81,12 +81,12 @@ export default function DataNeeded({ clientId, month, onOpenCheck, onBlockedCoun
         client={client.name} pack={pack} onPack={setPack} inputs={inputs} sqlMissing={sqlMissing} onMark={onMark} onOpenCheck={onOpenCheck}
         onRequest={() => { setSent(false); setOpen(true); }} clientCount={plan.clientRequests.length + plan.partyRequests.length} teamCount={plan.firmTasks.length}
       />
-      <Drawer open={open} onClose={() => setOpen(false)} title="Request what is missing" expandable>
+      <SidePanel open={open} onClose={() => setOpen(false)} title="Request what is missing">
         <RequestPanel
           client={client.name} plan={plan} message={message} onMessage={setMessage} channel={channel} onChannel={setChannel} sent={sent} reachable={reachable}
-          onSend={send} onCopy={() => { void navigator.clipboard?.writeText(message); toast.success("Copied."); }}
+          onSend={send} onCancel={() => setOpen(false)}
         />
-      </Drawer>
+      </SidePanel>
     </>
   );
 }

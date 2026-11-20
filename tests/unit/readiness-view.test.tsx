@@ -22,8 +22,8 @@ describe("data needed screen", () => {
   });
   it("splits the request into the client's message and the team's downloads", () => {
     const plan = requestPlan(INPUTS.filter((i) => ["audited_statements", "gstr2b"].includes(i.key)), { firmHoldsGstLogin: true, firmHoldsItLogin: true, tallyConnected: true });
-    const html = renderToStaticMarkup(<RequestPanel client="Acme" plan={plan} message="Hello" onMessage={() => {}} channel="email" onChannel={() => {}} onSend={() => {}} onCopy={() => {}} reachable="a@b.in" />);
-    expect(html).toMatch(/For your team to download \(1\)/);
+    const html = renderToStaticMarkup(<RequestPanel client="Acme" plan={plan} message="Hello" onMessage={() => {}} channel="email" onChannel={() => {}} onSend={() => {}} reachable="a@b.in" />);
+    expect(html).toMatch(/For your team \(1\)/);
     expect(html).toMatch(/GSTR-2B/);
     expect(html).toMatch(/Send to client/);
   });

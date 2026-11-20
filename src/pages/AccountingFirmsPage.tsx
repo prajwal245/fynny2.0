@@ -4,7 +4,6 @@ import {
   BellRing,
   BookOpen,
   Check,
-  CheckCircle2,
   ClipboardList,
   Clock,
   FileBarChart,
@@ -17,6 +16,7 @@ import {
   PanelRight,
   Plus,
   Scale,
+  ScanText,
   UserRound,
   X,
 } from "lucide-react";
@@ -35,15 +35,18 @@ import { DemoLink } from "@/components/site/BookDemo";
 import { ACCOUNTING_FAQS } from "@/content/accountingFirmsFaqs";
 
 /**
- * /for/accounting-firms: the document-chasing story for the whole firm
- * (partners, managers, seniors and juniors).
+ * /for/accounting-firms: the end-to-end month-end story for the whole firm
+ * (partners, managers, seniors and juniors), across all four modules:
+ * Chaser collects, Extract reads, Recon matches, Narrate reports.
  *
  * Self-contained on purpose: its own quiet palette (warm paper, white cards, soft
  * pastel washes, one terracotta accent) scoped under `.fa`, so it does not disturb
  * the rest of the site.
  *
  * Every product claim is one the code backs, and the mock-ups use the product's own
- * words: chase items are Open / Following Up / Escalated / Resolved; follow-ups run on
+ * words: chase items are Open / Following Up / Escalated / Resolved; unclear rows wait in
+ * the Review Queue; five matching passes leave exceptions with a reason; the MIS is built from
+ * matched lines, every figure opens its source, and a partner signs off or sends it back; follow-ups run on
  * day 0, 3 and 7 and come to a partner on day 10; email goes Mon-Sat 9:30 am-6:30 pm IST;
  * the channel is Email, WhatsApp or both; tone is gentle, standard or firm; client upload
  * links need no login; postings to Tally or Zoho and the MIS wait for a partner.
@@ -149,7 +152,9 @@ const STYLES = `
 .fa-composer .row { display:flex; justify-content:space-between; margin-top:22px; }
 .fa-composer .row i { width:28px; height:28px; border-radius:50%; background:#F6D9C9; color:var(--acc-ink); display:grid; place-items:center; font-style:normal; }
 .fa-tabs { display:flex; border-bottom:1px solid var(--line); }
-.fa-tabs span { font-size:13.5px; padding:14px 18px 13px; border-bottom:2px solid var(--acc); margin-bottom:-1px; }
+.fa-tabs button { all:unset; box-sizing:border-box; cursor:pointer; font-size:13.5px; padding:14px 18px 13px; margin-bottom:-1px; border-bottom:2px solid transparent; color:var(--mute); }
+.fa-tabs button[aria-selected="true"] { color:var(--ink); border-bottom-color:var(--acc); }
+.fa-tabs button:focus-visible { outline:2px solid var(--acc-ink); outline-offset:-2px; }
 .fa-sub { display:flex; align-items:center; gap:10px; padding:12px 20px; border-bottom:1px solid var(--line); font-size:13px; color:var(--mute); }
 .fa-sheetbody { padding:22px 22px 26px; }
 .fa-sheetbody h4 { font-size:20px; letter-spacing:-0.03em; font-weight:400; }
@@ -211,7 +216,7 @@ const STYLES = `
 .fa-ptile { border-radius:28px; padding:44px 40px; background:radial-gradient(90% 100% at 100% 0%, #D6ECE2 0%, transparent 62%), var(--sand); min-height:360px; display:flex; align-items:center; }
 .fa-files { width:100%; } .fa-files .fr { display:grid; grid-template-columns:38px 1fr auto; gap:12px; align-items:center; padding:12px 14px; border-top:1px solid var(--line); }
 .fa-files .fr b { display:block; font-size:14.5px; font-weight:500; } .fa-files .fr small { font-size:12.5px; color:var(--mute); }
-.fa-kind { width:38px; height:38px; border-radius:10px; display:grid; place-items:center; background:var(--soft); color:var(--grey); }
+.fa-kind { width:38px; height:38px; border-radius:10px; display:grid; place-items:center; font-size:9.5px; font-weight:700; letter-spacing:.04em; }
 .fa-kind.doc { background:#E4EAF7; color:#3157A6; } .fa-kind.sheet { background:#DFF2E7; color:#1B6B43; } .fa-kind.pdf { background:#FBE3DD; color:#B2420F; }
 @media (max-width:900px){ .fa-proc { grid-template-columns:1fr; gap:28px; } .fa-ptile { padding:26px 16px; min-height:0; } .fa-step[aria-selected="true"] .dd { max-height:160px; } }
 
@@ -417,40 +422,52 @@ function PillNav() {
   );
 }
 
-/* ────────────────────────── hero + the chase screen ────────────────────────── */
-
 const OPEN_ITEMS: [string, string][] = [
   ["HDFC current account statement, October", "Following up"],
   ["Purchase register (Tally export)", "Open"],
   ["TDS challans, Q2", "Escalated"],
 ];
-const DONE_ITEMS = [
-  "Sales register (Tally export)",
-  "ICICI cash credit statement",
-  "GSTR-2B, October",
+
+/* ────────────────────────── hero + the month-end screen ────────────────────────── */
+
+type TabKey = "docs" | "exceptions" | "mis";
+const TABS: { k: TabKey; label: string }[] = [
+  { k: "docs", label: "Documents" },
+  { k: "exceptions", label: "Exceptions" },
+  { k: "mis", label: "MIS" },
+];
+
+const DOC_ROWS: [string, string, string, Tone][] = [
+  ["HDFC current account, October.pdf", "Gmail", "Read", "green"],
+  ["Purchase register.xlsx", "Upload link", "2 rows to review", "amber"],
+  ["Sales register.xml", "Upload link", "Read", "green"],
+  ["Cash credit statement.jpg", "WhatsApp", "Read", "green"],
+];
+const EXC_ROWS: [string, string][] = [
+  ["Unidentified receipt", "₹48,200"],
+  ["Amount difference", "₹1,180 short"],
+  ["Possible duplicate", "₹9,500"],
+  ["GST mismatch", "₹2,340"],
+  ["Timing difference", "₹26,000"],
 ];
 
 function Workspace() {
-  const [paused, setPaused] = useState(false);
+  const [tab, setTab] = useState<TabKey>("exceptions");
   return (
     <figure style={{ margin: 0 }}>
-      <div className="fa-ws" role="group" aria-label="Sample chase screen">
+      <div className="fa-ws" role="group" aria-label="Sample month-end screen">
         <div className="body">
           <div className="fa-pane">
             <div className="fa-phead">
               <span className="ic">
-                <BellRing size={17} />
+                <ClipboardList size={17} />
               </span>
               <div>
-                <b>HDFC statement, October</b>
+                <b>October close</b>
                 <small>Mehta Textiles · Sample data</small>
               </div>
               <div className="right">
-                {paused ? (
-                  <Tag tone="grey">Paused until Fri</Tag>
-                ) : (
-                  <Tag tone="amber">Following up</Tag>
-                )}
+                <Tag tone="amber">Needs sign-off</Tag>
                 <span className="ic" aria-hidden="true">
                   <PanelRight size={16} />
                 </span>
@@ -459,57 +476,57 @@ function Workspace() {
             <div className="fa-thread">
               <div className="fa-tl">
                 <div className="fa-ev">
-                  <span className="dot">
-                    <ClipboardList size={16} />
-                  </span>
-                  <div>
-                    <b>Chase created</b>
-                    <p>
-                      October bank statement for Mehta Textiles, due Friday, by
-                      email and WhatsApp.
-                    </p>
-                    <small>Mon 9:42 AM · Riya</small>
-                  </div>
-                </div>
-                <div className="fa-ev">
                   <span className="dot ok">
                     <Mail size={16} />
                   </span>
                   <div>
-                    <b>Day 0 · email sent</b>
-                    <p>To Rakesh Mehta. Names the document and the month.</p>
-                    <small>Mon 9:45 AM</small>
+                    <b>Collect · Chaser</b>
+                    <p>
+                      8 of 11 documents in. The other 3 are being followed up on
+                      day 0, 3 and 7.
+                    </p>
                   </div>
                 </div>
                 <div className="fa-ev">
                   <span className="dot ok">
-                    <MessageCircle size={16} />
+                    <ScanText size={16} />
                   </span>
                   <div>
-                    <b>Day 3 · email and WhatsApp sent</b>
-                    <p>Follow-up 1 of 3.</p>
-                    <small>Thu 10:02 AM</small>
+                    <b>Read · Extract</b>
+                    <p>
+                      6 files read into lines. 2 rows weren’t clear and are
+                      waiting in the Review Queue.
+                    </p>
+                  </div>
+                </div>
+                <div className="fa-ev">
+                  <span className="dot ok">
+                    <Scale size={16} />
+                  </span>
+                  <div>
+                    <b>Match · Recon</b>
+                    <p>
+                      412 of 427 bank lines matched to the books. 15 exceptions,
+                      each with a reason.
+                    </p>
                   </div>
                 </div>
                 <div className="fa-ev">
                   <span className="dot next">
-                    <Clock size={16} />
+                    <FileBarChart size={16} />
                   </span>
                   <div>
-                    <b>Next: day 7</b>
+                    <b>Report · Narrate</b>
                     <p>
-                      Goes out Monday to Saturday, 9:30 am to 6:30 pm IST. Stops
-                      the moment the document arrives. On day 10 it comes to a
-                      partner.
+                      October MIS drafted from matched lines. Every figure opens
+                      the lines behind it.
                     </p>
                     <div className="fa-quote">
                       <div className="k">
-                        <span>Next message · WhatsApp</span>
-                        <span>Tone: standard</span>
+                        <span>Waiting for a partner</span>
                       </div>
-                      Hi Rakesh, hope you’re well. Could you please share the
-                      bank statement for Mehta Textiles when you get a chance?
-                      Thank you! – Shah &amp; Co
+                      Nothing is posted to Tally or Zoho, and nothing reaches
+                      the client, until a partner approves it.
                     </div>
                   </div>
                 </div>
@@ -517,65 +534,128 @@ function Workspace() {
             </div>
             <div className="fa-actbar">
               <button type="button" className="mini dark">
-                Mark resolved
+                Sign off
               </button>
               <button type="button" className="mini">
-                Escalate to partner
-              </button>
-              <button
-                type="button"
-                className="mini"
-                onClick={() => setPaused((v) => !v)}
-              >
-                {paused ? "Resume" : "Pause until promised date"}
+                Send back with a note
               </button>
             </div>
           </div>
           <div className="fa-pane">
-            <div className="fa-tabs">
-              <span>Chaser</span>
-            </div>
-            <div className="fa-sub">
-              <ClipboardList size={15} /> Document requests · this client
-            </div>
-            <div className="fa-sheetbody">
-              <h4>Mehta Textiles · October close</h4>
-              <div className="sm">11 document requests</div>
-              <div className="fa-stats">
-                <div>
-                  <small>Resolved</small>
-                  <b>
-                    8<span>of 11</span>
-                  </b>
-                </div>
-                <div className="miss">
-                  <small>Still open</small>
-                  <b>
-                    3<span>due Friday</span>
-                  </b>
-                </div>
-              </div>
-              <div className="fa-grp">Still open</div>
-              {OPEN_ITEMS.map(([n, st]) => (
-                <div className="fa-row" key={n}>
-                  <span>{n}</span>
-                  <Tag tone={STATUS_TONE[st]!}>{st}</Tag>
-                </div>
+            <div
+              className="fa-tabs"
+              role="tablist"
+              aria-label="Month-end details"
+            >
+              {TABS.map((t) => (
+                <button
+                  key={t.k}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === t.k}
+                  onClick={() => setTab(t.k)}
+                >
+                  {t.label}
+                </button>
               ))}
-              <div className="fa-grp">Resolved</div>
-              {DONE_ITEMS.map((n) => (
-                <div className="fa-row" key={n}>
-                  <span>{n}</span>
-                  <Tag tone="green">Resolved</Tag>
-                </div>
-              ))}
+            </div>
+            <div className="fa-sheetbody" role="tabpanel">
+              {tab === "docs" && (
+                <>
+                  <h4>Documents</h4>
+                  <div className="sm">
+                    Uploads, Gmail and WhatsApp in one inbox
+                  </div>
+                  <div className="fa-grp">Arrived this month</div>
+                  {DOC_ROWS.map(([n, src, st, tone]) => (
+                    <div className="fa-row" key={n}>
+                      <span>
+                        {n} <small style={{ color: "#9A988F" }}>· {src}</small>
+                      </span>
+                      <Tag tone={tone}>{st}</Tag>
+                    </div>
+                  ))}
+                  <div className="fa-grp">Still being chased</div>
+                  {OPEN_ITEMS.map(([n, st]) => (
+                    <div className="fa-row" key={n}>
+                      <span>{n}</span>
+                      <Tag tone={STATUS_TONE[st]!}>{st}</Tag>
+                    </div>
+                  ))}
+                </>
+              )}
+              {tab === "exceptions" && (
+                <>
+                  <h4>Bank to books</h4>
+                  <div className="sm">HDFC current account · October</div>
+                  <div className="fa-stats">
+                    <div>
+                      <small>Matched</small>
+                      <b>
+                        412<span>of 427</span>
+                      </b>
+                    </div>
+                    <div className="miss">
+                      <small>Exceptions</small>
+                      <b>
+                        15<span>each with a reason</span>
+                      </b>
+                    </div>
+                  </div>
+                  <div className="fa-grp">Needs a decision</div>
+                  {EXC_ROWS.map(([n, v]) => (
+                    <div className="fa-row" key={n}>
+                      <span>{n}</span>
+                      <span style={{ color: "var(--mute)", fontSize: 13 }}>
+                        {v}
+                      </span>
+                    </div>
+                  ))}
+                </>
+              )}
+              {tab === "mis" && (
+                <>
+                  <h4>October MIS</h4>
+                  <div className="sm">
+                    Draft · built from matched lines only
+                  </div>
+                  <div className="fa-stats">
+                    <div>
+                      <small>Revenue</small>
+                      <b style={{ fontSize: 22 }}>₹41,82,300</b>
+                    </div>
+                    <div>
+                      <small>Expenses</small>
+                      <b style={{ fontSize: 22 }}>₹27,10,940</b>
+                    </div>
+                  </div>
+                  <div className="fa-grp">Behind the numbers</div>
+                  {[
+                    ["Revenue", "126 bank and book lines"],
+                    ["Expenses", "98 bank and book lines"],
+                    ["Statutory dates", "GST and TDS due dates"],
+                  ].map(([n, v]) => (
+                    <div className="fa-row" key={n}>
+                      <span>{n}</span>
+                      <span style={{ color: "var(--mute)", fontSize: 13 }}>
+                        {v}
+                      </span>
+                    </div>
+                  ))}
+                  <div className="fa-grp">Export</div>
+                  <div className="fa-row">
+                    <span>PDF and Excel, after sign-off</span>
+                    <Tag tone="grey">Pending</Tag>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
       </div>
       <figcaption className="fa-note">
-        Sample screen with made-up data, using the product’s own statuses.
-        Schedule, channel and tone are set per request.
+        Sample screen with made-up data. Statuses and exception kinds are the
+        product’s own.
       </figcaption>
     </figure>
   );
@@ -591,14 +671,14 @@ function Hero() {
         </div>
         <span className="fa-badge">For accounting firms</span>
         <h1>
-          Stop chasing clients
+          Close every client’s month
           <br />
-          for documents.
+          without the grind.
         </h1>
         <p className="sub">
-          A workspace for every client. FynHelp tracks what’s missing, follows
-          up on your schedule, and asks a partner before anything touches the
-          books.
+          A workspace for every client. FynHelp collects the documents, reads
+          them, matches bank to books and drafts the MIS. A partner signs off
+          before anything is posted or sent.
         </p>
         <div className="acts">
           <StartButton where="afp-hero" />
@@ -612,7 +692,7 @@ function Hero() {
           {(["tally", "zoho", "gmail", "whatsapp"] as BrandKey[]).map((k) => (
             <b key={k}>
               <BrandIcon k={k} />
-              {k === "tally" ? "Tally" : BRAND_LABEL[k]}
+              {BRAND_LABEL[k]}
             </b>
           ))}
         </div>
@@ -630,9 +710,9 @@ function Statement() {
       <h2>
         Your team knows the clients.
         <br />
-        FynHelp handles the chasing.
+        FynHelp does the legwork.
       </h2>
-      <p>One workspace per client. One status everyone trusts.</p>
+      <p>One workspace per client. Documents in, signed-off MIS out.</p>
     </section>
   );
 }
@@ -644,7 +724,7 @@ function Bento() {
       <h2 className="h2">
         Everything your firm
         <br />
-        needs to stop chasing.
+        needs to close the month.
       </h2>
       <div className="fa-bento">
         <article>
@@ -688,78 +768,7 @@ function Bento() {
         </article>
 
         <article>
-          <div className="fa-art peach">
-            <div className="fa-mcard">
-              <div className="h">
-                Document requests <small>3 open</small>
-              </div>
-              {[
-                ["Sales register", "Resolved"],
-                ["HDFC statement", "Following up"],
-                ["Purchase register", "Open"],
-                ["Q2 TDS challans", "Escalated"],
-              ].map(([n, st]) => (
-                <div className="r" key={n}>
-                  <span>{n}</span>
-                  <Tag tone={STATUS_TONE[st!]!}>{st}</Tag>
-                </div>
-              ))}
-            </div>
-          </div>
-          <h3>Every request, tracked to closure</h3>
-          <p>
-            Open, following up, escalated or resolved. A request closes itself
-            when the document arrives.
-          </p>
-        </article>
-
-        <article>
           <div className="fa-art butter">
-            <div className="fa-mcard">
-              <div className="h">
-                Follow-up · Day 3 <Tag tone="line">Email</Tag>
-              </div>
-              <div className="fa-seg" aria-hidden="true">
-                <span>Gentle</span>
-                <span className="on">Standard</span>
-                <span>Firm</span>
-              </div>
-              <div className="pad">
-                Hi Rakesh, hope you’re well. Could you please share the bank
-                statement for Mehta Textiles when you get a chance? Thank you! –
-                Shah &amp; Co
-              </div>
-            </div>
-          </div>
-          <h3>Reminders in your firm’s name</h3>
-          <p>
-            Pick a gentle, standard or firm tone. Each message names the exact
-            document and month, and signs off as your firm.
-          </p>
-        </article>
-
-        <article>
-          <div className="fa-art sand">
-            <div className="fa-pillrow">
-              {(
-                ["tally", "zoho", "gmail", "whatsapp", "excel"] as BrandKey[]
-              ).map((k) => (
-                <span key={k}>
-                  <BrandIcon k={k} size={16} />
-                  {BRAND_LABEL[k]}
-                </span>
-              ))}
-            </div>
-          </div>
-          <h3>Works with Tally and Zoho Books</h3>
-          <p>
-            Upload your Tally exports or connect Zoho Books read-only. Anything
-            posted to your books waits for a partner.
-          </p>
-        </article>
-
-        <article>
-          <div className="fa-art mint">
             <div className="fa-mcard">
               <div className="h">Upload link</div>
               <div className="r" style={{ borderTop: 0 }}>
@@ -771,7 +780,7 @@ function Bento() {
                     Mehta Textiles
                     <br />
                     <span style={{ color: "var(--mute)", fontSize: 12.5 }}>
-                      HDFC statement, October
+                      October documents
                     </span>
                   </span>
                 </span>
@@ -811,10 +820,97 @@ function Bento() {
               </div>
             </div>
           </div>
-          <h3>Links clients can open</h3>
+          <h3>Documents arrive and get read</h3>
           <p>
-            Share an upload link. No client login needed, and photos from a
-            phone work.
+            Clients upload by link, email or WhatsApp, no login needed.
+            Statements, Tally exports and GST and TDS registers are read into
+            lines.
+          </p>
+        </article>
+
+        <article>
+          <div className="fa-art peach">
+            <div className="fa-mcard">
+              <div className="h">
+                Follow-up · Day 3 <Tag tone="line">Email</Tag>
+              </div>
+              <div className="fa-seg" aria-hidden="true">
+                <span>Gentle</span>
+                <span className="on">Standard</span>
+                <span>Firm</span>
+              </div>
+              <div className="pad">
+                Hi Rakesh, hope you’re well. Could you please share the bank
+                statement for Mehta Textiles when you get a chance? Thank you! –
+                Shah &amp; Co
+              </div>
+            </div>
+          </div>
+          <h3>Follow-ups that stop themselves</h3>
+          <p>
+            Email or WhatsApp on day 0, 3 and 7, in a tone you choose. They stop
+            when the document arrives, and on day 10 it comes to a partner.
+          </p>
+        </article>
+
+        <article>
+          <div className="fa-art sand">
+            <div className="fa-mcard">
+              <div className="h">
+                Bank to books <small>427 lines</small>
+              </div>
+              {[
+                ["Exact and same-day", "363", "green"],
+                ["Close and your rules", "49", "green"],
+                ["Exceptions", "15", "amber"],
+              ].map(([n, v, tone]) => (
+                <div className="r" key={n}>
+                  <span>{n}</span>
+                  <Tag tone={tone as Tone}>{v}</Tag>
+                </div>
+              ))}
+            </div>
+          </div>
+          <h3>Bank matched to the books</h3>
+          <p>
+            Five matching passes against Tally or Zoho Books. What doesn’t match
+            stays visible, with the reason.
+          </p>
+        </article>
+
+        <article>
+          <div className="fa-art mint">
+            <div className="fa-mcard">
+              <div className="h">
+                Review Queue <small>2 rows</small>
+              </div>
+              <div className="r">
+                <span style={{ lineHeight: 1.35 }}>
+                  Row 14 · ₹12,400
+                  <br />
+                  <span style={{ color: "var(--mute)", fontSize: 12.5 }}>
+                    Read from a photo
+                  </span>
+                </span>
+                <Tag tone="amber">Low confidence</Tag>
+              </div>
+              <div
+                className="pad"
+                style={{ display: "flex", gap: 8, paddingTop: 4 }}
+              >
+                <button type="button" className="mini dark">
+                  Confirm
+                </button>
+                <button type="button" className="mini">
+                  Edit
+                </button>
+              </div>
+            </div>
+          </div>
+          <h3>Unsure rows wait for a person</h3>
+          <p>
+            Only rows Extract wasn’t confident about reach the queue. Nothing
+            there is a transaction until someone confirms it.
           </p>
         </article>
 
@@ -831,10 +927,10 @@ function Bento() {
               </div>
             </div>
           </div>
-          <h3>Month-end, traced to source</h3>
+          <h3>A month-end you can trace</h3>
           <p>
-            Once the files are in, the MIS is drafted. Every figure opens the
-            lines behind it.
+            The MIS is drafted from matched lines only. Every figure opens the
+            lines behind it, and a partner signs it off.
           </p>
         </article>
       </div>
@@ -845,7 +941,8 @@ function Bento() {
 /* ────────────────────────── process ────────────────────────── */
 
 type FileRow = {
-  icon: "doc" | "sheet" | "mail" | "chat" | "clock" | "user";
+  icon:
+    "doc" | "sheet" | "mail" | "chat" | "clock" | "user" | "scale" | "report";
   title: string;
   sub: string;
   tag?: [Tone, string];
@@ -857,32 +954,20 @@ const ICONS = {
   chat: MessageCircle,
   clock: Clock,
   user: UserRound,
+  scale: Scale,
+  report: FileBarChart,
 };
 const STEPS: { n: string; t: string; d: string; files: FileRow[] }[] = [
   {
     n: "01",
-    t: "Open a workspace per client",
-    d: "Add the client and their contact. Documents, follow-ups, reconciliation and the MIS all live there.",
-    files: [
-      { icon: "doc", title: "Engagement letter", sub: "Document · uploaded" },
-      {
-        icon: "sheet",
-        title: "Tally day book, September",
-        sub: "Export · read",
-      },
-      { icon: "doc", title: "HDFC statement, September", sub: "PDF · read" },
-    ],
-  },
-  {
-    n: "02",
-    t: "Ask for what’s missing",
-    d: "Create a request for each document: which one, which month, when it’s due, and whether to use email, WhatsApp or both.",
+    t: "Collect what’s missing",
+    d: "Create a request for each document and choose email, WhatsApp or both. Follow-ups run on day 0, 3 and 7, and stop when it arrives.",
     files: [
       {
         icon: "doc",
         title: "HDFC statement, October",
         sub: "Due Friday · email + WhatsApp",
-        tag: ["line", "Open"],
+        tag: ["amber", "Following up"],
       },
       {
         icon: "sheet",
@@ -892,58 +977,83 @@ const STEPS: { n: string; t: string; d: string; files: FileRow[] }[] = [
       },
       {
         icon: "doc",
-        title: "TDS challans, Q2",
-        sub: "Due Friday · WhatsApp",
-        tag: ["line", "Open"],
+        title: "Sales register",
+        sub: "Received through the upload link",
+        tag: ["green", "Resolved"],
+      },
+    ],
+  },
+  {
+    n: "02",
+    t: "Read every document",
+    d: "Statements, Tally exports and GST and TDS registers become dated lines. Anything unclear waits in the Review Queue.",
+    files: [
+      {
+        icon: "doc",
+        title: "HDFC statement, October",
+        sub: "PDF · 427 lines read",
+        tag: ["green", "Read"],
+      },
+      {
+        icon: "sheet",
+        title: "Tally day book",
+        sub: "XML export · read",
+        tag: ["green", "Read"],
+      },
+      {
+        icon: "sheet",
+        title: "Purchase register",
+        sub: "Excel · 2 rows unclear",
+        tag: ["amber", "To review"],
       },
     ],
   },
   {
     n: "03",
-    t: "Let the follow-ups run",
-    d: "Day 0, 3 and 7 by default. They stop the moment the document arrives, and on day 10 the request comes to a partner.",
+    t: "Match bank to books",
+    d: "Five passes match bank lines to Tally or Zoho Books. What doesn’t match stays visible with a reason, and your decisions are remembered per client.",
     files: [
       {
-        icon: "mail",
-        title: "Day 0 · email",
-        sub: "Sent Monday",
-        tag: ["green", "Sent"],
+        icon: "scale",
+        title: "Exact and same-day",
+        sub: "363 lines",
+        tag: ["green", "Matched"],
       },
       {
-        icon: "chat",
-        title: "Day 3 · email and WhatsApp",
-        sub: "Sent Thursday",
-        tag: ["green", "Sent"],
+        icon: "scale",
+        title: "Close and your rules",
+        sub: "49 lines",
+        tag: ["green", "Matched"],
       },
       {
-        icon: "clock",
-        title: "Day 7 · next follow-up",
-        sub: "Mon to Sat, 9:30 am to 6:30 pm IST",
-        tag: ["amber", "Scheduled"],
+        icon: "scale",
+        title: "Exceptions",
+        sub: "15 lines, each with a reason",
+        tag: ["amber", "To decide"],
       },
     ],
   },
   {
     n: "04",
-    t: "Reconcile, then sign off",
-    d: "With the files in, bank lines are matched to the books and the MIS is drafted. A partner signs it off.",
+    t: "Draft the MIS, then sign off",
+    d: "Built from matched lines only, with every figure linked to its source. A partner signs off or sends it back with a note.",
     files: [
       {
-        icon: "sheet",
-        title: "Bank to Tally match",
-        sub: "412 of 427 lines matched",
-        tag: ["green", "15 to review"],
-      },
-      {
-        icon: "doc",
+        icon: "report",
         title: "October MIS",
         sub: "Every figure opens its lines",
         tag: ["amber", "Needs sign-off"],
       },
       {
         icon: "user",
-        title: "Partner sign-off",
-        sub: "Before anything goes to the client",
+        title: "Partner review",
+        sub: "Sign off, or send back with a note",
+        tag: ["grey", "Pending"],
+      },
+      {
+        icon: "sheet",
+        title: "PDF and Excel export",
+        sub: "After sign-off",
         tag: ["grey", "Pending"],
       },
     ],
@@ -956,9 +1066,9 @@ function Process() {
   return (
     <section className="sec wrap" id="how">
       <h2 className="h2">
-        From missing list
+        From missing documents
         <br />
-        to a complete file.
+        to a signed-off MIS.
       </h2>
       <div className="fa-proc">
         <div className="fa-steps" role="tablist" aria-label="Steps">
@@ -1069,13 +1179,14 @@ function Trust() {
             handled with care.
           </h2>
           <p className="sub">
-            Each firm’s data is kept apart, and every posting waits for a yes.
+            Figures are computed by code, and nothing is filed, posted or sent
+            without a person approving it.
           </p>
           <ul className="fa-ticks">
             {[
               "Only your firm’s team can open a client’s records",
               "Partner, manager and junior roles, checked on the server",
-              "Postings to your books and MIS sign-off wait for a partner",
+              "Every figure in the MIS links to the bank and book lines behind it",
             ].map((t) => (
               <li key={t}>
                 <i>
@@ -1096,7 +1207,8 @@ function Trust() {
               [
                 ["Post to Tally or Zoho", "amber", "Ask first"],
                 ["Release the monthly MIS", "amber", "Ask first"],
-                ["Read bank statements", "green", "Automatic"],
+                ["Read statements and registers", "green", "Automatic"],
+                ["Follow-up emails", "green", "On your schedule"],
                 ["Connect Gmail or WhatsApp", "grey", "Partner only"],
               ] as [string, Tone, string][]
             ).map(([t, tone, l]) => (
@@ -1206,11 +1318,11 @@ function Closing() {
   return (
     <div className="fa-end">
       <div className="wrap fa-close">
-        <h2>Spend tax season on the tax.</h2>
+        <h2>Spend month-end on the judgment.</h2>
         <p>
-          Let FynHelp handle the chasing.
+          Let FynHelp do the collecting, reading and matching.
           <br />
-          Your team handles the judgment.
+          Your team makes the calls.
         </p>
         <div className="acts">
           <StartButton where="afp-close" />

@@ -104,11 +104,11 @@ From you: NDA and data terms; India hosting decision; whether Tally and Zoho pos
 
 ## 7. Decisions of 20 Nov 2026, and what is built since this plan
 
-**Decisions:** (1) client data is hosted and processed in India only; the NDA and data terms are handled separately. (2) Posting to Tally and Zoho stays OFF for the QC module.
+**Decisions:** (1) client data (database and storage) is hosted in India, and AI is used as usual with its existing providers; the NDA and data terms are handled separately. (2) Posting to Tally and Zoho stays OFF for the QC module.
 
 **Built and tested** (each with unit tests; the Day Book items also pass the real-file gate on Satkaarika and SSSL):
 - Posting off: a server-side switch (`PRACTICE_TALLY_POSTING`, off unless set to `on`) refuses approvals and ledger creation and gives the connector nothing; the writing screen is hidden and says so. Zoho posting is off while `ZOHO_POSTING_FIRMS` is empty.
-- India-only residency switch for AI (`PRACTICE_DATA_RESIDENCY=india`): outside AI providers and the shared edge function are disabled; reading falls back to rules. System Health says "India-only mode". Moving the database and storage to an India region is an owner action: see `docs/INDIA_HOSTING.md`.
+- An OPTIONAL India-only AI switch (`PRACTICE_DATA_RESIDENCY=india`), left unset: AI works as usual. Moving the database and storage to an India region is an owner action: see `docs/INDIA_HOSTING.md`.
 - RC-6 post-match proof on every reconciliation, and the determinism test.
 - Review checks on the Day Book, in the client's Close tab: cash day by day with 40A(3) and 269ST party-day lists; adjustment entries register (year-end, month-end with another flag, round sums, narration words, owner or suspense ledgers, reversed next period, large entries; routine set-off and RCM tagged); ledger map suggestions by family, rate, tax head and year in the name; near-duplicate ledgers. Real result: all 4,290 Satkaarika and 10,724 SSSL vouchers read and balance; the Satkaarika register is 434 of 2,297 journals (a short list, not all of them); the duplicate check finds the blueprint's own "18% SUB CONTRACTOR SERVICES" against "18% SUBCONTRACTOR SERVICESS".
 - Excel working papers with a header block, live formulas (closing balance, differences, running totals) and control-total rows, for cash, adjustments, ledger map and the GST year view. A test reads each file back and checks the formulas.

@@ -131,3 +131,16 @@ describe("GSTR-3B annual report", () => {
     expect(c.find((x) => x.id === "rcm")!.status).toBe("agree");
   });
 });
+
+describe("credit notes in portal reports", () => {
+  const head = ["S.No.", "Original Period", "Amendment Period", "GSTIN", "Document Type", "Party Name", "Invoice No.", "Invoice Date", "RCM", "Invoice Type", " Taxable Value ", " GST % ", " IGST ", " CGST ", " SGST ", " CESS ", " Total Invoice Value "];
+  it("keeps a credit note negative whether the file prints it negative or positive (the year total once added them)", () => {
+    const rows = [head,
+      ["1", "Dec-25", "", "37AAA", "B2B", "X", "I1", "12/8/25", "No", "Regular", " 1,000.00 ", " 18.00 ", " -   ", " 90.00 ", " 90.00 ", " -   ", " 1,180.00 "],
+      ["2", "Dec-25", "", "37AAA", "Credit Note", "X", "C1", "12/9/25", "No", "Regular", " -38,750.00 ", " 18.00 ", " -   ", " -3,487.50 ", " -3,487.50 ", " -   ", " -45,725.00 "],
+      ["3", "Dec-25", "", "37AAA", "Credit Note", "X", "C2", "12/9/25", "No", "Regular", " 100.00 ", " 18.00 ", " -   ", " 9.00 ", " 9.00 ", " -   ", " 118.00 "]];
+    const r = readPortalReport(rows, { kind: "gstr1", month: "2025-12" });
+    expect(r.invoices.map((i) => i.taxable)).toEqual([1000, -38750, -100]);
+    expect(r.invoices[1]!.cgst).toBe(-3487.5);
+  });
+});

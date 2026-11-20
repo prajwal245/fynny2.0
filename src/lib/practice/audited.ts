@@ -218,7 +218,9 @@ export interface OpeningCompare {
 }
 
 /** Opening balances in Tally against last year's audited closing, by head. Tally writes a debit balance as a negative number. */
-export function compareOpening(bs: Statement, ledgers: MasterLedger[], tol = 100): OpeningCompare {
+export function compareOpening(bs: Statement, ledgers: MasterLedger[], tolIn?: number): OpeningCompare {
+  // Half the reporting unit: figures printed in thousands are good to ±₹500, in lakhs to ±₹50,000.
+  const tol = tolIn ?? Math.max(bs.unit / 2, 1);
   const audited: Record<Bucket, number> = {
     capital: val(bs, "share_capital") + val(bs, "reserves"),
     borrowings: val(bs, "lt_borrowings") + val(bs, "st_borrowings"),
@@ -250,7 +252,7 @@ export function compareOpening(bs: Statement, ledgers: MasterLedger[], tol = 100
     unmapped: [...unmapped].map(([group, v]) => ({ group, amount: r2(v.amount), ledgers: v.ledgers })),
     notes: [
       "Heads are matched by Tally's own primary groups. Borrowings are long and short term together, because Tally does not split them. A custom sub-group is listed separately, not forced into a head.",
-      `Differences within ${inr(tol)} are rounding: the audited figures are printed to two decimals of a thousand.`,
+      `Differences within ${inr(tol)} (half the unit the statements are printed in) are rounding.`,
     ],
   };
 }

@@ -35,6 +35,7 @@ import { decisionCount,
 } from "./recon/engine";
 import { pairOwnTransfers, type TransferPair } from "./recon/ownTransfers";
 import { pairReversals, type ReversalPair } from "./recon/reversals";
+import { proveReconciliation, type Proof, type ProofMatch, type ProofTxn } from "./recon/proof";
 
 interface TxnRow extends ReconTxn {
   match_status: string;
@@ -139,6 +140,8 @@ export interface ReconSummary {
   bank_only?: boolean;
   /** Book entries for a bank account whose statement has not been uploaded; they wait for it. */
   awaiting_statement?: number;
+  /** The post-match proof (RC-6): whether the stored matches are consistent with the lines. A failed proof is shown, never hidden. */
+  proof?: Proof;
 }
 
 /** "7 already matched; this run matched 5 more of 12 (4 same amount and date, 1 part payment). 2 need a decision." */
@@ -527,7 +530,36 @@ export async function runRecon(
     "recon",
     `Recon for ${client.client_name}, ${period.label}: ${summary.message}`,
   );
+  // The proof runs on what was stored, after everything else. A failure is recorded on the run and in the activity, and returned.
+  try {
+    summary.proof = await proveStored(db, ctx, businessId, period);
+    await db.from("ca_recon_runs").update({ snapshot: { status: "done", period, stats: outcome.stats, written, proof: { ok: summary.proof.ok, failed: summary.proof.checks.filter((c) => !c.ok).map((c) => c.id) } } }).eq("id", run.id);
+    if (!summary.proof.ok) await logActivity(db, ctx.firmId, businessId, "recon", `Self-check FAILED for ${client.client_name}, ${period.label}: ${summary.proof.checks.filter((c) => !c.ok).map((c) => `${c.id} ${c.detail}`).join(" ")}`.slice(0, 1900));
+  } catch (e) {
+    console.error(`[recon] proof for ${businessId} could not run: ${(e as Error).message}`);
+  }
   return summary;
+}
+
+/**
+ * Proves the stored matches of a client and period against the stored lines (RC-6). Reads the same rows the screens read, so a
+ * counter that disagrees with its list, a line used twice or a match that does not net to zero is found here before a person sees it.
+ */
+export async function proveStored(db: Db, ctx: FirmContext, businessId: string, period: { start: string; end: string }): Promise<Proof> {
+  const from = shiftDay(period.start, -45);
+  const to = shiftDay(period.end, 45);
+  const rows = await fetchAll<ProofTxn & { id: string }>((a, b) =>
+    db.from("ca_txns").select("id, side, direction, amount, txn_date, match_status").eq("ca_firm_id", ctx.firmId).eq("business_id", businessId).gte("txn_date", from).lte("txn_date", to).order("id").range(a, b),
+  );
+  const { data } = await db
+    .from("ca_recon_matches")
+    .select("bank_txn_id, book_txn_ids, match_stage, explanation")
+    .eq("ca_firm_id", ctx.firmId)
+    .eq("business_id", businessId)
+    .lte("period_start", period.end)
+    .gte("period_end", period.start);
+  const matches = ((data ?? []) as (ProofMatch & { book_txn_ids: string[] | null })[]).map((m) => ({ ...m, book_txn_ids: m.book_txn_ids ?? [] }));
+  return proveReconciliation(rows.map((r) => ({ ...r, amount: Number(r.amount) })), matches, period);
 }
 
 const shiftDay = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);

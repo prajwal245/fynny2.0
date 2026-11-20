@@ -201,11 +201,14 @@ export function readPortalReport(rows: string[][], opts: { month?: string | null
     if (opts.month && per !== opts.month) continue;
     if (cell(r[c.amd])) amended++;
     const dt = norm(r[c.type]);
-    const sign = /credit/.test(dt) ? -1 : 1;
+    // The portal reports already print a credit note's values as negative. A credit note is always negative here, whichever way the
+    // file shows it: negating a value that is already negative turned credit notes into additions.
+    const credit = /credit/.test(dt);
+    const sgn = (v: number) => (credit ? -Math.abs(v) : v);
     out.push({
       gstin: cell(r[c.gstin]).toUpperCase(), party: cell(r[c.party]), no: cell(r[c.no]), date: ymd(r[c.date], "mdy"), pos: "",
-      taxable: r2(num(r[c.tv]) * sign), igst: r2(num(r[c.igst]) * sign), cgst: r2(num(r[c.cgst]) * sign), sgst: r2(num(r[c.sgst]) * sign), cess: r2(num(r[c.cess]) * sign),
-      total: c.tot >= 0 ? r2(num(r[c.tot]) * sign) : null, rate: null, hsn: "", irn: "", reverseCharge: /^y/i.test(cell(r[c.rcm])),
+      taxable: r2(sgn(num(r[c.tv]))), igst: r2(sgn(num(r[c.igst]))), cgst: r2(sgn(num(r[c.cgst]))), sgst: r2(sgn(num(r[c.sgst]))), cess: r2(sgn(num(r[c.cess]))),
+      total: c.tot >= 0 ? r2(sgn(num(r[c.tot]))) : null, rate: null, hsn: "", irn: "", reverseCharge: /^y/i.test(cell(r[c.rcm])),
       itc: c.itc >= 0 ? (/^y/i.test(cell(r[c.itc])) ? "Y" : /^n/i.test(cell(r[c.itc])) ? "N" : null) : null,
       docType: /credit/.test(dt) ? "credit_note" : /debit/.test(dt) ? "debit_note" : "invoice", filedIn: per, row: ++seq, lines: 1, repeats: 0,
     });

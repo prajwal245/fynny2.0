@@ -3,12 +3,14 @@ import { toast } from "sonner";
 import { CheckCircle2, Upload, X, AlertTriangle, FileQuestion } from "lucide-react";
 import { Badge, Card, V } from "../ui";
 import { useV2 } from "../store";
-import { getTallyGstBooks } from "@/lib/practice/practice.functions";
+import { getGstLedgerVouchers, getTallyGstBooks } from "@/lib/practice/practice.functions";
+import type { Voucher } from "@/lib/practice/review/dayBook";
+import { rcmLoop, setOffCheck } from "@/lib/practice/review/setoff";
 import { readGstr2bJson, type ReadInvoices } from "@/lib/practice/gst/invoices";
 import { fiscalMonths, yearView } from "@/lib/practice/gst/year";
 import { firstRow, workbookBytes } from "@/lib/practice/review/workpaper";
 import { Download } from "lucide-react";
-import { detectWorkbook, monthsIn, readGstr3bAnnual, readJournalsGst, readPortalReport, readTallyRegister } from "@/lib/practice/gst/reports";
+import { readGstr3bPayment, detectWorkbook, monthsIn, readGstr3bAnnual, readJournalsGst, readPortalReport, readTallyRegister } from "@/lib/practice/gst/reports";
 import { checkReturns, readGstr1Json, readGstr3bJson, type Check, type Gstr1Read, type Gstr3bRead } from "@/lib/practice/gst/returns";
 
 const inr = (n: number) => `${n < 0 ? "−" : ""}₹${Math.abs(n).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
@@ -66,6 +68,17 @@ export default function GstReturnsCheck() {
   const [clientId, setClientId] = useState("");
   const [tally, setTally] = useState<{ sales: ReadInvoices; purchases: ReadInvoices; name: string } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [gstv, setGstv] = useState<Voucher[] | null>(null);
+  const [loadingV, setLoadingV] = useState(false);
+  const loadVouchers = async () => {
+    if (!clientId) return;
+    setLoadingV(true);
+    try {
+      const r = await getGstLedgerVouchers({ data: { business_id: clientId } });
+      setGstv(r.vouchers as Voucher[]);
+      if (!r.files) toast.error("No Tally Day Book (Excel) is on file for this client.");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not read the Day Book."); } finally { setLoadingV(false); }
+  };
 
   const take = async (files: FileList | File[]) => {
     setBusy(true);
@@ -127,8 +140,11 @@ export default function GstReturnsCheck() {
     const yv = fy && parts.gstr1?.rows && parts.gstr2b?.rows && parts.gstr3b?.rows
       ? yearView(fiscalMonths(fy), { gstr1: (x) => readPortalReport(parts.gstr1!.rows!, { kind: "gstr1", month: x }), gstr2b: (x) => readPortalReport(parts.gstr2b!.rows!, { kind: "gstr2b", month: x }), gstr3b: (x) => readGstr3bAnnual(parts.gstr3b!.rows!, x) })
       : null;
-    return { yv, fy, checks, notes, periods: [sales?.period, g1?.period, g2?.period, g3?.period].filter(Boolean) as string[] };
-  }, [parts, month, tally]);
+    const loops = fy && gstv && parts.gstr3b?.rows
+      ? fiscalMonths(fy).map((x) => { const pay = readGstr3bPayment(parts.gstr3b!.rows!, x); return { month: x, so: setOffCheck(gstv, pay, x), rcm: rcmLoop(gstv, pay, readGstr3bAnnual(parts.gstr3b!.rows!, x), x) }; })
+      : null;
+    return { loops, yv, fy, checks, notes, periods: [sales?.period, g1?.period, g2?.period, g3?.period].filter(Boolean) as string[] };
+  }, [parts, month, tally, gstv]);
 
   const have = Object.keys(parts) as Kind[];
   const allMonths = [...new Set(Object.values(parts).flatMap((p) => p?.months ?? []))].sort();
@@ -174,6 +190,7 @@ export default function GstReturnsCheck() {
           {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
         <button className="v2-btn v2-btn-ghost" disabled={!clientId || !month || loading} data-busy={loading || undefined} onClick={() => void loadTally()}>{loading ? "Reading…" : "Fill from Day Book"}</button>
+        <button className="v2-btn v2-btn-ghost" disabled={!clientId || loadingV} data-busy={loadingV || undefined} onClick={() => void loadVouchers()} title="Reads the GST ledger entries of the Day Book, for the set-off and reverse charge checks against GSTR-3B">{loadingV ? "Reading…" : "Check set-off and RCM"}</button>
       </Card>
 
       {new Set(model.periods).size > 1 && <p role="alert" style={{ color: V.maroon, fontSize: 13, margin: "0 0 14px" }}>These files are for different months ({[...new Set(model.periods)].join(", ")}). Use the same month for every file, or the differences will mean nothing.</p>}
@@ -213,6 +230,26 @@ export default function GstReturnsCheck() {
           </Card>
         ))}
       </div>
+      {model.loops && (
+        <Card data-testid="gst-loops" style={{ marginTop: 14 }}>
+          <strong style={{ fontSize: 15 }}>Set-off entry and reverse charge, month by month</strong>
+          <p style={{ margin: "6px 0 10px", fontSize: 12.5, color: V.muted }}>The month-end set-off journal in the books against GSTR-3B table 6.1, and the four legs of reverse charge (liability booked, cash paid, credit booked, and the return). A month without a set-off journal is shown, because the Output and Input ledgers then carry balances that look like dues.</p>
+          <div className="v2-scroll">
+            <table className="v2-table">
+              <thead><tr><th>Month</th><th>Set-off against 6.1</th><th>Reverse charge</th></tr></thead>
+              <tbody>
+                {model.loops.map((l) => (
+                  <tr key={l.month}>
+                    <td>{l.month}</td>
+                    <td><Badge tone={l.so.status === "agree" ? "good" : l.so.status === "no_return" ? "neutral" : "bad"}>{l.so.status === "agree" ? "Agrees" : l.so.status === "no_entry" ? "No entry" : l.so.status === "no_return" ? "No 6.1" : "Differs"}</Badge> <span style={{ fontSize: 12.5, color: V.body }}>{l.so.summary}</span></td>
+                    <td><Badge tone={l.rcm.status === "agree" ? "good" : l.rcm.status === "none" ? "neutral" : "bad"}>{l.rcm.status === "agree" ? "Agrees" : l.rcm.status === "none" ? "None" : "Differs"}</Badge> <span style={{ fontSize: 12.5, color: V.body }}>{l.rcm.summary}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
       {model.yv && (
         <Card data-testid="gst-year-view" style={{ marginTop: 14 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>

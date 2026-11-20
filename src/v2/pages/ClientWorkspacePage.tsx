@@ -21,6 +21,7 @@ import { parsePeriod } from "@/lib/practice/core";
 import { openExceptionsIn } from "../lib/exceptions";
 import OpeningBalanceCheck from "../components/OpeningBalanceCheck";
 import ReviewChecks from "../components/ReviewChecks";
+import PeriodLock from "../components/PeriodLock";
 import { MatchDrawer } from "../components/MatchDrawer";
 import { closeStage } from "../lib/closeStage";
 
@@ -328,7 +329,7 @@ export default function ClientWorkspacePage() {
 
       <MatchDrawer txnId={viewMatch} onClose={() => setViewMatch(null)} />
 
-      {tab === "close" && <><OpeningBalanceCheck /><ReviewChecks clientId={client.id} clientName={client.name} /><CloseChecklist clientId={client.id} onTab={setTab} /></>}
+      {tab === "close" && <><PeriodLock clientId={client.id} period={range ? range.start.slice(0, 7) : ""} /><OpeningBalanceCheck /><ReviewChecks clientId={client.id} clientName={client.name} /><CloseChecklist clientId={client.id} onTab={setTab} /></>}
 
       {tab === "mis" && <ReportsPage clientId={client.id} />}
 

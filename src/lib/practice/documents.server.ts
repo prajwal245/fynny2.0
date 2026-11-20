@@ -1143,6 +1143,8 @@ export async function documentUrl(
       "storage",
       error?.message ?? "Could not create link",
     );
+  // Opening or downloading a client file is recorded: who, which file, when.
+  await (await import("./qcStore.server")).logAccess(db, ctx, "download", `document: ${doc.original_filename ?? extractionId}`, null, { document_id: extractionId });
   return { url: data.signedUrl, filename: doc.original_filename ?? "document" };
 }
 

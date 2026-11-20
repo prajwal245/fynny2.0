@@ -255,6 +255,76 @@ export const runPracticeReviewChecks = createServerFn({ method: "POST" })
     }),
   );
 
+/** The vouchers that touch the GST ledgers, for checking the set-off entry and reverse charge against the returns. Read-only. */
+export const getGstLedgerVouchers = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ business_id: uuid }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      const { assertClient } = await import("./db.server");
+      await assertClient(db, ctx, data.business_id);
+      return (await import("./reviewChecks.server")).gstLedgerVouchers(db, ctx, data.business_id);
+    }),
+  );
+
+/** The ledger map for a client: suggestions, with a partner's confirmed choice replacing a suggestion. */
+export const getPracticeLedgerMap = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ business_id: uuid }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      const { assertClient } = await import("./db.server");
+      await assertClient(db, ctx, data.business_id);
+      const q = await import("./qcStore.server");
+      await q.logAccess(db, ctx, "read", "ledger map", data.business_id);
+      return q.getLedgerMap(db, ctx, data.business_id);
+    }),
+  );
+
+export const confirmPracticeLedgerMap = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ business_id: uuid, items: z.array(z.object({ ledger: z.string().min(1).max(300), family: z.string().min(1).max(40), gst_head: z.string().max(10).nullable().optional(), rate: z.number().nullable().optional(), rcm_category: z.string().max(60).nullable().optional(), tds_section: z.string().max(20).nullable().optional(), itc_eligibility: z.string().max(40).nullable().optional() })).min(1).max(2000) }).parse(d))
+  .handler(async ({ data, context }) =>
+    withWork(context.userId, async (db, ctx) => {
+      const { assertClient } = await import("./db.server");
+      await assertClient(db, ctx, data.business_id);
+      return (await import("./qcStore.server")).confirmLedgers(db, ctx, data.business_id, data.items);
+    }),
+  );
+
+/** Records an export or download made in the browser (a working paper), so the audit log covers more than creates. */
+export const logPracticeAccess = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ business_id: uuid.nullable().optional(), action: z.enum(["read", "download", "export"]), subject: z.string().min(1).max(300) }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      await (await import("./qcStore.server")).logAccess(db, ctx, data.action, data.subject, data.business_id ?? null);
+      return { ok: true };
+    }),
+  );
+
+export const lockPracticePeriod = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ business_id: uuid, period: z.string().regex(/^\d{4}-\d{2}$/) }).parse(d))
+  .handler(async ({ data, context }) =>
+    withWork(context.userId, async (db, ctx) => {
+      const { assertClient } = await import("./db.server");
+      await assertClient(db, ctx, data.business_id);
+      return (await import("./qcStore.server")).lockPeriod(db, ctx, data.business_id, data.period);
+    }),
+  );
+
+export const getPracticePeriodStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ business_id: uuid, period: z.string().regex(/^\d{4}-\d{2}$/) }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      const { assertClient } = await import("./db.server");
+      await assertClient(db, ctx, data.business_id);
+      return (await import("./qcStore.server")).periodStatus(db, ctx, data.business_id, data.period);
+    }),
+  );
+
 /** Whether writing to Tally is allowed on this deployment. It is off for the QC offering; the screens that write are hidden when it is. */
 export const getPostingMode = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

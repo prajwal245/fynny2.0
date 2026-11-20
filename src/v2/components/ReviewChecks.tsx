@@ -1,8 +1,9 @@
 import { useState } from "react";
+import type { Family } from "@/lib/practice/review/ledgerMap";
 import { toast } from "sonner";
 import { Download } from "lucide-react";
 import { Badge, Card, Segmented, V } from "../ui";
-import { runPracticeReviewChecks } from "@/lib/practice/practice.functions";
+import { confirmPracticeLedgerMap, getPracticeLedgerMap, logPracticeAccess, runPracticeReviewChecks } from "@/lib/practice/practice.functions";
 import type { ReviewChecks as Result } from "@/lib/practice/reviewChecks.server";
 import { workbookBytes, type SheetSpec } from "@/lib/practice/review/workpaper";
 import { adjustmentSheet, ADJ_FLAG_LABEL, cashSheet, ledgerMapSheet } from "@/lib/practice/review/workpapers";
@@ -18,6 +19,7 @@ const save = (name: string, bytes: Uint8Array) => {
 };
 
 type Tab = "cash" | "adj" | "map";
+const FAMILIES: Family[] = ["sales", "purchase", "expense", "input_tax", "input_tax_carry_forward", "output_tax", "rcm_liability", "rcm_input", "gst_payment", "gst_late_fee_interest", "cess", "tds_payable", "tds_receivable", "cash", "bank", "loan", "owner", "round_off", "party_or_other"];
 
 /** Review checks on the client's prepared books. Read-only: nothing is posted or changed, and each table downloads as an Excel working paper. */
 export default function ReviewChecks({ clientId, clientName }: { clientId: string; clientName: string }) {
@@ -25,6 +27,20 @@ export default function ReviewChecks({ clientId, clientName }: { clientId: strin
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<Tab>("cash");
   const [opening, setOpening] = useState("");
+  // The ledger map as stored: suggestions with a partner's confirmed choice, and the edits made on this screen.
+  const [lm, setLm] = useState<Awaited<ReturnType<typeof getPracticeLedgerMap>> | null>(null);
+  const [edits, setEdits] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const loadMap = async () => {
+    try { setLm(await getPracticeLedgerMap({ data: { business_id: clientId } })); setEdits({}); } catch (e) { toast.error(e instanceof Error ? e.message : "Could not load the ledger map."); }
+  };
+  const confirmMap = async () => {
+    if (!lm) return;
+    const items = lm.rows.filter((x) => x.family !== "party_or_other" || edits[x.ledger]).map((x) => { const fam = edits[x.ledger] ?? x.confirmed?.family ?? x.family; return { ledger: x.ledger, family: fam, gst_head: x.gstHead, rate: x.rate }; });
+    if (!items.length) { toast.message("Nothing to confirm yet."); return; }
+    setSaving(true);
+    try { const r = await confirmPracticeLedgerMap({ data: { business_id: clientId, items } }); toast.success(`${r.saved} ledgers confirmed.`); await loadMap(); } catch (e) { toast.error(e instanceof Error ? e.message : "Could not save."); } finally { setSaving(false); }
+  };
 
   const run = async () => {
     setBusy(true);
@@ -41,6 +57,8 @@ export default function ReviewChecks({ clientId, clientName }: { clientId: strin
     if (!r) return;
     const sheet: SheetSpec = tab === "cash" ? cashSheet(r.cash, header("Day-wise cash balance")) : tab === "adj" ? adjustmentSheet(r.adjustments, header("Entries that look like adjustments")) : ledgerMapSheet(r.ledgerMap, header("Suggested ledger map (to be confirmed once per client)"));
     save(`${clientName.replace(/[^\w]+/g, "_")}_${sheet.name.replace(/\s+/g, "_")}.xlsx`, workbookBytes([sheet]));
+    // The audit log covers exports, not only creates.
+    void logPracticeAccess({ data: { business_id: clientId, action: "export", subject: `working paper: ${sheet.name}` } }).catch(() => undefined);
   };
 
   const fam = r ? r.ledgerMap.reduce<Record<string, number>>((m, x) => ((m[x.family] = (m[x.family] ?? 0) + 1), m), {}) : {};
@@ -96,12 +114,25 @@ export default function ReviewChecks({ clientId, clientName }: { clientId: strin
 
               {tab === "map" && (
                 <div>
-                  <p style={{ fontSize: 13, color: V.body, margin: "0 0 8px" }}>{r.ledgerMap.length} ledgers read from the vouchers. {Object.entries(fam).filter(([k]) => k !== "party_or_other").map(([k, n]) => `${n} ${k.replace(/_/g, " ")}`).join(", ")}; {fam["party_or_other"] ?? 0} parties or others. This is a suggestion; nothing reads a ledger through it until a person confirms it.</p>
-                  {r.duplicates.length > 0 && <p style={{ fontSize: 13, margin: "0 0 8px" }}><b>Possible duplicate ledgers:</b> {r.duplicates.slice(0, 6).map(([a, b]) => `${a} / ${b}`).join("; ")}{r.duplicates.length > 6 ? ` and ${r.duplicates.length - 6} more` : ""}. Their groups can differ and change gross profit.</p>}
-                  <div className="v2-scroll" style={{ maxHeight: 320 }}>
-                    <table className="v2-table"><thead><tr><th>Ledger</th><th>Suggested family</th><th>GST head</th><th>Rate</th><th>Year in name</th></tr></thead>
-                      <tbody>{r.ledgerMap.filter((m) => m.family !== "party_or_other").slice(0, 200).map((m) => <tr key={m.ledger}><td>{m.ledger}</td><td>{m.family.replace(/_/g, " ")}</td><td>{m.gstHead ?? ""}</td><td>{m.rate ?? ""}</td><td>{m.year ?? ""}</td></tr>)}</tbody></table>
-                  </div>
+                  {!lm && <button className="v2-btn v2-btn-ghost" onClick={() => void loadMap()}>Load the confirmed map</button>}
+                  {lm && lm.sqlMissing && <p role="alert" style={{ color: V.maroon, fontSize: 13 }}>The QC tables are not created yet. Run supabase/migrations/20261120100000_ledger_map_party_audit_lock.sql once, then reload.</p>}
+                  {lm && (
+                    <>
+                      <p style={{ fontSize: 13, color: V.body, margin: "0 0 8px" }}>{lm.rows.length} ledgers; <b>{lm.confirmedCount}</b> confirmed. A partner or manager confirms the map once per client; every check then reads ledgers through it. Change a family where the suggestion is wrong, then confirm.</p>
+                      {r.duplicates.length > 0 && <p style={{ fontSize: 13, margin: "0 0 8px" }}><b>Possible duplicate ledgers:</b> {r.duplicates.slice(0, 6).map(([a, b]) => `${a} / ${b}`).join("; ")}{r.duplicates.length > 6 ? ` and ${r.duplicates.length - 6} more` : ""}. Their groups can differ and change gross profit.</p>}
+                      <button className="v2-btn v2-btn-primary" disabled={saving} data-busy={saving || undefined} onClick={() => void confirmMap()} style={{ marginBottom: 10 }}>{saving ? "Saving…" : "Confirm these ledgers"}</button>
+                      <div className="v2-scroll" style={{ maxHeight: 340 }}>
+                        <table className="v2-table"><thead><tr><th>Ledger</th><th>Family</th><th>GST head</th><th>Rate</th><th>Status</th></tr></thead>
+                          <tbody>{lm.rows.filter((m) => m.family !== "party_or_other" || m.confirmed).slice(0, 250).map((m) => (
+                            <tr key={m.ledger}>
+                              <td>{m.ledger}</td>
+                              <td><select className="v2-input" aria-label={`Family of ${m.ledger}`} style={{ minWidth: 190 }} value={edits[m.ledger] ?? m.confirmed?.family ?? m.family} onChange={(e) => setEdits((x) => ({ ...x, [m.ledger]: e.target.value }))}>{FAMILIES.map((f) => <option key={f} value={f}>{f.replace(/_/g, " ")}</option>)}</select></td>
+                              <td>{m.gstHead ?? ""}</td><td>{m.rate ?? ""}</td>
+                              <td>{m.confirmed ? <Badge tone="good">Confirmed</Badge> : <Badge tone="neutral">Suggested</Badge>}</td>
+                            </tr>))}</tbody></table>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </>

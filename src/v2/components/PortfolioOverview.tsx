@@ -13,6 +13,7 @@ import { Link } from "@tanstack/react-router";
 import {
   AlertTriangle,
   ArrowRight,
+  Clock,
   LayoutGrid,
   List,
   ListChecks,
@@ -22,6 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { CloseProgress } from "./CloseProgress";
+import { nextDeadline } from "../lib/needsView";
 import type { CloseState } from "../store";
 import {
   FUNNEL,
@@ -346,11 +348,14 @@ function ClientRow({ r, close }: { r: PortfolioRow; close?: CloseState }) {
 }
 
 export function PortfolioOverview({
+  after,
   rows,
   closes,
   period,
   totals,
 }: {
+  /** Rendered right under the hero, before the client list. */
+  after?: React.ReactNode;
   rows: PortfolioRow[];
   /** The full close state per client, for the progress bars. */
   closes: Record<string, CloseState>;
@@ -386,6 +391,7 @@ export function PortfolioOverview({
     [rows, tab, query, stage, sort],
   );
   const closedCount = counts.Closed;
+  const deadline = useMemo(() => nextDeadline(period), [period]);
   const filtered = Boolean(stage) || Boolean(query.trim()) || tab !== "all";
   const reset = () => {
     setStage(null);
@@ -463,6 +469,11 @@ export function PortfolioOverview({
             >
               {closedLine(rows, period)}
             </p>
+            {deadline && (
+              <p data-testid="next-deadline" style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, color: deadline.days <= 3 ? "var(--v2-maroon)" : "var(--v2-body)" }}>
+                <Clock size={14} strokeWidth={1.7} aria-hidden="true" /> Next: {deadline.label} for {period.split(" ")[0]}, {new Date(`${deadline.due}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} · {deadline.days === 0 ? "due today" : `${deadline.days} day${deadline.days === 1 ? "" : "s"} left`}
+              </p>
+            )}
           </div>
           <div
             className="pw-ring"
@@ -583,6 +594,8 @@ export function PortfolioOverview({
           ))}
         </div>
       </div>
+
+      {after}
 
       <div role="tablist" aria-label="Show clients" className="pw-tabs">
         {TABS.map((t) => (

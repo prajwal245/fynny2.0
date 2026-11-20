@@ -11,7 +11,6 @@ import { PortfolioOverview } from "../components/PortfolioOverview";
 import { rowOf } from "../lib/portfolioView";
 import {
   AgentActivity,
-  AgentStrip,
   NeedsYou,
   SetupChecklist,
   TODAY_STYLES,
@@ -26,16 +25,16 @@ import { ValueCard } from "../components/ValueCard";
 const PANEL_KEY = "fynhelp.v2.homepanel";
 
 /** The side panel (setup and agent activity): open by default on a wide screen, closed on a narrow one, and the choice is remembered. */
-function usePanel(): [boolean, () => void] {
-  const [open, setOpen] = useState(true);
+function usePanel(setUp: boolean): [boolean, () => void] {
+  const [open, setOpen] = useState(!setUp);
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(PANEL_KEY);
-      setOpen(saved === null ? window.innerWidth > 1100 : saved === "1");
+      setOpen(saved === null ? !setUp && window.innerWidth > 1100 : saved === "1");
     } catch {
       /* private mode: keep the default */
     }
-  }, []);
+  }, [setUp]);
   const toggle = () =>
     setOpen((o) => {
       try {
@@ -60,39 +59,18 @@ export default function PortfolioPage() {
     closeStateFor,
     session,
     agentRuns,
+    partnerView,
+    setChaseStatus,
   } = useV2();
   const needs = useNeedsYou();
   const guide = useFirstCloseSteps();
   const [adding, setAdding] = useState(false);
-  const [panel, togglePanel] = usePanel();
+  const [panel, togglePanel] = usePanel(guide.done >= guide.steps.length);
 
   // Same month as the sidebar badge and the queue.
   const openEx = openExceptionsIn(exceptions, monthOf, period);
   const openRev = review.filter((r) => r.status === "open");
   const openChase = chases.filter((c) => c.status !== "Resolved");
-  const live = Object.fromEntries(
-    (["extract", "recon", "narrate", "chaser"] as const).map((a) => {
-      const on = runs.filter((r) => r.agent === a && r.status === "running");
-      return [a, { count: on.length, what: on[0]?.stage }];
-    }),
-  ) as Record<
-    "extract" | "recon" | "narrate" | "chaser",
-    { count: number; what?: string }
-  >;
-  const lastRun: Partial<
-    Record<"extract" | "recon" | "narrate" | "chaser", string>
-  > = {};
-  for (const r of agentRuns)
-    if (
-      r.status === "succeeded" &&
-      (r.agent === "extract" ||
-        r.agent === "recon" ||
-        r.agent === "narrate" ||
-        r.agent === "chaser") &&
-      !lastRun[r.agent]
-    )
-      lastRun[r.agent] = r.at;
-
   const closes = Object.fromEntries(
     clients.map((c) => [c.id, closeStateFor(c.id)]),
   );
@@ -149,8 +127,6 @@ export default function PortfolioPage() {
         }
       />
 
-      <AgentStrip live={live} last={lastRun} />
-
       {clients.length > 0 && <ValueCard period={period} />}
 
       {clients.length === 0 ? (
@@ -176,8 +152,8 @@ export default function PortfolioPage() {
             style={{ marginBottom: 26 }}
           >
             <div className="today-main">
-              <NeedsYou items={needs} />
               <PortfolioOverview
+                after={<NeedsYou items={needs} role={partnerView ? "Partner" : "Junior"} onResolveChase={(id) => setChaseStatus(id, "Resolved")} />}
                 rows={rows}
                 closes={closes}
                 period={period}

@@ -19,7 +19,6 @@ import { Route as GuideRouteImport } from './routes/guide'
 import { Route as LaunchRouteImport } from './routes/launch'
 import { Route as SamplesRouteImport } from './routes/samples'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
-import { Route as BlogRssDotxmlRouteImport } from './routes/blog.rss[.]xml'
 import { Route as MainIndexRouteImport } from './routes/_main/index'
 import { Route as MainAboutRouteImport } from './routes/_main/about'
 import { Route as MainCaFirmsRouteImport } from './routes/_main/ca-firms'
@@ -51,6 +50,7 @@ import { Route as AppOnboardingRouteImport } from './routes/app/onboarding'
 import { Route as AppResetPasswordRouteImport } from './routes/app/reset-password'
 import { Route as AppReviewRouteImport } from './routes/app/review'
 import { Route as AppSettingsRouteImport } from './routes/app/settings'
+import { Route as BlogRssDotxmlRouteImport } from './routes/blog.rss[.]xml'
 import { Route as DemoIndexRouteImport } from './routes/demo.index'
 import { Route as DemoSplatRouteImport } from './routes/demo.$'
 import { Route as UTokenRouteImport } from './routes/u.$token'
@@ -107,6 +107,7 @@ import { Route as MainDashboardSimulatorRouteImport } from './routes/_main/dashb
 import { Route as MainDashboardTdsTaxRouteImport } from './routes/_main/dashboard/tds-tax'
 import { Route as MainDashboardVendorsRouteImport } from './routes/_main/dashboard/vendors'
 import { Route as MainDashboardWorkingCapitalRouteImport } from './routes/_main/dashboard/working-capital'
+import { Route as MainForAccountingFirmsRouteImport } from './routes/_main/for.accounting-firms'
 import { Route as ApiPublicCaAutoEscalateChasersRouteImport } from './routes/api/public/ca-auto-escalate-chasers'
 import { Route as ApiPublicCaAutoFollowupRouteImport } from './routes/api/public/ca-auto-followup'
 import { Route as ApiPublicCaBrainChaserLearningRouteImport } from './routes/api/public/ca-brain-chaser-learning'
@@ -281,11 +282,6 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
-const BlogRssDotxmlRoute = BlogRssDotxmlRouteImport.update({
-  id: '/blog/rss.xml',
-  path: '/blog/rss.xml',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const MainIndexRoute = MainIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -440,6 +436,11 @@ const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
   getParentRoute: () => AppRoute,
+} as any)
+const BlogRssDotxmlRoute = BlogRssDotxmlRouteImport.update({
+  id: '/blog/rss.xml',
+  path: '/blog/rss.xml',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const DemoIndexRoute = DemoIndexRouteImport.update({
   id: '/demo/',
@@ -732,6 +733,11 @@ const MainDashboardWorkingCapitalRoute =
     path: '/working-capital',
     getParentRoute: () => MainDashboardRoute,
   } as any)
+const MainForAccountingFirmsRoute = MainForAccountingFirmsRouteImport.update({
+  id: '/for/accounting-firms',
+  path: '/for/accounting-firms',
+  getParentRoute: () => MainRoute,
+} as any)
 const ApiPublicCaAutoEscalateChasersRoute =
   ApiPublicCaAutoEscalateChasersRouteImport.update({
     id: '/api/public/ca-auto-escalate-chasers',
@@ -1474,7 +1480,6 @@ export interface FileRoutesByFullPath {
   '/launch': typeof LaunchRoute
   '/samples': typeof SamplesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/blog/rss.xml': typeof BlogRssDotxmlRoute
   '/about': typeof MainAboutRoute
   '/ca-firms': typeof MainCaFirmsRoute
   '/community': typeof MainCommunityRoute
@@ -1504,6 +1509,7 @@ export interface FileRoutesByFullPath {
   '/app/reset-password': typeof AppResetPasswordRoute
   '/app/review': typeof AppReviewRoute
   '/app/settings': typeof AppSettingsRoute
+  '/blog/rss.xml': typeof BlogRssDotxmlRoute
   '/demo/$': typeof DemoSplatRoute
   '/u/$token': typeof UTokenRoute
   '/app/': typeof AppIndexRoute
@@ -1557,6 +1563,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/tds-tax': typeof MainDashboardTdsTaxRoute
   '/dashboard/vendors': typeof MainDashboardVendorsRoute
   '/dashboard/working-capital': typeof MainDashboardWorkingCapitalRoute
+  '/for/accounting-firms': typeof MainForAccountingFirmsRoute
   '/api/public/ca-auto-escalate-chasers': typeof ApiPublicCaAutoEscalateChasersRoute
   '/api/public/ca-auto-followup': typeof ApiPublicCaAutoFollowupRoute
   '/api/public/ca-brain-chaser-learning': typeof ApiPublicCaBrainChaserLearningRoute
@@ -1696,7 +1703,6 @@ export interface FileRoutesByTo {
   '/launch': typeof LaunchRoute
   '/samples': typeof SamplesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/blog/rss.xml': typeof BlogRssDotxmlRoute
   '/about': typeof MainAboutRoute
   '/ca-firms': typeof MainCaFirmsRoute
   '/community': typeof MainCommunityRoute
@@ -1725,6 +1731,7 @@ export interface FileRoutesByTo {
   '/app/reset-password': typeof AppResetPasswordRoute
   '/app/review': typeof AppReviewRoute
   '/app/settings': typeof AppSettingsRoute
+  '/blog/rss.xml': typeof BlogRssDotxmlRoute
   '/demo/$': typeof DemoSplatRoute
   '/u/$token': typeof UTokenRoute
   '/app': typeof AppIndexRoute
@@ -1775,6 +1782,7 @@ export interface FileRoutesByTo {
   '/dashboard/tds-tax': typeof MainDashboardTdsTaxRoute
   '/dashboard/vendors': typeof MainDashboardVendorsRoute
   '/dashboard/working-capital': typeof MainDashboardWorkingCapitalRoute
+  '/for/accounting-firms': typeof MainForAccountingFirmsRoute
   '/api/public/ca-auto-escalate-chasers': typeof ApiPublicCaAutoEscalateChasersRoute
   '/api/public/ca-auto-followup': typeof ApiPublicCaAutoFollowupRoute
   '/api/public/ca-brain-chaser-learning': typeof ApiPublicCaBrainChaserLearningRoute
@@ -1920,7 +1928,6 @@ export interface FileRoutesById {
   '/launch': typeof LaunchRoute
   '/samples': typeof SamplesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/blog/rss.xml': typeof BlogRssDotxmlRoute
   '/_main/about': typeof MainAboutRoute
   '/_main/ca-firms': typeof MainCaFirmsRoute
   '/_main/community': typeof MainCommunityRoute
@@ -1950,6 +1957,7 @@ export interface FileRoutesById {
   '/app/reset-password': typeof AppResetPasswordRoute
   '/app/review': typeof AppReviewRoute
   '/app/settings': typeof AppSettingsRoute
+  '/blog/rss.xml': typeof BlogRssDotxmlRoute
   '/demo/$': typeof DemoSplatRoute
   '/u/$token': typeof UTokenRoute
   '/_main/': typeof MainIndexRoute
@@ -2004,6 +2012,7 @@ export interface FileRoutesById {
   '/_main/dashboard/tds-tax': typeof MainDashboardTdsTaxRoute
   '/_main/dashboard/vendors': typeof MainDashboardVendorsRoute
   '/_main/dashboard/working-capital': typeof MainDashboardWorkingCapitalRoute
+  '/_main/for/accounting-firms': typeof MainForAccountingFirmsRoute
   '/api/public/ca-auto-escalate-chasers': typeof ApiPublicCaAutoEscalateChasersRoute
   '/api/public/ca-auto-followup': typeof ApiPublicCaAutoFollowupRoute
   '/api/public/ca-brain-chaser-learning': typeof ApiPublicCaBrainChaserLearningRoute
@@ -2146,7 +2155,6 @@ export interface FileRouteTypes {
     | '/launch'
     | '/samples'
     | '/sitemap.xml'
-    | '/blog/rss.xml'
     | '/about'
     | '/ca-firms'
     | '/community'
@@ -2176,6 +2184,7 @@ export interface FileRouteTypes {
     | '/app/reset-password'
     | '/app/review'
     | '/app/settings'
+    | '/blog/rss.xml'
     | '/demo/$'
     | '/u/$token'
     | '/app/'
@@ -2229,6 +2238,7 @@ export interface FileRouteTypes {
     | '/dashboard/tds-tax'
     | '/dashboard/vendors'
     | '/dashboard/working-capital'
+    | '/for/accounting-firms'
     | '/api/public/ca-auto-escalate-chasers'
     | '/api/public/ca-auto-followup'
     | '/api/public/ca-brain-chaser-learning'
@@ -2368,7 +2378,6 @@ export interface FileRouteTypes {
     | '/launch'
     | '/samples'
     | '/sitemap.xml'
-    | '/blog/rss.xml'
     | '/about'
     | '/ca-firms'
     | '/community'
@@ -2397,6 +2406,7 @@ export interface FileRouteTypes {
     | '/app/reset-password'
     | '/app/review'
     | '/app/settings'
+    | '/blog/rss.xml'
     | '/demo/$'
     | '/u/$token'
     | '/app'
@@ -2447,6 +2457,7 @@ export interface FileRouteTypes {
     | '/dashboard/tds-tax'
     | '/dashboard/vendors'
     | '/dashboard/working-capital'
+    | '/for/accounting-firms'
     | '/api/public/ca-auto-escalate-chasers'
     | '/api/public/ca-auto-followup'
     | '/api/public/ca-brain-chaser-learning'
@@ -2591,7 +2602,6 @@ export interface FileRouteTypes {
     | '/launch'
     | '/samples'
     | '/sitemap.xml'
-    | '/blog/rss.xml'
     | '/_main/about'
     | '/_main/ca-firms'
     | '/_main/community'
@@ -2621,6 +2631,7 @@ export interface FileRouteTypes {
     | '/app/reset-password'
     | '/app/review'
     | '/app/settings'
+    | '/blog/rss.xml'
     | '/demo/$'
     | '/u/$token'
     | '/_main/'
@@ -2675,6 +2686,7 @@ export interface FileRouteTypes {
     | '/_main/dashboard/tds-tax'
     | '/_main/dashboard/vendors'
     | '/_main/dashboard/working-capital'
+    | '/_main/for/accounting-firms'
     | '/api/public/ca-auto-escalate-chasers'
     | '/api/public/ca-auto-followup'
     | '/api/public/ca-brain-chaser-learning'
@@ -2925,13 +2937,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/blog/rss.xml': {
-      id: '/blog/rss.xml'
-      path: '/blog/rss.xml'
-      fullPath: '/blog/rss.xml'
-      preLoaderRoute: typeof BlogRssDotxmlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/_main/': {
       id: '/_main/'
       path: '/'
@@ -3148,6 +3153,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/app/settings'
       preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/blog/rss.xml': {
+      id: '/blog/rss.xml'
+      path: '/blog/rss.xml'
+      fullPath: '/blog/rss.xml'
+      preLoaderRoute: typeof BlogRssDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/demo/': {
       id: '/demo/'
@@ -3540,6 +3552,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/dashboard/working-capital'
       preLoaderRoute: typeof MainDashboardWorkingCapitalRouteImport
       parentRoute: typeof MainDashboardRoute
+    }
+    '/_main/for/accounting-firms': {
+      id: '/_main/for/accounting-firms'
+      path: '/for/accounting-firms'
+      fullPath: '/for/accounting-firms'
+      preLoaderRoute: typeof MainForAccountingFirmsRouteImport
+      parentRoute: typeof MainRoute
     }
     '/api/public/ca-auto-escalate-chasers': {
       id: '/api/public/ca-auto-escalate-chasers'
@@ -4864,6 +4883,7 @@ interface MainRouteChildren {
   MainIndexRoute: typeof MainIndexRoute
   MainAgentsSlugRoute: typeof MainAgentsSlugRoute
   MainBlogSlugRoute: typeof MainBlogSlugRoute
+  MainForAccountingFirmsRoute: typeof MainForAccountingFirmsRoute
   MainBlogIndexRoute: typeof MainBlogIndexRoute
 }
 
@@ -4891,6 +4911,7 @@ const MainRouteChildren: MainRouteChildren = {
   MainIndexRoute: MainIndexRoute,
   MainAgentsSlugRoute: MainAgentsSlugRoute,
   MainBlogSlugRoute: MainBlogSlugRoute,
+  MainForAccountingFirmsRoute: MainForAccountingFirmsRoute,
   MainBlogIndexRoute: MainBlogIndexRoute,
 }
 
@@ -4979,7 +5000,6 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
 
 import type { getRouter } from './router.tsx'
 import type { startInstance } from './start.ts'

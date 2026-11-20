@@ -67,6 +67,7 @@ export function SiteFooter() {
               </Link>
             ))}
             <Link to="/pricing">Pricing</Link>
+            <Link to="/for/accounting-firms">For accounting firms</Link>
             <Link to="/enterprise">For finance teams</Link>
           </nav>
           <nav aria-label="Company">

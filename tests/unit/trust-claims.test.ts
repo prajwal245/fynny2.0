@@ -11,6 +11,8 @@ const PUBLIC_FILES = [
   "src/pages/AboutPage.tsx",
   "src/pages/ContactPage.tsx",
   "src/pages/CAFirmsPage.tsx",
+  "src/pages/AccountingFirmsPage.tsx",
+  "src/content/accountingFirmsFaqs.ts",
   "src/pages/EnterprisePage.tsx",
   "src/pages/PipelinePage.tsx",
   "src/pages/PressPage.tsx",

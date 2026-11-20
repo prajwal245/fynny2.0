@@ -16,6 +16,10 @@ export interface StaticPost {
   /** ISO date of the latest real change, for the sitemap and article markup. Defaults to published_at. */
   updated_at?: string;
   content: string;
+  /** A picture for the top of the article and the blog list, under /public. */
+  cover_image_url?: string;
+  /** The picture social networks show; defaults to the cover. */
+  og_image?: string;
 }
 
 /** The closing call to action every article ends with: the launch page, which also applies the 30-day offer. */
@@ -30,5 +34,9 @@ export const table = (head: string[], rows: string[][]) =>
   `<div class="table-wrap"><table><thead><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
 
 export const answer = (text: string) => `<p class="answer"><strong>Short answer</strong>${text}</p>`;
+
+/** A figure with a caption, sized so the page does not jump while it loads. */
+export const figure = (src: string, alt: string, caption: string, w = 1200, h = 440) =>
+  `<figure><img src="${src}" alt="${alt}" width="${w}" height="${h}" loading="lazy" /><figcaption>${caption}</figcaption></figure>`;
 
 export const PUBLISHED = "2026-10-27T06:30:00.000Z";

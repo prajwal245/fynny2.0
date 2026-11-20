@@ -163,7 +163,7 @@ describe("credit and liability statement", () => {
   });
 });
 
-import { detectLedgerFile } from "@/lib/practice/gst/ledgers";
+import { detectLedgerFile, missingReturns } from "@/lib/practice/gst/ledgers";
 describe("which report is this file", () => {
   it("names each sheet by what it holds", () => {
     const got = detectLedgerFile([
@@ -172,5 +172,16 @@ describe("which report is this file", () => {
     expect(got).toEqual([{ kind: "challans", sheet: "Sheet1" }, { kind: "filing_status", sheet: "Sheet2" }]);
     expect(detectLedgerFile([{ name: "a", rows: itcRows }, { name: "b", rows: utilRows }]).map((x) => x.kind)).toEqual(["itc_report", "itc_util"]);
     expect(detectLedgerFile([{ name: "Day Book", rows: [["Date", "Particulars", "Vch Type", "Vch No.", "Debit Amount", "Credit Amount"]] }]).map((x) => x.kind)).toEqual(["day_book"]);
+  });
+});
+
+describe("missing returns", () => {
+  it("groups consecutive months into one line per return type", () => {
+    const filed = [{ month: "2025-04", type: "GSTR1", arn: "a", status: "Filed", date: null }, { month: "2025-04", type: "GSTR3B", arn: "b", status: "Filed", date: null }];
+    const out = missingReturns(filed, ["2025-04", "2025-05", "2025-06", "2025-07", "2026-01"]);
+    expect(out).toEqual([
+      "GSTR-1 for 2025-05 to 2025-07 are not in the filing status report.", "GSTR-1 for 2026-01 is not in the filing status report.",
+      "GSTR-3B for 2025-05 to 2025-07 are not in the filing status report.", "GSTR-3B for 2026-01 is not in the filing status report.",
+    ]);
   });
 });

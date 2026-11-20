@@ -20,6 +20,8 @@ import { AgentStatusBadge } from "../agents";
 import { BulkBar, ConfirmButton, SEL_STYLES, SelectAllHeader, SelectCell, useSelection } from "../components/Selection";
 import { ReviewItem, useV2 } from "../store";
 import { BX_STYLES } from "../components/BooksExport";
+import { ConfidenceBadge } from "../components/kit/Kit";
+import { confidenceView } from "../lib/agentTrust";
 const BX_STYLES_REVIEW = BX_STYLES + SEL_STYLES;
 
 type Draft = {
@@ -138,8 +140,7 @@ export default function ReviewPage({
     sel.clear();
   };
 
-  const tone = (c: number): Tone => (c >= 0.7 ? "warn" : "bad");
-
+  
   return (
     <>
       <style>{BX_STYLES_REVIEW}</style>
@@ -252,7 +253,7 @@ export default function ReviewPage({
                       <div className="rv-cut2">{r.reason}</div>
                     </td>
                     <td>
-                      <Badge tone={tone(r.confidence)}>{Math.round(r.confidence * 100)}%</Badge>
+                      <ConfidenceBadge score={r.confidence} reason={r.reason} />
                     </td>
                     <td style={{ textAlign: "right" }}>
                       <button type="button" className="v2-btn v2-btn-ghost" style={{ padding: "4px 10px", fontSize: 12.5 }} onClick={(e) => { e.stopPropagation(); openItem(r); }}>
@@ -276,7 +277,7 @@ export default function ReviewPage({
           <div style={{ display: "grid", gap: 18 }}>
             <AgentStatusBadge
               agent="extract"
-              label={`Extract confidence ${Math.round(open.confidence * 100)} percent`}
+              label={`Extract: ${confidenceView(open.confidence).label.toLowerCase()} (${Math.round(open.confidence * 100)}%)`}
             />
             {open.reason && (
               <div

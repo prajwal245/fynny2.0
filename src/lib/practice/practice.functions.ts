@@ -319,6 +319,50 @@ export const savePracticePartyMaster = createServerFn({ method: "POST" })
     }),
   );
 
+export const getPracticeReadiness = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ business_id: uuid, month: z.string().regex(/^\d{4}-\d{2}$/), fy: z.string().regex(/^\d{4}-\d{2}$/) }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      const { assertClient } = await import("./db.server");
+      await assertClient(db, ctx, data.business_id);
+      return (await import("./qcStore.server")).getInputStates(db, ctx, data.business_id, data.month, data.fy);
+    }),
+  );
+
+export const getPracticeBooksConnection = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ business_id: uuid, month: z.string().regex(/^\d{4}-\d{2}$/) }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      const { assertClient } = await import("./db.server");
+      await assertClient(db, ctx, data.business_id);
+      return (await import("./booksConnection.server")).booksConnection(db, ctx, data.business_id, data.month);
+    }),
+  );
+
+export const syncPracticeBooks = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ business_id: uuid, month: z.string().regex(/^\d{4}-\d{2}$/) }).parse(d))
+  .handler(async ({ data, context }) =>
+    withWork(context.userId, async (db, ctx) => {
+      const { assertClient } = await import("./db.server");
+      await assertClient(db, ctx, data.business_id);
+      return (await import("./booksConnection.server")).syncBooksNow(db, ctx, data.business_id, data.month);
+    }),
+  );
+
+export const markPracticeInput = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ business_id: uuid, key: z.string().min(1).max(60), month: z.string().regex(/^\d{4}-\d{2}$/), fy: z.string().regex(/^\d{4}-\d{2}$/), status: z.enum(["received", "not_applicable", "missing"]), note: z.string().max(300).nullable().optional() }).parse(d))
+  .handler(async ({ data, context }) =>
+    withWork(context.userId, async (db, ctx) => {
+      const { assertClient } = await import("./db.server");
+      await assertClient(db, ctx, data.business_id);
+      return (await import("./qcStore.server")).markInput(db, ctx, data.business_id, data.key, data.month, data.fy, data.status, data.note);
+    }),
+  );
+
 /** Records an export or download made in the browser (a working paper), so the audit log covers more than creates. */
 export const logPracticeAccess = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

@@ -38,8 +38,8 @@ export const V = {
 };
 
 const THEME_VARS = `
-:root { --v2-bg:#F7F6F3; --v2-card:#FFFFFF; --v2-ink:#141210; --v2-body:rgba(20,18,16,0.74); --v2-muted:rgba(20,18,16,0.58); --v2-line:rgba(20,18,16,0.09); --v2-blue:#FBE6DC; --v2-beige:#EADBC8; --v2-gray:#F4F2EE; --v2-maroon:#8E1B1F; --v2-coral:#D92B2B; --v2-green:#2F6B4F; --v2-brand:#D92B2B; --v2-brandBright:#D92B2B; --v2-brandDeep:#8E1B1F; --v2-cream:#F3EADC; --v2-warnBg:#FCEBD9; --v2-warnFg:#7A3E0C; --v2-side:#FFFFFF; --v2-head:rgba(250,247,242,.86); --v2-overlay:rgba(20,20,20,.34); --v2-pop:#FFFFFF; --v2-sticky:#FFFFFF; --v2-sticky-hover:#F7F5F1; --v2-input:#FFFFFF; --v2-seg:#FFFFFF; --v2-tab:#FFFFFF; --v2-tab-shadow:0 1px 2px rgba(20,20,20,.08), 0 6px 14px -8px rgba(20,20,20,.25); --v2-good-bg:rgba(47,107,79,.11); --v2-dash:rgba(20,20,20,.2); --v2-switch:rgba(20,20,20,.14); --v2-shine:#FFFFFF; --v2-card-shadow:0 1px 2px rgba(20,18,16,.04), 0 12px 28px -22px rgba(20,18,16,.20); --v2-glow:none; --v2-scheme:light; --v2-ag-extract-tint:#FDE8E3; --v2-ag-extract-ink:#9E241D; --v2-ag-extract-dot:#E4302A; --v2-ag-recon-tint:#F8E1DA; --v2-ag-recon-ink:#6E1712; --v2-ag-recon-dot:#B42424; --v2-ag-narrate-tint:#FCEEE4; --v2-ag-narrate-ink:#7A3420; --v2-ag-narrate-dot:#C8553D; --v2-ag-chaser-tint:#F4E4DF; --v2-ag-chaser-ink:#3A0E0A; --v2-ag-chaser-dot:#8A1E18; --v2-btn-a:#D92B2B; --v2-btn-b:#8E1B1F; --v2-btn-ha:#C42626; --v2-btn-hb:#701519; --v2-lq:#EADBC8; --v2-lq-ink:#8E1B1F; }
-:root[data-v2-theme="dark"] { --v2-bg:#141210; --v2-card:rgba(255,255,255,0.045); --v2-ink:#FAF7F2; --v2-body:rgba(250,247,242,0.74); --v2-muted:rgba(250,247,242,0.50); --v2-line:rgba(255,255,255,0.09); --v2-blue:rgba(217,43,43,0.16); --v2-beige:rgba(234,219,200,0.12); --v2-gray:rgba(255,255,255,0.06); --v2-maroon:#FF8A80; --v2-coral:#8E1B1F; --v2-green:#5BD39A; --v2-brand:#D92B2B; --v2-brandBright:#D92B2B; --v2-brandDeep:#EADBC8; --v2-cream:rgba(234,219,200,0.07); --v2-warnBg:rgba(234,219,200,0.12); --v2-warnFg:#EADBC8; --v2-side:rgba(20,18,16,.72); --v2-head:rgba(20,18,16,.72); --v2-overlay:rgba(0,0,0,.62); --v2-pop:#1B1816; --v2-sticky:#1C1917; --v2-sticky-hover:#26221F; --v2-input:rgba(255,255,255,.05); --v2-seg:rgba(217,43,43,.22); --v2-tab:linear-gradient(180deg, rgba(217,43,43,.28), rgba(217,43,43,.14)); --v2-tab-shadow:0 1px 0 rgba(255,255,255,.14) inset, 0 8px 18px -10px rgba(217,43,43,.7); --v2-good-bg:rgba(91,211,154,.16); --v2-dash:rgba(255,255,255,.25); --v2-switch:rgba(255,255,255,.18); --v2-shine:rgba(255,255,255,.12); --v2-card-shadow:0 1px 0 rgba(255,255,255,.05) inset, 0 18px 40px -28px rgba(0,0,0,.8); --v2-glow:radial-gradient(120% 70% at 100% 105%, rgba(217,43,43,.30) 0%, rgba(120,12,30,.16) 38%, transparent 70%), radial-gradient(70% 40% at 0% 0%, rgba(142,27,31,.07) 0%, transparent 70%); --v2-scheme:dark; --v2-ag-extract-tint:rgba(217,43,43,.18); --v2-ag-extract-ink:#FF9A8F; --v2-ag-extract-dot:#D92B2B; --v2-ag-recon-tint:rgba(142,27,31,.18); --v2-ag-recon-ink:#F0A27A; --v2-ag-recon-dot:#8E1B1F; --v2-ag-narrate-tint:rgba(234,219,200,.14); --v2-ag-narrate-ink:#EADBC8; --v2-ag-narrate-dot:#EADBC8; --v2-ag-chaser-tint:rgba(250,247,242,.12); --v2-ag-chaser-ink:#FAF7F2; --v2-ag-chaser-dot:#E0605A; --v2-btn-a:#E23A3A; --v2-btn-b:#A81F24; --v2-btn-ha:#EC4A4A; --v2-btn-hb:#C23030; --v2-lq:#EADBC8; --v2-lq-ink:#141210; }
+:root { --v2-bg:#F7F6F3; --v2-card:#FFFFFF; --v2-ink:#141210; --v2-body:rgba(20,18,16,0.74); --v2-muted:rgba(20,18,16,0.58); --v2-line:rgba(20,18,16,0.09); --v2-blue:#FBE6DC; --v2-beige:#EADBC8; --v2-gray:#F4F2EE; --v2-maroon:#8E1B1F; --v2-coral:#D92B2B; --v2-green:#2F6B4F; --v2-brand:#D92B2B; --v2-brandBright:#D92B2B; --v2-brandDeep:#8E1B1F; --v2-cream:#F3EADC; --v2-warnBg:#FCEBD9; --v2-warnFg:#7A3E0C; --v2-side:#FFFFFF; --v2-head:rgba(250,247,242,.86); --v2-overlay:rgba(20,20,20,.34); --v2-pop:#FFFFFF; --v2-sticky:#FFFFFF; --v2-sticky-hover:#F7F5F1; --v2-input:#FFFFFF; --v2-seg:#FFFFFF; --v2-tab:#FFFFFF; --v2-tab-shadow:0 1px 2px rgba(20,20,20,.08), 0 6px 14px -8px rgba(20,20,20,.25); --v2-good-bg:rgba(47,107,79,.11); --v2-dash:rgba(20,20,20,.2); --v2-switch:rgba(20,20,20,.14); --v2-shine:#FFFFFF; --v2-card-shadow:0 1px 2px rgba(20,18,16,.04), 0 12px 28px -22px rgba(20,18,16,.20); --v2-glow:none; --v2-scheme:light; --v2-ag-extract-tint:#FDE8E3; --v2-ag-extract-ink:#9E241D; --v2-ag-extract-dot:#E4302A; --v2-ag-recon-tint:#F8E1DA; --v2-ag-recon-ink:#6E1712; --v2-ag-recon-dot:#B42424; --v2-ag-narrate-tint:#FCEEE4; --v2-ag-narrate-ink:#7A3420; --v2-ag-narrate-dot:#C8553D; --v2-ag-chaser-tint:#F4E4DF; --v2-ag-chaser-ink:#3A0E0A; --v2-ag-chaser-dot:#8A1E18; --v2-btn-a:#D92B2B; --v2-btn-b:#8E1B1F; --v2-btn-ha:#C42626; --v2-btn-hb:#701519; --v2-lq:#EADBC8; --v2-lq-ink:#8E1B1F; --v2-tab-bg:rgba(255,255,255,.55); --v2-tab-active:#FFFFFF; }
+:root[data-v2-theme="dark"] { --v2-bg:#141210; --v2-card:rgba(255,255,255,0.045); --v2-ink:#FAF7F2; --v2-body:rgba(250,247,242,0.74); --v2-muted:rgba(250,247,242,0.50); --v2-line:rgba(255,255,255,0.09); --v2-blue:rgba(217,43,43,0.16); --v2-beige:rgba(234,219,200,0.12); --v2-gray:rgba(255,255,255,0.06); --v2-maroon:#FF8A80; --v2-coral:#8E1B1F; --v2-green:#5BD39A; --v2-brand:#D92B2B; --v2-brandBright:#D92B2B; --v2-brandDeep:#EADBC8; --v2-cream:rgba(234,219,200,0.07); --v2-warnBg:rgba(234,219,200,0.12); --v2-warnFg:#EADBC8; --v2-side:rgba(20,18,16,.72); --v2-head:rgba(20,18,16,.72); --v2-overlay:rgba(0,0,0,.62); --v2-pop:#1B1816; --v2-sticky:#1C1917; --v2-sticky-hover:#26221F; --v2-input:rgba(255,255,255,.05); --v2-seg:rgba(217,43,43,.22); --v2-tab:linear-gradient(180deg, rgba(217,43,43,.28), rgba(217,43,43,.14)); --v2-tab-shadow:0 1px 0 rgba(255,255,255,.14) inset, 0 8px 18px -10px rgba(217,43,43,.7); --v2-good-bg:rgba(91,211,154,.16); --v2-dash:rgba(255,255,255,.25); --v2-switch:rgba(255,255,255,.18); --v2-shine:rgba(255,255,255,.12); --v2-card-shadow:0 1px 0 rgba(255,255,255,.05) inset, 0 18px 40px -28px rgba(0,0,0,.8); --v2-glow:radial-gradient(120% 70% at 100% 105%, rgba(217,43,43,.30) 0%, rgba(120,12,30,.16) 38%, transparent 70%), radial-gradient(70% 40% at 0% 0%, rgba(142,27,31,.07) 0%, transparent 70%); --v2-scheme:dark; --v2-ag-extract-tint:rgba(217,43,43,.18); --v2-ag-extract-ink:#FF9A8F; --v2-ag-extract-dot:#D92B2B; --v2-ag-recon-tint:rgba(142,27,31,.18); --v2-ag-recon-ink:#F0A27A; --v2-ag-recon-dot:#8E1B1F; --v2-ag-narrate-tint:rgba(234,219,200,.14); --v2-ag-narrate-ink:#EADBC8; --v2-ag-narrate-dot:#EADBC8; --v2-ag-chaser-tint:rgba(250,247,242,.12); --v2-ag-chaser-ink:#FAF7F2; --v2-ag-chaser-dot:#E0605A; --v2-btn-a:#E23A3A; --v2-btn-b:#A81F24; --v2-btn-ha:#EC4A4A; --v2-btn-hb:#C23030; --v2-lq:#EADBC8; --v2-lq-ink:#141210; --v2-tab-bg:rgba(255,255,255,.05); --v2-tab-active:rgba(255,255,255,.12); }
 `;
 
 export type ThemeMode = "light" | "dark";
@@ -72,6 +72,7 @@ ${LIQUID_BUTTON_CSS}
 .v2 { background:${V.bg}; background-image:var(--v2-glow); background-attachment:fixed; color:${V.ink}; color-scheme:var(--v2-scheme); font-family:${V.font}; -webkit-font-smoothing:antialiased; font-size:15px; }
 .v2 *, .v2 *::before, .v2 *::after { box-sizing:border-box; }
 .v2 h1,.v2 h2,.v2 h3,.v2 h4 { font-family:${V.font}; margin:0; letter-spacing:-0.02em; font-weight:600; color:${V.ink}; }
+:where(.v2 a) { color:inherit; text-decoration:none; }
 .v2 p,.v2 span,.v2 a,.v2 li,.v2 td,.v2 th,.v2 button,.v2 input,.v2 select,.v2 textarea,.v2 label { font-family:${V.font}; }
 .v2 .num, .v2 .tabular-nums, .v2-table td, .v2-table th { font-variant-numeric:tabular-nums; }
 /* Identifiers and raw data (references, GSTIN/PAN, section codes, transaction ids). */
@@ -111,7 +112,8 @@ ${LIQUID_BUTTON_CSS}
 .v2-input, .v2 select.v2-input, .v2 textarea.v2-input { width:100%; background:var(--v2-input); border:1px solid ${V.line}; border-radius:12px; padding:10px 13px; font-size:14.5px; color:${V.ink}; outline:none; transition:border-color .18s ease; }
 .v2-label { display:block; font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; color:${V.muted}; margin-bottom:6px; font-weight:600; }
 .v2-table { width:100%; border-collapse:collapse; }
-.v2-table th { text-align:left; font-size:11.5px; letter-spacing:.09em; text-transform:uppercase; color:${V.muted}; font-weight:600; padding:12px 16px; border-bottom:1px solid ${V.line}; }
+.v2-table th { text-align:left; font-size:12px; letter-spacing:0; text-transform:none; color:${V.muted}; font-weight:600; padding:11px 16px; background:${V.gray}; border-top:1px solid ${V.line}; border-bottom:1px solid ${V.line}; white-space:nowrap; }
+.v2-table tbody tr { transition:background .15s ease; } .v2-table tbody tr:hover { background:${V.gray}; }
 .v2-table td { padding:14px 16px; font-size:14px; color:${V.ink}; border-bottom:1px solid ${V.line}; vertical-align:middle; }
 .v2-table tbody tr:last-child td { border-bottom:none; }
 .v2-table tbody tr.clickable:hover { background:${V.gray}; cursor:pointer; }
@@ -595,23 +597,27 @@ export function Modal({ open, onClose, title, children }: { open: boolean; onClo
   );
 }
 
+/** Page tabs as one capsule with a raised white thumb on the active tab, the way the reference lays them out. */
 export function Tabs({ items, value, onChange }: { items: { value: string; label: string; count?: number }[]; value: string; onChange: (v: string) => void }) {
   return (
-    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-      {items.map((i) => {
-        const active = i.value === value;
-        return (
-          <button
-            key={i.value}
-            onClick={() => onChange(i.value)}
-            className="v2-btn"
-            style={{ background: active ? V.brand : V.card, color: active ? "#fff" : V.body, borderColor: active ? V.brand : V.line, padding: "8px 15px", fontSize: 13.5 }}
-          >
-            {i.label}
-            {typeof i.count === "number" && <span style={{ opacity: 0.6 }}>{i.count}</span>}
-          </button>
-        );
-      })}
+    <div role="tablist" style={{ display: "flex", marginBottom: 18, overflowX: "auto", scrollbarWidth: "none" }}>
+      <div style={{ display: "inline-flex", gap: 2, padding: 5, borderRadius: 999, background: "var(--v2-tab-bg, rgba(255,255,255,.55))", border: `1px solid ${V.line}`, boxShadow: "0 1px 2px rgba(20,18,16,.04), 0 10px 24px -18px rgba(20,18,16,.25)", backdropFilter: "blur(10px)" }}>
+        {items.map((i) => {
+          const active = i.value === value;
+          return (
+            <button
+              key={i.value}
+              role="tab"
+              aria-selected={active}
+              onClick={() => onChange(i.value)}
+              style={{ border: 0, cursor: "pointer", font: "inherit", fontSize: 13.5, fontWeight: active ? 650 : 500, padding: "9px 18px", borderRadius: 999, whiteSpace: "nowrap", color: active ? V.ink : V.body, background: active ? "var(--v2-tab-active, #fff)" : "transparent", boxShadow: active ? "0 1px 2px rgba(20,18,16,.08), 0 8px 18px -10px rgba(20,18,16,.3)" : "none", transition: "background .2s ease, color .2s ease, box-shadow .2s ease" }}
+            >
+              {i.label}
+              {typeof i.count === "number" && <span style={{ marginLeft: 7, fontSize: 11.5, fontWeight: 700, color: active ? V.maroon : V.muted }}>{i.count}</span>}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -645,13 +651,13 @@ export function Segmented<T extends string>({ options, value, onChange, label }:
             role="tab"
             aria-selected={on}
             onClick={() => onChange(o.value)}
-            style={{ position: "relative", border: 0, background: "transparent", cursor: "pointer", font: "inherit", fontSize: 12.5, fontWeight: 600, padding: "7px 14px", borderRadius: 999, color: on ? "#fff" : V.body, transition: "color .25s ease" }}
+            style={{ position: "relative", border: 0, background: "transparent", cursor: "pointer", font: "inherit", fontSize: 12.5, fontWeight: 600, padding: "7px 14px", borderRadius: 999, color: on ? V.ink : V.body, transition: "color .25s ease" }}
           >
             {on && (
               <motion.span
                 layoutId={`seg-${id}`}
                 transition={{ type: "spring", stiffness: 480, damping: 34 }}
-                style={{ position: "absolute", inset: 0, borderRadius: 999, background: `linear-gradient(180deg, var(--v2-btn-a), var(--v2-btn-b))`, boxShadow: "0 8px 18px -10px var(--v2-brand)" }}
+                style={{ position: "absolute", inset: 0, borderRadius: 999, background: "var(--v2-tab-active, #fff)", boxShadow: "0 1px 2px rgba(20,18,16,.08), 0 8px 18px -10px rgba(20,18,16,.3)" }}
               />
             )}
             <span style={{ position: "relative", display: "inline-flex", gap: 6, alignItems: "center" }}>

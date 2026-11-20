@@ -49,11 +49,17 @@ function DeliveryHealth({ d }: { d: Delivery }) {
       label: "Email",
       detail: d.emailConnected ? "The email provider is connected." : "No email provider is connected, so no email leaves the server at all. Add RESEND_API_KEY (and PRACTICE_FROM_EMAIL) in Vercel and redeploy.",
     },
-    {
-      ok: d.lifecycleEmails30 > 0 ? true : null,
-      label: "Nudge emails",
-      detail: `${d.lifecycleEmails30} sent in the last 30 days (upload nudges, trial reminders, recaps). These are separate from the follow-up emails counted above, and every one is recorded.`,
-    },
+    (() => {
+      const lc = d.lifecycle;
+      const lcHours = lc ? (Date.now() - new Date(lc.at).getTime()) / 3_600_000 : null;
+      const ran = lc ? `The job last ran ${ist(lc.at)} IST (checked ${lc.checked ?? 0} firms, sent ${lc.sent ?? 0}, errors ${lc.errors ?? 0}).` : "The nudge job has never run: check that the hourly job is calling the site.";
+      const stale = lcHours != null && lcHours > 26;
+      return {
+        ok: !d.emailConnected || !lc || stale || (lc.errors ?? 0) > 0 ? false : d.lifecycleEmails30 > 0 ? true : null,
+        label: "Nudge emails",
+        detail: `${d.lifecycleEmails30} sent in the last 30 days (upload nudges, trial reminders, recaps; every one is recorded). ${ran}${stale ? " That is a long time ago." : ""} ${d.lifecycleEmails30 === 0 && lc && !stale ? "Zero can be right: test and demo firms and firms that switched these emails off are skipped, and each email waits for its own day of the trial." : ""}`.trim(),
+      };
+    })(),
   ];
   return (
     <div className="grid gap-2">
@@ -169,7 +175,7 @@ export default function FollowUpsPage() {
             </details>
           )}
           {d.whatsapp.ready && !d.whatsapp.marketingAllowed && (
-            <p className="text-xs mt-2" style={{ color: "#92400e" }} data-testid="wa-marketing-off">Marketing templates are switched off here (WHATSAPP_TOUCH_ALLOW_MARKETING is set to off in Vercel), so a template Meta classed as Marketing waits for a person. Remove that setting to let it send at the Marketing rate.</p>
+            <p className="text-xs mt-2" style={{ color: "#92400e" }} data-testid="wa-marketing-off">Marketing templates are switched off here (WHATSAPP_TOUCH_ALLOW_MARKETING is set to "never" in Vercel), so a template Meta classed as Marketing waits for a person. Remove that setting to let it send at the Marketing rate.</p>
           )}
           <p className="text-xs mt-3" style={{ color: muted }}>Sent only to people who agreed to WhatsApp, about their own set-up, trial, plan, documents or results, 9 am to 8 pm IST, at most once in 3 days. Each message has Call me, Not now and Stop messages buttons.</p>
         </Panel>

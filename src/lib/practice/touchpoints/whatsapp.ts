@@ -207,8 +207,12 @@ export function touchTemplateUsable(t: MetaTemplate | undefined, opts: { allowMa
   return { ok: true };
 }
 
-/** Marketing templates may be used unless WHATSAPP_TOUCH_ALLOW_MARKETING is 0 or false. They cost more per message. */
-export const marketingAllowed = (flag: string | undefined) => !/^(0|false|no|off)$/i.test((flag ?? "").trim());
+/**
+ * Marketing templates are used: the decision is to send a follow-up with whichever approved template exists, whatever Meta classed it as
+ * (Marketing costs more per message, which the estimate shows). Only the explicit value "never" switches them off, so a stray "off" or
+ * "0" left in the environment no longer stops every follow-up.
+ */
+export const marketingAllowed = (flag: string | undefined) => (flag ?? "").trim().toLowerCase() !== "never";
 
 /**
  * The template to send a follow-up with. Utility wins: the plain wording (`_v2` name, or the name in the environment

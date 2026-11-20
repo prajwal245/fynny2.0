@@ -1,14 +1,26 @@
 import { useState } from "react";
 import {
   ArrowRight,
+  BellRing,
+  BookOpen,
   Check,
-  ChevronDown,
+  CheckCircle2,
+  ClipboardList,
+  Clock,
+  FileBarChart,
+  FileSpreadsheet,
   FileText,
-  Link2,
-  Lock,
+  Inbox,
+  Mail,
   Menu,
+  MessageCircle,
+  PanelRight,
+  Plus,
+  Scale,
+  UserRound,
   X,
 } from "lucide-react";
+import { SiGmail, SiGooglesheets, SiWhatsapp, SiZoho } from "react-icons/si";
 import { Link } from "@/lib/router-compat";
 import FynLogo from "@/components/FynLogo";
 import { COMPANY } from "@/content/legal/company";
@@ -23,227 +35,325 @@ import { DemoLink } from "@/components/site/BookDemo";
 import { ACCOUNTING_FAQS } from "@/content/accountingFirmsFaqs";
 
 /**
- * /for/accounting-firms: the document-chasing story for CA and accounting firms.
+ * /for/accounting-firms: the document-chasing story for the whole firm
+ * (partners, managers, seniors and juniors).
  *
- * Self-contained on purpose: its own quiet palette (warm paper, white cards,
- * hairline borders, one terracotta accent) scoped under `.fa`, so it does not
- * disturb the rest of the site. Every product claim here is one the code backs:
- * client upload links need no login, follow-ups follow a schedule the firm sets,
- * postings to Tally/Zoho and the MIS wait for a partner. The mock-ups use sample data.
+ * Self-contained on purpose: its own quiet palette (warm paper, white cards, soft
+ * pastel washes, one terracotta accent) scoped under `.fa`, so it does not disturb
+ * the rest of the site.
+ *
+ * Every product claim is one the code backs, and the mock-ups use the product's own
+ * words: chase items are Open / Following Up / Escalated / Resolved; follow-ups run on
+ * day 0, 3 and 7 and come to a partner on day 10; email goes Mon-Sat 9:30 am-6:30 pm IST;
+ * the channel is Email, WhatsApp or both; tone is gentle, standard or firm; client upload
+ * links need no login; postings to Tally or Zoho and the MIS wait for a partner.
+ * Brand marks come from Simple Icons; where no genuine mark is available (Tally, Excel)
+ * a neutral icon is used instead of an imitation. Mock-ups use sample data.
  */
 
 /* ────────────────────────── styles ────────────────────────── */
 
 const STYLES = `
-.fa { --paper:#FAF9F6; --card:#FFFFFF; --soft:#F4F2EC; --line:#E6E4DD; --ink:#181816; --mute:#666560; --acc:#E85D2A; --acc-ink:#C8461A;
-  --amber-bg:#FBEFD5; --amber:#7A4F00; --mint-bg:#DCF0E5; --mint:#1B5E3E; --grey-bg:#ECEAE3; --grey:#55544F;
-  background:var(--paper); color:var(--ink); font-family:'Instrument Sans','Inter',system-ui,sans-serif; -webkit-font-smoothing:antialiased; overflow-x:hidden; }
+.fa { --paper:#FBFAF7; --card:#FFFFFF; --soft:#F3F1EB; --line:#E7E4DC; --ink:#161614; --mute:#6B6A64; --acc:#F06A32; --acc-ink:#C8461A;
+  --mint:#DCEFE5; --peach:#F9DFD2; --butter:#F6EDB6; --sand:#F3F1EB;
+  --green-bg:#DFF2E7; --green:#1B6B43; --amber-bg:#FDE6D8; --amber:#B2420F; --grey-bg:#ECEAE4; --grey:#5C5B56;
+  --sans:var(--font-geist-sans),'Instrument Sans','Inter',system-ui,sans-serif;
+  background:var(--paper); color:var(--ink); font-family:var(--sans); -webkit-font-smoothing:antialiased; overflow-x:clip; }
 .fa *, .fa *::before, .fa *::after { box-sizing:border-box; }
-.fa h1,.fa h2,.fa h3,.fa h4 { font-family:'Fraunces',Georgia,serif; font-weight:400; letter-spacing:-0.025em; line-height:1.06; margin:0; }
+.fa h1,.fa h2,.fa h3,.fa h4 { font-family:var(--sans); font-weight:300; letter-spacing:-0.04em; line-height:1.05; margin:0; }
 .fa p { margin:0; }
 .fa a { color:inherit; }
-.fa a:focus-visible, .fa button:focus-visible, .fa summary:focus-visible { outline:2px solid var(--acc-ink); outline-offset:3px; border-radius:8px; }
-.fa .wrap { max-width:1120px; margin:0 auto; padding:0 20px; }
-.fa .sec { padding:96px 0; }
-.fa .mono { font-variant-numeric:tabular-nums; }
-@media (max-width:760px){ .fa .sec { padding:64px 0; } }
+.fa button { font-family:inherit; }
+.fa a:focus-visible, .fa button:focus-visible, .fa summary:focus-visible { outline:2px solid var(--acc-ink); outline-offset:3px; border-radius:10px; }
+.fa .wrap { width:min(1100px, 100% - 48px); margin:0 auto; }
+.fa .sec { padding:112px 0 0; }
+@media (max-width:760px){ .fa .wrap { width:calc(100% - 32px); } .fa .sec { padding-top:72px; } }
+.fa .h2 { font-size:clamp(34px,4.6vw,52px); }
 
 /* buttons */
-.fa .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; height:46px; padding:0 22px; border-radius:999px; font-size:15px; font-weight:600; text-decoration:none; border:1px solid transparent; cursor:pointer; white-space:nowrap; transition:transform .2s, background .2s, border-color .2s; }
+.fa .btn { display:inline-flex; align-items:center; justify-content:center; gap:10px; height:50px; padding:0 8px 0 24px; border-radius:999px; font-size:16px; font-weight:500; text-decoration:none; border:1px solid transparent; cursor:pointer; white-space:nowrap; transition:transform .2s, background .2s, border-color .2s; letter-spacing:-0.01em; }
 .fa .btn:hover { transform:translateY(-1px); }
 .fa .btn-acc { background:var(--acc-ink); color:#fff; }
 .fa .btn-acc:hover { background:#B03C14; }
-.fa .btn-line { background:transparent; color:var(--ink); border-color:#CFCCC2; }
+.fa .btn-acc .ar { width:34px; height:34px; border-radius:50%; background:#fff; color:var(--acc-ink); display:grid; place-items:center; }
+.fa .btn-line { background:transparent; color:var(--ink); border-color:#CDCAC0; padding:0 24px; }
 .fa .btn-line:hover { border-color:var(--ink); }
-.fa .btn-sm { height:38px; padding:0 18px; font-size:14px; }
+.fa .btn-dline { background:transparent; color:#F4F2EC; border-color:rgba(244,242,236,.28); padding:0 22px; height:44px; font-size:15px; }
+.fa .btn-dline:hover { border-color:#F4F2EC; }
+.fa .btn-sm { height:42px; padding:0 20px; font-size:15px; }
 
 /* floating pill nav */
-.fa-navwrap { position:sticky; top:12px; z-index:50; display:flex; justify-content:center; padding:0 12px; pointer-events:none; }
-.fa-nav { pointer-events:auto; display:flex; align-items:center; gap:22px; width:min(860px,100%); height:56px; padding:0 8px 0 20px; background:rgba(250,249,246,.82); backdrop-filter:blur(14px) saturate(1.3); -webkit-backdrop-filter:blur(14px) saturate(1.3); border:1px solid var(--line); border-radius:999px; }
-.fa-nav .links { display:flex; gap:2px; flex:1; justify-content:center; }
-.fa-nav .links a { font-size:14.5px; font-weight:500; color:var(--mute); text-decoration:none; padding:8px 13px; border-radius:999px; transition:color .15s, background .15s; }
-.fa-nav .links a:hover { color:var(--ink); background:rgba(24,24,22,.05); }
-.fa-nav .burger { display:none; width:38px; height:38px; border-radius:999px; border:1px solid var(--line); background:transparent; align-items:center; justify-content:center; cursor:pointer; color:var(--ink); }
-.fa-sheet { position:fixed; inset:78px 12px auto 12px; z-index:49; background:var(--paper); border:1px solid var(--line); border-radius:20px; padding:10px 18px 18px; }
-.fa-sheet a.m { display:block; font-family:'Fraunces',Georgia,serif; font-size:22px; padding:13px 2px; text-decoration:none; border-bottom:1px solid var(--line); }
-@media (max-width:760px){ .fa-nav .links { display:none; } .fa-nav { justify-content:space-between; } .fa-nav .burger { display:inline-flex; } .fa-nav .cta-d { display:none; } }
+.fa-navwrap { position:sticky; top:14px; z-index:50; display:flex; justify-content:center; padding:0 14px; pointer-events:none; height:0; }
+.fa-nav { pointer-events:auto; display:flex; align-items:center; gap:30px; height:58px; padding:0 8px 0 22px; background:rgba(255,255,255,.84); backdrop-filter:blur(16px) saturate(1.3); -webkit-backdrop-filter:blur(16px) saturate(1.3); border:1px solid var(--line); border-radius:999px; box-shadow:0 10px 30px -18px rgba(22,22,20,.25); }
+.fa-nav .links { display:flex; gap:2px; }
+.fa-nav .links a { font-size:15px; font-weight:450; text-decoration:none; padding:8px 13px; border-radius:999px; transition:background .15s; }
+.fa-nav .links a:hover { background:rgba(22,22,20,.06); }
+.fa-nav .burger { display:none; width:40px; height:40px; border-radius:999px; border:1px solid var(--line); background:transparent; align-items:center; justify-content:center; cursor:pointer; color:var(--ink); }
+.fa-sheet { position:fixed; inset:82px 14px auto 14px; z-index:49; background:var(--card); border:1px solid var(--line); border-radius:24px; padding:8px 20px 20px; box-shadow:0 30px 60px -30px rgba(22,22,20,.35); }
+.fa-sheet a.m { display:block; font-size:22px; font-weight:300; padding:15px 2px; text-decoration:none; border-bottom:1px solid var(--line); letter-spacing:-0.03em; }
+@media (max-width:820px){ .fa-nav { gap:14px; width:100%; justify-content:space-between; } .fa-nav .links { display:none; } .fa-nav .burger { display:inline-flex; } .fa-nav .cta-d { margin-left:auto; } }
+@media (max-width:420px){ .fa-nav .cta-d { display:none; } }
 
 /* hero */
-.fa-hero { padding:72px 0 24px; text-align:center; }
-.fa-crumb { font-size:13px; color:var(--mute); display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
-.fa-crumb a { text-decoration:none; } .fa-crumb a:hover { color:var(--ink); }
-.fa-badge { display:inline-block; margin-top:18px; font-size:11px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; color:var(--acc-ink); padding:6px 12px; border:1px solid #F0CDBE; background:#FDF1EA; border-radius:999px; }
-.fa-hero h1 { font-size:clamp(40px,7vw,80px); max-width:14ch; margin:22px auto 0; font-weight:400; }
-.fa-hero h1 em { font-style:italic; font-weight:300; color:var(--acc-ink); }
-.fa-hero .sub { font-size:18px; line-height:1.55; color:var(--mute); max-width:52ch; margin:22px auto 0; }
-.fa-hero .acts { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-top:30px; }
-.fa-hero .note { margin-top:14px; font-size:13px; color:var(--mute); }
-.fa-works { display:flex; align-items:center; justify-content:center; gap:10px 22px; flex-wrap:wrap; margin-top:40px; font-size:13px; color:var(--mute); }
-.fa-works b { font-weight:600; font-size:15px; color:#8C8A83; letter-spacing:-0.01em; }
+.fa-hero { position:relative; padding:128px 0 0; }
+.fa-hero::before { content:''; position:absolute; inset:0 0 auto 0; height:760px; pointer-events:none; z-index:0;
+  background:radial-gradient(38% 42% at 88% 22%, rgba(248,200,170,.55), transparent 70%), radial-gradient(34% 40% at 76% 62%, rgba(250,214,190,.45), transparent 70%), radial-gradient(40% 46% at 18% 12%, rgba(236,232,218,.9), transparent 70%), radial-gradient(30% 36% at 55% 8%, rgba(246,237,182,.45), transparent 70%); filter:blur(14px); }
+.fa-hero .wrap { position:relative; z-index:1; }
+.fa-crumb { font-size:14px; display:flex; gap:10px; flex-wrap:wrap; }
+.fa-crumb a { text-decoration:none; } .fa-crumb a:hover { text-decoration:underline; }
+.fa-badge { display:inline-block; margin-top:22px; font-size:13px; font-weight:500; letter-spacing:.04em; text-transform:uppercase; padding:7px 14px; background:var(--butter); border-radius:10px; }
+.fa-hero h1 { font-size:clamp(42px,6.3vw,84px); max-width:15em; margin-top:26px; letter-spacing:-0.05em; line-height:1.02; }
+.fa-hero .sub { font-size:clamp(18px,1.9vw,21px); line-height:1.55; color:var(--mute); max-width:34em; margin-top:26px; }
+.fa-hero .acts { display:flex; gap:12px; flex-wrap:wrap; margin-top:32px; }
+.fa-hero .note { margin-top:14px; font-size:13.5px; color:var(--mute); }
+.fa-works { display:flex; align-items:center; gap:10px 26px; flex-wrap:wrap; margin-top:34px; font-size:15px; color:var(--mute); }
+.fa-works b { font-weight:500; color:var(--ink); display:inline-flex; align-items:center; gap:8px; }
+.fa-works b i { width:18px; height:18px; border-radius:5px; background:var(--ink); color:#fff; font-style:normal; font-size:11px; display:grid; place-items:center; font-weight:600; }
+@media (max-width:760px){ .fa-hero { padding-top:108px; } .fa-hero .acts .btn { flex:1 1 auto; } }
 
 /* workspace mock */
-.fa-ws { margin:48px auto 0; max-width:1020px; background:var(--card); border:1px solid var(--line); border-radius:20px; overflow:hidden; text-align:left; }
-.fa-ws .bar { display:flex; align-items:center; gap:10px; padding:13px 18px; border-bottom:1px solid var(--line); font-size:14px; }
-.fa-ws .bar b { font-weight:600; } .fa-ws .bar span { color:var(--mute); }
-.fa-ws .bar .dots { margin-left:auto; display:flex; gap:5px; } .fa-ws .bar .dots i { width:9px; height:9px; border-radius:50%; background:var(--line); }
-.fa-ws .body { display:grid; grid-template-columns:1.25fr 1fr; }
-.fa-ws .thread { padding:22px 22px 26px; display:flex; flex-direction:column; gap:18px; border-right:1px solid var(--line); }
-.fa-ev { display:grid; grid-template-columns:30px 1fr; gap:12px; }
-.fa-av { width:30px; height:30px; border-radius:50%; background:var(--soft); border:1px solid var(--line); display:grid; place-items:center; font-size:11px; font-weight:600; color:var(--grey); }
-.fa-av.f { background:var(--ink); color:var(--paper); border-color:var(--ink); font-family:'Fraunces',serif; font-size:13px; }
-.fa-ev .who { font-size:13.5px; font-weight:600; } .fa-ev .who span { font-weight:400; color:var(--mute); margin-left:6px; font-size:12.5px; }
-.fa-ev p { font-size:14.5px; line-height:1.55; margin-top:3px; color:#33332F; }
-.fa-mail { margin-top:11px; border:1px solid var(--line); border-radius:12px; background:var(--paper); overflow:hidden; }
-.fa-mail .hd { padding:11px 14px; border-bottom:1px solid var(--line); font-size:12.5px; color:var(--mute); line-height:1.6; display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
-.fa-mail .hd b { color:var(--ink); font-weight:600; }
-.fa-mail .tx { padding:12px 14px; font-size:13.5px; line-height:1.6; color:#33332F; }
-.fa-mail .ft { display:flex; gap:8px; padding:0 14px 13px; flex-wrap:wrap; align-items:center; }
-.fa-mail .ft .hint { margin-left:auto; font-size:12px; color:var(--mute); }
-.fa .pill { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600; padding:4px 10px; border-radius:999px; white-space:nowrap; }
-.fa .pill.green { background:var(--mint-bg); color:var(--mint); } .fa .pill.amber { background:var(--amber-bg); color:var(--amber); } .fa .pill.grey { background:var(--grey-bg); color:var(--grey); }
-.fa .pill.line { background:transparent; border:1px solid var(--line); color:var(--grey); }
-.fa .mini-btn { font:inherit; font-size:13px; font-weight:600; height:32px; padding:0 14px; border-radius:9px; border:1px solid var(--line); background:var(--card); color:var(--ink); cursor:pointer; }
-.fa .mini-btn:hover { border-color:var(--ink); }
-.fa .mini-btn.dark { background:var(--ink); border-color:var(--ink); color:var(--paper); }
-.fa-list { padding:20px 22px 24px; background:var(--card); }
-.fa-list .top { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
-.fa-list h4 { font-size:19px; }
-.fa-list .meter { display:flex; gap:3px; margin:14px 0 6px; }
-.fa-list .meter i { flex:1; height:6px; border-radius:3px; background:var(--mint-bg); } .fa-list .meter i.m { background:#F2C98A; }
-.fa-list .cnt { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
-.fa-sheetrow { display:grid; grid-template-columns:1fr auto; align-items:center; gap:10px; padding:10px 0; border-top:1px solid var(--line); font-size:13.5px; }
-.fa-sheetrow:first-of-type { border-top:0; }
-.fa-sheetrow .nm { display:flex; align-items:center; gap:9px; min-width:0; } .fa-sheetrow .nm span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.fa-sheetrow .nm svg { flex:0 0 auto; color:#8C8A83; }
+.fa-ws { margin-top:56px; background:var(--card); border:1px solid var(--line); border-radius:26px; overflow:hidden; box-shadow:0 40px 90px -50px rgba(22,22,20,.35); }
+.fa-ws .body { display:grid; grid-template-columns:1.05fr 1fr; min-height:620px; }
+.fa-pane { display:flex; flex-direction:column; min-width:0; }
+.fa-pane + .fa-pane { border-left:1px solid var(--line); }
+.fa-phead { display:flex; align-items:center; gap:12px; padding:14px 18px; border-bottom:1px solid var(--line); min-height:64px; }
+.fa-phead .ic { width:34px; height:34px; border-radius:9px; background:var(--soft); display:grid; place-items:center; color:var(--mute); flex:0 0 auto; }
+.fa-phead b { display:block; font-size:14.5px; font-weight:500; letter-spacing:-0.01em; } .fa-phead small { font-size:12px; color:var(--mute); }
+.fa-phead .right { margin-left:auto; display:flex; align-items:center; gap:10px; }
+.fa-avs { display:flex; } .fa-avs .fa-av { margin-left:-8px; border:2px solid #fff; width:28px; height:28px; } .fa-avs .fa-av:first-child { margin-left:0; }
+.fa-av { width:30px; height:30px; border-radius:50%; background:var(--soft); border:1px solid var(--line); display:grid; place-items:center; font-size:11px; font-weight:600; color:var(--grey); flex:0 0 auto; }
+.fa-av.f { background:var(--ink); color:#fff; border-color:var(--ink); }
+.fa-av.o { background:var(--peach); color:var(--amber); border-color:transparent; }
+.fa-thread { padding:22px 22px 18px; display:flex; flex-direction:column; gap:16px; flex:1; }
+.fa-msg { display:grid; grid-template-columns:30px minmax(0,1fr); gap:12px; }
+.fa-msg > div { min-width:0; }
+.fa-msg .who { font-size:13px; color:var(--mute); } .fa-msg .who b { color:var(--ink); font-weight:500; margin-right:4px; }
+.fa-msg p { font-size:15px; line-height:1.55; margin-top:2px; } .fa-msg p strong { font-weight:600; }
+.fa-work { font-size:12.5px; color:var(--mute); margin-top:6px; }
+.fa-chip { width:100%; margin-top:10px; border:1px solid var(--line); border-radius:14px; padding:12px; display:grid; grid-template-columns:38px 1fr auto; gap:12px; align-items:center; max-width:360px; }
+.fa-chip .ic { width:38px; height:38px; border-radius:10px; background:var(--soft); display:grid; place-items:center; color:var(--mute); }
+.fa-chip b { display:block; font-size:14px; font-weight:500; } .fa-chip small { font-size:12px; color:var(--mute); }
+.fa .tag { display:inline-flex; align-items:center; font-size:12px; font-weight:500; padding:3px 10px; border-radius:999px; white-space:nowrap; }
+.fa .tag.green { background:var(--green-bg); color:var(--green); } .fa .tag.amber { background:var(--amber-bg); color:var(--amber); }
+.fa .tag.grey { background:var(--grey-bg); color:var(--grey); } .fa .tag.line { border:1px solid var(--line); color:var(--grey); background:transparent; }
+.fa-action { width:100%; margin-top:10px; border:1px solid var(--line); border-radius:14px; padding:14px 16px; max-width:430px; }
+.fa-action .t { flex-wrap:wrap; display:flex; align-items:center; justify-content:space-between; gap:10px; font-weight:500; font-size:14.5px; }
+.fa-action .t span { display:inline-flex; align-items:center; gap:8px; } .fa-action .t svg { color:var(--acc-ink); }
+.fa-action b { display:block; font-size:14px; font-weight:500; margin-top:12px; }
+.fa-action p { font-size:13.5px !important; color:var(--mute); line-height:1.5; margin-top:3px !important; }
+.fa-action .bt { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+.fa .mini { font-size:13px; font-weight:500; height:32px; padding:0 14px; border-radius:9px; border:1px solid var(--line); background:var(--card); color:var(--ink); cursor:pointer; }
+.fa .mini:hover { border-color:var(--ink); } .fa .mini.dark { background:var(--ink); border-color:var(--ink); color:#fff; }
+.fa-composer { margin:0 18px 18px; background:var(--soft); border-radius:18px; padding:16px 16px 12px; }
+.fa-composer .ph { font-size:14.5px; color:#8E8D86; }
+.fa-composer .row { display:flex; justify-content:space-between; margin-top:22px; }
+.fa-composer .row i { width:28px; height:28px; border-radius:50%; background:#F6D9C9; color:var(--acc-ink); display:grid; place-items:center; font-style:normal; }
+.fa-tabs { display:flex; border-bottom:1px solid var(--line); }
+.fa-tabs span { font-size:13.5px; padding:14px 18px 13px; border-bottom:2px solid var(--acc); margin-bottom:-1px; }
+.fa-sub { display:flex; align-items:center; gap:10px; padding:12px 20px; border-bottom:1px solid var(--line); font-size:13px; color:var(--mute); }
+.fa-sheetbody { padding:22px 22px 26px; }
+.fa-sheetbody h4 { font-size:20px; letter-spacing:-0.03em; font-weight:400; }
+.fa-sheetbody .sm { font-size:13px; color:var(--mute); margin-top:3px; }
+.fa-stats { display:grid; grid-template-columns:1fr 1fr; border:1px solid var(--line); border-radius:12px; margin-top:18px; }
+.fa-stats > div { padding:14px 16px; } .fa-stats > div + div { border-left:1px solid var(--line); }
+.fa-stats small { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--mute); }
+.fa-stats b { display:block; font-size:28px; font-weight:300; letter-spacing:-0.04em; margin-top:2px; } .fa-stats b span { font-size:13px; color:var(--mute); letter-spacing:0; margin-left:6px; font-weight:400; }
+.fa-stats .miss b span { color:var(--acc-ink); }
+.fa-grp { font-size:13px; color:var(--mute); margin:22px 0 6px; }
+.fa-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:11px 0; border-top:1px solid var(--line); font-size:14px; }
+.fa-row > span:first-child { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+@media (max-width:900px){ .fa-ws .body { grid-template-columns:1fr; min-height:0; } .fa-pane + .fa-pane { border-left:0; border-top:1px solid var(--line); } .fa-thread { padding:18px 16px; } .fa-sheetbody { padding:18px 16px 22px; } }
 .fa-note { text-align:center; margin-top:14px; font-size:12.5px; color:var(--mute); }
-@media (max-width:560px){ .fa-mail .hd { flex-direction:column-reverse; align-items:flex-start; } .fa-ws .thread, .fa-list { padding-left:16px; padding-right:16px; } }
-@media (max-width:860px){ .fa-ws .body { grid-template-columns:1fr; } .fa-ws .thread { border-right:0; border-bottom:1px solid var(--line); } }
 
 /* statement */
-.fa-state { text-align:center; }
-.fa-state h2 { font-size:clamp(34px,5.4vw,64px); max-width:18ch; margin:0 auto; }
-.fa-state h2 em { font-style:italic; font-weight:300; color:var(--mute); }
-.fa-state p { margin:22px auto 0; font-size:18px; color:var(--mute); max-width:40ch; line-height:1.5; }
-
-/* section heads */
-.fa-head { text-align:center; max-width:640px; margin:0 auto 52px; }
-.fa-head h2 { font-size:clamp(30px,4.4vw,50px); }
-.fa-head p { margin-top:16px; font-size:16.5px; line-height:1.6; color:var(--mute); }
-.fa-eyebrow { display:block; margin-bottom:14px; font-size:11px; font-weight:600; letter-spacing:.18em; text-transform:uppercase; color:var(--mute); }
+.fa-state { text-align:center; padding-top:120px; }
+.fa-state h2 { font-size:clamp(30px,4.2vw,46px); line-height:1.12; letter-spacing:-0.04em; }
+.fa-state p { margin-top:14px; font-size:clamp(17px,1.8vw,20px); color:var(--ink); font-weight:300; }
 
 /* bento */
-.fa-bento { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-.fa-tile { background:var(--soft); border:1px solid var(--line); border-radius:18px; padding:14px 14px 24px; display:flex; flex-direction:column; }
-.fa-tile .art { background:var(--card); border:1px solid var(--line); border-radius:13px; padding:16px; min-height:216px; display:flex; flex-direction:column; justify-content:center; gap:10px; }
-.fa-tile h3 { font-size:23px; margin:22px 10px 0; letter-spacing:-0.02em; }
-.fa-tile p { margin:8px 10px 0; font-size:15px; line-height:1.55; color:var(--mute); }
-@media (max-width:760px){ .fa-bento { grid-template-columns:1fr; } }
-.fa-stack { display:flex; align-items:center; }
-.fa-stack .fa-av { margin-left:-8px; border:2px solid var(--card); width:34px; height:34px; } .fa-stack .fa-av:first-child { margin-left:0; }
-.fa-stack .lbl { margin-left:12px; font-size:13px; color:var(--mute); }
-.fa-bubble { border:1px solid var(--line); border-radius:12px; background:var(--paper); padding:13px 15px; font-size:14px; line-height:1.6; color:#33332F; }
-.fa-bubble .meta { display:flex; justify-content:space-between; gap:8px; font-size:12px; color:var(--mute); margin-bottom:6px; flex-wrap:wrap; }
-.fa-chips { display:flex; flex-wrap:wrap; gap:8px; }
-.fa-chip { display:inline-flex; align-items:center; gap:7px; font-size:13.5px; font-weight:500; padding:7px 13px; border:1px solid var(--line); border-radius:999px; background:var(--card); }
-.fa-chip i { width:7px; height:7px; border-radius:50%; background:var(--mint); }
-.fa-share { border:1px solid var(--line); border-radius:12px; padding:14px; background:var(--paper); }
-.fa-share .t { font-weight:600; font-size:14px; display:flex; align-items:center; gap:8px; }
-.fa-share .row { display:flex; gap:8px; margin-top:12px; align-items:center; }
-.fa-share .url { flex:1; min-width:0; font-size:12.5px; padding:9px 11px; background:var(--card); border:1px solid var(--line); border-radius:9px; color:var(--mute); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.fa-share .opt { margin-top:12px; font-size:13px; color:var(--mute); display:flex; align-items:center; gap:8px; }
-.fa-trace { font-size:13.5px; }
-.fa-trace .r { display:grid; grid-template-columns:1fr auto; gap:10px; padding:9px 0; border-top:1px solid var(--line); } .fa-trace .r:first-child { border-top:0; }
-.fa-trace .r span:last-child { color:var(--mute); font-size:12.5px; }
-.fa-trace .tot { font-weight:600; }
+.fa-bento { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:36px 24px; margin-top:56px; align-items:start; }
+.fa-art { border-radius:28px; padding:34px 26px; display:flex; align-items:center; justify-content:center; background:var(--sand); }
+.fa-art.mint { background:radial-gradient(110% 120% at 100% 0%, #CFEBE0 0%, transparent 60%), var(--sand); }
+.fa-art.peach { background:radial-gradient(110% 120% at 100% 0%, #F7D3C5 0%, transparent 62%), var(--sand); }
+.fa-art.butter { background:radial-gradient(110% 120% at 100% 0%, #F5EAB0 0%, transparent 62%), var(--sand); }
+.fa-art.sand { background:radial-gradient(110% 120% at 100% 0%, #E6E2D6 0%, transparent 62%), var(--sand); }
+.fa-mcard { width:100%; background:var(--card); border-radius:16px; box-shadow:0 14px 34px -16px rgba(22,22,20,.22); font-size:14px; overflow:hidden; }
+.fa-mcard .h { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:12px 14px; border-bottom:1px solid var(--line); font-weight:500; font-size:13.5px; }
+.fa-mcard .h small { font-weight:400; font-size:11.5px; background:var(--grey-bg); color:var(--grey); padding:3px 9px; border-radius:999px; }
+.fa-mcard .r { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 14px; border-top:1px solid var(--line); } .fa-mcard .h + .r { border-top:0; }
+.fa-mcard .r .n { display:flex; align-items:center; gap:10px; min-width:0; }
+.fa-mcard .r .n em { font-style:normal; color:#9A988F; font-size:12px; }
+.fa-mcard .pad { padding:12px 14px 14px; line-height:1.55; }
+.fa-mcard .pad .k { color:var(--mute); } .fa-mcard .pad b { font-weight:500; }
+.fa-mcard .sep { border-top:1px solid var(--line); margin:10px 0; }
+.fa-bento h3 { font-size:25px; font-weight:350; letter-spacing:-0.03em; margin:20px 4px 0; line-height:1.15; }
+.fa-bento p { font-size:16px; line-height:1.55; color:var(--mute); margin:8px 4px 0; }
+.fa-pillrow { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; }
+.fa-pillrow span { display:inline-flex; align-items:center; gap:8px; background:var(--card); border-radius:999px; padding:9px 16px; font-size:14px; font-weight:500; box-shadow:0 8px 20px -14px rgba(22,22,20,.3); }
+.fa-pillrow span i { width:7px; height:7px; border-radius:50%; background:var(--green); }
+.fa-dot { width:28px; height:28px; border-radius:50%; background:var(--ink); color:#fff; display:grid; place-items:center; font-size:11px; font-weight:600; }
+.fa-bul { padding:2px 14px 14px; } .fa-bul div { padding:9px 0 9px 16px; position:relative; border-top:1px solid var(--line); line-height:1.4; } .fa-bul div:first-child { border-top:0; }
+.fa-bul div::before { content:''; position:absolute; left:0; top:17px; width:5px; height:5px; border-radius:50%; background:var(--acc); }
+@media (max-width:1000px){ .fa-bento { grid-template-columns:1fr 1fr; } }
+@media (max-width:640px){ .fa-bento { grid-template-columns:1fr; gap:34px; } .fa-art { padding:28px 18px; } }
 
 /* process */
-.fa-proc { display:grid; grid-template-columns:1fr 1fr; gap:56px; align-items:start; }
-.fa-steps { display:flex; flex-direction:column; }
-.fa-step { all:unset; box-sizing:border-box; display:grid; grid-template-columns:44px 1fr; gap:6px 14px; padding:22px 0; border-top:1px solid var(--line); cursor:pointer; }
-.fa-step:last-child { border-bottom:1px solid var(--line); }
-.fa-step .n { font-family:'Fraunces',serif; font-size:20px; color:#A9A79F; padding-top:1px; transition:color .2s; }
-.fa-step .tt { font-family:'Fraunces',serif; font-size:24px; letter-spacing:-0.02em; color:#8C8A83; transition:color .2s; }
-.fa-step .dd { grid-column:2; font-size:15.5px; line-height:1.55; color:var(--mute); max-height:0; opacity:0; overflow:hidden; transition:max-height .35s, opacity .3s; }
-.fa-step[aria-selected="true"] .n { color:var(--acc-ink); } .fa-step[aria-selected="true"] .tt { color:var(--ink); }
-.fa-step[aria-selected="true"] .dd { max-height:90px; opacity:1; margin-top:2px; }
+.fa-proc { display:grid; grid-template-columns:1fr 1.15fr; gap:56px; margin-top:56px; align-items:center; }
+.fa-steps { display:flex; flex-direction:column; border-left:1px solid var(--line); }
+.fa-step { all:unset; box-sizing:border-box; display:block; padding:20px 0 20px 22px; margin-left:-1px; border-left:2px solid transparent; cursor:pointer; }
+.fa-step .tt { display:flex; align-items:baseline; gap:14px; font-size:clamp(21px,2.2vw,26px); font-weight:300; letter-spacing:-0.03em; color:#A6A49B; transition:color .2s; }
+.fa-step .tt i { font-style:normal; font-size:12px; letter-spacing:.05em; }
+.fa-step .dd { font-size:16px; line-height:1.55; color:var(--mute); padding-left:30px; max-height:0; opacity:0; overflow:hidden; transition:max-height .35s, opacity .3s; }
+.fa-step[aria-selected="true"] { border-left-color:var(--acc); }
+.fa-step[aria-selected="true"] .tt { color:var(--ink); } .fa-step[aria-selected="true"] .tt i { color:var(--acc-ink); }
+.fa-step[aria-selected="true"] .dd { max-height:120px; opacity:1; margin-top:6px; }
 .fa-step:focus-visible { outline:2px solid var(--acc-ink); outline-offset:2px; }
-.fa-docs { position:relative; background:var(--soft); border:1px solid var(--line); border-radius:20px; padding:28px; min-height:380px; display:flex; flex-direction:column; justify-content:center; gap:14px; }
-.fa-doc { background:var(--card); border:1px solid var(--line); border-radius:13px; padding:15px 16px; display:grid; grid-template-columns:36px 1fr auto; gap:12px; align-items:center; }
-.fa-doc:nth-child(2) { margin-left:22px; margin-right:-4px; } .fa-doc:nth-child(3) { margin-left:44px; margin-right:-8px; }
-.fa-doc .ic { width:36px; height:36px; border-radius:10px; background:var(--soft); display:grid; place-items:center; color:var(--grey); }
-.fa-doc b { display:block; font-size:14.5px; font-weight:600; } .fa-doc small { color:var(--mute); font-size:12.5px; }
-@media (max-width:860px){ .fa-proc { grid-template-columns:1fr; gap:32px; } .fa-doc:nth-child(n) { margin-left:0; margin-right:0; } .fa-docs { min-height:0; padding:18px; } .fa-step[aria-selected="true"] .dd { max-height:140px; } }
+.fa-ptile { border-radius:28px; padding:44px 40px; background:radial-gradient(90% 100% at 100% 0%, #D6ECE2 0%, transparent 62%), var(--sand); min-height:360px; display:flex; align-items:center; }
+.fa-files { width:100%; } .fa-files .fr { display:grid; grid-template-columns:38px 1fr auto; gap:12px; align-items:center; padding:12px 14px; border-top:1px solid var(--line); }
+.fa-files .fr b { display:block; font-size:14.5px; font-weight:500; } .fa-files .fr small { font-size:12.5px; color:var(--mute); }
+.fa-kind { width:38px; height:38px; border-radius:10px; display:grid; place-items:center; background:var(--soft); color:var(--grey); }
+.fa-kind.doc { background:#E4EAF7; color:#3157A6; } .fa-kind.sheet { background:#DFF2E7; color:#1B6B43; } .fa-kind.pdf { background:#FBE3DD; color:#B2420F; }
+@media (max-width:900px){ .fa-proc { grid-template-columns:1fr; gap:28px; } .fa-ptile { padding:26px 16px; min-height:0; } .fa-step[aria-selected="true"] .dd { max-height:160px; } }
 
 /* integrations */
-.fa-int { display:grid; grid-template-columns:1fr 1fr; background:var(--card); border:1px solid var(--line); border-radius:22px; overflow:hidden; }
-.fa-int .l { padding:44px 40px; } .fa-int h2 { font-size:clamp(28px,3.6vw,40px); }
-.fa-int ul { list-style:none; padding:0; margin:26px 0 0; display:flex; flex-direction:column; gap:14px; }
-.fa-int li { display:flex; gap:12px; font-size:15.5px; line-height:1.5; } .fa-int li svg { flex:0 0 auto; margin-top:3px; color:var(--mint); }
-.fa-int li b { font-weight:600; }
-.fa-int .cap { margin-top:26px; font-family:'Fraunces',serif; font-style:italic; font-size:19px; color:var(--mute); }
-.fa-int .r { background:var(--soft); border-left:1px solid var(--line); position:relative; min-height:380px; display:grid; place-items:center; padding:24px; }
-.fa-badges { position:relative; width:100%; max-width:380px; height:300px; }
-.fa-badge2 { position:absolute; display:flex; align-items:center; gap:10px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 16px; font-size:15px; font-weight:600; }
-.fa-badge2 small { display:block; font-weight:400; font-size:12px; color:var(--mute); }
-.fa-badge2 .gl { width:30px; height:30px; border-radius:9px; display:grid; place-items:center; font-family:'Fraunces',serif; font-size:15px; background:var(--soft); border:1px solid var(--line); }
-@media (max-width:860px){ .fa-int { grid-template-columns:1fr; } .fa-int .l { padding:30px 22px; } .fa-int .r { border-left:0; border-top:1px solid var(--line); min-height:0; } .fa-badges { height:auto; display:flex; flex-direction:column; gap:10px; } .fa-badge2 { position:static; } }
+.fa-int { display:grid; grid-template-columns:1fr 1fr; gap:48px; align-items:center; background:var(--soft); border-radius:32px; padding:64px; }
+.fa-int .sub { font-size:19px; color:var(--mute); margin-top:18px; font-weight:300; }
+.fa-ticks { list-style:none; padding:0; margin:28px 0 0; display:flex; flex-direction:column; gap:14px; }
+.fa-ticks li { display:flex; align-items:center; gap:14px; font-size:16.5px; }
+.fa-ticks li i { width:24px; height:24px; border-radius:50%; background:var(--butter); display:grid; place-items:center; flex:0 0 auto; color:var(--ink); }
+.fa-dark .fa-ticks li i { background:var(--butter); }
+.fa-int .cap { font-size:19px; margin-top:30px; font-weight:350; letter-spacing:-0.02em; }
+.fa-intart { background:radial-gradient(80% 90% at 100% 0%, #F7EFC2 0%, transparent 60%), #fff; border-radius:24px; min-height:300px; display:flex; align-items:center; justify-content:center; padding:30px; }
+.fa-intart .fa-pillrow span { box-shadow:0 0 0 1px var(--line); }
+@media (max-width:900px){ .fa-int { grid-template-columns:1fr; padding:36px 22px; gap:30px; border-radius:26px; } .fa-intart { min-height:200px; padding:22px; } }
 
-/* trust (the one dark band) */
-.fa-dark { background:#181816; color:#F4F1E8; }
-.fa-trust { display:grid; grid-template-columns:1fr 1fr; gap:56px; align-items:center; }
-.fa-dark .fa-eyebrow { color:rgba(244,241,232,.55); }
-.fa-dark h2 { font-size:clamp(30px,4.2vw,48px); }
-.fa-dark h2 em { font-style:italic; font-weight:300; color:rgba(244,241,232,.55); }
-.fa-trust ul { list-style:none; padding:0; margin:30px 0 0; display:flex; flex-direction:column; gap:18px; }
-.fa-trust li { display:grid; grid-template-columns:26px 1fr; gap:12px; }
-.fa-trust li i { width:24px; height:24px; border-radius:50%; background:rgba(232,93,42,.18); color:#F58A5E; display:grid; place-items:center; margin-top:1px; }
-.fa-trust li b { display:block; font-weight:600; font-size:16px; } .fa-trust li span { font-size:14.5px; line-height:1.5; color:rgba(244,241,232,.62); }
-.fa-perm { background:var(--card); color:var(--ink); border-radius:18px; padding:8px 22px 14px; }
-.fa-perm .h { display:flex; justify-content:space-between; align-items:center; padding:16px 0 12px; border-bottom:1px solid var(--line); }
-.fa-perm .h h4 { font-size:20px; } .fa-perm .h span { font-size:12.5px; color:var(--mute); }
-.fa-perm .r { display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center; padding:15px 0; border-top:1px solid var(--line); } .fa-perm .r:first-of-type { border-top:0; }
-.fa-perm .r b { display:block; font-size:14.5px; font-weight:600; } .fa-perm .r small { font-size:12.5px; color:var(--mute); }
-.fa-perm .foot { padding-top:12px; border-top:1px solid var(--line); font-size:12.5px; color:var(--mute); }
-@media (max-width:860px){ .fa-trust { grid-template-columns:1fr; gap:36px; } }
+/* trust (the one dark card) */
+.fa-dark { background:#141413; color:#F4F2EC; border-radius:32px; padding:64px; display:grid; grid-template-columns:1fr 1fr; gap:48px; align-items:center; }
+.fa-dark .sub { font-size:19px; line-height:1.5; color:rgba(244,242,236,.6); margin-top:18px; font-weight:300; }
+.fa-dark .fa-ticks { margin-top:26px; } .fa-dark .fa-ticks li { font-size:16px; }
+.fa-dark .lnk { display:inline-block; margin-top:26px; font-size:15px; text-decoration:underline; text-underline-offset:4px; text-decoration-color:rgba(244,242,236,.4); }
+.fa-dart { background:radial-gradient(80% 90% at 100% 0%, #F3CDBE 0%, transparent 62%), #F1EEE7; border-radius:24px; padding:44px 36px; }
+.fa-perm { background:#fff; color:var(--ink); border-radius:16px; box-shadow:0 14px 34px -16px rgba(22,22,20,.3); overflow:hidden; }
+.fa-perm .h { padding:14px 16px; border-bottom:1px solid var(--line); font-weight:500; font-size:14.5px; }
+.fa-perm .r { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:13px 16px; border-top:1px solid var(--line); font-size:14px; } .fa-perm .h + .r { border-top:0; }
+@media (max-width:900px){ .fa-dark { grid-template-columns:1fr; padding:36px 22px; gap:30px; border-radius:26px; } .fa-dart { padding:24px 16px; } }
 
 /* faq */
-.fa-faq { max-width:760px; margin:0 auto; }
-.fa-faq details { border-top:1px solid var(--line); } .fa-faq details:last-child { border-bottom:1px solid var(--line); }
-.fa-faq summary { list-style:none; cursor:pointer; display:flex; justify-content:space-between; align-items:center; gap:18px; padding:22px 0; font-family:'Fraunces',serif; font-size:21px; letter-spacing:-0.015em; }
+.fa-faqgrid { display:grid; grid-template-columns:.8fr 1.4fr; gap:56px; align-items:start; }
+.fa-faqgrid .links { margin-top:28px; display:flex; flex-direction:column; gap:14px; align-items:flex-start; }
+.fa-faqgrid .links a { font-size:15px; text-decoration:none; border-bottom:1px solid #BEBBB0; padding-bottom:2px; } .fa-faqgrid .links a:hover { border-color:var(--ink); }
+.fa-faq { display:flex; flex-direction:column; gap:12px; }
+.fa-faq details { background:var(--soft); border-radius:22px; }
+.fa-faq summary { list-style:none; cursor:pointer; display:flex; justify-content:space-between; align-items:center; gap:18px; padding:22px 26px; font-size:18px; font-weight:400; letter-spacing:-0.02em; }
 .fa-faq summary::-webkit-details-marker { display:none; }
 .fa-faq summary svg { flex:0 0 auto; color:var(--mute); transition:transform .25s; }
-.fa-faq details[open] summary svg { transform:rotate(180deg); }
-.fa-faq details p { padding:0 40px 24px 0; font-size:16px; line-height:1.65; color:var(--mute); }
+.fa-faq details[open] summary svg { transform:rotate(45deg); }
+.fa-faq details p { padding:0 60px 26px 26px; font-size:16px; line-height:1.65; color:var(--mute); }
+@media (max-width:900px){ .fa-faqgrid { grid-template-columns:1fr; gap:28px; } .fa-faq summary { padding:18px 20px; font-size:17px; } .fa-faq details p { padding:0 20px 22px; } }
 
-/* closing */
-.fa-close { text-align:center; background:var(--soft); border:1px solid var(--line); border-radius:26px; padding:72px 24px; }
-.fa-close h2 { font-size:clamp(34px,5.4vw,60px); } .fa-close h2 em { font-style:italic; font-weight:300; color:var(--acc-ink); }
-.fa-close p { margin:18px auto 0; color:var(--mute); font-size:17.5px; max-width:44ch; line-height:1.5; }
-.fa-close .acts { margin-top:30px; display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
-
-/* footer */
-.fa-foot { border-top:1px solid var(--line); margin-top:96px; padding:56px 0 28px; }
+/* closing + footer (one dark block) */
+.fa-end { background:#1A1A19; color:#F4F2EC; margin-top:120px; }
+.fa-close { text-align:center; padding:96px 0 84px; }
+.fa-close h2 { font-size:clamp(34px,5vw,56px); }
+.fa-close p { font-size:19px; color:rgba(244,242,236,.62); font-weight:300; margin-top:14px; line-height:1.6; }
+.fa-close .acts { margin-top:30px; display:flex; flex-direction:column; align-items:center; gap:18px; }
+.fa-foot { border-top:1px solid rgba(244,242,236,.1); padding:56px 0 30px; }
 .fa-cols { display:grid; grid-template-columns:1.5fr repeat(5, minmax(0,1fr)); gap:28px; }
-.fa-cols h5 { font-family:'Instrument Sans',sans-serif; font-size:12px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--mute); margin:0 0 14px; }
-.fa-cols a { display:block; text-decoration:none; font-size:14.5px; padding:5px 0; color:#33332F; } .fa-cols a:hover { color:var(--acc-ink); }
-.fa-cols .about { font-size:14px; line-height:1.6; color:var(--mute); max-width:28ch; margin-top:14px; }
-.fa-bottom { margin-top:44px; padding-top:20px; border-top:1px solid var(--line); display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; font-size:13px; color:var(--mute); }
-@media (max-width:980px){ .fa-cols { grid-template-columns:repeat(3, minmax(0,1fr)); } .fa-cols .brand { grid-column:1 / -1; } }
-@media (max-width:520px){ .fa-cols { grid-template-columns:1fr 1fr; } }
+.fa-cols h5 { font-size:12px; font-weight:500; letter-spacing:.12em; text-transform:uppercase; color:rgba(244,242,236,.5); margin:0 0 16px; }
+.fa-cols a { display:block; text-decoration:none; font-size:15px; padding:6px 0; color:rgba(244,242,236,.88); } .fa-cols a:hover { color:#fff; text-decoration:underline; }
+.fa-cols .about { font-size:16px; line-height:1.5; color:rgba(244,242,236,.75); max-width:20em; margin-top:16px; font-weight:300; }
+.fa-cols .addr { font-size:13.5px; color:rgba(244,242,236,.5); margin-top:14px; line-height:1.5; }
+.fa-cols .mail { display:block; margin-top:14px; font-size:14px; padding:0; }
+.fa-bottom { margin-top:40px; padding-top:22px; border-top:1px solid rgba(244,242,236,.1); font-size:14px; color:rgba(244,242,236,.5); display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+@media (max-width:1000px){ .fa-cols { grid-template-columns:repeat(3, minmax(0,1fr)); } .fa-cols .brand { grid-column:1 / -1; } }
+@media (max-width:520px){ .fa-cols { grid-template-columns:1fr 1fr; } .fa-close { padding:72px 0 64px; } }
 
 @media (prefers-reduced-motion: reduce){ .fa .btn, .fa-step .dd, .fa-faq summary svg { transition:none; } .fa .btn:hover { transform:none; } }
+
+.fa .tag.red { background:#F8DDD8; color:#A12B1F; }
+.fa-tl { position:relative; display:flex; flex-direction:column; gap:0; }
+.fa-ev { display:grid; grid-template-columns:34px minmax(0,1fr); gap:12px; padding-bottom:18px; position:relative; }
+.fa-ev:not(:last-child)::before { content:''; position:absolute; left:16px; top:34px; bottom:2px; width:1px; background:var(--line); }
+.fa-ev .dot { width:34px; height:34px; border-radius:50%; background:var(--soft); border:1px solid var(--line); display:grid; place-items:center; color:var(--grey); }
+.fa-ev .dot.ok { background:var(--green-bg); color:var(--green); border-color:transparent; }
+.fa-ev .dot.next { background:#fff; border-style:dashed; }
+.fa-ev b { display:block; font-size:14.5px; font-weight:500; letter-spacing:-0.01em; }
+.fa-ev p { font-size:13.5px; line-height:1.5; color:var(--mute); margin-top:2px; }
+.fa-ev small { font-size:12px; color:#9A988F; }
+.fa-quote { margin-top:10px; background:var(--soft); border-radius:12px; padding:12px 14px; font-size:13.5px; line-height:1.55; }
+.fa-quote .k { display:flex; justify-content:space-between; gap:8px; font-size:12px; color:var(--mute); margin-bottom:6px; flex-wrap:wrap; }
+.fa-actbar { display:flex; gap:8px; flex-wrap:wrap; padding:14px 18px 18px; border-top:1px solid var(--line); }
+.fa-brandchip { display:inline-flex; align-items:center; gap:8px; }
+.fa-seg { display:flex; gap:4px; background:var(--soft); border-radius:10px; padding:3px; margin:12px 14px 0; }
+.fa-seg span { flex:1; text-align:center; font-size:12.5px; padding:6px 0; border-radius:8px; color:var(--mute); }
+.fa-seg span.on { background:#fff; color:var(--ink); font-weight:500; box-shadow:0 1px 3px rgba(22,22,20,.12); }
+.fa-mcard .ic { width:30px; height:30px; border-radius:9px; background:var(--soft); display:grid; place-items:center; color:var(--grey); flex:0 0 auto; }
 `;
 
 /* ────────────────────────── small pieces ────────────────────────── */
 
-function Pill({
-  tone,
-  children,
-}: {
-  tone: "green" | "amber" | "grey" | "line";
-  children: React.ReactNode;
-}) {
-  return <span className={`pill ${tone}`}>{children}</span>;
+type Tone = "green" | "amber" | "grey" | "line" | "red";
+function Tag({ tone, children }: { tone: Tone; children: React.ReactNode }) {
+  return <span className={`tag ${tone}`}>{children}</span>;
+}
+
+/** Chase statuses exactly as the product names them. */
+const STATUS_TONE: Record<string, Tone> = {
+  Open: "line",
+  "Following up": "amber",
+  Escalated: "red",
+  Resolved: "green",
+};
+
+type BrandKey = "tally" | "zoho" | "gmail" | "whatsapp" | "excel";
+const BRAND_LABEL: Record<BrandKey, string> = {
+  tally: "Tally",
+  zoho: "Zoho Books",
+  gmail: "Gmail",
+  whatsapp: "WhatsApp",
+  excel: "Excel and CSV",
+};
+
+/** Real marks where Simple Icons has them; a plain icon (never an imitation logo) where it does not. */
+function BrandIcon({ k, size = 18 }: { k: BrandKey; size?: number }) {
+  switch (k) {
+    case "zoho":
+      return <SiZoho size={size + 8} color="#C8202B" aria-hidden="true" />;
+    case "gmail":
+      return <SiGmail size={size} color="#EA4335" aria-hidden="true" />;
+    case "whatsapp":
+      return <SiWhatsapp size={size} color="#25D366" aria-hidden="true" />;
+    case "excel":
+      return (
+        <SiGooglesheets size={size - 2} color="#188038" aria-hidden="true" />
+      );
+    default:
+      return <BookOpen size={size} color="#1F4E79" aria-hidden="true" />;
+  }
+}
+
+function Brand({ k }: { k: BrandKey }) {
+  return (
+    <span className="fa-brandchip">
+      <BrandIcon k={k} />
+      {BRAND_LABEL[k]}
+    </span>
+  );
+}
+
+function StartButton({ where }: { where: string }) {
+  return (
+    <Link
+      to={SIGNUP_URL}
+      onClick={() => trackCta("start", where)}
+      className="btn btn-acc"
+    >
+      {CTA_START}
+      <span className="ar">
+        <ArrowRight size={16} />
+      </span>
+    </Link>
+  );
 }
 
 function PillNav() {
@@ -254,6 +364,16 @@ function PillNav() {
     { label: "Pricing", href: "/pricing" },
     { label: "About", href: "/about" },
   ];
+  const item = (l: { label: string; href: string }, cls?: string) =>
+    l.href.startsWith("#") ? (
+      <a key={l.label} className={cls} href={l.href}>
+        {l.label}
+      </a>
+    ) : (
+      <Link key={l.label} className={cls} to={l.href}>
+        {l.label}
+      </Link>
+    );
   return (
     <>
       <div className="fa-navwrap">
@@ -265,23 +385,12 @@ function PillNav() {
           >
             <FynLogo size="sm" />
           </Link>
-          <div className="links">
-            {links.map((l) =>
-              l.href.startsWith("#") ? (
-                <a key={l.label} href={l.href}>
-                  {l.label}
-                </a>
-              ) : (
-                <Link key={l.label} to={l.href}>
-                  {l.label}
-                </Link>
-              ),
-            )}
-          </div>
+          <div className="links">{links.map((l) => item(l))}</div>
           <Link
             to={SIGNUP_URL}
             onClick={() => trackCta("start", "afp-nav")}
             className="btn btn-acc btn-sm cta-d"
+            style={{ padding: "0 20px" }}
           >
             {CTA_START}
           </Link>
@@ -298,154 +407,175 @@ function PillNav() {
       </div>
       {open && (
         <div className="fa-sheet" onClick={() => setOpen(false)}>
-          {links.map((l) =>
-            l.href.startsWith("#") ? (
-              <a key={l.label} className="m" href={l.href}>
-                {l.label}
-              </a>
-            ) : (
-              <Link key={l.label} className="m" to={l.href}>
-                {l.label}
-              </Link>
-            ),
-          )}
-          <Link
-            to={SIGNUP_URL}
-            onClick={() => trackCta("start", "afp-nav-m")}
-            className="btn btn-acc"
-            style={{ width: "100%", marginTop: 16 }}
-          >
-            {CTA_START}
-          </Link>
+          {links.map((l) => item(l, "m"))}
+          <div style={{ marginTop: 18 }}>
+            <StartButton where="afp-nav-m" />
+          </div>
         </div>
       )}
     </>
   );
 }
 
-/* ────────────────────────── hero ────────────────────────── */
+/* ────────────────────────── hero + the chase screen ────────────────────────── */
 
-const CHECKLIST: { name: string; got: boolean }[] = [
-  { name: "HDFC current account statement, October", got: false },
-  { name: "Purchase register (Tally export)", got: false },
-  { name: "TDS challans, Q2", got: false },
-  { name: "Sales register (Tally export)", got: true },
-  { name: "ICICI cash credit statement", got: true },
-  { name: "GSTR-2B, October", got: true },
-  { name: "Payroll summary", got: true },
-  { name: "Petty cash voucher book", got: true },
+const OPEN_ITEMS: [string, string][] = [
+  ["HDFC current account statement, October", "Following up"],
+  ["Purchase register (Tally export)", "Open"],
+  ["TDS challans, Q2", "Escalated"],
+];
+const DONE_ITEMS = [
+  "Sales register (Tally export)",
+  "ICICI cash credit statement",
+  "GSTR-2B, October",
 ];
 
-function WorkspaceMock() {
+function Workspace() {
   const [paused, setPaused] = useState(false);
   return (
     <figure style={{ margin: 0 }}>
-      <div className="fa-ws" role="group" aria-label="Sample client workspace">
-        <div className="bar">
-          <b># october-close</b>
-          <span>· Mehta Textiles Pvt Ltd</span>
-          <div className="dots" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-          </div>
-        </div>
+      <div className="fa-ws" role="group" aria-label="Sample chase screen">
         <div className="body">
-          <div className="thread">
-            <div className="fa-ev">
-              <div className="fa-av">RS</div>
+          <div className="fa-pane">
+            <div className="fa-phead">
+              <span className="ic">
+                <BellRing size={17} />
+              </span>
               <div>
-                <div className="who">
-                  Riya Shah<span>9:15 AM</span>
-                </div>
-                <p>
-                  What is still missing from Mehta Textiles for the October
-                  close?
-                </p>
+                <b>HDFC statement, October</b>
+                <small>Mehta Textiles · Sample data</small>
+              </div>
+              <div className="right">
+                {paused ? (
+                  <Tag tone="grey">Paused until Fri</Tag>
+                ) : (
+                  <Tag tone="amber">Following up</Tag>
+                )}
+                <span className="ic" aria-hidden="true">
+                  <PanelRight size={16} />
+                </span>
               </div>
             </div>
-            <div className="fa-ev">
-              <div className="fa-av f">F</div>
-              <div>
-                <div className="who">
-                  FynHelp<span>9:16 AM</span>
+            <div className="fa-thread">
+              <div className="fa-tl">
+                <div className="fa-ev">
+                  <span className="dot">
+                    <ClipboardList size={16} />
+                  </span>
+                  <div>
+                    <b>Chase created</b>
+                    <p>
+                      October bank statement for Mehta Textiles, due Friday, by
+                      email and WhatsApp.
+                    </p>
+                    <small>Mon 9:42 AM · Riya</small>
+                  </div>
                 </div>
-                <p>
-                  Checked the checklist against what has arrived. 3 of 11 items
-                  are still missing: the HDFC statement for October, the
-                  purchase register, and the Q2 TDS challans.
-                </p>
-                <div className="fa-mail">
-                  <div className="hd">
-                    <div>
-                      <b>Day 3 follow-up</b> · email
-                      <br />
-                      To: Rakesh Mehta · Subject: Three documents for the
-                      October close
+                <div className="fa-ev">
+                  <span className="dot ok">
+                    <Mail size={16} />
+                  </span>
+                  <div>
+                    <b>Day 0 · email sent</b>
+                    <p>To Rakesh Mehta. Names the document and the month.</p>
+                    <small>Mon 9:45 AM</small>
+                  </div>
+                </div>
+                <div className="fa-ev">
+                  <span className="dot ok">
+                    <MessageCircle size={16} />
+                  </span>
+                  <div>
+                    <b>Day 3 · email and WhatsApp sent</b>
+                    <p>Follow-up 1 of 3.</p>
+                    <small>Thu 10:02 AM</small>
+                  </div>
+                </div>
+                <div className="fa-ev">
+                  <span className="dot next">
+                    <Clock size={16} />
+                  </span>
+                  <div>
+                    <b>Next: day 7</b>
+                    <p>
+                      Goes out Monday to Saturday, 9:30 am to 6:30 pm IST. Stops
+                      the moment the document arrives. On day 10 it comes to a
+                      partner.
+                    </p>
+                    <div className="fa-quote">
+                      <div className="k">
+                        <span>Next message · WhatsApp</span>
+                        <span>Tone: standard</span>
+                      </div>
+                      Hi Rakesh, hope you’re well. Could you please share the
+                      bank statement for Mehta Textiles when you get a chance?
+                      Thank you! – Shah &amp; Co
                     </div>
-                    {paused ? (
-                      <Pill tone="grey">Paused</Pill>
-                    ) : (
-                      <Pill tone="amber">Goes out tomorrow, 10:00</Pill>
-                    )}
-                  </div>
-                  <div className="tx">
-                    Hi Rakesh, a quick note from Shah &amp; Co. To close October
-                    we still need three things from you. The link below lets you
-                    send them from your phone, no login needed.
-                  </div>
-                  <div className="ft">
-                    <button
-                      type="button"
-                      className="mini-btn"
-                      onClick={() => setPaused((v) => !v)}
-                    >
-                      {paused ? "Resume" : "Pause"}
-                    </button>
-                    <button type="button" className="mini-btn dark">
-                      Send now
-                    </button>
-                    <span className="hint">
-                      Stops the moment all three arrive
-                    </span>
                   </div>
                 </div>
               </div>
+            </div>
+            <div className="fa-actbar">
+              <button type="button" className="mini dark">
+                Mark resolved
+              </button>
+              <button type="button" className="mini">
+                Escalate to partner
+              </button>
+              <button
+                type="button"
+                className="mini"
+                onClick={() => setPaused((v) => !v)}
+              >
+                {paused ? "Resume" : "Pause until promised date"}
+              </button>
             </div>
           </div>
-          <div className="fa-list">
-            <div className="top">
-              <h4>Document checklist</h4>
-              <Pill tone="amber">Due Friday</Pill>
+          <div className="fa-pane">
+            <div className="fa-tabs">
+              <span>Chaser</span>
             </div>
-            <div className="meter" aria-hidden="true">
-              {Array.from({ length: 11 }).map((_, i) => (
-                <i key={i} className={i >= 8 ? "m" : ""} />
+            <div className="fa-sub">
+              <ClipboardList size={15} /> Document requests · this client
+            </div>
+            <div className="fa-sheetbody">
+              <h4>Mehta Textiles · October close</h4>
+              <div className="sm">11 document requests</div>
+              <div className="fa-stats">
+                <div>
+                  <small>Resolved</small>
+                  <b>
+                    8<span>of 11</span>
+                  </b>
+                </div>
+                <div className="miss">
+                  <small>Still open</small>
+                  <b>
+                    3<span>due Friday</span>
+                  </b>
+                </div>
+              </div>
+              <div className="fa-grp">Still open</div>
+              {OPEN_ITEMS.map(([n, st]) => (
+                <div className="fa-row" key={n}>
+                  <span>{n}</span>
+                  <Tag tone={STATUS_TONE[st]!}>{st}</Tag>
+                </div>
+              ))}
+              <div className="fa-grp">Resolved</div>
+              {DONE_ITEMS.map((n) => (
+                <div className="fa-row" key={n}>
+                  <span>{n}</span>
+                  <Tag tone="green">Resolved</Tag>
+                </div>
               ))}
             </div>
-            <div className="cnt">
-              <Pill tone="green">8 of 11 received</Pill>
-              <Pill tone="amber">3 missing</Pill>
-            </div>
-            {CHECKLIST.map((c) => (
-              <div className="fa-sheetrow" key={c.name}>
-                <div className="nm">
-                  <FileText size={15} />
-                  <span>{c.name}</span>
-                </div>
-                {c.got ? (
-                  <Pill tone="green">In workspace</Pill>
-                ) : (
-                  <Pill tone="amber">Missing</Pill>
-                )}
-              </div>
-            ))}
           </div>
         </div>
       </div>
       <figcaption className="fa-note">
-        A sample workspace with made-up data. The checklist and reminder rules
-        are yours to set.
+        Sample screen with made-up data, using the product’s own statuses.
+        Schedule, channel and tone are set per request.
       </figcaption>
     </figure>
   );
@@ -461,21 +591,17 @@ function Hero() {
         </div>
         <span className="fa-badge">For accounting firms</span>
         <h1>
-          Stop chasing clients <em>for documents.</em>
+          Stop chasing clients
+          <br />
+          for documents.
         </h1>
         <p className="sub">
-          A dedicated workspace for every client. FynHelp tracks what’s missing,
-          chases it on a schedule you set, and waits for a partner’s sign-off
-          before anything reaches the books.
+          A workspace for every client. FynHelp tracks what’s missing, follows
+          up on your schedule, and asks a partner before anything touches the
+          books.
         </p>
         <div className="acts">
-          <Link
-            to={SIGNUP_URL}
-            onClick={() => trackCta("start", "afp-hero")}
-            className="btn btn-acc"
-          >
-            {CTA_START} <ArrowRight size={17} />
-          </Link>
+          <StartButton where="afp-hero" />
           <DemoLink location="afp-hero" className="btn btn-line">
             {CTA_DEMO}
           </DemoLink>
@@ -483,13 +609,14 @@ function Hero() {
         <p className="note">{CTA_NOTE}</p>
         <div className="fa-works" aria-label="Works with">
           <span>Works with</span>
-          <b>Tally</b>
-          <b>Zoho Books</b>
-          <b>Gmail</b>
-          <b>WhatsApp</b>
-          <b>Excel &amp; CSV</b>
+          {(["tally", "zoho", "gmail", "whatsapp"] as BrandKey[]).map((k) => (
+            <b key={k}>
+              <BrandIcon k={k} />
+              {k === "tally" ? "Tally" : BRAND_LABEL[k]}
+            </b>
+          ))}
         </div>
-        <WorkspaceMock />
+        <Workspace />
       </div>
     </section>
   );
@@ -499,13 +626,13 @@ function Hero() {
 
 function Statement() {
   return (
-    <section className="sec">
-      <div className="wrap fa-state">
-        <h2>
-          Your team knows the clients. <em>FynHelp handles the chasing.</em>
-        </h2>
-        <p>One workspace per client. One live status everyone trusts.</p>
-      </div>
+    <section className="wrap fa-state">
+      <h2>
+        Your team knows the clients.
+        <br />
+        FynHelp handles the chasing.
+      </h2>
+      <p>One workspace per client. One status everyone trusts.</p>
     </section>
   );
 }
@@ -513,182 +640,203 @@ function Statement() {
 function Bento() {
   const [copied, setCopied] = useState(false);
   return (
-    <section className="sec" style={{ paddingTop: 24 }}>
-      <div className="wrap">
-        <div className="fa-head">
-          <span className="fa-eyebrow">What’s inside</span>
-          <h2>Everything your firm needs to stop chasing</h2>
-        </div>
-        <div className="fa-bento">
-          <article className="fa-tile">
-            <div className="art">
-              <div className="fa-stack">
-                <div className="fa-av">RS</div>
-                <div className="fa-av">PK</div>
-                <div className="fa-av f">F</div>
-                <span className="lbl">2 staff + FynHelp</span>
+    <section className="sec wrap">
+      <h2 className="h2">
+        Everything your firm
+        <br />
+        needs to stop chasing.
+      </h2>
+      <div className="fa-bento">
+        <article>
+          <div className="fa-art mint">
+            <div className="fa-mcard">
+              <div className="h">Mehta Textiles</div>
+              {[
+                [FileText, "Documents", "14 read"],
+                [BellRing, "Chase items", "3 open"],
+                [Scale, "Bank reconciliation", "412 of 427 matched"],
+                [FileBarChart, "October MIS", "Draft"],
+              ].map(([Icon, n, v]) => {
+                const I = Icon as typeof FileText;
+                return (
+                  <div className="r" key={n as string}>
+                    <span className="n">
+                      <span className="ic">
+                        <I size={15} />
+                      </span>
+                      {n as string}
+                    </span>
+                    <em
+                      style={{
+                        fontStyle: "normal",
+                        color: "#8E8D86",
+                        fontSize: 12.5,
+                      }}
+                    >
+                      {v as string}
+                    </em>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <h3>A workspace for every client</h3>
+          <p>
+            Documents, follow-ups, reconciliation and the MIS for one client, in
+            one place.
+          </p>
+        </article>
+
+        <article>
+          <div className="fa-art peach">
+            <div className="fa-mcard">
+              <div className="h">
+                Document requests <small>3 open</small>
               </div>
               {[
-                ["Sales register, October", true],
-                ["HDFC statement, October", false],
-                ["TDS challans, Q2", false],
-              ].map(([n, got]) => (
-                <div
-                  className="fa-sheetrow"
-                  key={n as string}
-                  style={{ borderTop: "1px solid var(--line)" }}
-                >
-                  <div className="nm">
-                    <FileText size={15} />
-                    <span>{n as string}</span>
-                  </div>
-                  {got ? (
-                    <Pill tone="green">Received</Pill>
-                  ) : (
-                    <Pill tone="amber">Missing</Pill>
-                  )}
+                ["Sales register", "Resolved"],
+                ["HDFC statement", "Following up"],
+                ["Purchase register", "Open"],
+                ["Q2 TDS challans", "Escalated"],
+              ].map(([n, st]) => (
+                <div className="r" key={n}>
+                  <span>{n}</span>
+                  <Tag tone={STATUS_TONE[st!]!}>{st}</Tag>
                 </div>
               ))}
             </div>
-            <h3>A workspace for every client</h3>
-            <p>The engagement, files, notes and team in one place.</p>
-          </article>
+          </div>
+          <h3>Every request, tracked to closure</h3>
+          <p>
+            Open, following up, escalated or resolved. A request closes itself
+            when the document arrives.
+          </p>
+        </article>
 
-          <article className="fa-tile">
-            <div className="art">
-              <div className="fa-bubble">
-                <div className="meta">
-                  <span>Follow-up · Day 3</span>
-                  <Pill tone="amber">Scheduled</Pill>
-                </div>
-                Hi Rakesh, we have your sales register and bank statement. Still
-                outstanding: purchase register and Q2 TDS challans.
+        <article>
+          <div className="fa-art butter">
+            <div className="fa-mcard">
+              <div className="h">
+                Follow-up · Day 3 <Tag tone="line">Email</Tag>
               </div>
-              <div style={{ fontSize: 13, color: "var(--mute)" }}>
-                2 of 4 received · checked against the checklist on arrival
+              <div className="fa-seg" aria-hidden="true">
+                <span>Gentle</span>
+                <span className="on">Standard</span>
+                <span>Firm</span>
               </div>
-            </div>
-            <h3>The checklist, always current</h3>
-            <p>
-              Every file that arrives is read and ticked off against what you
-              asked for.
-            </p>
-          </article>
-
-          <article className="fa-tile">
-            <div className="art">
-              <div className="fa-bubble">
-                <div className="meta">
-                  <span>WhatsApp · Shah &amp; Co.</span>
-                  <Pill tone="line">You press send</Pill>
-                </div>
-                Namaste Rakesh ji, October books are nearly done. Could you send
-                the purchase register when you get a minute? Here is your link.
+              <div className="pad">
+                Hi Rakesh, hope you’re well. Could you please share the bank
+                statement for Mehta Textiles when you get a chance? Thank you! –
+                Shah &amp; Co
               </div>
             </div>
-            <h3>Reminders in your firm’s voice</h3>
-            <p>
-              Warm, plain drafts in your firm’s name, not a robotic mail merge.
-              Follow-ups stop when the file arrives.
-            </p>
-          </article>
+          </div>
+          <h3>Reminders in your firm’s name</h3>
+          <p>
+            Pick a gentle, standard or firm tone. Each message names the exact
+            document and month, and signs off as your firm.
+          </p>
+        </article>
 
-          <article className="fa-tile">
-            <div className="art">
-              <div className="fa-chips">
-                {[
-                  "Tally",
-                  "Zoho Books",
-                  "Gmail",
-                  "WhatsApp",
-                  "Excel",
-                  "CSV",
-                  "Bank PDFs",
-                ].map((c) => (
-                  <span className="fa-chip" key={c}>
-                    <i />
-                    {c}
+        <article>
+          <div className="fa-art sand">
+            <div className="fa-pillrow">
+              {(
+                ["tally", "zoho", "gmail", "whatsapp", "excel"] as BrandKey[]
+              ).map((k) => (
+                <span key={k}>
+                  <BrandIcon k={k} size={16} />
+                  {BRAND_LABEL[k]}
+                </span>
+              ))}
+            </div>
+          </div>
+          <h3>Works with Tally and Zoho Books</h3>
+          <p>
+            Upload your Tally exports or connect Zoho Books read-only. Anything
+            posted to your books waits for a partner.
+          </p>
+        </article>
+
+        <article>
+          <div className="fa-art mint">
+            <div className="fa-mcard">
+              <div className="h">Upload link</div>
+              <div className="r" style={{ borderTop: 0 }}>
+                <span className="n">
+                  <span className="ic">
+                    <Inbox size={15} />
                   </span>
-                ))}
+                  <span style={{ lineHeight: 1.3 }}>
+                    Mehta Textiles
+                    <br />
+                    <span style={{ color: "var(--mute)", fontSize: 12.5 }}>
+                      HDFC statement, October
+                    </span>
+                  </span>
+                </span>
               </div>
-              <div style={{ fontSize: 13, color: "var(--mute)", marginTop: 4 }}>
-                Read-only by default. Entries are posted only once a partner
-                approves them.
-              </div>
-            </div>
-            <h3>Works with Tally and the tools you keep</h3>
-            <p>
-              No migration. Keep the ledger where it is and let FynHelp read
-              around it.
-            </p>
-          </article>
-
-          <article className="fa-tile">
-            <div className="art">
-              <div className="fa-share">
-                <div className="t">
-                  <Link2 size={16} /> Upload link for Mehta Textiles
-                </div>
-                <div className="opt">
-                  <Lock size={14} /> Anyone with the link can upload · No login
-                  needed
-                </div>
-                <div className="row">
-                  <div className="url">fynhelp.com/u/k3Fq…x9</div>
-                  <button
-                    type="button"
-                    className="mini-btn dark"
-                    onClick={() => setCopied(true)}
-                    aria-live="polite"
-                  >
-                    {copied ? "Link copied" : "Copy link"}
-                  </button>
-                </div>
-                <div className="opt" style={{ marginTop: 10 }}>
-                  Expires in 14 days · Photos from a phone work
-                </div>
-              </div>
-            </div>
-            <h3>Links clients can open</h3>
-            <p>
-              Send a link, not a portal. Clients upload from any phone with
-              nothing to sign up for.
-            </p>
-          </article>
-
-          <article className="fa-tile">
-            <div className="art">
-              <div className="fa-trace">
-                <div
-                  style={{
-                    fontFamily: "Fraunces, serif",
-                    fontSize: 18,
-                    marginBottom: 6,
-                  }}
+              <div
+                className="r"
+                style={{
+                  background: "var(--soft)",
+                  margin: "0 12px",
+                  borderRadius: 12,
+                  borderTop: 0,
+                }}
+              >
+                <span style={{ lineHeight: 1.3 }}>
+                  Anyone with
+                  <br />
+                  the link
+                </span>
+                <span style={{ color: "var(--mute)", fontSize: 13 }}>
+                  can upload
+                </span>
+                <button
+                  type="button"
+                  className="mini"
+                  onClick={() => setCopied(true)}
+                  aria-live="polite"
+                  style={{ height: 28, fontSize: 12 }}
                 >
-                  October MIS · Mehta Textiles
-                </div>
-                <div className="r">
-                  <span>Revenue</span>
-                  <span>₹41,82,300 · 126 lines</span>
-                </div>
-                <div className="r">
-                  <span>Purchases</span>
-                  <span>₹27,10,940 · 98 lines</span>
-                </div>
-                <div className="r">
-                  <span className="tot">Awaiting partner sign-off</span>
-                  <Pill tone="amber">Ask first</Pill>
-                </div>
+                  {copied ? "Link copied" : "Copy link"}
+                </button>
+              </div>
+              <div
+                className="pad"
+                style={{ fontSize: 12.5, color: "var(--mute)" }}
+              >
+                No account needed to open it. Expires in 14 days.
               </div>
             </div>
-            <h3>A month-end you can trace</h3>
-            <p>
-              Once the documents are in, the MIS is drafted and every figure
-              opens the lines behind it.
-            </p>
-          </article>
-        </div>
+          </div>
+          <h3>Links clients can open</h3>
+          <p>
+            Share an upload link. No client login needed, and photos from a
+            phone work.
+          </p>
+        </article>
+
+        <article>
+          <div className="fa-art peach">
+            <div className="fa-mcard">
+              <div className="h">
+                October MIS · Mehta Textiles <small>Draft</small>
+              </div>
+              <div className="fa-bul">
+                <div>Revenue ties to 126 bank lines</div>
+                <div>15 lines need a decision</div>
+                <div>Partner signs off before it goes out</div>
+              </div>
+            </div>
+          </div>
+          <h3>Month-end, traced to source</h3>
+          <p>
+            Once the files are in, the MIS is drafted. Every figure opens the
+            lines behind it.
+          </p>
+        </article>
       </div>
     </section>
   );
@@ -696,110 +844,107 @@ function Bento() {
 
 /* ────────────────────────── process ────────────────────────── */
 
-type DocCard = {
-  icon: "doc";
+type FileRow = {
+  icon: "doc" | "sheet" | "mail" | "chat" | "clock" | "user";
   title: string;
   sub: string;
-  pill: ["green" | "amber" | "grey" | "line", string];
+  tag?: [Tone, string];
 };
-const STEPS: { n: string; t: string; d: string; docs: DocCard[] }[] = [
+const ICONS = {
+  doc: FileText,
+  sheet: FileSpreadsheet,
+  mail: Mail,
+  chat: MessageCircle,
+  clock: Clock,
+  user: UserRound,
+};
+const STEPS: { n: string; t: string; d: string; files: FileRow[] }[] = [
   {
     n: "01",
     t: "Open a workspace per client",
-    d: "Add the engagement and last month’s files. Your checklist, contacts and team sit in one place.",
-    docs: [
+    d: "Add the client and their contact. Documents, follow-ups, reconciliation and the MIS all live there.",
+    files: [
+      { icon: "doc", title: "Engagement letter", sub: "Document · uploaded" },
       {
-        icon: "doc",
-        title: "Engagement letter",
-        sub: "Mehta Textiles · signed",
-        pill: ["green", "On file"],
+        icon: "sheet",
+        title: "Tally day book, September",
+        sub: "Export · read",
       },
-      {
-        icon: "doc",
-        title: "Monthly checklist",
-        sub: "11 items · due the 7th",
-        pill: ["line", "Template"],
-      },
-      {
-        icon: "doc",
-        title: "September close",
-        sub: "Prior month · reconciled",
-        pill: ["grey", "Archived"],
-      },
+      { icon: "doc", title: "HDFC statement, September", sub: "PDF · read" },
     ],
   },
   {
     n: "02",
-    t: "Check what’s missing",
-    d: "FynHelp compares the checklist against what has arrived and tells you exactly what is still outstanding.",
-    docs: [
-      {
-        icon: "doc",
-        title: "Sales register",
-        sub: "Received Nov 2",
-        pill: ["green", "In workspace"],
-      },
+    t: "Ask for what’s missing",
+    d: "Create a request for each document: which one, which month, when it’s due, and whether to use email, WhatsApp or both.",
+    files: [
       {
         icon: "doc",
         title: "HDFC statement, October",
-        sub: "Not yet received",
-        pill: ["amber", "Missing"],
+        sub: "Due Friday · email + WhatsApp",
+        tag: ["line", "Open"],
+      },
+      {
+        icon: "sheet",
+        title: "Purchase register",
+        sub: "Due Friday · email",
+        tag: ["line", "Open"],
       },
       {
         icon: "doc",
         title: "TDS challans, Q2",
-        sub: "Not yet received",
-        pill: ["amber", "Missing"],
+        sub: "Due Friday · WhatsApp",
+        tag: ["line", "Open"],
       },
     ],
   },
   {
     n: "03",
-    t: "Chase on your schedule",
-    d: "Follow-ups go out on Day 0, 3 and 7, or whatever you set, and stop when the file lands. After two unanswered ones, the item goes to a partner.",
-    docs: [
+    t: "Let the follow-ups run",
+    d: "Day 0, 3 and 7 by default. They stop the moment the document arrives, and on day 10 the request comes to a partner.",
+    files: [
       {
-        icon: "doc",
+        icon: "mail",
         title: "Day 0 · email",
-        sub: "Sent Nov 4",
-        pill: ["green", "Sent"],
+        sub: "Sent Monday",
+        tag: ["green", "Sent"],
       },
       {
-        icon: "doc",
-        title: "Day 3 · email",
-        sub: "Tomorrow, 10:00",
-        pill: ["amber", "Scheduled"],
+        icon: "chat",
+        title: "Day 3 · email and WhatsApp",
+        sub: "Sent Thursday",
+        tag: ["green", "Sent"],
       },
       {
-        icon: "doc",
-        title: "WhatsApp message",
-        sub: "Opens ready to send",
-        pill: ["line", "You press send"],
+        icon: "clock",
+        title: "Day 7 · next follow-up",
+        sub: "Mon to Sat, 9:30 am to 6:30 pm IST",
+        tag: ["amber", "Scheduled"],
       },
     ],
   },
   {
     n: "04",
-    t: "Reconcile and sign off",
-    d: "With the files in, bank lines are matched to the books and the MIS is drafted. Nothing reaches the client until a partner signs it off.",
-    docs: [
+    t: "Reconcile, then sign off",
+    d: "With the files in, bank lines are matched to the books and the MIS is drafted. A partner signs it off.",
+    files: [
       {
-        icon: "doc",
+        icon: "sheet",
         title: "Bank to Tally match",
         sub: "412 of 427 lines matched",
-        pill: ["green", "15 to review"],
+        tag: ["green", "15 to review"],
       },
       {
         icon: "doc",
         title: "October MIS",
         sub: "Every figure opens its lines",
-        pill: ["amber", "Ask first"],
+        tag: ["amber", "Needs sign-off"],
       },
       {
-        icon: "doc",
-        title: "Signed-off PDF",
-        sub: "After partner approval",
-        pill: ["grey", "Pending"],
+        icon: "user",
+        title: "Partner sign-off",
+        sub: "Before anything goes to the client",
+        tag: ["grey", "Pending"],
       },
     ],
   },
@@ -809,51 +954,51 @@ function Process() {
   const [i, setI] = useState(0);
   const cur = STEPS[i]!;
   return (
-    <section
-      className="sec"
-      id="how"
-      style={{
-        background: "var(--card)",
-        borderTop: "1px solid var(--line)",
-        borderBottom: "1px solid var(--line)",
-      }}
-    >
-      <div className="wrap">
-        <div className="fa-head">
-          <span className="fa-eyebrow">How it works</span>
-          <h2>From missing list to a complete file</h2>
+    <section className="sec wrap" id="how">
+      <h2 className="h2">
+        From missing list
+        <br />
+        to a complete file.
+      </h2>
+      <div className="fa-proc">
+        <div className="fa-steps" role="tablist" aria-label="Steps">
+          {STEPS.map((s, k) => (
+            <button
+              key={s.n}
+              type="button"
+              role="tab"
+              aria-selected={k === i}
+              className="fa-step"
+              onClick={() => setI(k)}
+            >
+              <span className="tt">
+                <i>{s.n}</i>
+                {s.t}
+              </span>
+              <span className="dd" style={{ display: "block" }}>
+                {s.d}
+              </span>
+            </button>
+          ))}
         </div>
-        <div className="fa-proc">
-          <div className="fa-steps" role="tablist" aria-label="Steps">
-            {STEPS.map((s, k) => (
-              <button
-                key={s.n}
-                type="button"
-                role="tab"
-                aria-selected={k === i}
-                className="fa-step"
-                onClick={() => setI(k)}
-                onMouseEnter={() => setI(k)}
-              >
-                <span className="n">{s.n}</span>
-                <span className="tt">{s.t}</span>
-                <span className="dd">{s.d}</span>
-              </button>
-            ))}
-          </div>
-          <div className="fa-docs" role="tabpanel" aria-live="polite">
-            {cur.docs.map((d) => (
-              <div className="fa-doc" key={`${cur.n}-${d.title}`}>
-                <div className="ic">
-                  <FileText size={17} />
+        <div className="fa-ptile" role="tabpanel" aria-live="polite">
+          <div className="fa-mcard fa-files">
+            <div className="h">Step {cur.n}</div>
+            {cur.files.map((f) => {
+              const I = ICONS[f.icon];
+              return (
+                <div className="fr" key={`${cur.n}-${f.title}`}>
+                  <span className="fa-kind">
+                    <I size={17} />
+                  </span>
+                  <div>
+                    <b>{f.title}</b>
+                    <small>{f.sub}</small>
+                  </div>
+                  {f.tag ? <Tag tone={f.tag[0]}>{f.tag[1]}</Tag> : <span />}
                 </div>
-                <div>
-                  <b>{d.title}</b>
-                  <small>{d.sub}</small>
-                </div>
-                <Pill tone={d.pill[0]}>{d.pill[1]}</Pill>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
@@ -864,166 +1009,46 @@ function Process() {
 /* ────────────────────────── integrations ────────────────────────── */
 
 function Integrations() {
+  const rows: [BrandKey, string][] = [
+    ["tally", "Tally for the books: upload exports as you do today"],
+    ["zoho", "Zoho Books, read-only, for bank ledgers and open invoices"],
+    ["gmail", "Gmail, read-only, to pick up client attachments"],
+    ["whatsapp", "WhatsApp to follow up with clients"],
+  ];
   return (
-    <section className="sec">
-      <div className="wrap">
-        <div className="fa-int">
-          <div className="l">
-            <span className="fa-eyebrow">Your stack, untouched</span>
-            <h2>Keep the tools your firm already uses</h2>
-            <ul>
-              {[
-                [
-                  "Tally",
-                  " for the books: upload the day book or ledger export, as you do today.",
-                ],
-                [
-                  "Zoho Books",
-                  " read-only: pull a client’s bank ledger and open invoices.",
-                ],
-                [
-                  "Gmail",
-                  " for client email, so replies and attachments land in the right workspace.",
-                ],
-                [
-                  "Excel and CSV",
-                  " for registers, and PDFs or photos for statements.",
-                ],
-              ].map(([b, rest]) => (
-                <li key={b}>
-                  <Check size={18} />
-                  <span>
-                    <b>{b}</b>
-                    {rest}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <p className="cap">
-              No new portal for clients. Just a faster chase.
-            </p>
-          </div>
-          <div className="r">
-            <div className="fa-badges" aria-hidden="true">
-              <div className="fa-badge2" style={{ top: 6, left: 4 }}>
-                <span className="gl">T</span>
-                <span>
-                  Tally<small>Bank ledger, day book</small>
-                </span>
-              </div>
-              <div className="fa-badge2" style={{ top: 70, right: 0 }}>
-                <span className="gl">Z</span>
-                <span>
-                  Zoho Books<small>Read-only connect</small>
-                </span>
-              </div>
-              <div className="fa-badge2" style={{ top: 148, left: 24 }}>
-                <span className="gl">G</span>
-                <span>
-                  Gmail<small>Client email</small>
-                </span>
-              </div>
-              <div className="fa-badge2" style={{ top: 226, right: 22 }}>
-                <span className="gl">W</span>
-                <span>
-                  WhatsApp<small>Quick-send link</small>
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ────────────────────────── trust ────────────────────────── */
-
-function Trust() {
-  return (
-    <section className="sec fa-dark">
-      <div className="wrap fa-trust">
+    <section className="sec wrap">
+      <div className="fa-int">
         <div>
-          <span className="fa-eyebrow">Security and control</span>
-          <h2>
-            Client data, handled with care.{" "}
-            <em>Every posting waits for a yes.</em>
+          <h2 className="h2">
+            Keep the tools your
+            <br />
+            firm already uses.
           </h2>
-          <ul>
-            {[
-              [
-                "Each firm’s data kept apart",
-                "Isolated at the database level, with files in private storage and shared only through short-lived links.",
-              ],
-              [
-                "A partner approves what matters",
-                "Entries posted to Tally or Zoho and the signed-off MIS need a person’s approval first.",
-              ],
-              [
-                "Every action on the record",
-                "An audit trail shows what was sent, matched or changed, and by whom.",
-              ],
-            ].map(([b, s]) => (
-              <li key={b}>
+          <p className="sub">
+            FynHelp works around your ledger, not instead of it.
+          </p>
+          <ul className="fa-ticks">
+            {rows.map(([k, t]) => (
+              <li key={k}>
                 <i>
-                  <Check size={14} />
+                  <Check size={13} />
                 </i>
-                <div>
-                  <b>{b}</b>
-                  <span>{s}</span>
-                </div>
+                {t}
               </li>
             ))}
           </ul>
+          <p className="cap">No new portal for clients. Just a faster chase.</p>
         </div>
-        <div className="fa-perm" role="group" aria-label="Sample permissions">
-          <div className="h">
-            <h4>Permissions</h4>
-            <span>Mehta Textiles</span>
-          </div>
-          {[
-            [
-              "Post entries to Tally or Zoho",
-              "Previewed first, partner approves",
-              "amber",
-              "Ask first",
-            ],
-            [
-              "Release the monthly MIS",
-              "Partner sign-off",
-              "amber",
-              "Ask first",
-            ],
-            [
-              "Read bank statements and registers",
-              "On upload",
-              "green",
-              "Automatic",
-            ],
-            [
-              "Email follow-ups for missing files",
-              "Your schedule, stops on arrival",
-              "green",
-              "On schedule",
-            ],
-            [
-              "WhatsApp message to a client",
-              "Opens ready to send",
-              "line",
-              "You press send",
-            ],
-          ].map(([t, s, tone, label]) => (
-            <div className="r" key={t}>
-              <div>
-                <b>{t}</b>
-                <small>{s}</small>
-              </div>
-              <Pill tone={tone as "green" | "amber" | "line"}>{label}</Pill>
-            </div>
-          ))}
-          <div className="foot">
-            Sample view. Posting to a ledger is off until you switch it on for a
-            client.
+        <div className="fa-intart" aria-hidden="true">
+          <div className="fa-pillrow">
+            {(
+              ["tally", "zoho", "gmail", "whatsapp", "excel"] as BrandKey[]
+            ).map((k) => (
+              <span key={k}>
+                <BrandIcon k={k} size={16} />
+                {BRAND_LABEL[k]}
+              </span>
+            ))}
           </div>
         </div>
       </div>
@@ -1031,53 +1056,93 @@ function Trust() {
   );
 }
 
-/* ────────────────────────── faq, close, footer ────────────────────────── */
+/* ────────────────────────── trust (the one dark card) ────────────────────────── */
+
+function Trust() {
+  return (
+    <section className="sec wrap">
+      <div className="fa-dark">
+        <div>
+          <h2 className="h2">
+            Client data,
+            <br />
+            handled with care.
+          </h2>
+          <p className="sub">
+            Each firm’s data is kept apart, and every posting waits for a yes.
+          </p>
+          <ul className="fa-ticks">
+            {[
+              "Only your firm’s team can open a client’s records",
+              "Partner, manager and junior roles, checked on the server",
+              "Postings to your books and MIS sign-off wait for a partner",
+            ].map((t) => (
+              <li key={t}>
+                <i>
+                  <Check size={13} />
+                </i>
+                {t}
+              </li>
+            ))}
+          </ul>
+          <Link to="/security" className="lnk">
+            How we handle security
+          </Link>
+        </div>
+        <div className="fa-dart">
+          <div className="fa-perm" role="group" aria-label="Sample permissions">
+            <div className="h">What needs a partner</div>
+            {(
+              [
+                ["Post to Tally or Zoho", "amber", "Ask first"],
+                ["Release the monthly MIS", "amber", "Ask first"],
+                ["Read bank statements", "green", "Automatic"],
+                ["Connect Gmail or WhatsApp", "grey", "Partner only"],
+              ] as [string, Tone, string][]
+            ).map(([t, tone, l]) => (
+              <div className="r" key={t}>
+                <span>{t}</span>
+                <Tag tone={tone}>{l}</Tag>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ────────────────────────── faq, closing, footer ────────────────────────── */
 
 function Faq() {
   return (
-    <section className="sec">
-      <div className="wrap">
-        <div className="fa-head" style={{ marginBottom: 36 }}>
-          <span className="fa-eyebrow">Questions</span>
-          <h2>Before you ask</h2>
+    <section className="sec wrap">
+      <div className="fa-faqgrid">
+        <div>
+          <h2 className="h2">
+            Questions,
+            <br />
+            answered.
+          </h2>
+          <div className="links">
+            <Link to="/blog/client-document-collection-reminder-templates-ca-firms">
+              Reminder templates for client documents
+            </Link>
+            <Link to="/blog/chatgpt-for-accounting-vs-fynhelp-ca-firms-india">
+              ChatGPT for accounting vs FynHelp
+            </Link>
+          </div>
         </div>
         <div className="fa-faq">
-          {ACCOUNTING_FAQS.map(([q, a]) => (
-            <details key={q}>
+          {ACCOUNTING_FAQS.map(([q, a], k) => (
+            <details key={q} open={k === 0}>
               <summary>
                 {q}
-                <ChevronDown size={20} aria-hidden="true" />
+                <Plus size={18} aria-hidden="true" />
               </summary>
               <p>{a}</p>
             </details>
           ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function Closing() {
-  return (
-    <section style={{ padding: "0 0 0" }}>
-      <div className="wrap">
-        <div className="fa-close">
-          <h2>
-            Spend close week <em>on the close.</em>
-          </h2>
-          <p>Let FynHelp handle the chasing. Your team handles the judgment.</p>
-          <div className="acts">
-            <Link
-              to={SIGNUP_URL}
-              onClick={() => trackCta("start", "afp-close")}
-              className="btn btn-acc"
-            >
-              {CTA_START} <ArrowRight size={17} />
-            </Link>
-            <DemoLink location="afp-close" className="btn btn-line">
-              {CTA_DEMO}
-            </DemoLink>
-          </div>
         </div>
       </div>
     </section>
@@ -1093,13 +1158,14 @@ const FOOT: { h: string; links: [string, string][] }[] = [
       ["Recon", "/agents/recon"],
       ["Narrate", "/agents/narrate"],
       ["Chaser", "/agents/chaser"],
+      ["Pricing", "/pricing"],
     ],
   },
   {
     h: "Use cases",
     links: [
-      ["CA firms", "/ca-firms"],
       ["Accounting firms", "/for/accounting-firms"],
+      ["CA firms", "/ca-firms"],
       ["Finance teams", "/enterprise"],
       ["All use cases", "/use-cases"],
     ],
@@ -1112,7 +1178,7 @@ const FOOT: { h: string; links: [string, string][] }[] = [
         "ChatGPT vs FynHelp",
         "/blog/chatgpt-for-accounting-vs-fynhelp-ca-firms-india",
       ],
-      ["Pricing", "/pricing"],
+      ["Bank reconciliation", "/agents/recon"],
     ],
   },
   {
@@ -1136,38 +1202,55 @@ const FOOT: { h: string; links: [string, string][] }[] = [
   },
 ];
 
-function Footer() {
+function Closing() {
   return (
-    <footer className="fa-foot">
-      <div className="wrap">
-        <div className="fa-cols">
-          <div className="brand">
-            <FynLogo size="sm" loading="lazy" />
-            <p className="about">
-              Practice software for Indian CA firms. Documents in, matched books
-              and a signed-off MIS out.
-            </p>
-          </div>
-          {FOOT.map((c) => (
-            <nav key={c.h} aria-label={c.h}>
-              <h5>{c.h}</h5>
-              {c.links.map(([l, to]) => (
-                <Link key={l} to={to}>
-                  {l}
-                </Link>
-              ))}
-            </nav>
-          ))}
-        </div>
-        <div className="fa-bottom">
-          <span>
-            &copy; {new Date().getFullYear()} {COMPANY.entity || "FynHelp"} ·
-            Bengaluru, India
-          </span>
-          <span>support@fynhelp.com</span>
+    <div className="fa-end">
+      <div className="wrap fa-close">
+        <h2>Spend tax season on the tax.</h2>
+        <p>
+          Let FynHelp handle the chasing.
+          <br />
+          Your team handles the judgment.
+        </p>
+        <div className="acts">
+          <StartButton where="afp-close" />
+          <DemoLink location="afp-close" className="btn btn-dline">
+            {CTA_DEMO}
+          </DemoLink>
         </div>
       </div>
-    </footer>
+      <footer className="fa-foot">
+        <div className="wrap">
+          <div className="fa-cols">
+            <div className="brand">
+              <FynLogo variant="light" size="sm" loading="lazy" />
+              <p className="about">
+                One workspace for your firm, and every client in it.
+              </p>
+              <p className="addr">Bengaluru, India</p>
+              <a className="mail" href="mailto:support@fynhelp.com">
+                support@fynhelp.com
+              </a>
+            </div>
+            {FOOT.map((c) => (
+              <nav key={c.h} aria-label={c.h}>
+                <h5>{c.h}</h5>
+                {c.links.map(([l, to]) => (
+                  <Link key={l} to={to}>
+                    {l}
+                  </Link>
+                ))}
+              </nav>
+            ))}
+          </div>
+          <div className="fa-bottom">
+            <span>
+              &copy; {new Date().getFullYear()} {COMPANY.entity || "FynHelp"}
+            </span>
+          </div>
+        </div>
+      </footer>
+    </div>
   );
 }
 
@@ -1186,9 +1269,8 @@ export default function AccountingFirmsPage() {
         <Integrations />
         <Trust />
         <Faq />
-        <Closing />
       </main>
-      <Footer />
+      <Closing />
     </div>
   );
 }

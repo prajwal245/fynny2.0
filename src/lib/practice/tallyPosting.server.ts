@@ -10,6 +10,7 @@
  *    (tallyLedgerRequests.server.ts) that the connector reads back from Tally before it counts.
  */
 import { PracticeError } from "./core";
+import { POSTING_OFF_MESSAGE, tallyPostingEnabled } from "./posting";
 import { logActivity, type Db, type FirmContext } from "./db.server";
 import type { ConnectorRow } from "./tallyConnector.server";
 import {
@@ -268,6 +269,7 @@ export async function approvePosting(
     confirmNotDuplicate?: boolean;
   },
 ) {
+  if (!tallyPostingEnabled()) throw new PracticeError("posting_off", POSTING_OFF_MESSAGE);
   if (!canApprove(ctx))
     throw new PracticeError(
       "forbidden",
@@ -453,6 +455,7 @@ export async function cancelPosting(db: Db, ctx: FirmContext, id: string) {
 
 /** Queued lines for this connector's companies, each with its ready XML. Interrupted lines are held, not resent. */
 export async function claimPostings(db: Db, c: ConnectorRow) {
+  if (!tallyPostingEnabled()) return [];
   const nowMs = Date.now();
   const lease = new Date(nowMs - LEASE_MINUTES * 60_000).toISOString();
   const { data: cos } = await db

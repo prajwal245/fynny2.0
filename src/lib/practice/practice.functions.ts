@@ -243,6 +243,11 @@ export const getTallyGstBooks = createServerFn({ method: "POST" })
     }),
   );
 
+/** Whether writing to Tally is allowed on this deployment. It is off for the QC offering; the screens that write are hidden when it is. */
+export const getPostingMode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => ({ tally: (await import("./posting")).tallyPostingEnabled() }));
+
 export const saveGstResult = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ business_id: uuid, summary: z.string().min(3).max(900) }).parse(d))

@@ -55,7 +55,23 @@ export async function checkAiProviders(): Promise<{ configured: string[]; edge: 
   return { configured: list.map((p) => p.name), edge, results };
 }
 
+/**
+ * Indian data residency. With PRACTICE_DATA_RESIDENCY=india no client document text or image leaves India for an AI model: only an
+ * endpoint whose host is on the allow-list (PRACTICE_AI_INDIA_HOSTS, default Google Vertex AI in Mumbai) may be used, and the shared
+ * edge function and every other provider are switched off. With none allowed, reading falls back to rules and nothing is sent anywhere.
+ */
+export const residencyIndiaOnly = () => (env("PRACTICE_DATA_RESIDENCY") ?? "").toLowerCase() === "india";
+export const indiaAiHosts = () => (env("PRACTICE_AI_INDIA_HOSTS") ?? "asia-south1-aiplatform.googleapis.com").split(",").map((h) => h.trim().toLowerCase()).filter(Boolean);
+export const allowedByResidency = (url: string) => {
+  if (!residencyIndiaOnly()) return true;
+  try { return indiaAiHosts().includes(new URL(url).hostname.toLowerCase()); } catch { return false; }
+};
+
 function providers(): Provider[] {
+  return rawProviders().filter((p) => allowedByResidency(p.url));
+}
+
+function rawProviders(): Provider[] {
   const list: Provider[] = [];
   const groq = env("GROQ_API_KEY");
   if (groq)
@@ -260,7 +276,9 @@ export function practiceLlm(
   const list = providers();
   const edgeAvailable =
     Boolean(supabaseUrl() && env("SUPABASE_SERVICE_ROLE_KEY")) &&
-    env("PRACTICE_AI_DISABLED") !== "1";
+    env("PRACTICE_AI_DISABLED") !== "1" &&
+    // The shared edge function may run outside India, so it is not used in India-only mode.
+    !residencyIndiaOnly();
   if (!list.length && !edgeAvailable) return null;
   const timeoutMs = opts.timeoutMs ?? 45_000;
   // The whole server call is cut off at 60 s, so every AI call made with this

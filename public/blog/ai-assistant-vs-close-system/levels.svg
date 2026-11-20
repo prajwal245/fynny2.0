@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 500" width="1200" height="500" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" role="img" aria-label="Four levels of AI access, from files only to the whole computer">
+  <rect width="1200" height="500" rx="28" fill="#FAF7F2"/>
+  <text x="600" y="56" font-size="28" font-weight="700" text-anchor="middle" fill="#141210">How much access should an AI tool get?</text>
+  <g font-size="21">
+    <rect x="48" y="92" width="1104" height="84" rx="16" fill="#2F6B4F" fill-opacity=".14" stroke="#2F6B4F" stroke-width="2"/>
+    <text x="80" y="128" font-weight="700" fill="#141210">Level 0   Works only on files you give it</text>
+    <text x="80" y="158" font-size="18" fill="#141210" fill-opacity=".72">Start here for client work. FynHelp's review checks sit here: read-only, nothing posted.</text>
+    <rect x="1000" y="112" width="120" height="40" rx="20" fill="#2F6B4F"/><text x="1060" y="139" font-size="17" font-weight="700" text-anchor="middle" fill="#fff">START HERE</text>
+
+    <rect x="48" y="188" width="1104" height="72" rx="16" fill="#FFFFFF" stroke="#141210" stroke-opacity=".1" stroke-width="2"/>
+    <text x="80" y="222" font-weight="700" fill="#141210">Level 1   Can read the web</text>
+    <text x="80" y="248" font-size="18" fill="#141210" fill-opacity=".72">More context, for research. Check what leaves the firm in each query.</text>
+
+    <rect x="48" y="272" width="1104" height="72" rx="16" fill="#FFFFFF" stroke="#8E1B1F" stroke-opacity=".4" stroke-width="2"/>
+    <text x="80" y="306" font-weight="700" fill="#141210">Level 2   Can write to other systems</text>
+    <text x="80" y="332" font-size="18" fill="#141210" fill-opacity=".72">Powerful, and risky without precautions. In FynHelp, posting is off unless a partner turns it on.</text>
+
+    <rect x="48" y="356" width="1104" height="72" rx="16" fill="#141210"/>
+    <text x="80" y="390" font-weight="700" fill="#FAF7F2">Level 3   Controls the whole computer</text>
+    <text x="80" y="416" font-size="18" fill="#FAF7F2" fill-opacity=".72">Not for client books. Keep it away from the machine that holds them.</text>
+  </g>
+  <text x="600" y="470" font-size="18" text-anchor="middle" fill="#141210" fill-opacity=".62">Move up one level at a time, and only with a reason.</text>
+</svg>

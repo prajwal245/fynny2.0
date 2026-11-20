@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { STATIC_POSTS, publishedStatic } from "..";
 import { faqFromHtml } from "@/lib/blog";
@@ -17,9 +18,9 @@ const DB_SLUGS = [
 const PAGES = ["/launch", "/pricing", "/samples", "/agents/extract", "/agents/recon", "/agents/narrate", "/agents/chaser"];
 
 describe("launch articles", () => {
-  it("are eleven, each with its own address", () => {
-    expect(STATIC_POSTS).toHaveLength(11);
-    expect(new Set(STATIC_POSTS.map((p) => p.slug)).size).toBe(11);
+  it("are twelve, each with its own address", () => {
+    expect(STATIC_POSTS).toHaveLength(12);
+    expect(new Set(STATIC_POSTS.map((p) => p.slug)).size).toBe(12);
     for (const p of STATIC_POSTS) expect(p.slug).toMatch(/^[a-z0-9-]+$/);
   });
 
@@ -57,6 +58,14 @@ describe("launch articles", () => {
   });
 
   it("are all live now", () => {
-    expect(publishedStatic()).toHaveLength(11);
+    expect(publishedStatic()).toHaveLength(12);
+  });
+
+  it("use pictures that exist, with a description", () => {
+    for (const p of STATIC_POSTS) {
+      const srcs = [p.cover_image_url, p.og_image, ...[...p.content.matchAll(/<img [^>]*src="([^"]+)"/g)].map((m) => m[1])].filter(Boolean) as string[];
+      for (const s of srcs) expect(existsSync(`public${s}`), `${p.slug}: ${s}`).toBe(true);
+      for (const [tag] of p.content.matchAll(/<img [^>]*>/g)) expect(tag, p.slug).toMatch(/alt="[^"]{10,}"/);
+    }
   });
 });

@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720" font-family="Inter, 'Helvetica Neue', Arial, sans-serif">
+  <rect width="1280" height="720" fill="#FAF7F2"/>
+  <rect x="0" y="0" width="1280" height="10" fill="#D92B2B"/>
+  <text x="72" y="96" font-size="22" font-weight="700" letter-spacing="3" fill="#8E1B1F">COMPARISON  ·  CA FIRMS</text>
+  <text x="72" y="178" font-size="58" font-weight="700" fill="#141210">An AI assistant, or a</text>
+  <text x="72" y="248" font-size="58" font-weight="700" fill="#141210">month-end close system?</text>
+  <!-- left card -->
+  <g>
+    <rect x="72" y="320" width="540" height="320" rx="24" fill="#FFFFFF" stroke="#141210" stroke-opacity=".1" stroke-width="2"/>
+    <text x="104" y="372" font-size="26" font-weight="700" fill="#141210">General AI assistant</text>
+    <text x="104" y="404" font-size="19" fill="#141210" fill-opacity=".6">ChatGPT, Claude</text>
+    <rect x="104" y="430" width="330" height="48" rx="24" fill="#EADBC8"/>
+    <text x="126" y="461" font-size="19" fill="#141210">What doesn't match?</text>
+    <rect x="178" y="494" width="396" height="48" rx="24" fill="#F4F2EE"/>
+    <text x="200" y="525" font-size="19" fill="#141210">Here are a few differences…</text>
+    <text x="104" y="596" font-size="20" font-weight="600" fill="#8E1B1F">Thinks with you. Answers may vary.</text>
+  </g>
+  <!-- right card -->
+  <g>
+    <rect x="668" y="320" width="540" height="320" rx="24" fill="#141210"/>
+    <text x="700" y="372" font-size="26" font-weight="700" fill="#FAF7F2">FynHelp</text>
+    <text x="700" y="404" font-size="19" fill="#FAF7F2" fill-opacity=".62">Month-end close for CA firms</text>
+    <g font-size="20" fill="#FAF7F2">
+      <circle cx="716" cy="452" r="13" fill="#2F6B4F"/><path d="M709 452 l5 5 l9 -10" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="744" y="459">Opening + movement = closing</text>
+      <circle cx="716" cy="502" r="13" fill="#2F6B4F"/><path d="M709 502 l5 5 l9 -10" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="744" y="509">Every match nets to zero</text>
+      <circle cx="716" cy="552" r="13" fill="#2F6B4F"/><path d="M709 552 l5 5 l9 -10" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="744" y="559">Same files, same result</text>
+    </g>
+    <text x="700" y="610" font-size="20" font-weight="600" fill="#EADBC8">Proves the books. A partner signs.</text>
+  </g>
+  <text x="1208" y="690" font-size="20" font-weight="700" text-anchor="end" fill="#8E1B1F">fynhelp.com</text>
+</svg>

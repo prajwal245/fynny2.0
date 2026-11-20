@@ -61,7 +61,7 @@ const asListPost = (p: StaticPost): ListPost => ({
   category: p.category,
   reading_time_minutes: p.reading_time_minutes,
   published_at: p.published_at,
-  cover_image_url: null,
+  cover_image_url: p.cover_image_url ?? null,
   is_featured: false,
 });
 
@@ -78,10 +78,10 @@ const asBlogPost = (p: StaticPost): BlogPost => ({
   views: 0,
   reading_time_minutes: p.reading_time_minutes,
   published_at: p.published_at,
-  cover_image_url: null,
+  cover_image_url: p.cover_image_url ?? null,
   seo_title: p.seo_title,
   seo_description: p.seo_description,
-  og_image: null,
+  og_image: p.og_image ?? p.cover_image_url ?? null,
   updated_at: p.updated_at ?? p.published_at,
 });
 

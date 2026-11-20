@@ -266,14 +266,6 @@ ${LIQUID_BUTTON_CSS}
 .fh-plan li b { color:${C.ink}; font-weight:600; }
 .fh-plan .fh-btn { width:100%; justify-content:center; margin-top:auto; }
 
-/* testimonials */
-.fh-quotes { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:44px; text-align:left; }
-@media (max-width:900px){ .fh-quotes{ grid-template-columns:1fr; } }
-.fh-quote { background:${C.card}; border:1px solid ${C.line}; border-radius:20px; padding:24px; display:flex; flex-direction:column; gap:18px; }
-.fh-quote p { font-size:16px; line-height:1.62; color:${C.body}; margin:0; }
-.fh-quote .who { display:flex; align-items:center; gap:10px; margin-top:auto; font-size:14.5px; font-weight:600; }
-.fh-quote .who i { width:32px; height:32px; border-radius:50%; background:linear-gradient(140deg,${C.coral},${C.maroonDeep}); display:block; flex:0 0 auto; }
-.fh-quote .who small { display:block; font-weight:400; color:${C.muted}; margin-top:2px; }
 
 /* faq */
 .fh-faq-grid { display:grid; grid-template-columns:.75fr 1.25fr; gap:44px; align-items:start; }

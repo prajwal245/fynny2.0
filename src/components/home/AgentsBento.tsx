@@ -74,7 +74,7 @@ const Tick = () => (
 
 const MATCHES: { d: string; n: string; a: string; chip: string; tone: "g" | "y" | "c" }[] = [
   { d: "03 Sep", n: "NEFT Sundara Textiles", a: "48,200", chip: "Exact match", tone: "g" },
-  { d: "05 Sep", n: "UPI Acme Traders", a: "12,500", chip: "Exact match", tone: "g" },
+  { d: "05 Sep", n: "UPI Kumar Traders", a: "12,500", chip: "Exact match", tone: "g" },
   { d: "09 Sep", n: "RTGS Lotus Fabrics", a: "66,000", chip: "Close match", tone: "y" },
   { d: "12 Sep", n: "Cheque 4471", a: "3,150", chip: "Your rule", tone: "g" },
   { d: "18 Sep", n: "Bank charges", a: "590", chip: "Needs you", tone: "c" },

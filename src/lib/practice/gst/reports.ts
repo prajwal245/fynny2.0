@@ -116,7 +116,9 @@ export function readTallyRegister(rows: string[][], opts: { month?: string | nul
     const no = (side === "purchase" ? cell(r[cSup]) : "") || cell(r[cNo]);
     out.push({
       gstin: cell(r[cGstin]).toUpperCase().replace(/\s+/g, ""), party: cell(r[cParty]), no,
-      date: (side === "purchase" ? ymd(r[cSupDt], "dmy") : null) ?? vdate, pos: "",
+      date: (side === "purchase" ? ymd(r[cSupDt], "dmy") : null) ?? vdate,
+      // The day it was booked, when that is not the supplier's invoice date: what the "booked late" rule looks at.
+      bookedOn: side === "purchase" && ymd(r[cSupDt], "dmy") && ymd(r[cSupDt], "dmy") !== vdate ? vdate : null, pos: "",
       taxable: r2(sign * taxable), igst: r2(sign * tax.igst), cgst: r2(sign * tax.cgst), sgst: r2(sign * tax.sgst), cess: r2(sign * tax.cess),
       total: r2(sign * gross), rate: null, hsn: "", irn: "", reverseCharge: rcm, itc: null,
       docType: type === "credit note" ? "credit_note" : type === "debit note" ? "credit_note" : "invoice", filedIn: null,

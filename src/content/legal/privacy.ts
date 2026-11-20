@@ -235,6 +235,11 @@ export const PRIVACY: LegalDoc = {
      "Document text relevant to the task"
     ],
     [
+     "Lovable AI Gateway",
+     "Routing of document-reading and MIS-drafting requests to AI models",
+     "Document text relevant to the task"
+    ],
+    [
      "OCR.space",
      "Text recognition for scanned documents",
      "Scanned pages relevant to the task"

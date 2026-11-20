@@ -5,16 +5,16 @@
  */
 export const COMPANY = {
   /** Registered legal name, e.g. "FynHelp Technologies Private Limited". */
-  entity: "",
+  entity: "FIVENTO AI PRIVATE LIMITED",
   /** CIN or LLPIN. */
-  cin: "",
-  /** Registered office address, one line. */
-  address: "",
+  cin: "U62013AP2026PTC126138",
+  /** Registered office, shown on the legal pages only. City and state, not a street address: the firm has no public office. */
+  address: "Visakhapatnam, Andhra Pradesh",
   /** Grievance Officer's full name. */
   officer: "",
   /** Grievance Officer's telephone, e.g. "+91 80 1234 5678". */
   phone: "",
-  /** Where the primary database runs. */
+  /** Where the primary database runs. Change this one line when the database moves (for example "Mumbai, India (Supabase ap-south-1)"); every page that states the region reads it. */
   region: "Sydney, Australia (Supabase ap-southeast-2)",
 };
 

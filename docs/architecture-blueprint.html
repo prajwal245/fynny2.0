@@ -1,0 +1,681 @@
+<title>FynHelp Verify Blueprint</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: one sticky tab bar over six views. Colour carries only status (built, partly built, planned, gap); the accent is a single ink-teal. */
+:root{
+  --bg:#f4f6f9; --surface:#ffffff; --surface2:#eef2f6; --ink:#14202e; --muted:#566476; --line:#d9e0e8;
+  --accent:#0d6a73; --accent-ink:#ffffff;
+  --built:#1b7a4b; --built-bg:#e3f3ea; --part:#9a5b00; --part-bg:#fbefd9; --plan:#4e5f78; --plan-bg:#e6ebf2; --gap:#b3261e; --gap-bg:#fbe5e3;
+  --f-head:"Space Grotesk",system-ui,sans-serif; --f-body:"Inter",system-ui,sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e141b; --surface:#151d27; --surface2:#1b2531; --ink:#e6ebf1; --muted:#97a5b7; --line:#273445;
+  --accent:#4fc1c8; --accent-ink:#06191b;
+  --built:#5ccb91; --built-bg:#12301f; --part:#f0b45a; --part-bg:#3a2a0d; --plan:#9fb0c6; --plan-bg:#212d3c; --gap:#ff8d84; --gap-bg:#3d1a18; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e141b; --surface:#151d27; --surface2:#1b2531; --ink:#e6ebf1; --muted:#97a5b7; --line:#273445;
+  --accent:#4fc1c8; --accent-ink:#06191b;
+  --built:#5ccb91; --built-bg:#12301f; --part:#f0b45a; --part-bg:#3a2a0d; --plan:#9fb0c6; --plan-bg:#212d3c; --gap:#ff8d84; --gap-bg:#3d1a18; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14.5px;line-height:1.55;margin:0;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 48px}
+.wrap{max-width:1180px;margin:0 auto}
+h1,h2,h3{font-family:var(--f-head);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:clamp(26px,4vw,38px);line-height:1.1}
+h2{font-size:21px} h3{font-size:15px}
+p{margin:0}
+p,li,h2,h3,.act,.ask{overflow-wrap:anywhere}
+code,.mono{font-family:var(--f-mono);font-size:12.5px}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+header.top{padding-block:28px 18px;display:grid;gap:10px}
+.kicker{font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lede{max-width:70ch;color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:6px;font-size:12.5px;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap}
+.pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.s-built{color:var(--built);background:var(--built-bg)} .s-part{color:var(--part);background:var(--part-bg)}
+.s-plan{color:var(--plan);background:var(--plan-bg)} .s-gap{color:var(--gap);background:var(--gap-bg)}
+nav.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line);display:flex;gap:2px;overflow-x:auto;padding-block:6px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+nav.tabs button{border:0;background:none;padding:9px 14px;border-radius:8px;color:var(--muted);font-weight:500;white-space:nowrap}
+nav.tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 0 0 1px var(--line)}
+main{padding-block:22px;display:grid;gap:22px}
+.view[hidden]{display:none}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px}
+.grid{display:grid;gap:12px}
+.cols2{grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))}
+.cols3{grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr))}
+.muted{color:var(--muted)}
+.hint{font-size:12.5px;color:var(--muted)}
+/* pipeline */
+.stages{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,196px),1fr));gap:10px}
+.stage{text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 13px;display:grid;gap:7px;min-width:0}
+.stage[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+.stage .n{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.stage b{font-family:var(--f-head);font-size:15px;line-height:1.2}
+.detail{display:grid;gap:16px}
+.detail h2{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.sec h3{font-size:12px;font-family:var(--f-mono);text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:6px;font-weight:500}
+.sec ul{margin:0;padding-left:18px;display:grid;gap:4px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-family:var(--f-mono);font-size:12px;padding:2px 8px;border-radius:6px;background:var(--surface2);border:1px solid var(--line);overflow-wrap:anywhere}
+.ask{border-left:3px solid var(--accent);padding:4px 0 4px 12px;background:var(--surface2);border-radius:0 8px 8px 0}
+.cross{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:10px}
+/* flow */
+.diagram{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.diagram svg{display:block;min-width:960px;width:100%;height:auto}
+.node rect{fill:var(--surface2);stroke:var(--line);stroke-width:1.2}
+.node text{fill:var(--ink);font-family:var(--f-body);font-size:12.5px}
+.node .sub{fill:var(--muted);font-size:10.5px;font-family:var(--f-mono)}
+.node{cursor:pointer;transition:opacity .15s}
+.node.k-layer rect{fill:var(--surface);stroke:var(--accent);stroke-width:1.6}
+.node.k-db rect{fill:var(--surface2)}
+.node.dim,.edge.dim{opacity:.18}
+.node.sel rect{stroke:var(--accent);stroke-width:2.6}
+.node:focus-visible rect{stroke:var(--accent);stroke-width:3}
+.edge{fill:none;stroke:var(--muted);stroke-width:1.3;transition:opacity .15s}
+.edge.audit{stroke-dasharray:4 4}
+.edge.on{stroke:var(--accent);stroke-width:2.4}
+.colhead{fill:var(--muted);font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.st-dot-built{fill:var(--built)} .st-dot-part{fill:var(--part)} .st-dot-plan{fill:var(--plan)}
+/* tables */
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+input[type=search],select,textarea{background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit;min-width:0}
+input[type=search]{flex:1 1 220px}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:720px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--f-mono);font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:500;background:var(--surface2);position:sticky;top:0}
+tr:last-child td{border-bottom:0}
+td.id{font-family:var(--f-mono);font-size:12px;white-space:nowrap}
+.sev-error{color:var(--gap);font-weight:600} .sev-warn{color:var(--part);font-weight:600} .sev-info{color:var(--muted)}
+/* roadmap */
+.lanes{display:grid;gap:12px}
+.lane{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+.lane h3{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline}
+.items{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr));gap:8px}
+.item{text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:10px 11px;display:grid;gap:6px;border-left-width:4px}
+.item.s-built{border-left-color:var(--built)} .item.s-part{border-left-color:var(--part)} .item.s-plan{border-left-color:var(--plan)}
+.item[aria-pressed="true"]{box-shadow:0 0 0 2px var(--accent)}
+.item span.t{font-weight:600;line-height:1.3}
+.bar{display:flex;height:10px;border-radius:99px;overflow:hidden;background:var(--surface2)}
+.bar i{display:block}
+.counts{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px}
+/* approval */
+.steps{display:grid;gap:8px}
+.step{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:12px;align-items:start;text-align:left;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px}
+.step[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+.step .dot{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-family:var(--f-mono);font-size:12px;background:var(--surface2);border:1px solid var(--line)}
+.step.done .dot{background:var(--built);color:#fff;border-color:var(--built)}
+.step.doing .dot{background:var(--part);color:#fff;border-color:var(--part)}
+.step .gate{font-size:11.5px;font-family:var(--f-mono);color:var(--gap)}
+.seg{display:inline-flex;flex-wrap:wrap;max-width:100%;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.grid>*,.card,.steps>*{min-width:0}
+.seg button{border:0;background:var(--surface);padding:6px 11px;font-size:13px;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.seg button.gap[aria-pressed="true"]{background:var(--gap);color:#fff}
+.seg button.unsure[aria-pressed="true"]{background:var(--part);color:#fff}
+.lanes2{display:grid;gap:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
+.lane2{display:grid;grid-template-columns:130px minmax(0,1fr);border-bottom:1px solid var(--line)}
+.lane2:last-child{border-bottom:0}
+.lane2 .who{padding:12px;background:var(--surface2);font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.lane2 .acts{display:flex;flex-wrap:wrap;gap:8px;padding:10px}
+.act{background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px;max-width:260px}
+.act em{display:block;font-style:normal;font-size:11.5px;color:var(--muted);font-family:var(--f-mono)}
+@media (max-width:560px){.lane2{grid-template-columns:1fr}.step{grid-template-columns:30px minmax(0,1fr)}.step .right{grid-column:2}}
+.rv{display:grid;gap:10px}
+.rvq{display:grid;gap:8px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.rvq textarea{width:100%;min-height:40px;resize:vertical}
+.btn{background:var(--accent);color:var(--accent-ink);border:0;border-radius:8px;padding:8px 14px;font-weight:600}
+.btn.ghost{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <div class="kicker">FynHelp · Verify module · architecture blueprint · 19 Nov 2026</div>
+  <h1>How a client's month is proved, from first file to signed report</h1>
+  <p class="lede">This blueprint is drawn from the code in the repository, not from the plan. Every stage shows what is built, what is only partly built, what is planned, where its data lands in the database, and which rules check it. The last two tabs are for approval: the steps from internal sign-off to the advisor's review, and a sheet where each missing checkpoint can be marked.</p>
+  <div class="legend" aria-label="Status key">
+    <span><span class="pill s-built">Built</span> works in the app and is covered by tests</span>
+    <span><span class="pill s-part">Partly built</span> a working piece exists, a part is missing</span>
+    <span><span class="pill s-plan">Planned</span> designed, not built</span>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist" aria-label="Blueprint views">
+  <button role="tab" id="t-pipeline" data-view="pipeline" aria-selected="true">Pipeline</button>
+  <button role="tab" id="t-flow" data-view="flow" aria-selected="false">Data flow</button>
+  <button role="tab" id="t-rules" data-view="rules" aria-selected="false">Validation rules</button>
+  <button role="tab" id="t-roadmap" data-view="roadmap" aria-selected="false">Roadmap</button>
+  <button role="tab" id="t-approval" data-view="approval" aria-selected="false">Approval workflow</button>
+  <button role="tab" id="t-review" data-view="review" aria-selected="false">Advisor review</button>
+</nav>
+
+<main>
+  <section class="view" id="v-pipeline" aria-labelledby="t-pipeline">
+    <div class="grid" style="gap:14px">
+      <p class="muted">Ten stages, in order. Select one to see what it does today, where its output is stored, the rules that guard it and what the advisor is asked to confirm. Data is revalidated at every stage; a stage that cannot prove its output stops the line and says what is missing.</p>
+      <div class="stages" id="stages"></div>
+      <div class="card detail" id="stageDetail" aria-live="polite"></div>
+      <div>
+        <h2 style="margin-bottom:10px">Layers that run across every stage</h2>
+        <div class="cross" id="cross"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="v-flow" hidden aria-labelledby="t-flow">
+    <div class="grid" style="gap:14px">
+      <p class="muted">Sources on the left, processing layers in the middle, database destinations on the right. Select any box to light up everything it touches. Dashed lines are the audit trail, written by every layer.</p>
+      <div class="diagram"><svg id="flowSvg" viewBox="0 0 1120 720" role="img" aria-label="Data flow from sources through processing layers to database tables"></svg></div>
+      <div class="card" id="flowDetail" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-rules" hidden aria-labelledby="t-rules">
+    <div class="grid" style="gap:14px">
+      <p class="muted">Every rule that can stop or flag a month. A rule has an id, the stage it belongs to, how serious it is and whether it exists yet. Nothing is hidden behind AI: a rule is a fixed check that produces the same answer on the same files.</p>
+      <div class="tools">
+        <input type="search" id="rq" placeholder="Search a rule, id or file" aria-label="Search rules">
+        <select id="rl" aria-label="Stage"></select>
+        <select id="rs" aria-label="Status"><option value="">Any status</option><option value="built">Built</option><option value="part">Partly built</option><option value="plan">Planned</option></select>
+        <span class="hint" id="rcount"></span>
+      </div>
+      <div class="tbl"><table><thead><tr><th>Id</th><th>Stage</th><th>What it checks</th><th>If it fails</th><th>Status</th></tr></thead><tbody id="rbody"></tbody></table></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-roadmap" hidden aria-labelledby="t-roadmap">
+    <div class="grid" style="gap:14px">
+      <p class="muted">The four phases from the advisor meeting, with the status of each piece as of today. Select a piece for what exists and what is still missing. Automated entries and filing stay in Phase 4, behind the quality-control engine.</p>
+      <div class="card"><div class="counts" id="rmCounts"></div><div class="bar" id="rmBar" style="margin-top:10px"></div></div>
+      <div class="lanes" id="lanes"></div>
+      <div class="card" id="itemDetail" aria-live="polite"><span class="muted">Select a piece above.</span></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-approval" hidden aria-labelledby="t-approval">
+    <div class="grid" style="gap:22px">
+      <div class="grid" style="gap:12px">
+        <h2>A. Getting this blueprint approved</h2>
+        <p class="muted">The route agreed with the advisor. Two steps are gates: nothing is shared before the NDA is signed, and the advisor never receives production source code. Mark each step as you go; the state stays in this browser only.</p>
+        <div class="card"><div class="counts" id="apCounts"></div><div class="bar" id="apBar" style="margin-top:10px"></div></div>
+        <div class="grid cols2" style="align-items:start">
+          <div class="steps" id="steps"></div>
+          <div class="card detail" id="stepDetail" aria-live="polite"></div>
+        </div>
+      </div>
+      <div class="grid" style="gap:12px">
+        <h2>B. How a client's month is approved inside the product</h2>
+        <p class="muted">Who may do what before a month counts as closed. The system checks what it can prove; a person confirms only what it cannot; a difference is closed only by a named person with a reason. Any changed file makes the earlier result stale.</p>
+        <div class="lanes2" id="lanes2"></div>
+        <div class="grid cols3" id="gates"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="v-review" hidden aria-labelledby="t-review">
+    <div class="grid" style="gap:14px">
+      <p class="muted">For the advisor: for each stage, say whether the checkpoint is right, whether something is missing, or whether you are unsure, and add a note. Your answers stay in this browser. Use Copy summary to send them back to the team.</p>
+      <div class="card"><div class="counts" id="rvCounts"></div></div>
+      <div class="tools"><label class="hint" for="rname">Reviewed by</label><input type="search" id="rname" placeholder="Name and firm" style="max-width:300px" aria-label="Reviewed by"><button class="btn" id="copyBtn">Copy summary</button><button class="btn ghost" id="clearBtn">Clear answers</button><span class="hint" id="copyNote" role="status"></span></div>
+      <div class="rv" id="rv"></div>
+      <textarea id="summary" readonly rows="8" style="width:100%;font-family:var(--f-mono);font-size:12px" aria-label="Summary text" hidden></textarea>
+    </div>
+  </section>
+</main>
+</div>
+
+<script>
+/* ---------- the content ---------- */
+const ST = { built: "Built", part: "Partly built", plan: "Planned" };
+const pill = (s) => `<span class="pill s-${s}">${ST[s]}</span>`;
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const chips = (a) => (a && a.length ? `<div class="chips">${a.map((x) => `<span class="chip">${esc(x)}</span>`).join("")}</div>` : '<span class="muted">None yet</span>');
+const list = (a) => `<ul>${a.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`;
+
+const STAGES = [
+  { id: "collect", name: "Document collection", st: "built",
+    does: "Gets every file a month needs into one place, and knows which ones are still missing.",
+    built: ["Upload links the client can use without an account, with expiry and revoke", "Gmail intake rules, WhatsApp chase templates, manual upload, the Tally connector and Zoho Books link", "Expected-statement list per client, so a missing bank statement blocks the month and is named", "Password-protected PDFs: the password is saved encrypted and revealing it is logged"],
+    gaps: ["A single 'documents still missing' list that also covers GST returns, registers and the audited balance sheet", "Pending-verification list per client across all checks"],
+    code: ["practice/uploadLinks.server.ts", "practice/gmailIntake.server.ts", "practice/chaser.server.ts", "practice/documents.server.ts"],
+    db: ["storage: ca-client-documents (private)", "ca_document_requests", "ca_document_extractions", "ca_file_passwords", "ca_touchpoints"],
+    rules: ["CL-1 All expected statements received"],
+    asks: ["Which documents must exist before a month can be reviewed, for a trader, a contractor and a service company?", "Is a signed audited balance sheet needed every year, or only once per client?"] },
+  { id: "extract", name: "Extraction", st: "built",
+    does: "Turns each file into rows and totals. Rules read what they can; AI reads only unstructured PDFs, and its output must tie to the document's own totals.",
+    built: ["Ten bank PDF layouts verified on real files, plus Excel statements and loan statements", "Tally Day Book (XML and Excel), Tally masters, Tally sales, purchase and debit note registers, and journals posted to GST ledgers", "GSTR-1 and GSTR-2B reports for the year, the GSTR-3B annual report (one column block per month), and the monthly JSON", "Last year's signed balance sheet and profit and loss, read from the PDF text"],
+    gaps: ["Scanned audited statements with no text layer need the vision reader", "Layout memory: remember a bank layout the AI read once, so the next one is free"],
+    code: ["practice/extract/*", "practice/gst/files.ts", "practice/gst/reports.ts", "practice/audited.ts"],
+    db: ["ca_document_extractions", "ca_ai_calls (cost and prompt record)"],
+    rules: ["ST-1 Running balance follows", "ST-2 Bank-printed totals tie", "OB-2 Audited statements prove themselves", "TX-1 Register vouchers tie to gross total"],
+    asks: ["Which statement and register layouts do your clients' files use that we have not seen?", "Are GST portal downloads always Excel, or do some clients send the JSON?"] },
+  { id: "classify", name: "Classification", st: "part",
+    does: "Decides what a file is (bank statement, loan statement, Day Book, register, GST return) so the right reader and the right checks run.",
+    built: ["Bank statement against loan statement, including loan files with no 'loan' in the name", "Day Book against masters against ledger report", "Tally register sheets recognised only when they carry Tally's heading row"],
+    gaps: ["One classifier across every format; GST files are told apart by sheet and heading today", "A person's correction of a wrong class is not yet remembered per firm"],
+    code: ["practice/extract/classify.ts", "practice/extract/loanStatement.ts", "practice/gst/files.ts"],
+    db: ["ca_document_extractions (kind, side)"],
+    rules: ["CF-1 A loan statement never becomes bank lines", "CF-2 A sheet named like a register but not laid out like one is left to the general reader"],
+    asks: ["Which file types do clients most often send under the wrong name?"] },
+  { id: "normalize", name: "Normalization", st: "part",
+    does: "Puts every figure, date, invoice number and party into one form, so files from different places can be compared.",
+    built: ["Indian digit grouping, negatives in brackets, Dr and Cr suffixes", "Dates read day first by default, and month first when a date in the column proves it", "Invoice numbers compared without punctuation, case or leading zeros", "GSTIN kept in one form; counterparty aliases per firm"],
+    gaps: ["A customer and vendor master that links one party across invoices, payments and ledgers", "Confirmed ledger-to-head mapping per client for the opening balance check"],
+    code: ["practice/gst/invoices.ts", "practice/ledgerLearning.ts", "practice/india.ts"],
+    db: ["ca_txns", "ca_counterparty_aliases"],
+    rules: ["NM-1 Month-first dates are detected, not assumed", "NM-2 Credit notes carry negative amounts whichever way a file signs them"],
+    asks: ["How should two names for one party be joined: by GSTIN, PAN, or a person's choice?"] },
+  { id: "validate", name: "Validation", st: "built",
+    does: "Tests each file on its own, before anything is compared with another file.",
+    built: ["38 GST invoice rules: GSTIN shape and check character, state code, PAN, numbers, dates, tax split, rate, totals, HSN, IRN, reverse charge", "Bank statements: balance follows line by line and ties to the bank's printed totals", "Failed statements are held until a partner accepts them with a reason", "Tally masters balance (debits equal credits); audited schedule ties to its totals"],
+    gaps: ["Blocked credit under section 17(5) and ITC reversal rules wait for the CA's list", "HSN against rate table"],
+    code: ["practice/gst/validations.ts", "practice/statementVerification.ts", "practice/extract/tallyMasters.ts"],
+    db: ["ca_document_extractions (verification result)", "ca_review_items"],
+    rules: ["38 rules in the Validation rules tab", "ST-1 to ST-4", "OB-2, OB-3"],
+    asks: ["Which of the 38 rules would you drop, and which important rule is missing?", "Which severities would you change?"] },
+  { id: "match", name: "Cross-source matching", st: "built",
+    does: "Compares one source with another and lists what agrees, what differs and what is on one side only.",
+    built: ["Bank statements against the Day Book, per account, with own-account transfers, reversals and loan lines handled", "GSTR-2B against the purchase register with vendor follow-up text", "Sales register against GSTR-1 invoice by invoice; GSTR-1 against GSTR-3B; ITC available against claimed; reverse charge", "Opening balances against last year's audited closing, by balance sheet group, on the client page", "Ageing of open bills from the Day Book's bill allocations"],
+    gaps: ["Mapping each receipt and payment to the invoices it settles, with a screen", "Loan statement against loan ledger", "Physical invoice against Tally"],
+    code: ["practice/recon/engine.ts", "practice/gst/reconcile.ts", "practice/gst/returns.ts", "practice/audited.ts", "practice/ageing.ts"],
+    db: ["ca_recon_runs", "ca_recon_matches", "ca_exceptions"],
+    rules: ["RC-1 to RC-5", "GR-1 to GR-5", "OB-1"],
+    asks: ["What tolerance do you accept per invoice and per month before a difference is a finding?", "In what order do you check GSTR-1, 3B, 2B and the books?"] },
+  { id: "post", name: "Post-matching verification", st: "plan",
+    does: "Proves the matching itself: nothing counted twice, matched totals agree on both sides, nothing outside the period.",
+    built: ["Partial: statement tie-out and per-account reconciliation totals exist"],
+    gaps: ["A re-check run after every match that fails loudly if a line is used twice, a matched pair does not net to zero or own-account transfers do not cancel"],
+    code: ["to be added beside practice/recon/engine.ts"],
+    db: ["ca_recon_runs (check result)", "ca_exceptions"],
+    rules: ["RC-6 Matched totals agree on both sides and no line is used twice"],
+    asks: ["What proof do you look for after a reconciliation before you trust it?"] },
+  { id: "evidence", name: "Evidence verification", st: "part",
+    does: "Lets anyone see, for a result, exactly which document and line it came from.",
+    built: ["Transaction lineage drawer from a result back to its source line", "Original documents open through signed links that expire in five minutes", "GST checks show both figures and both sources, and name the file a check still needs"],
+    gaps: ["The evidence pack: one PDF and Excel per client and month with each input's SHA-256", "Saved check results with a hash of their inputs, so a changed file marks them stale", "The rule and the source place on every line of the opening-balance and returns checks"],
+    code: ["components/ca/TxnLineageDrawer.tsx", "practice/gst/returns.ts"],
+    db: ["ca_audit_events (append-only)", "ca_reports_log"],
+    rules: ["VE-1 Changed input makes a result stale", "VE-2 A check that cannot run names the file it needs", "EV-1 Evidence pack lists every input with its hash"],
+    asks: ["What must an evidence pack show for you to hand it to a client or an auditor?"] },
+  { id: "exceptions", name: "Exception handling", st: "built",
+    does: "Turns every doubt into an item with an owner, a status and a history, instead of a guess.",
+    built: ["Seven kinds: unidentified, amount difference, timing, duplicate, GST mismatch, cash, own-account", "Owner, status, due date and a full history per exception; queries sent to the client by WhatsApp or email", "Partner or manager must accept a timing difference with a note"],
+    gaps: ["Exception kinds for opening balance and GST value mismatch in the queue", "A named-person decision on each opening-balance difference", "Bulk actions for repeated patterns"],
+    code: ["practice/exceptionKinds.ts", "practice/exceptionWork.server.ts"],
+    db: ["ca_exceptions", "ca_review_items", "ca_chaser_events"],
+    rules: ["EX-1 A difference is closed only by a named person with a reason"],
+    asks: ["Which exception kinds do you use that are not in the seven?"] },
+  { id: "report", name: "Final QC report", st: "part",
+    does: "Gives the partner one answer for the month and the proof behind it.",
+    built: ["Month-end close: ten steps, the system ticks what it can prove, a named person confirms the rest", "Two states kept apart: Bank and Books Closed, and Fully Closed", "Partner sign-off on the MIS; open items must be acknowledged first", "Reports log and MIS export"],
+    gaps: ["The evidence pack as the sign-off attachment", "A Close step for opening balances, once results can be saved"],
+    code: ["practice/close/steps.ts", "practice/close/close.server.ts", "practice/reports.server.ts"],
+    db: ["ca_close_steps", "ca_close_events", "ca_reports_log"],
+    rules: ["CL-1 to CL-10"],
+    asks: ["Which of the ten close steps would you move, rename or remove?"] },
+];
+
+const CROSS = [
+  { n: "Roles and access", st: "built", t: "Partner, manager, senior, junior, staff. Settings, connections and sign-off are partner-only and checked on the server, not just on the screen." },
+  { n: "Audit trail", st: "part", t: "Append-only table that cannot be edited or deleted from the app. Today it records creates and two-step sign-in changes; reads, downloads, exports and role changes are planned." },
+  { n: "Tenant isolation", st: "built", t: "Row-level security on every table that holds client data. A cross-firm test that runs on every change is planned." },
+  { n: "Document registry and reuse", st: "part", t: "A document uploaded once is stored and read once; checks reuse it. Relationship links between party, invoice, payment and ledger are partial." },
+  { n: "Data protection", st: "part", t: "Encrypted in transit and at rest, encrypted secrets, signed short-lived file links, public claims checked by a test. Retention, erasure, export and a Mumbai region are planned." },
+  { n: "Sign-in", st: "part", t: "Two-step sign-in is on by default for new firms. Existing firms keep their setting." },
+];
+
+/* layers and database tables for the flow diagram */
+const SOURCES = [
+  { id: "s1", t: "Bank statements", sub: "PDF · Excel · scan", st: "built", d: "Ten bank layouts verified on real files; password-protected files supported." },
+  { id: "s2", t: "Tally Day Book and registers", sub: "XML · Excel", st: "built", d: "Day Book, sales, purchase, debit note and journal registers. Taxable value is the sum of each voucher's ledger columns." },
+  { id: "s3", t: "Tally masters", sub: "ledgers · opening balances", st: "built", d: "Each ledger with its group and opening balance; debit is negative as Tally writes it." },
+  { id: "s4", t: "GSTR-1 · 3B · 2B", sub: "portal Excel · JSON", st: "built", d: "GSTR-1 workbook (month-first dates), GSTR-3B annual report (twelve months, cut to one), GSTR-2B." },
+  { id: "s5", t: "Audited statements", sub: "balance sheet · P&L · PDF", st: "built", d: "Read from the signed PDF's text and proved before anything is compared: totals add up, profit adds up, reserves roll forward." },
+  { id: "s6", t: "Client channels", sub: "link · Gmail · WhatsApp", st: "built", d: "How files arrive: upload link, Gmail rules, WhatsApp chase, manual, Tally connector, Zoho." },
+];
+const LAYERS = [
+  { id: "l1", t: "1 Collection", sub: "registry · missing list", st: "built", stage: "collect", d: "Stores the original in private storage and records what is expected and what is missing." },
+  { id: "l2", t: "2-3 Extract + classify", sub: "rules first, AI on PDFs", st: "built", stage: "extract", d: "Reads each file into rows and totals; AI output must tie to the document's own totals or it is held." },
+  { id: "l3", t: "4-5 Normalize + validate", sub: "38 GST rules, tie-outs", st: "built", stage: "validate", d: "One form for dates, numbers and parties; each file tested alone." },
+  { id: "l4", t: "6 Cross-source matching", sub: "bank · GST · opening", st: "built", stage: "match", d: "Compares sources and lists agree, differ and one-side-only." },
+  { id: "l5", t: "7-8 Post-match + evidence", sub: "re-check · input hash", st: "part", stage: "post", d: "Proves the matching and ties every result to its sources. Re-check and evidence pack are planned." },
+  { id: "l6", t: "9 Exceptions", sub: "owner · status · history", st: "built", stage: "exceptions", d: "Every doubt becomes an item a named person closes with a reason." },
+  { id: "l7", t: "10 Close + QC report", sub: "10 steps · sign-off", st: "part", stage: "report", d: "The partner's answer for the month and the proof behind it." },
+];
+const DBS = [
+  { id: "d1", t: "Private storage", sub: "ca-client-documents", st: "built", d: "Original files. A signed link opens one for five minutes." },
+  { id: "d2", t: "ca_document_extractions", sub: "what each file read as", st: "built", d: "Kind, side, rows, verification result and who uploaded it." },
+  { id: "d3", t: "ca_txns", sub: "normalized lines", st: "built", d: "Every bank and book line in one form, linked to its source document." },
+  { id: "d4", t: "ca_recon_runs · matches", sub: "what agreed with what", st: "built", d: "Each run and each match, with the rule that made it." },
+  { id: "d5", t: "ca_exceptions · review", sub: "owners and history", st: "built", d: "Exceptions, their owner, state and notes; review items; chase events." },
+  { id: "d6", t: "ca_close_steps · events", sub: "who confirmed what", st: "built", d: "Confirmed steps with name and time; every confirm and un-confirm is an event." },
+  { id: "d7", t: "ca_audit_events", sub: "append-only", st: "part", d: "Cannot be edited or deleted from the app. Needs more event types." },
+  { id: "d8", t: "ca_reports_log · evidence", sub: "reports; pack planned", st: "part", d: "MIS reports today. The evidence pack and a table for saved Verify results are planned." },
+];
+/* edges: from, to, audit? */
+const EDGES = [
+  ["s1","l1"],["s2","l1"],["s3","l1"],["s4","l1"],["s5","l1"],["s6","l1"],
+  ["l1","l2"],["l2","l3"],["l3","l4"],["l4","l5"],["l5","l6"],["l6","l7"],
+  ["l1","d1"],["l2","d2"],["l3","d3"],["l4","d4"],["l5","d4"],["l6","d5"],["l7","d6"],["l7","d8"],
+  ["l1","d7",1],["l3","d7",1],["l4","d7",1],["l6","d7",1],["l7","d7",1],
+];
+
+const R = (id, stage, what, sev, st, ifFails) => ({ id, stage, what, sev, st, ifFails });
+const RULES = [
+  R("CL-1","Collection","Every expected bank statement for the month has arrived","hold","built","The month cannot be marked closed; the missing statement is named and can be chased"),
+  R("ST-1","Extraction","Running balance follows line by line","hold","built","The statement is held until a partner accepts it with a reason"),
+  R("ST-2","Extraction","Lines add up to the totals the bank prints","hold","built","Held, with the difference shown"),
+  R("TX-1","Extraction","Each Tally register voucher's ledger columns add up to its gross total","warn","built","The voucher is named; check it in Tally"),
+  R("OB-2","Extraction","The audited balance sheet adds up: liabilities and assets each equal the printed total, and the two totals are equal","hold","built","Nothing is compared from that balance sheet"),
+  R("OB-3","Extraction","The profit and loss adds up, and closing reserves equal opening reserves plus the year's profit, or the difference is stated","warn","built","The difference is shown"),
+  R("CF-1","Classification","A loan statement never becomes bank lines","error","built","It is set aside from bank reconciliation"),
+  R("CF-2","Classification","A sheet that only carries a register's name is not read as a Tally register","error","built","The general invoice reader is used"),
+  R("NM-1","Normalization","Dates are read month first only when a date in the column proves it","error","built","A month-first file is noted as such"),
+  R("NM-2","Normalization","Credit notes carry negative amounts whichever way a file signs them","error","built","Totals still agree with the return"),
+  ...[
+    ["gstin_missing","GSTIN present","warn","A purchase without the supplier's GSTIN cannot be matched to GSTR-2B or claimed as ITC"],
+    ["gstin_check","GSTIN passes its check character","error","The portal will not match it"],
+    ["gstin_format","GSTIN has the right shape","error","Not a GSTIN pattern"],
+    ["gstin_state","GSTIN state code is a real state","error","Mistyped GSTIN"],
+    ["gstin_pan","PAN inside the GSTIN is well formed","error","Mistyped GSTIN"],
+    ["own_gstin","Not an invoice to or from yourself","warn","Check the party"],
+    ["name_per_gstin","One name per GSTIN","info","Same party under two names"],
+    ["gstin_per_name","One GSTIN per party name","warn","Same name under two GSTINs"],
+    ["no_missing","Invoice number present","error","Cannot be matched"],
+    ["no_length","Invoice number within 16 characters (sales)","error","The portal rejects it"],
+    ["no_chars","Invoice number uses allowed characters (sales)","error","The portal rejects it"],
+    ["no_duplicate","No invoice number used twice for one party","error","Possible double entry"],
+    ["repeated_rows","No line entered twice inside one invoice","warn","Possible double entry"],
+    ["probable_duplicate","No probable duplicate under another number","warn","Same party, amount and day under a different number"],
+    ["series_gaps","Invoice series has no gaps (sales)","info","A number may be missing"],
+    ["doc_credit_without_original","Credit notes name their invoice","info","Cannot be traced"],
+    ["date_missing","Invoice date present and readable","error","Cannot be placed in a month"],
+    ["date_future","No invoice dated in the future","error","Typing error"],
+    ["date_pre_gst","No invoice dated before GST began","error","Typing error"],
+    ["date_period_sales","Sales fall in the return month","warn","Wrong period"],
+    ["date_after_period_purchase","Purchases are not dated after the month","warn","Cannot be in that month's 2B"],
+    ["itc_time_limit","Purchase ITC is inside its time limit","warn","Credit may be lost"],
+    ["booked_late","Purchases are booked within 90 days of the invoice date","warn","Credit may belong to an earlier month or be past its limit"],
+    ["mixed_months","One month in the register","info","Wrong period selected"],
+    ["igst_cgst_mixed","IGST and CGST/SGST are not mixed","error","Wrong tax split"],
+    ["cgst_sgst_equal","CGST equals SGST","error","Wrong tax split"],
+    ["rate_slab","Tax is a standard GST rate on the taxable value","warn","Unusual rate, or charges outside the taxable value"],
+    ["rate_stated","Stated rate matches the tax charged","warn","Rate mismatch"],
+    ["total_matches","Invoice value = taxable value + tax","warn","Total does not add up"],
+    ["taxable_nonpositive","No zero or negative taxable value on an invoice","warn","Check the invoice"],
+    ["tax_without_taxable","Tax is not charged on nothing","error","Tax with no base"],
+    ["no_tax","Taxable invoices carry tax","info","Check exemption"],
+    ["pos_igst","IGST or CGST/SGST fits the states","warn","Wrong place of supply or tax type"],
+    ["hsn_shape","HSN or SAC code has a valid length","warn","Wrong code length"],
+    ["irn_shape","IRN is well formed where given","error","Invalid IRN"],
+    ["irn_missing","B2B sales carry an IRN (sales)","info","E-invoice may be required"],
+    ["rcm","Reverse-charge purchases are known","info","Check the liability"],
+    ["itc_blocked","ITC is available on every GSTR-2B invoice","info","Credit not available"],
+  ].map(([id,what,sev,f]) => R(id,"Validation",what,sev,"built",f)),
+  R("RC-1","Matching","Bank lines are matched to book entries per bank account","error","built","Unmatched lines become exceptions"),
+  R("RC-2","Matching","Transfers between the client's own accounts are recognised and set aside visibly","error","built","Shown with Undo"),
+  R("RC-3","Matching","Reversed payments are matched to their original","error","built","Exception"),
+  R("RC-4","Matching","Loan statement lines stay out of bank reconciliation","error","built","Set aside"),
+  R("RC-5","Matching","Possible duplicates are flagged and never deleted","warn","built","Exception of kind duplicate"),
+  R("GR-1","Matching","Sales register against GSTR-1, invoice by invoice and in total","error","built","Missing invoices named both ways; difference shown"),
+  R("GR-2","Matching","GSTR-1 outward tax against GSTR-3B 3.1(a)","error","built","Difference shown with both sources"),
+  R("GR-3","Matching","ITC available in GSTR-2B against ITC claimed in GSTR-3B","error","built","Excess claim named"),
+  R("GR-4","Matching","Reverse-charge tax in the books against GSTR-3B and the credit taken","error","built","Difference shown"),
+  R("GR-5","Matching","GSTR-2B against the purchase register","error","built","ITC at risk, amount differences, vendor follow-up text"),
+  R("GR-6","Matching","Blocked credit under section 17(5)","error","plan","Waits for the CA to confirm the list of ledgers"),
+  R("GR-7","Matching","ITC reversal where a supplier is unpaid for 180 days","error","plan","Waits for the CA's confirmation of the rule and the payment dates"),
+  R("OB-1","Matching","Tally's opening of each balance sheet group equals last year's audited closing, within a stated tolerance","error","built","The group shows as differing, with both figures"),
+  R("BW-1","Matching","Party totals of open bills equal the Tally ledger closing","error","part","Ageing engine built; the report must say it is incomplete and show the gap"),
+  R("RC-6","Post-match","Matched totals agree on both sides; no line used twice; nothing outside the period","error","plan","The run is marked failed"),
+  R("VE-1","Evidence","A changed input makes the stored result stale, never passed","error","plan","Needs saved results first"),
+  R("VE-2","Evidence","A GST check that cannot run names the file it needs","error","built","Nothing partial is shown as complete"),
+  R("EV-1","Evidence","The evidence pack lists every input with its SHA-256","error","plan","Pack cannot be signed"),
+  R("EX-1","Exceptions","A difference is closed only by a named person with a role, time and reason","error","part","Built for exceptions; not yet for opening-balance differences"),
+  ...[
+    ["CL-2","Statement verification passed","auto"],["CL-3","Bank reconciliation completed","auto"],["CL-4","Open exceptions resolved or explained","auto"],
+    ["CL-5","GST filed and reconciled","partner or manager confirms"],["CL-6","TDS paid and reconciled","partner or manager confirms"],["CL-7","Provisions and adjustments posted","partner or manager confirms"],
+    ["CL-8","MIS prepared","auto"],["CL-9","MIS reviewed","any team member confirms"],["CL-10","Partner sign-off","partner only"],
+  ].map(([id,w,who]) => R(id,"Close",`${w} (${who})`,"hold","built","The month cannot show as closed")),
+];
+
+const LANES = [
+  { n: "Phase 1: strengthen what exists", items: [
+    { t: "Bank reconciliation accuracy", st: "built", d: "Per-account matching, own-account transfers, reversals, loan statements set aside. Real-file regression gate holds the counts.", gap: "Layout memory for new bank layouts." },
+    { t: "Cross-source validation", st: "part", d: "Statement tie-out, GST invoice rules, masters balance, audited schedule tie-out.", gap: "A single validation report across all files of a client-month." },
+    { t: "Evidence tracking", st: "part", d: "Lineage drawer, signed document links, source and rule on every Verify result, inputs hash.", gap: "The exportable evidence pack." },
+    { t: "Post-matching verification", st: "plan", d: "Designed as rule RC-6.", gap: "Not built." },
+  ]},
+  { n: "Phase 2: statutory reconciliation", items: [
+    { t: "GSTR-2B against purchases", st: "built", d: "Matched, amount differences, missing in portal, ITC at risk, vendor follow-up text.", gap: "2B Excel for the full year not yet read from a real file." },
+    { t: "Returns check (1 vs books, 1 vs 3B, 2B vs 3B, RCM)", st: "built", d: "Runs on the portal Excel files, cut to the month. On one real December, GSTR-1 and 3B agree and one invoice is missing from the books.", gap: "The real files stay outside the repository; counts only go in the regression gate." },
+    { t: "Excel readers for portal and Tally files", st: "built", d: "GSTR-1 and GSTR-2B reports, GSTR-3B annual, Tally registers with ledger columns, debit notes and journals, cut to the month. Month-first dates and credit-note kinds are read correctly.", gap: "More firms' files to test against." },
+    { t: "Sales invoice against Tally", st: "part", d: "Sales register against GSTR-1 exists.", gap: "Physical or software-generated invoice files read and compared: not built." },
+    { t: "Blocked credit and ITC reversal", st: "plan", d: "Rules GR-6 and GR-7.", gap: "Waits for the CA to confirm the rules." },
+  ]},
+  { n: "Phase 3: financial reconciliation", items: [
+    { t: "Opening balances against audited closing", st: "part", d: "Reads the signed balance sheet and profit and loss, proves them, and compares each group with Tally's opening balances on the client page. Tested.", gap: "Saved results, a named-person decision on each difference, and a Close step." },
+    { t: "Invoice-to-payment and bill-to-bill", st: "part", d: "Ageing engine built from the Day Book's bill allocations: open bills by age, party totals against the ledger closing.", gap: "Mapping each receipt and payment to the invoices it settles, and the screen." },
+    { t: "Customer and vendor relationships", st: "part", d: "Counterparty aliases per firm.", gap: "A party master across invoices, payments and ledgers." },
+    { t: "Loan reconciliation", st: "plan", d: "Loan statements are recognised and kept apart.", gap: "EMI, interest and principal against the loan ledger." },
+  ]},
+  { n: "Phase 4: later, behind the QC engine", items: [
+    { t: "Automated accounting entries", st: "plan", d: "Not started for Verify. Separately, approved entries can already be posted to Tally one at a time.", gap: "Deferred." },
+    { t: "GST return preparation and filing", st: "plan", d: "Deliberately not started.", gap: "Deferred; compliance and reputational risk." },
+  ]},
+  { n: "Compliance track", items: [
+    { t: "Truthful public security claims", st: "built", d: "False claims removed; a test fails if one returns; company details filled from the incorporation certificate.", gap: "Grievance officer name and phone still to be supplied." },
+    { t: "Mumbai region", st: "plan", d: "Step-by-step runbook written. Needs the Supabase and Vercel owner.", gap: "Until it is done, the site says Sydney." },
+    { t: "Audit log of reads, downloads and exports", st: "plan", d: "The append-only table exists.", gap: "More event types and a partner screen." },
+    { t: "Retention, erasure and export", st: "plan", d: "Promised in the privacy policy.", gap: "Not built." },
+    { t: "Data processing agreement and questionnaire", st: "plan", d: "Described in the compliance plan.", gap: "To be written and reviewed by a lawyer." },
+  ]},
+];
+
+const APPROVAL = [
+  { n: 1, t: "Blueprint prepared", who: "Product", st: "done", gate: "", d: "This page: the data flow, the processing layers, the database tables, the rules, built against planned.", enter: "Code and plans read.", exit: "Blueprint shows every stage with its status and an advisor checkpoint.", proof: "This artifact; docs/TRUST_COMPLIANCE_AND_QC_MODULE_PLAN.md; docs/BUILD_PROMPT_VERIFY_MODULE.md" },
+  { n: 2, t: "Internal approval", who: "Founders", st: "todo", gate: "", d: "Founders read the blueprint, fix anything untrue, and decide the order of work.", enter: "Blueprint prepared.", exit: "Written yes from each founder; open questions listed.", proof: "A dated note of who approved" },
+  { n: 3, t: "NDA executed", who: "Founders and advisor", st: "todo", gate: "GATE: nothing is shared before this", d: "A signed non-disclosure agreement covers the test environment, the sample files and the blueprint.", enter: "Internal approval.", exit: "Signed copy filed.", proof: "Signed NDA" },
+  { n: 4, t: "Test environment shared", who: "Product", st: "todo", gate: "GATE: no production code, no real client data", d: "A separate project with a demo firm and masked data, a read-only role, no production keys. Architecture-level access only, as agreed.", enter: "NDA executed.", exit: "Advisor can sign in and open every stage.", proof: "Environment note with the role and what it can see" },
+  { n: 5, t: "Advisor reviews the architecture", who: "Advisor", st: "todo", gate: "", d: "The advisor uses the Advisor review tab to mark each checkpoint as right, missing or unsure, with notes.", enter: "Test environment shared.", exit: "Every stage answered; summary sent back.", proof: "The summary text from the review tab" },
+  { n: 6, t: "Sample files collected", who: "Advisor and product", st: "doing", gate: "", d: "Sales invoices, Tally registers and filed GSTR returns. One client's GSTR-1, GSTR-3B, GSTR-2B, registers and audited statements are already in; more clients and an invoice sample are needed.", enter: "NDA executed.", exit: "At least three clients of different kinds; invoices in every format they use.", proof: "A list of files with client type and month, counts only" },
+  { n: 7, t: "Suggestions implemented", who: "Product", st: "todo", gate: "", d: "Each 'missing' checkpoint becomes a rule, a stage change or a screen; each is tested before it is called done.", enter: "Review summary and samples.", exit: "Every accepted gap closed or scheduled with a reason.", proof: "Change list with tests; real-file gate counts not lower" },
+  { n: 8, t: "Advisor validates the updated workflow", who: "Advisor", st: "todo", gate: "", d: "The advisor repeats the review on the changed workflow and the evidence pack of a real month.", enter: "Suggestions implemented.", exit: "Written confirmation, or a short list of what is still wrong.", proof: "Signed-off review" },
+  { n: 9, t: "Approved for pilot firms", who: "Founders", st: "todo", gate: "", d: "Pilot firms are switched on with the module flagged per firm, starting with one client-month each.", enter: "Advisor validation.", exit: "First pilot month closed with an evidence pack.", proof: "The pack, and the partner's sign-off" },
+];
+const LANES2 = [
+  { who: "Junior or article assistant", acts: [["Uploads files or receives them from the client", "collection"],["Reads what is missing and chases it", "chaser"],["Works the exceptions given to them", "owner"]] },
+  { who: "The system", acts: [["Reads, validates, matches, checks", "no AI figures"],["Ticks only what it can prove", "auto steps"],["Marks a result stale if a file changed", "inputs hash"]] },
+  { who: "Manager", acts: [["Reviews exceptions and closes them with a reason", "name, role, time"],["Confirms GST, TDS and provisions", "authorized steps"],["Accepts a timing difference with a note", ""]] },
+  { who: "Partner", acts: [["Accepts a held statement with a reason", ""],["Signs off the MIS and the month", "partner only"],["Receives the evidence pack", "planned"]] },
+];
+const GATES = [
+  { t: "No silent acceptance", d: "A statement that does not tie, a balance sheet that does not add up, or a difference between two sources stays open until a named person closes it." },
+  { t: "Nothing is posted or filed", d: "Verify reads and proposes. It posts nothing to Tally, files nothing with the portal and changes no client file." },
+  { t: "Changed file, changed answer", d: "If an input changes after a check ran, that result shows as stale and cannot count towards closing the month." },
+];
+
+const CHECKPOINTS = {
+  collect: ["Is the expected-documents list per client type complete?", "Who should be told when a document is missing, and when?", "Is anything collected that should not be (PAN, Aadhaar, passwords)?"],
+  extract: ["Are there statement or register layouts your clients use that are not covered?", "Is AI reading acceptable only when its output ties to the document's own totals?", "Do GST portal files reach you as Excel, JSON or PDF?"],
+  classify: ["Which files are most often named wrongly or sent in the wrong format?", "Should a person confirm the class of an unusual file before checks run?"],
+  normalize: ["How are two names for one party joined?", "Which date and number conventions cause errors in your files?", "Which Tally ledger groups does your firm customise?"],
+  validate: ["Which of the 38 GST rules would you remove or re-grade?", "Which important rule is missing (blocked credit, HSN against rate, e-way bill, TCS)?", "Is a held statement the right default when the balance does not follow?"],
+  match: ["What tolerance do you accept before a difference is a finding?", "Is the order GSTR-1, 3B, 2B then books right?", "Which matching pairs are missing (TDS 26AS and AIS against books, e-invoice against GSTR-1)?"],
+  post: ["What do you check after a reconciliation to trust it?", "Is 'no line used twice, both sides net to zero' enough?"],
+  evidence: ["What must an evidence pack show for a client or an auditor?", "Is a hash of each input file useful to you, or too technical?", "How long must evidence be kept?"],
+  exceptions: ["Are the seven kinds the right ones?", "Who should own which kind, and how fast must it be answered?", "What should never be closed without a client's written reply?"],
+  report: ["Are the ten close steps in the right order and the right size?", "Which steps may be confirmed by a junior, and which only by a partner?", "What must the partner see on one screen before signing?"],
+};
+
+/* ---------- state ---------- */
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("fvb:" + k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("fvb:" + k, JSON.stringify(v)); } catch { /* storage is optional */ } },
+};
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+
+/* ---------- tabs ---------- */
+const VIEWS = ["pipeline", "flow", "rules", "roadmap", "approval", "review"];
+function show(v, push = true) {
+  if (!VIEWS.includes(v)) v = "pipeline";
+  VIEWS.forEach((x) => { $("#v-" + x).hidden = x !== v; $("#t-" + x).setAttribute("aria-selected", String(x === v)); });
+  if (push && location.hash !== "#" + v) history.replaceState(null, "", "#" + v);
+}
+$$("nav.tabs button").forEach((b) => b.addEventListener("click", () => show(b.dataset.view)));
+addEventListener("hashchange", () => show(location.hash.slice(1), false));
+
+/* ---------- pipeline ---------- */
+let curStage = STAGES[0].id;
+function renderStages() {
+  $("#stages").innerHTML = STAGES.map((s, i) => `<button class="stage" data-id="${s.id}" aria-pressed="${s.id === curStage}"><span class="n">Stage ${i + 1} of 10</span><b>${esc(s.name)}</b>${pill(s.st)}</button>`).join("");
+  const s = STAGES.find((x) => x.id === curStage), i = STAGES.indexOf(s);
+  $("#stageDetail").innerHTML = `
+    <h2>${i + 1}. ${esc(s.name)} ${pill(s.st)}</h2>
+    <p>${esc(s.does)}</p>
+    <div class="grid cols2">
+      <div class="sec"><h3>Built today</h3>${list(s.built)}</div>
+      <div class="sec"><h3>Still missing</h3>${list(s.gaps)}</div>
+      <div class="sec"><h3>Database destinations</h3>${chips(s.db)}</div>
+      <div class="sec"><h3>Rules that guard it</h3>${chips(s.rules)}</div>
+      <div class="sec"><h3>Code</h3>${chips(s.code)}</div>
+    </div>
+    <div class="sec"><h3>Asked of the advisor</h3><div class="grid">${s.asks.map((q) => `<div class="ask">${esc(q)}</div>`).join("")}</div></div>
+    <div><button class="btn ghost" id="toReview">Answer these in the review sheet</button></div>`;
+  $("#toReview").addEventListener("click", () => { show("review"); const el = $("#rvq-" + s.id); if (el) el.scrollIntoView({ block: "start" }); });
+}
+$("#stages").addEventListener("click", (e) => { const b = e.target.closest(".stage"); if (b) { curStage = b.dataset.id; renderStages(); } });
+$("#cross").innerHTML = CROSS.map((c) => `<div class="card"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><h3>${esc(c.n)}</h3>${pill(c.st)}</div><p class="muted">${esc(c.t)}</p></div>`).join("");
+
+/* ---------- flow ---------- */
+const POS = {};
+function layoutFlow() {
+  SOURCES.forEach((n, i) => (POS[n.id] = { x: 20, y: 52 + i * 106, w: 214, h: 62 }));
+  LAYERS.forEach((n, i) => (POS[n.id] = { x: 340, y: 40 + i * 94, w: 250, h: 66 }));
+  DBS.forEach((n, i) => (POS[n.id] = { x: 700, y: 28 + i * 84, w: 244, h: 56 }));
+}
+const NODES = () => [...SOURCES.map((n) => ({ ...n, k: "src" })), ...LAYERS.map((n) => ({ ...n, k: "layer" })), ...DBS.map((n) => ({ ...n, k: "db" }))];
+function edgePath(a, b) {
+  const A = POS[a], B = POS[b];
+  const fromRight = A.x < B.x;
+  if (A.x === B.x) { // vertical layer to layer
+    const x = A.x + A.w / 2, y1 = A.y + A.h, y2 = B.y;
+    return `M${x} ${y1} L${x} ${y2}`;
+  }
+  const x1 = fromRight ? A.x + A.w : A.x, y1 = A.y + A.h / 2, x2 = fromRight ? B.x : B.x + B.w, y2 = B.y + B.h / 2, mx = (x1 + x2) / 2;
+  return `M${x1} ${y1} C${mx} ${y1} ${mx} ${y2} ${x2} ${y2}`;
+}
+let selNode = null;
+function renderFlow() {
+  layoutFlow();
+  const svg = $("#flowSvg");
+  const heads = [["Sources", 20], ["Processing layers", 340], ["Database", 700]];
+  const dots = { built: "st-dot-built", part: "st-dot-part", plan: "st-dot-plan" };
+  svg.innerHTML = `<defs><marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="var(--muted)"/></marker></defs>` +
+    heads.map(([t, x]) => `<text class="colhead" x="${x}" y="22">${t}</text>`).join("") +
+    EDGES.map(([a, b, au]) => `<path class="edge${au ? " audit" : ""}" data-a="${a}" data-b="${b}" d="${edgePath(a, b)}" marker-end="url(#ah)"/>`).join("") +
+    NODES().map((n) => { const p = POS[n.id]; return `<g class="node k-${n.k}" tabindex="0" role="button" aria-label="${esc(n.t)}, ${ST[n.st]}" data-id="${n.id}"><rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="9"/><circle class="${dots[n.st]}" cx="${p.x + 14}" cy="${p.y + 16}" r="4.5"/><text x="${p.x + 26}" y="${p.y + 20}" font-weight="600">${esc(n.t)}</text><text class="sub" x="${p.x + 14}" y="${p.y + 40}">${esc(n.sub)}</text></g>`; }).join("");
+  const pick = (id) => { selNode = selNode === id ? null : id; paintFlow(); };
+  $$(".node", svg).forEach((g) => { g.addEventListener("click", () => pick(g.dataset.id)); g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(g.dataset.id); } }); });
+  paintFlow();
+}
+function paintFlow() {
+  const svg = $("#flowSvg");
+  const touch = new Set();
+  if (selNode) { touch.add(selNode); EDGES.forEach(([a, b]) => { if (a === selNode || b === selNode) { touch.add(a); touch.add(b); } }); }
+  $$(".node", svg).forEach((g) => { g.classList.toggle("dim", !!selNode && !touch.has(g.dataset.id)); g.classList.toggle("sel", g.dataset.id === selNode); });
+  $$(".edge", svg).forEach((p) => { const on = selNode && (p.dataset.a === selNode || p.dataset.b === selNode); p.classList.toggle("on", !!on); p.classList.toggle("dim", !!selNode && !on); });
+  const d = $("#flowDetail");
+  if (!selNode) { d.innerHTML = '<span class="muted">Select a box to see what it holds and what it connects to.</span>'; return; }
+  const n = NODES().find((x) => x.id === selNode);
+  const ins = EDGES.filter((e) => e[1] === selNode).map((e) => NODES().find((x) => x.id === e[0]).t);
+  const outs = EDGES.filter((e) => e[0] === selNode).map((e) => NODES().find((x) => x.id === e[1]).t);
+  d.innerHTML = `<h2 style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">${esc(n.t)} ${pill(n.st)}</h2><p style="margin-block:8px">${esc(n.d)}</p><div class="grid cols2"><div class="sec"><h3>Comes from</h3>${chips(ins)}</div><div class="sec"><h3>Goes to</h3>${chips(outs)}</div></div>${n.stage ? `<p style="margin-top:12px"><button class="btn ghost" id="goStage">Open this stage in the pipeline</button></p>` : ""}`;
+  const g = $("#goStage"); if (g) g.addEventListener("click", () => { curStage = n.stage; renderStages(); show("pipeline"); });
+}
+
+/* ---------- rules ---------- */
+function renderRules() {
+  const stages = [...new Set(RULES.map((r) => r.stage))];
+  $("#rl").innerHTML = '<option value="">Any stage</option>' + stages.map((s) => `<option>${esc(s)}</option>`).join("");
+  const draw = () => {
+    const q = $("#rq").value.trim().toLowerCase(), st = $("#rl").value, ss = $("#rs").value;
+    const rows = RULES.filter((r) => (!st || r.stage === st) && (!ss || r.st === ss) && (!q || `${r.id} ${r.what} ${r.ifFails} ${r.stage}`.toLowerCase().includes(q)));
+    $("#rbody").innerHTML = rows.map((r) => `<tr><td class="id">${esc(r.id)}</td><td>${esc(r.stage)}</td><td>${esc(r.what)} <span class="hint sev-${r.sev}">${r.sev === "hold" ? "holds the month" : r.sev}</span></td><td class="muted">${esc(r.ifFails)}</td><td>${pill(r.st)}</td></tr>`).join("") || '<tr><td colspan="5" class="muted">No rule matches.</td></tr>';
+    $("#rcount").textContent = `${rows.length} of ${RULES.length} rules`;
+  };
+  ["input", "change"].forEach((ev) => ["#rq", "#rl", "#rs"].forEach((s) => $(s).addEventListener(ev, draw)));
+  draw();
+}
+
+/* ---------- roadmap ---------- */
+let curItem = null;
+function renderRoadmap() {
+  const all = LANES.flatMap((l) => l.items), n = all.length, c = (s) => all.filter((i) => i.st === s).length;
+  $("#rmCounts").innerHTML = ["built", "part", "plan"].map((s) => `<span>${pill(s)} <b>${c(s)}</b> of ${n}</span>`).join("");
+  $("#rmBar").innerHTML = ["built", "part", "plan"].map((s) => `<i style="width:${(c(s) / n) * 100}%;background:var(--${s === "built" ? "built" : s === "part" ? "part" : "plan"})"></i>`).join("");
+  $("#lanes").innerHTML = LANES.map((l, li) => `<div class="lane"><h3>${esc(l.n)}</h3><div class="items">${l.items.map((it, ii) => `<button class="item s-${it.st}" data-k="${li}-${ii}" aria-pressed="${curItem === li + "-" + ii}"><span class="t">${esc(it.t)}</span>${pill(it.st)}</button>`).join("")}</div></div>`).join("");
+  const d = $("#itemDetail");
+  if (!curItem) { d.innerHTML = '<span class="muted">Select a piece above.</span>'; return; }
+  const [li, ii] = curItem.split("-").map(Number), it = LANES[li].items[ii];
+  d.innerHTML = `<h2 style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">${esc(it.t)} ${pill(it.st)}</h2><div class="grid cols2" style="margin-top:10px"><div class="sec"><h3>What exists</h3><p>${esc(it.d)}</p></div><div class="sec"><h3>What is missing</h3><p>${esc(it.gap)}</p></div></div>`;
+}
+$("#lanes").addEventListener("click", (e) => { const b = e.target.closest(".item"); if (b) { curItem = b.dataset.k; renderRoadmap(); } });
+
+/* ---------- approval ---------- */
+let apState = store.get("ap", {});
+let curStep = 1;
+const apOf = (s) => apState[s.n] || s.st;
+function renderApproval() {
+  const done = APPROVAL.filter((s) => apOf(s) === "done").length, doing = APPROVAL.filter((s) => apOf(s) === "doing").length, n = APPROVAL.length;
+  $("#apCounts").innerHTML = `<span><b>${done}</b> of ${n} steps done</span><span><b>${doing}</b> in progress</span><span class="muted">${n - done - doing} not started</span>`;
+  $("#apBar").innerHTML = `<i style="width:${(done / n) * 100}%;background:var(--built)"></i><i style="width:${(doing / n) * 100}%;background:var(--part)"></i>`;
+  $("#steps").innerHTML = APPROVAL.map((s) => `<button class="step ${apOf(s)}" data-n="${s.n}" aria-pressed="${s.n === curStep}"><span class="dot">${s.n}</span><span><b>${esc(s.t)}</b><br><span class="hint">${esc(s.who)}</span>${s.gate ? `<br><span class="gate">${esc(s.gate)}</span>` : ""}</span><span class="right hint">${apOf(s) === "done" ? "Done" : apOf(s) === "doing" ? "In progress" : "Not started"}</span></button>`).join("");
+  const s = APPROVAL.find((x) => x.n === curStep);
+  $("#stepDetail").innerHTML = `<h2>${s.n}. ${esc(s.t)}</h2><p>${esc(s.d)}</p>${s.gate ? `<p class="gate" style="color:var(--gap)">${esc(s.gate)}</p>` : ""}<div class="sec"><h3>Owner</h3><p>${esc(s.who)}</p></div><div class="sec"><h3>Starts when</h3><p>${esc(s.enter)}</p></div><div class="sec"><h3>Finished when</h3><p>${esc(s.exit)}</p></div><div class="sec"><h3>Proof kept</h3><p>${esc(s.proof)}</p></div><div class="sec"><h3>Mark this step</h3><div class="seg" role="group" aria-label="Step status">${["todo", "doing", "done"].map((v) => `<button data-set="${v}" aria-pressed="${apOf(s) === v}">${{ todo: "Not started", doing: "In progress", done: "Done" }[v]}</button>`).join("")}</div></div>`;
+}
+$("#steps").addEventListener("click", (e) => { const b = e.target.closest(".step"); if (b) { curStep = Number(b.dataset.n); renderApproval(); } });
+$("#stepDetail").addEventListener("click", (e) => { const b = e.target.closest("[data-set]"); if (b) { apState[curStep] = b.dataset.set; store.set("ap", apState); renderApproval(); } });
+$("#lanes2").innerHTML = LANES2.map((l) => `<div class="lane2"><div class="who">${esc(l.who)}</div><div class="acts">${l.acts.map(([t, m]) => `<div class="act">${esc(t)}${m ? `<em>${esc(m)}</em>` : ""}</div>`).join("")}</div></div>`).join("");
+$("#gates").innerHTML = GATES.map((g) => `<div class="card"><h3 style="margin-bottom:6px">${esc(g.t)}</h3><p class="muted">${esc(g.d)}</p></div>`).join("");
+
+/* ---------- advisor review ---------- */
+let rv = store.get("rv", {});      // key "stageId:i" -> {a:"agree|gap|unsure", n:""}
+function renderReview() {
+  $("#rv").innerHTML = STAGES.map((s, si) => `<div id="rvq-${s.id}" class="grid" style="gap:8px"><h2 style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">${si + 1}. ${esc(s.name)} ${pill(s.st)}</h2>${[...(CHECKPOINTS[s.id] || [])].map((q, i) => { const k = s.id + ":" + i, v = rv[k] || {}; return `<div class="rvq"><div>${esc(q)}</div><div class="seg" role="group" aria-label="Answer">${[["agree", "Right"], ["gap", "Something missing"], ["unsure", "Unsure"]].map(([a, t]) => `<button class="${a}" data-k="${k}" data-a="${a}" aria-pressed="${v.a === a}">${t}</button>`).join("")}</div><textarea id="note-${s.id}-${i}" data-k="${k}" placeholder="Note (optional)" aria-label="Note">${esc(v.n || "")}</textarea></div>`; }).join("")}</div>`).join("");
+  counts();
+}
+function counts() {
+  const all = STAGES.flatMap((s) => (CHECKPOINTS[s.id] || []).map((_, i) => s.id + ":" + i)), n = all.length;
+  const c = (a) => all.filter((k) => (rv[k] || {}).a === a).length;
+  $("#rvCounts").innerHTML = `<span><b>${c("agree") + c("gap") + c("unsure")}</b> of ${n} answered</span><span class="pill s-built">${c("agree")} right</span><span class="pill s-gap">${c("gap")} missing</span><span class="pill s-part">${c("unsure")} unsure</span>`;
+}
+$("#rv").addEventListener("click", (e) => { const b = e.target.closest("button[data-a]"); if (!b) return; const k = b.dataset.k; rv[k] = { ...(rv[k] || {}), a: rv[k] && rv[k].a === b.dataset.a ? "" : b.dataset.a }; store.set("rv", rv); renderReview(); });
+$("#rv").addEventListener("input", (e) => { const t = e.target.closest("textarea[data-k]"); if (!t) return; rv[t.dataset.k] = { ...(rv[t.dataset.k] || {}), n: t.value }; store.set("rv", rv); });
+$("#rname").value = store.get("rname", "");
+$("#rname").addEventListener("input", (e) => store.set("rname", e.target.value));
+function summaryText() {
+  const lines = [`FynHelp Verify blueprint: advisor review`, `Reviewed by: ${$("#rname").value || "(name not given)"}`, `Date: ${new Date().toISOString().slice(0, 10)}`, ""];
+  const lab = { agree: "RIGHT", gap: "MISSING", unsure: "UNSURE" };
+  STAGES.forEach((s, si) => { const qs = CHECKPOINTS[s.id] || []; const rows = qs.map((q, i) => ({ q, v: rv[s.id + ":" + i] || {} })).filter((r) => r.v.a || r.v.n); if (!rows.length) return; lines.push(`${si + 1}. ${s.name}`); rows.forEach((r) => lines.push(`  [${lab[r.v.a] || "NO ANSWER"}] ${r.q}${r.v.n ? "\n      Note: " + r.v.n : ""}`)); lines.push(""); });
+  if (lines.length <= 4) lines.push("No answers yet.");
+  return lines.join("\n");
+}
+$("#copyBtn").addEventListener("click", async () => {
+  const text = summaryText(), box = $("#summary"), note = $("#copyNote");
+  box.value = text; box.hidden = false;
+  try { await navigator.clipboard.writeText(text); note.textContent = "Copied. Paste it into an email or message."; }
+  catch { box.focus(); box.select(); note.textContent = "Select the text below and copy it."; }
+});
+$("#clearBtn").addEventListener("click", () => { rv = {}; store.set("rv", rv); $("#summary").hidden = true; $("#copyNote").textContent = ""; renderReview(); });
+
+/* ---------- start ---------- */
+renderStages(); renderFlow(); renderRules(); renderRoadmap(); renderApproval(); renderReview();
+show(location.hash.slice(1), false);
+</script>

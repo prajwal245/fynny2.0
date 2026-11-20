@@ -10,6 +10,7 @@
  * trailing slash. Filtered or tracking URLs (?tab=, ?utm_…) all point back
  * to the clean page.
  */
+import { COMPANY } from "@/content/legal/company";
 import { PLANS as BILLING_PLANS, PLAN_ORDER } from "@/lib/practice/billing/plans";
 
 /** The one public address of the site. Preview deployments are noindexed (vercel.json). */
@@ -126,6 +127,7 @@ export function organizationLd(): JsonLd {
     "@type": "Organization",
     "@id": ORG_ID,
     name: ORG_NAME,
+    legalName: COMPANY.entity || undefined,
     url: `${SITE_URL}/`,
     ...(SAME_AS.length ? { sameAs: SAME_AS } : {}),
     logo: { "@type": "ImageObject", url: absoluteUrl("/logo.png") },

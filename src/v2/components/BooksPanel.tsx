@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { TallyPosting } from "./TallyPosting";
+import { getPostingMode } from "@/lib/practice/practice.functions";
 import { useBooksFor } from "./BooksExport";
 import { V } from "../ui";
 
@@ -15,6 +17,13 @@ export function BooksPanel({
   documentId: string;
 }) {
   const books = useBooksFor(clientId);
+  // Writing to the books is off for the QC offering; the writing screen appears only if a deployment has switched it on.
+  const [canPost, setCanPost] = useState<boolean | null>(null);
+  useEffect(() => {
+    let live = true;
+    getPostingMode().then((m) => live && setCanPost(m.tally)).catch(() => live && setCanPost(false));
+    return () => { live = false; };
+  }, []);
   if (books.length === 1 && books[0] === "zoho") {
     return (
       <div
@@ -64,7 +73,13 @@ export function BooksPanel({
           </span>
         </div>
       )}
-      <TallyPosting clientId={clientId} documentId={documentId} />
+      {canPost ? (
+        <TallyPosting clientId={clientId} documentId={documentId} />
+      ) : canPost === false ? (
+        <p data-testid="posting-off" style={{ margin: 0, fontSize: 13, color: V.muted }}>
+          Posting to Tally is switched off. FynHelp reads and reviews your books; it does not write entries to them.
+        </p>
+      ) : null}
     </>
   );
 }

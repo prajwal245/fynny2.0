@@ -5,6 +5,9 @@ import { Badge, Card, V } from "../ui";
 import { useV2 } from "../store";
 import { getTallyGstBooks } from "@/lib/practice/practice.functions";
 import { readGstr2bJson, type ReadInvoices } from "@/lib/practice/gst/invoices";
+import { fiscalMonths, yearView } from "@/lib/practice/gst/year";
+import { firstRow, workbookBytes } from "@/lib/practice/review/workpaper";
+import { Download } from "lucide-react";
 import { detectWorkbook, monthsIn, readGstr3bAnnual, readJournalsGst, readPortalReport, readTallyRegister } from "@/lib/practice/gst/reports";
 import { checkReturns, readGstr1Json, readGstr3bJson, type Check, type Gstr1Read, type Gstr3bRead } from "@/lib/practice/gst/returns";
 
@@ -119,7 +122,12 @@ export default function GstReturnsCheck() {
     const g3 = parts.gstr3b ? (parts.gstr3b.rows ? readGstr3bAnnual(parts.gstr3b.rows, m ?? "") : readGstr3bJson(parts.gstr3b.json)) : null;
     const notes = [sales?.notes, purReg?.notes, dn?.notes, jr?.notes, g1?.notes, g2?.notes, g3?.notes].flatMap((x) => x ?? []).filter(Boolean);
     const checks = checkReturns({ salesBooks: sales, purchaseBooks: purchases, gstr1: g1x, gstr3b: g3, gstr2b: g2, rcmBooks: jr?.rcm ?? null });
-    return { checks, notes, periods: [sales?.period, g1?.period, g2?.period, g3?.period].filter(Boolean) as string[] };
+    // The year view needs the three portal reports as year files (Excel); a JSON is one month and cannot give a year.
+    const fy = m ? (Number(m.slice(5)) >= 4 ? Number(m.slice(0, 4)) : Number(m.slice(0, 4)) - 1) : null;
+    const yv = fy && parts.gstr1?.rows && parts.gstr2b?.rows && parts.gstr3b?.rows
+      ? yearView(fiscalMonths(fy), { gstr1: (x) => readPortalReport(parts.gstr1!.rows!, { kind: "gstr1", month: x }), gstr2b: (x) => readPortalReport(parts.gstr2b!.rows!, { kind: "gstr2b", month: x }), gstr3b: (x) => readGstr3bAnnual(parts.gstr3b!.rows!, x) })
+      : null;
+    return { yv, fy, checks, notes, periods: [sales?.period, g1?.period, g2?.period, g3?.period].filter(Boolean) as string[] };
   }, [parts, month, tally]);
 
   const have = Object.keys(parts) as Kind[];
@@ -205,6 +213,34 @@ export default function GstReturnsCheck() {
           </Card>
         ))}
       </div>
+      {model.yv && (
+        <Card data-testid="gst-year-view" style={{ marginTop: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <strong style={{ fontSize: 15 }}>Year view, FY {model.fy}-{String((model.fy ?? 0) + 1).slice(2)}</strong>
+            <Badge tone={model.yv.missing.gstr1.length + model.yv.missing.gstr2b.length + model.yv.missing.gstr3b.length ? "warn" : "neutral"}>{model.yv.missing.gstr1.length + model.yv.missing.gstr2b.length + model.yv.missing.gstr3b.length ? "Months missing" : "12 months"}</Badge>
+            <button className="v2-btn v2-btn-ghost" style={{ marginLeft: "auto" }} onClick={() => {
+              const yv = model.yv!;
+              const first = firstRow(5);
+              const bytes = workbookBytes([{ name: "GST year view", header: [["Working paper", "GSTR-1 vs GSTR-3B and ITC, by month and cumulative"], ["Financial year", `${model.fy}-${String((model.fy ?? 0) + 1).slice(2)}`], ["Sources", "GSTR-1, GSTR-2B and GSTR-3B reports from the portal"], ["Prepared by", "FynHelp"], ["Status", "Draft: the input credit comparison is provisional"]],
+                columns: ["Month", "GSTR-1 tax", "GSTR-3B 3.1(a) tax", "Outward difference", "Outward cumulative", "ITC available (2B)", "ITC claimed (3B, net of RCM)", "ITC difference", "ITC cumulative"],
+                rows: yv.rows.map((r, i) => { const row = first + i; return [r.month, r.g1Tax, r.g3bTax, { f: `B${row}-C${row}`, v: r.outwardDiff }, i === 0 ? { f: `D${row}`, v: r.outwardCumulative } : { f: `E${row - 1}+D${row}`, v: r.outwardCumulative }, r.itc2b, r.itc3b, { f: `G${row}-F${row}`, v: r.itcDiff }, i === 0 ? { f: `H${row}`, v: r.itcCumulative } : { f: `I${row - 1}+H${row}`, v: r.itcCumulative }]; }),
+                total: { label: "Control total", columns: [1, 2, 5, 6] }, notes: yv.notes }]);
+              const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+              const a = document.createElement("a"); a.href = url; a.download = `GST_year_view_${model.fy}.xlsx`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+            }}><Download size={14} /> Working paper (Excel)</button>
+          </div>
+          <div className="v2-scroll" style={{ marginTop: 10 }}>
+            <table className="v2-table">
+              <thead><tr><th>Month</th><th style={{ textAlign: "right" }}>GSTR-1 tax</th><th style={{ textAlign: "right" }}>3B 3.1(a) tax</th><th style={{ textAlign: "right" }}>Outward diff</th><th style={{ textAlign: "right" }}>Running</th><th style={{ textAlign: "right" }}>ITC 2B</th><th style={{ textAlign: "right" }}>ITC 3B</th><th style={{ textAlign: "right" }}>ITC diff</th><th style={{ textAlign: "right" }}>Running</th></tr></thead>
+              <tbody>
+                {model.yv.rows.map((r) => <tr key={r.month}><td>{r.month}</td><td className="num" style={{ textAlign: "right" }}>{inr(r.g1Tax)}</td><td className="num" style={{ textAlign: "right" }}>{inr(r.g3bTax)}</td><td className="num" style={{ textAlign: "right", color: Math.abs(r.outwardDiff) > 1 ? V.maroon : undefined }}>{inr(r.outwardDiff)}</td><td className="num" style={{ textAlign: "right" }}>{inr(r.outwardCumulative)}</td><td className="num" style={{ textAlign: "right" }}>{inr(r.itc2b)}</td><td className="num" style={{ textAlign: "right" }}>{inr(r.itc3b)}</td><td className="num" style={{ textAlign: "right", color: Math.abs(r.itcDiff) > 1 ? V.maroon : undefined }}>{inr(r.itcDiff)}</td><td className="num" style={{ textAlign: "right" }}>{inr(r.itcCumulative)}</td></tr>)}
+                <tr style={{ fontWeight: 700 }}><td>Year</td><td className="num" style={{ textAlign: "right" }}>{inr(model.yv.totals.g1Tax)}</td><td className="num" style={{ textAlign: "right" }}>{inr(model.yv.totals.g3bTax)}</td><td className="num" style={{ textAlign: "right" }}>{inr(model.yv.totals.outwardDiff)}</td><td /><td className="num" style={{ textAlign: "right" }}>{inr(model.yv.totals.itc2b)}</td><td className="num" style={{ textAlign: "right" }}>{inr(model.yv.totals.itc3b)}</td><td className="num" style={{ textAlign: "right" }}>{inr(model.yv.totals.itcDiff)}</td><td /></tr>
+              </tbody>
+            </table>
+          </div>
+          {model.yv.notes.map((n) => <p key={n} style={{ fontSize: 12.5, color: V.muted, margin: "6px 0 0" }}>{n}</p>)}
+        </Card>
+      )}
       <p style={{ fontSize: 12, color: V.muted, marginTop: 14 }}>Read-only. Files stay in your browser and nothing is filed or changed. A difference up to ₹1 is treated as rounding. Exports and nil-rated supplies are shown on GSTR-1 but are not in the outward comparison. Sales booked as journals without GST ledgers are not in a sales register, so they appear as "in GSTR-1, not in the books".</p>
     </div>
   );

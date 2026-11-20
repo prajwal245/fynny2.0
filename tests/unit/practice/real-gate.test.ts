@@ -57,6 +57,39 @@ describe.skipIf(!REAL || !existsSync(REAL ?? ""))("real-file gate", { timeout: 9
     const r = await reconCase("Satkaarika Enterprises", ["Satkaarika||CA 7856871247.pdf"], ["Satkaarika||BOOKS||Day Book.xlsx"], { start: "2025-04-01", end: "2026-03-31" });
     record("satkaarika_fy", { bank: r.bank, matched: r.matched, open: r.open }, ["matched"], ["open"], ["bank"]);
   });
+  it.skipIf(!has("SSSL||UBI_1967.pdf") || !has("SSSL||BOOKS||DayBook.xlsx"))("RC-6 and determinism on SSSL May: the proof passes, and Start over gives the same matches", async () => {
+    const r = await reconCase("Sri Satyanarayana Swamy Logistics", ["SSSL||ICICI_1053_AprJun25.pdf", "SSSL||HDFC_2932.pdf", "SSSL||UBI_1967.pdf", "SSSL||Kotak_3368.pdf"], ["SSSL||BOOKS||DayBook.xlsx"], { start: "2025-05-01", end: "2025-05-31" }, { startOver: true });
+    console.log(`   RC-6 SSSL May: proof ${r.proofOk ? "passes" : "FAILS"}; start over ${r.restart?.first} then ${r.restart?.second} matched`, r.proofFailed);
+    expect(r.proofOk, r.proofFailed.join(" | ")).toBe(true);
+    expect(r.restart?.same, `start over changed the matches: ${r.restart?.first} then ${r.restart?.second}`).toBe(true);
+    expect(r.restart?.proofOk).toBe(true);
+  });
+  it.skipIf(!has("Satkaarika||BOOKS||Day Book.xlsx") || !has("SSSL||BOOKS||DayBook.xlsx"))("review checks read both real Day Books in full and find the blueprint's own examples", async () => {
+    const XLSX = await import("xlsx");
+    const { readDayBookVouchers } = await import("@/lib/practice/review/dayBook");
+    const { reviewCash } = await import("@/lib/practice/review/cash");
+    const { adjustmentRegister } = await import("@/lib/practice/review/adjustments");
+    const { nearDuplicates } = await import("@/lib/practice/review/ledgerMap");
+    const load = (f: string) => { const wb = XLSX.read(readFileSync(`${REAL}/${f}`), { type: "buffer", raw: false }); return readDayBookVouchers(XLSX.utils.sheet_to_json<string[]>(wb.Sheets[wb.SheetNames[0]!]!, { header: 1, raw: false, defval: "" })); };
+    const sat = load("Satkaarika||BOOKS||Day Book.xlsx");
+    const sssl = load("SSSL||BOOKS||DayBook.xlsx");
+    // Every voucher is read, and each balances: debits equal credits.
+    for (const v of [...sat, ...sssl]) expect(Math.abs(v.legs.reduce((n, l) => n + l.debit - l.credit, 0)), `${v.type} ${v.no} does not balance`).toBeLessThan(1);
+    expect(sat.length).toBe(4290);
+    expect(sssl.length).toBe(10724);
+    expect(reviewCash(sat).days.length).toBeGreaterThan(20);
+    const adj = adjustmentRegister(sat);
+    expect(adj.length).toBeGreaterThan(0);
+    expect(adj.length, "the register should be a short list, not every journal").toBeLessThan(sat.filter((v) => /journal|contra/i.test(v.type)).length / 2);
+    const names = [...new Set(sat.flatMap((v) => v.legs.map((l) => l.ledger)))];
+    expect(nearDuplicates(names).some(([a, b]) => /SUB ?CONTRACTOR SERVICES/i.test(a) && /SUBCONTRACTOR SERVICESS/i.test(b))).toBe(true);
+  });
+  it.skipIf(!has("Satkaarika||CA 7856871247.pdf") || !has("Satkaarika||BOOKS||Day Book.xlsx"))("RC-6 and determinism on Satkaarika, full year", async () => {
+    const r = await reconCase("Satkaarika Enterprises", ["Satkaarika||CA 7856871247.pdf", "Satkaarika||CC 6407563276 Mar.pdf", "Satkaarika||CA 8088091704.pdf"], ["Satkaarika||BOOKS||Day Book.xlsx"], { start: "2025-04-01", end: "2026-03-31" }, { startOver: true });
+    console.log(`   RC-6 Satkaarika: proof ${r.proofOk ? "passes" : "FAILS"}; start over ${r.restart?.first} then ${r.restart?.second} matched`, r.proofFailed);
+    expect(r.proofOk, r.proofFailed.join(" | ")).toBe(true);
+    expect(r.restart?.same, `start over changed the matches: ${r.restart?.first} then ${r.restart?.second}`).toBe(true);
+  });
   it.skipIf(!has("Satkaarika||CC 6407563276 Mar.pdf") || !has("Satkaarika||CA 8088091704.pdf") || !has("Satkaarika||GECL loan.pdf"))("Satkaarika: with the CC statement, a second CA account and the loan statements", async () => {
     const r = await reconCase("Satkaarika Enterprises", ["Satkaarika||CA 7856871247.pdf", "Satkaarika||CC 6407563276 Mar.pdf", "Satkaarika||GECL loan.pdf", "Satkaarika||Term loan.pdf", "Satkaarika||Vehicle loan.pdf", "Satkaarika||CA 8088091704.pdf"], ["Satkaarika||BOOKS||Day Book.xlsx"], { start: "2025-04-01", end: "2026-03-31" });
     record("satkaarika_all", { bank: r.bank, matched: r.matched, open: r.open }, ["matched"], ["open"], ["bank"]);

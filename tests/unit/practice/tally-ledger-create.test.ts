@@ -18,6 +18,9 @@ import * as reqs from "@/lib/practice/tallyLedgerRequests.server";
 // @ts-expect-error plain JavaScript module shipped to customers
 import * as connector from "../../../public/downloads/fynhelp-tally-connector.mjs";
 
+// These tests are about the writing feature itself, which is off by default for the QC offering: turn it on for this file only.
+process.env["PRACTICE_TALLY_POSTING"] = "on";
+
 const COMPANY = "Godavari Spices & Foods Pvt Ltd";
 const existing = [
   { name: "HDFC Bank A/c 50200071", parent: "Bank Accounts" },

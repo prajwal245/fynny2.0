@@ -20,7 +20,7 @@ const FIRM = "f1";
 const BUSINESS = "b1";
 type Row = Record<string, unknown>;
 
-export async function reconCase(client: string, bankFiles: string[], bookFiles: string[], range: { start: string; end: string }) {
+export async function reconCase(client: string, bankFiles: string[], bookFiles: string[], range: { start: string; end: string }, opts: { startOver?: boolean } = {}) {
   const all = [...bankFiles.map((f) => ({ f, side: "bank" })), ...bookFiles.map((f) => ({ f, side: "books" }))];
   const docs = all.map((x, i) => ({ id: `d${i + 1}`, ca_firm_id: FIRM, business_id: BUSINESS, original_filename: x.f, storage_path: `${FIRM}/${BUSINESS}/${i}-${x.f}`, side: x.side, extract_status: null, extract_attempts: 0, extracted: { source: x.side === "books" ? "Tally" : "Manual" }, uploaded_by: "u1" }));
   const blobs = Object.fromEntries(all.map((x, i) => [`${FIRM}/${BUSINESS}/${i}-${x.f}`, new Uint8Array(readFileSync(`${REAL}/${x.f}`))]));
@@ -31,6 +31,17 @@ export async function reconCase(client: string, bankFiles: string[], bookFiles: 
   const ctx = { firmId: FIRM, firmName: "Firm", firmEmail: null, userId: "u1", role: "owner" as const };
   const summary = await runRecon(db, ctx, BUSINESS, range);
   const txns = (tables["ca_txns"] ?? []) as Row[];
+  // The set of matched bank lines, as a signature, so two runs can be compared.
+  const signature = () => txns.filter((t) => t["side"] === "bank" && t["match_status"] === "matched").map((t) => String(t["id"])).sort().join(",");
+  const first = signature();
+  let restart: { same: boolean; first: number; second: number; proofOk: boolean } | null = null;
+  if (opts.startOver) {
+    const { resetAutoMatches } = await import("@/lib/practice/recon.server");
+    await resetAutoMatches(db, ctx, BUSINESS, range);
+    const again = await runRecon(db, ctx, BUSINESS, range);
+    const second = signature();
+    restart = { same: first === second, first: first ? first.split(",").length : 0, second: second ? second.split(",").length : 0, proofOk: again.proof?.ok === true };
+  }
   // Only the month the run covered.
   const inRange = (t: Row) => String(t["txn_date"]).slice(0, 10) >= range.start && String(t["txn_date"]).slice(0, 10) <= range.end;
   const bank = txns.filter((t) => t["side"] === "bank" && inRange(t));
@@ -56,7 +67,7 @@ export async function reconCase(client: string, bankFiles: string[], bookFiles: 
   for (const b of openBooks) { const m = /\(([^()]*\d{4}[^()]*)\)/.exec(String(b["description"])); const k = m ? m[1]! : "(no bank ledger)"; byLedger.set(k, (byLedger.get(k) ?? 0) + 1); }
   const bookLeft = [...byLedger.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, n]) => `${n} × ${k}`);
   const noLedger = openBooks.filter((b) => !/\(([^()]*\d{4}[^()]*)\)/.test(String(b["description"]))).slice(0, 6).map((b) => `${String(b["txn_date"]).slice(0, 10)} ${b["direction"]} ${Number(b["amount"]).toFixed(2)} ${String(b["description"]).slice(0, 70)}`);
-  return { txns, noLedger, bookLeft, left, summary, bank: bank.length, books: books.length, matched: bank.filter((t) => t["match_status"] === "matched").length, open: open.length, pairable, ignored: bank.filter((t) => t["match_status"] === "ignored").length };
+  return { restart, proofOk: summary.proof?.ok === true, proofFailed: (summary.proof?.checks ?? []).filter((c) => !c.ok).map((c) => `${c.id}: ${c.detail}`), txns, noLedger, bookLeft, left, summary, bank: bank.length, books: books.length, matched: bank.filter((t) => t["match_status"] === "matched").length, open: open.length, pairable, ignored: bank.filter((t) => t["match_status"] === "ignored").length };
 }
 
 describe.skipIf(!REAL || !existsSync(REAL ?? ""))("reconciliation on real statements and Tally books", { timeout: 600_000 }, () => {

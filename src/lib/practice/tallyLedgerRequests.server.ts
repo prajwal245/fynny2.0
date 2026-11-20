@@ -3,6 +3,7 @@
  * counted as created after the connector has read it back from Tally.
  */
 import { PracticeError } from "./core";
+import { POSTING_OFF_MESSAGE, tallyPostingEnabled } from "./posting";
 import { logActivity, type Db, type FirmContext } from "./db.server";
 import type { ConnectorRow } from "./tallyConnector.server";
 import {
@@ -75,6 +76,7 @@ export async function requestLedger(
     allowSimilar?: boolean;
   },
 ) {
+  if (!tallyPostingEnabled()) throw new PracticeError("posting_off", POSTING_OFF_MESSAGE);
   if (!canApprove(ctx))
     throw new PracticeError(
       "forbidden",
@@ -185,6 +187,7 @@ export async function cancelLedgerRequest(
 
 /** Queued ledger requests for this connector, each with its ready XML. Only a connector that can create ledgers gets any. */
 export async function claimLedgerRequests(db: Db, c: ConnectorRow) {
+  if (!tallyPostingEnabled()) return [];
   const { data: me } = await db
     .from("ca_tally_connectors")
     .select("agent_version")

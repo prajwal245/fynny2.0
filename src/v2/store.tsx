@@ -268,6 +268,8 @@ export type ReconResult = {
   bank: number;
   at: string;
   period?: string;
+  /** The post-match proof (RC-6) for this run. */
+  proof?: { ok: boolean; checks: { id: string; label: string; ok: boolean; detail: string }[] };
 };
 
 export type Activity = {
@@ -1549,6 +1551,7 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
             bank: s.bank + (s.matched_total - s.matched),
             at: today(),
             period: s.period.label,
+            ...(s.proof ? { proof: { ok: s.proof.ok, checks: s.proof.checks.map((c: { id: string; label: string; ok: boolean; detail: string }) => ({ id: c.id, label: c.label, ok: c.ok, detail: c.detail })) } } : {}),
           };
           setRecon((p) => ({ ...p, [clientId]: result }));
           onDone?.(result);

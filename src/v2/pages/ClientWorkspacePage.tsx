@@ -20,6 +20,7 @@ import ChaserPage from "./ChaserPage";
 import { parsePeriod } from "@/lib/practice/core";
 import { openExceptionsIn } from "../lib/exceptions";
 import OpeningBalanceCheck from "../components/OpeningBalanceCheck";
+import ReviewChecks from "../components/ReviewChecks";
 import { MatchDrawer } from "../components/MatchDrawer";
 import { closeStage } from "../lib/closeStage";
 
@@ -236,6 +237,15 @@ export default function ClientWorkspacePage() {
             <Stat label="Matched" value={<AnimatedCounter value={matchedBank} />} tone="good" hint={result ? `Last run ${formatDate(result.at)}` : matchedBank ? `Matched in ${period}` : "Run recon to match"} />
             <Stat label="Unmatched" value={<AnimatedCounter value={bankSide.length - matchedBank - ignoredBank} />} tone={bankSide.length - matchedBank - ignoredBank ? "bad" : "neutral"} hint={unmatchedN > openN ? `${openN} to decide, ${unmatchedN - openN} explained or waiting for a statement` : `${openN} open exception${openN === 1 ? "" : "s"} in ${period}`} onClick={() => setTab("exceptions")} />
           </div>
+          {result?.proof && (
+            result.proof.ok ? (
+              <p data-testid="recon-proof-ok" style={{ margin: "0 0 14px", fontSize: 12.5, color: V.muted }}>Self-check passed: each line is used once, every match nets to zero, both sides move the same way, and the counters equal the lists.</p>
+            ) : (
+              <div role="alert" data-testid="recon-proof-failed" style={{ background: "rgba(217,43,43,.08)", border: "1px solid rgba(217,43,43,.35)", borderRadius: 12, padding: "10px 14px", marginBottom: 14, fontSize: 13, lineHeight: 1.55 }}>
+                <b>The self-check failed, so do not rely on these counts yet.</b> {result.proof.checks.filter((c) => !c.ok).map((c) => `${c.id}: ${c.detail}`).join(" ")} It is recorded in this client's Activity; press Start over to run it again.
+              </div>
+            )
+          )}
           {/* A bare "0 open exceptions" beside unmatched lines would look like nothing is wrong: say what is going on and what to press. */}
           {unmatchedN > 0 && periodEx.length === 0 && !result && !reconRunning && (
             <div role="status" data-testid="unmatched-without-exceptions" style={{ background: "rgba(176,120,30,.10)", border: "1px solid rgba(176,120,30,.35)", borderRadius: 12, padding: "10px 14px", marginBottom: 14, fontSize: 13.5, color: V.body }}>
@@ -318,7 +328,7 @@ export default function ClientWorkspacePage() {
 
       <MatchDrawer txnId={viewMatch} onClose={() => setViewMatch(null)} />
 
-      {tab === "close" && <><OpeningBalanceCheck /><CloseChecklist clientId={client.id} onTab={setTab} /></>}
+      {tab === "close" && <><OpeningBalanceCheck /><ReviewChecks clientId={client.id} clientName={client.name} /><CloseChecklist clientId={client.id} onTab={setTab} /></>}
 
       {tab === "mis" && <ReportsPage clientId={client.id} />}
 

@@ -231,6 +231,22 @@ export const readAuditedPdf = createServerFn({ method: "POST" })
     }),
   );
 
+/** Form 26AS / Annual Tax Statement PDF read by code: each deductor's lines are re-added against its own total before anything is compared. */
+export const read26asPdf = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ base64: z.string().min(100).max(12_000_000) }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async () => {
+      const { pdfText } = await import("./files.server");
+      const { read26as, prove26as } = await import("./tax/tds");
+      const { text } = await pdfText(Uint8Array.from(Buffer.from(data.base64, "base64")));
+      if (text.replace(/\s/g, "").length < 200) return { ok: false as const, reason: "This PDF has no text layer. Download the Annual Tax Statement PDF from the income tax portal (TRACES) rather than scanning it." };
+      const a = read26as(text);
+      if (!a.deductors.length) return { ok: false as const, reason: a.notes[0] ?? "No deductor found in Part I." };
+      return { ok: true as const, as26: a, checks: prove26as(a) };
+    }),
+  );
+
 /** Sales and purchase registers read from a client's Tally Day Books, for the GST returns check. */
 export const getTallyGstBooks = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -289,6 +305,17 @@ export const confirmPracticeLedgerMap = createServerFn({ method: "POST" })
       const { assertClient } = await import("./db.server");
       await assertClient(db, ctx, data.business_id);
       return (await import("./qcStore.server")).confirmLedgers(db, ctx, data.business_id, data.items);
+    }),
+  );
+
+export const savePracticePartyMaster = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ business_id: uuid, parties: z.array(z.object({ party: z.string().min(1).max(300), aliases: z.array(z.string().max(300)).max(20), gstin: z.string().max(15).nullable(), pan: z.string().max(10).nullable() })).min(1).max(5000) }).parse(d))
+  .handler(async ({ data, context }) =>
+    withWork(context.userId, async (db, ctx) => {
+      const { assertClient } = await import("./db.server");
+      await assertClient(db, ctx, data.business_id);
+      return (await import("./qcStore.server")).savePartyMaster(db, ctx, data.business_id, data.parties);
     }),
   );
 

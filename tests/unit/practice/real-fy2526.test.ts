@@ -16,6 +16,10 @@ import {
 } from "@/lib/practice/gst/ledgers";
 import { readTrialBalance, readLedgerMasters, trialBalanceIntegrity, tbAgainstMasters } from "@/lib/practice/review/trialBalance";
 import { readDayBookVouchers } from "@/lib/practice/review/dayBook";
+import { ageingReport } from "@/lib/practice/review/ageingReport";
+import { buildPartyMaster } from "@/lib/practice/review/partyMaster";
+import { read26as, prove26as, booksTds, compareTds, matchDeductors } from "@/lib/practice/tax/tds";
+import { pdfText } from "@/lib/practice/files.server";
 
 const DIR = process.env["REAL_FY2526"];
 const has = (f: string) => Boolean(DIR && existsSync(`${DIR}/${f}`));
@@ -97,5 +101,36 @@ describe.skipIf(!DIR || !has("tb.xlsx"))("FY 2025-26 real files", () => {
     const v = readDayBookVouchers(pick("daybook.xlsx", "day_book"));
     expect(v).toHaveLength(4362);
     for (const x of v) expect(Math.abs(x.legs.reduce((a, l) => a + l.debit - l.credit, 0))).toBeLessThan(0.01);
+  });
+
+  it("ageing: every debtor and creditor ties to the Trial Balance closing, to the paisa", () => {
+    const tb = readTrialBalance(pick("tb.xlsx", "trial_balance")), ms = readLedgerMasters(pick("tb.xlsx", "ledger_masters"));
+    const v = readDayBookVouchers(pick("daybook.xlsx", "day_book"));
+    for (const side of ["debtor", "creditor"] as const) {
+      const r = ageingReport(v, tb, ms, { side, asAt: "2026-03-31", fyStart: "2025-04-01", tbDate: "2026-03-31" });
+      expect(r.rows.length).toBeGreaterThan(5);
+      expect(r.untied).toEqual([]);
+    }
+  });
+
+  it("party master: GSTIN and PAN from the masters, bill-wise parties counted", () => {
+    const b = buildPartyMaster(readLedgerMasters(pick("tb.xlsx", "ledger_masters")));
+    expect(b.parties.length).toBeGreaterThan(400);
+    expect(b.withGstin).toBeGreaterThan(30);
+    expect(b.billWise).toBeGreaterThan(0);
+  });
+
+  it.skipIf(!has("26as.pdf"))("26AS: eight deductors read, every deductor's lines add to its own total, and books are compared by section", async () => {
+    const { text } = await pdfText(new Uint8Array(readFileSync(`${DIR}/26as.pdf`)));
+    const a = read26as(text);
+    expect(a.deductors).toHaveLength(8);
+    expect(prove26as(a).every((c) => c.ok)).toBe(true);
+    const tb = readTrialBalance(pick("tb.xlsx", "trial_balance"));
+    const led = tb.ledgers.filter((l) => /tds receivable|tcs receivable/i.test(l.group)).map((l) => l.name);
+    const books = booksTds(readDayBookVouchers(pick("daybook.xlsx", "day_book")), led, { start: "2025-04-01", end: "2026-03-31" });
+    const cmp = compareTds(a, books);
+    expect(cmp.rows.length).toBeGreaterThanOrEqual(3);
+    expect(cmp.as26Total).toBe(a.deductors.reduce((n, d) => n + d.tax, 0));
+    expect(matchDeductors(a, books).matches.filter((m) => m.parties.length).length).toBeGreaterThanOrEqual(6);
   });
 });

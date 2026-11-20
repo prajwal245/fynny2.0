@@ -40,6 +40,21 @@ export async function confirmLedgers(db: Db, ctx: FirmContext, businessId: strin
   return { saved: rows.length };
 }
 
+export interface PartyInput { party: string; aliases: string[]; gstin: string | null; pan: string | null }
+
+/** Fills the party master from Tally's masters. Rows already confirmed by a person keep their credit days, Udyam and related-party fields: only the identity fields are written. */
+export async function savePartyMaster(db: Db, ctx: FirmContext, businessId: string, parties: PartyInput[]): Promise<{ saved: number }> {
+  if (!canConfirm(ctx)) throw new PracticeError("forbidden", "Only a partner or manager can fill the party master.");
+  const now = new Date().toISOString();
+  const rows = parties.slice(0, 5000).map((p) => ({ ca_firm_id: ctx.firmId, business_id: businessId, party: p.party.slice(0, 300), aliases: p.aliases.slice(0, 20).map((a) => a.slice(0, 300)), gstin: p.gstin, pan: p.pan, updated_at: now }));
+  for (let i = 0; i < rows.length; i += 200) {
+    const { error } = await db.from("ca_party_master").upsert(rows.slice(i, i + 200), { onConflict: "business_id,party" });
+    if (error) throw new PracticeError("db_error", missing(error) ? NEEDS_SQL : error.message);
+  }
+  await logAccess(db, ctx, "export", "party master filled from Tally masters", businessId, { parties: rows.length });
+  return { saved: rows.length };
+}
+
 /** Records who read, downloaded or exported what. Never blocks the action it records. */
 export async function logAccess(db: Db, ctx: FirmContext, action: "read" | "download" | "export", subject: string, businessId: string | null, detail: Record<string, unknown> = {}): Promise<void> {
   try {

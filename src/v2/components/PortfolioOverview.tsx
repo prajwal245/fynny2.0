@@ -13,6 +13,7 @@ import { Link } from "@tanstack/react-router";
 import {
   AlertTriangle,
   ArrowRight,
+  Clock,
   LayoutGrid,
   List,
   ListChecks,
@@ -22,6 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { CloseProgress } from "./CloseProgress";
+import { nextDeadline } from "../lib/needsView";
 import type { CloseState } from "../store";
 import {
   FUNNEL,
@@ -57,35 +59,32 @@ const STAGE_STYLE: Record<StageKey, { from: string; to: string; ink: string }> =
 const PW_STYLES = `
 .pw { display:grid; gap:18px; min-width:0; }
 .pw button { font-family:inherit; }
-.pw-hero { border-radius:24px; padding:22px 24px 20px; color:#FAF7F2; background:radial-gradient(120% 140% at 100% 0%, rgba(217,43,43,.38) 0%, transparent 55%), linear-gradient(135deg,#2A1816 0%,#43201D 55%,#5E1E20 100%); box-shadow:0 18px 40px -26px rgba(60,20,16,.7); }
-.pw .pw-hero h2 { font-size:22px; font-weight:600; letter-spacing:-.015em; margin:0; color:#FAF7F2; }
-.pw .pw-hero p { margin:4px 0 0; font-size:14px; color:rgba(250,247,242,.74); }
+.pw-hero { border-radius:24px; padding:24px 26px 22px; color:var(--v2-ink); border:1px solid var(--v2-line); background:radial-gradient(110% 130% at 100% 0%, rgba(217,43,43,.07) 0%, transparent 55%), radial-gradient(90% 120% at 0% 100%, rgba(234,219,200,.45) 0%, transparent 60%), var(--v2-card); box-shadow:var(--v2-card-shadow); }
+.pw .pw-hero h2 { font-size:22px; font-weight:600; letter-spacing:-.015em; margin:0; color:var(--v2-ink); }
+.pw .pw-hero p { margin:4px 0 0; font-size:14px; color:var(--v2-body); }
 .pw-hero-top { display:flex; align-items:center; justify-content:space-between; gap:16px; }
-.pw-ring { --p:0; position:relative; width:68px; height:68px; flex:none; border-radius:999px; display:grid; place-items:center; background:conic-gradient(#8FD6B0 calc(var(--p) * 1%), rgba(255,255,255,.14) 0); }
-.pw-ring::before { content:""; position:absolute; inset:6px; border-radius:999px; background:#3A1D1B; }
+.pw-ring { --p:0; position:relative; width:68px; height:68px; flex:none; border-radius:999px; display:grid; place-items:center; background:conic-gradient(var(--v2-green) calc(var(--p) * 1%), rgba(20,18,16,.08) 0); }
+.pw-ring::before { content:""; position:absolute; inset:6px; border-radius:999px; background:var(--v2-card); }
 .pw-ring span { position:relative; text-align:center; line-height:1.1; }
 .pw-ring b { display:block; font-size:19px; font-weight:600; font-variant-numeric:tabular-nums; }
-.pw-ring em { display:block; font-style:normal; font-size:11px; color:rgba(250,247,242,.7); }
+.pw-ring em { display:block; font-style:normal; font-size:11px; color:var(--v2-muted); }
 .pw-mixhead { display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 16px; margin-top:22px; font-size:14px; font-weight:600; }
 .pw-mixhead span:last-child { font-weight:400; font-size:12.5px; }
-.pw-hero .pw-mix { background:rgba(255,255,255,.07); box-shadow:inset 0 0 0 1px rgba(255,255,255,.08); margin-top:10px; }
-.pw-hero .pw-seg[aria-pressed="true"] { box-shadow:0 0 0 2px #FAF7F2; }
-.pw-hero .pw-pill { background:rgba(255,255,255,.07); color:#FAF7F2; box-shadow:inset 0 0 0 1px rgba(255,255,255,.14); }
-.pw-hero .pw-pill:hover { background:rgba(255,255,255,.13); }
-.pw-hero .pw-pill[aria-pressed="true"] { box-shadow:inset 0 0 0 1.5px #FAF7F2; }
-.pw-hero .pw-pill em { color:rgba(250,247,242,.6); }
-.pw-hero .pw-pill:focus-visible, .pw-hero .pw-seg:focus-visible { outline-color:#FAF7F2; }
+.pw-hero .pw-mix { margin-top:10px; }
+.pw-hero .pw-seg[aria-pressed="true"] { box-shadow:0 0 0 2px var(--v2-ink); }
+.pw-hero .pw-seg:focus-visible { outline-color:var(--v2-brand); }
 .pw-tiles { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:18px; }
-.pw-tile { display:grid; grid-template-columns:auto minmax(0,1fr); gap:12px; align-items:center; padding:14px 16px; border-radius:16px; background:rgba(255,255,255,.07); box-shadow:inset 0 0 0 1px rgba(255,255,255,.10); color:inherit; text-decoration:none; text-align:left; cursor:pointer; border:0; transition:background .16s ease, transform .12s ease; }
-.pw-tile:hover { background:rgba(255,255,255,.13); transform:translateY(-1px); }
-.pw-tile:focus-visible { outline:2px solid #FAF7F2; outline-offset:2px; }
-.pw-tile-ic { width:38px; height:38px; border-radius:12px; display:grid; place-items:center; background:rgba(255,255,255,.12); }
+.pw-tile { display:grid; grid-template-columns:auto minmax(0,1fr); gap:14px; align-items:center; padding:16px 18px; border-radius:18px; background:var(--v2-card); border:1px solid var(--v2-line); box-shadow:0 1px 2px rgba(20,18,16,.03); color:inherit; text-decoration:none; text-align:left; cursor:pointer; transition:transform .16s ease, box-shadow .16s ease, border-color .16s ease; }
+.pw-tile:hover { transform:translateY(-2px); border-color:color-mix(in srgb, var(--v2-brand) 30%, var(--v2-line)); box-shadow:0 16px 30px -22px rgba(20,18,16,.35); }
+.pw-tile:focus-visible { outline:2px solid var(--v2-brand); outline-offset:2px; }
+.pw-tile-ic { width:42px; height:42px; border-radius:14px; display:grid; place-items:center; background:var(--v2-cream); color:var(--v2-maroon); border:1px solid var(--v2-line); }
+.pw-tile-ic svg { stroke-width:1.6; }
 .pw-tile-t b { display:block; font-size:26px; font-weight:600; line-height:1.1; font-variant-numeric:tabular-nums; }
-.pw-tile-t em { display:block; font-style:normal; font-size:12.5px; color:rgba(250,247,242,.72); margin-top:2px; }
+.pw-tile-t em { display:block; font-style:normal; font-size:12.5px; color:var(--v2-muted); margin-top:2px; }
 .pw-card-box { border-radius:22px; background:var(--v2-card); border:1px solid var(--v2-line); box-shadow:var(--v2-card-shadow); padding:20px 22px; }
 .pw-title { font-size:17px; font-weight:600; margin:0; }
 .pw-sub { font-size:13px; color:var(--v2-muted); margin:3px 0 0; }
-.pw-mix { display:flex; gap:6px; height:52px; margin-top:16px; padding:6px; border-radius:18px; background:var(--v2-gray); }
+.pw-mix { display:flex; gap:6px; height:46px; margin-top:16px; padding:5px; border-radius:16px; background:var(--v2-gray); border:1px solid var(--v2-line); }
 .pw-seg { all:unset; box-sizing:border-box; cursor:pointer; border-radius:13px; display:grid; place-items:center; font-size:14px; font-weight:600; font-variant-numeric:tabular-nums; transition:transform .12s ease, box-shadow .16s ease, opacity .16s ease; min-width:0; }
 .pw-seg:hover { transform:translateY(-1px); }
 .pw-seg:focus-visible { outline:2px solid var(--v2-brand); outline-offset:2px; }
@@ -98,13 +97,13 @@ const PW_STYLES = `
 .pw-pill[aria-pressed="true"] { box-shadow:inset 0 0 0 1.5px var(--v2-ink); font-weight:600; }
 .pw-pill i { width:10px; height:10px; border-radius:999px; flex:none; }
 .pw-pill em { font-style:normal; color:var(--v2-muted); font-variant-numeric:tabular-nums; margin-left:4px; }
-.pw-tabs { display:flex; gap:22px; border-bottom:1px solid var(--v2-line); overflow-x:auto; scrollbar-width:none; }
-.pw-tab { all:unset; box-sizing:border-box; cursor:pointer; padding:10px 0 12px; font-size:14.5px; color:var(--v2-muted); display:inline-flex; align-items:center; gap:8px; border-bottom:2px solid transparent; margin-bottom:-1px; white-space:nowrap; }
+.pw-tabs { display:inline-flex; gap:2px; padding:5px; border-radius:999px; border:1px solid var(--v2-line); background:var(--v2-tab-bg, rgba(255,255,255,.55)); box-shadow:0 1px 2px rgba(20,18,16,.04), 0 10px 24px -18px rgba(20,18,16,.25); overflow-x:auto; scrollbar-width:none; max-width:100%; }
+.pw-tab { all:unset; box-sizing:border-box; cursor:pointer; padding:8px 16px; border-radius:999px; font-size:13.5px; color:var(--v2-body); display:inline-flex; align-items:center; gap:8px; white-space:nowrap; transition:background .2s ease, color .2s ease, box-shadow .2s ease; }
 .pw-tab:hover { color:var(--v2-ink); }
 .pw-tab:focus-visible { outline:2px solid var(--v2-brand); outline-offset:2px; border-radius:6px; }
-.pw-tab[aria-selected="true"] { color:var(--v2-ink); font-weight:600; border-bottom-color:var(--v2-ink); }
+.pw-tab[aria-selected="true"] { color:var(--v2-ink); font-weight:650; background:var(--v2-tab-active, #fff); box-shadow:0 1px 2px rgba(20,18,16,.08), 0 8px 18px -10px rgba(20,18,16,.3); }
 .pw-count { min-width:22px; height:22px; padding:0 7px; border-radius:999px; display:inline-grid; place-items:center; font-size:12px; font-weight:600; background:var(--v2-gray); color:var(--v2-body); font-variant-numeric:tabular-nums; }
-.pw-tab[aria-selected="true"] .pw-count { background:var(--v2-ink); color:var(--v2-bg); }
+.pw-tab[aria-selected="true"] .pw-count { background:rgba(217,43,43,.12); color:var(--v2-maroon); }
 .pw-bar { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
 .pw-bar .grow { flex:1 1 auto; font-size:13.5px; color:var(--v2-muted); }
 .pw-search { display:flex; align-items:center; gap:8px; padding:0 12px; height:38px; border-radius:12px; background:var(--v2-input); box-shadow:inset 0 0 0 1px var(--v2-line); min-width:200px; }
@@ -124,7 +123,7 @@ const PW_STYLES = `
 .pw-cardc { min-width:0; position:relative; display:grid; gap:14px; padding:18px; border-radius:22px; background:var(--v2-card); border:1px solid var(--v2-line); box-shadow:var(--v2-card-shadow); transition:transform .16s ease, box-shadow .2s ease; }
 .pw-cardc:hover { transform:translateY(-2px); }
 .pw-head { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:12px; align-items:center; }
-.pw-av { width:40px; height:40px; border-radius:13px; display:grid; place-items:center; font-size:14px; font-weight:600; }
+.pw-av { width:40px; height:40px; border-radius:13px; display:grid; place-items:center; font-size:14px; font-weight:600; border:1px solid rgba(20,18,16,.06); }
 .pw-name { font-size:15.5px; font-weight:600; color:var(--v2-ink); text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:block; }
 .pw-name::after { content:""; position:absolute; inset:0; border-radius:inherit; }
 .pw-name:focus-visible { outline:none; }
@@ -349,11 +348,14 @@ function ClientRow({ r, close }: { r: PortfolioRow; close?: CloseState }) {
 }
 
 export function PortfolioOverview({
+  after,
   rows,
   closes,
   period,
   totals,
 }: {
+  /** Rendered right under the hero, before the client list. */
+  after?: React.ReactNode;
   rows: PortfolioRow[];
   /** The full close state per client, for the progress bars. */
   closes: Record<string, CloseState>;
@@ -389,6 +391,7 @@ export function PortfolioOverview({
     [rows, tab, query, stage, sort],
   );
   const closedCount = counts.Closed;
+  const deadline = useMemo(() => nextDeadline(period), [period]);
   const filtered = Boolean(stage) || Boolean(query.trim()) || tab !== "all";
   const reset = () => {
     setStage(null);
@@ -424,7 +427,7 @@ export function PortfolioOverview({
       label: "Clients",
       value: rows.length,
       hint: "active",
-      icon: <Users size={18} />,
+      icon: <Users size={18} strokeWidth={1.6} />,
       onClick: reset,
     },
     {
@@ -432,7 +435,7 @@ export function PortfolioOverview({
       label: "Open exceptions",
       value: totals.exceptions,
       hint: "across clients",
-      icon: <AlertTriangle size={18} />,
+      icon: <AlertTriangle size={18} strokeWidth={1.6} />,
       to: "/app/exceptions",
     },
     {
@@ -440,7 +443,7 @@ export function PortfolioOverview({
       label: "Awaiting review",
       value: totals.review,
       hint: "unsure lines",
-      icon: <ListChecks size={18} />,
+      icon: <ListChecks size={18} strokeWidth={1.6} />,
       to: "/app/review",
     },
     {
@@ -448,7 +451,7 @@ export function PortfolioOverview({
       label: "Open chases",
       value: totals.chases,
       hint: "documents pending",
-      icon: <Send size={18} />,
+      icon: <Send size={18} strokeWidth={1.6} />,
       to: "/app/chaser",
     },
   ];
@@ -460,13 +463,17 @@ export function PortfolioOverview({
       <div className="pw-hero">
         <div className="pw-hero-top">
           <div style={{ minWidth: 0 }}>
-            <h2 style={{ color: "#FAF7F2" }}>Close for {period}</h2>
+            <h2>Close for {period}</h2>
             <p
               data-testid="portfolio-closed-line"
-              style={{ color: "rgba(250,247,242,.74)" }}
             >
               {closedLine(rows, period)}
             </p>
+            {deadline && (
+              <p data-testid="next-deadline" style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, color: deadline.days <= 3 ? "var(--v2-maroon)" : "var(--v2-body)" }}>
+                <Clock size={14} strokeWidth={1.7} aria-hidden="true" /> Next: {deadline.label} for {period.split(" ")[0]}, {new Date(`${deadline.due}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} · {deadline.days === 0 ? "due today" : `${deadline.days} day${deadline.days === 1 ? "" : "s"} left`}
+              </p>
+            )}
           </div>
           <div
             className="pw-ring"
@@ -522,8 +529,8 @@ export function PortfolioOverview({
         </div>
 
         <div className="pw-mixhead">
-          <span style={{ color: "#FAF7F2" }}>Where every client stands</span>
-          <span style={{ color: "rgba(250,247,242,.6)" }}>
+          <span>Where every client stands</span>
+          <span style={{ color: "var(--v2-muted)" }}>
             {stage
               ? `Showing clients at ${stage}. Click it again to show all.`
               : "Click any segment to filter"}
@@ -557,7 +564,7 @@ export function PortfolioOverview({
             <span
               style={{
                 margin: "auto",
-                color: "rgba(250,247,242,.6)",
+                color: "var(--v2-muted)",
                 fontSize: 13,
               }}
             >
@@ -587,6 +594,8 @@ export function PortfolioOverview({
           ))}
         </div>
       </div>
+
+      {after}
 
       <div role="tablist" aria-label="Show clients" className="pw-tabs">
         {TABS.map((t) => (

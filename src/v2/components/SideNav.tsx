@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertTriangle, BarChart3, BookOpen, ChevronDown, ChevronLeft, ChevronRight, FileText, LayoutGrid, ListChecks, LogOut, Receipt, CalendarCheck, Send, Settings, Users, X } from "lucide-react";
+import { AlertTriangle, BarChart3, BookOpen, LifeBuoy, ChevronDown, ChevronLeft, ChevronRight, FileText, LayoutGrid, ListChecks, LogOut, Receipt, CalendarCheck, Send, Settings, Users, X } from "lucide-react";
 import type { ComponentType } from "react";
 import { V } from "../ui";
 import { FirstCloseLauncher } from "./FirstCloseGuide";
@@ -106,12 +106,15 @@ export function SideNav({
         })}
         <div style={{ flex: 1 }} />
         <FirstCloseLauncher compact />
-        <a className="v2-rail-btn" href="/guide" target="_blank" rel="noreferrer" title="Resource and Product Guide" aria-label="Resource and Product Guide" data-testid="guide-link">
-          <BookOpen size={18} />
-        </a>
-        <button className="v2-rail-btn" onClick={onSignOut} title="Sign out" aria-label="Sign out">
-          <LogOut size={18} />
-        </button>
+        {/* With the menu open these live at the bottom of the panel, labelled; the icons show only when the menu is folded away. */}
+        <div className="v2-rail-foot">
+          <a className="v2-rail-btn" href="/guide" target="_blank" rel="noreferrer" title="Documentation" aria-label="Documentation" data-testid="guide-link">
+            <BookOpen size={18} />
+          </a>
+          <button className="v2-rail-btn" onClick={onSignOut} title="Logout" aria-label="Logout">
+            <LogOut size={18} />
+          </button>
+        </div>
       </div>
 
       <aside className="v2-panel" aria-label="Pages" aria-hidden={folded ? true : undefined}>
@@ -193,6 +196,12 @@ export function SideNav({
             );
           })}
         </nav>
+
+        <div className="v2-foot" data-testid="side-foot">
+          <a href="/guide" target="_blank" rel="noreferrer"><BookOpen size={16} /><span>Documentation</span></a>
+          <Link to="/app/settings" search={{ tab: "help" } as never} onClick={onClose}><LifeBuoy size={16} /><span>Support</span></Link>
+          <button type="button" className="out" onClick={onSignOut}><LogOut size={16} /><span>Logout</span></button>
+        </div>
       </aside>
 
       <button className="v2-fold" onClick={fold} aria-label={folded ? "Show the menu" : "Hide the menu"} aria-keyshortcuts="[" title={folded ? "Show the menu ([)" : "Hide the menu ([)"}>
@@ -228,6 +237,14 @@ export const SIDENAV_STYLES = `
 .v2-sub { margin:2px 0 6px 21px; padding-left:12px; border-left:1px solid ${V.line}; display:grid; gap:1px; }
 .v2-nav .v2-sub a { padding:8px 11px; font-size:13.5px; margin:0; border-radius:10px; }
 .v2-nav .v2-sub a[data-status="active"] { box-shadow:none; background:${V.blue}; color:${V.ink}; }
+.v2-foot { margin-top:10px; padding-top:10px; border-top:1px solid ${V.line}; display:grid; gap:2px; }
+.v2-foot a, .v2-foot button { display:flex; align-items:center; gap:11px; width:100%; padding:10px 13px; border-radius:12px; border:0; background:transparent; font:inherit; font-size:14px; color:${V.body}; cursor:pointer; text-decoration:none; text-align:left; transition:background .18s ease, color .18s ease; }
+.v2-foot a:hover, .v2-foot button:hover { background:${V.gray}; color:${V.ink}; }
+.v2-foot .out { color:#C23030; } .v2-foot .out:hover { background:rgba(217,43,43,.1); color:#C23030; }
+.v2-rail-foot { display:grid; gap:6px; }
+.v2-side:not(.folded) .v2-rail-foot { display:none; }
+@media (max-width:900px){ .v2-side .v2-rail-foot { display:grid; } }
+.v2-nav svg, .v2-rail-btn svg, .v2-group svg, .v2-foot svg { stroke-width:1.6; }
 .v2-count { margin-left:auto; font-size:11px; font-weight:700; background:${V.beige}; color:${V.ink}; border-radius:999px; padding:1px 7px; }
 @media (max-width:900px){
   .v2-side { position:fixed; left:0; top:0; z-index:60; transform:translateX(-100%); transition:transform .28s cubic-bezier(.16,1,.3,1); box-shadow:0 0 60px rgba(0,0,0,.35); }

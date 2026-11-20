@@ -7,11 +7,12 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
-import { AlertTriangle, ArrowRight, Check, CheckCircle2, FileWarning, ListChecks, PhoneCall, PenLine, Sparkles, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, MoreHorizontal, Check, CheckCircle2, FileWarning, ListChecks, PhoneCall, PenLine, Sparkles, X } from "lucide-react";
 import { Card, V } from "../ui";
 import { AGENTS, AgentGlyph, ShimmerText, type AgentKey } from "../agents";
 import { useV2, type AgentRunRecord, monthOf } from "../store";
 import { openExceptions } from "../lib/exceptions";
+import { closeOptions, groupNeeds, tomorrow, visible, type Snoozed } from "../lib/needsView";
 
 export type NeedsItem = {
   key: string;
@@ -173,57 +174,116 @@ export function useNeedsYou(): NeedsItem[] {
   }, [clients, docs, review, exceptions, chases, reports, period, isReadyForMis, canSignOff, generateReport, isRunning, clientName, navigate]);
 }
 
-export function NeedsYou({ items }: { items: NeedsItem[] }) {
+const SNOOZE_KEY = "fynhelp.v2.needs.snoozed";
+const readSnoozed = (): Snoozed => {
+  try { return JSON.parse(window.localStorage.getItem(SNOOZE_KEY) ?? "{}") as Snoozed; } catch { return {}; }
+};
+
+/**
+ * What waits on a person, grouped by the kind of work and ordered for the role, with a way to close each item that fits its kind.
+ * See lib/needsView for the rules.
+ */
+export function NeedsYou({ items, role = "Partner", onResolveChase }: { items: NeedsItem[]; role?: "Partner" | "Junior"; onResolveChase?: (chaseId: string) => void }) {
+  const [snoozed, setSnoozed] = useState<Snoozed>({});
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  const [menu, setMenu] = useState<string | null>(null);
+  const [showSnoozed, setShowSnoozed] = useState(false);
+  useEffect(() => { setSnoozed(readSnoozed()); }, []);
+  useEffect(() => {
+    if (!menu) return;
+    const off = () => setMenu(null);
+    document.addEventListener("click", off);
+    return () => document.removeEventListener("click", off);
+  }, [menu]);
+  const { shown, hidden } = visible(items, snoozed);
+  const groups = groupNeeds(shown, role);
+  const snooze = (key: string) => {
+    const next = { ...snoozed, [key]: tomorrow() };
+    setSnoozed(next);
+    try { window.localStorage.setItem(SNOOZE_KEY, JSON.stringify(next)); } catch { /* the snooze just is not remembered */ }
+    toast.success("It will be back tomorrow if it is still open.");
+  };
+  const unsnoozeAll = () => {
+    setSnoozed({});
+    try { window.localStorage.removeItem(SNOOZE_KEY); } catch { /* ignore */ }
+  };
+  const act = (it: NeedsItem, id: string) => {
+    setMenu(null);
+    if (id === "snooze") snooze(it.key);
+    else if (id === "chase_resolved") { onResolveChase?.(it.key.split(":")[1]!); toast.success("Chase closed. Follow-ups stop."); }
+  };
+  const row = (it: NeedsItem) => (
+    <motion.li key={it.key} layout initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: 24 }} transition={{ duration: 0.25 }} className="today-item" data-need={it.key.split(":")[0]}>
+      <span className="today-icon" style={{ background: TONE_BG[it.tone], color: TONE_FG[it.tone] }}>{it.icon}</span>
+      <span style={{ minWidth: 0 }}>
+        <span style={{ display: "block", fontSize: 13.5, fontWeight: 600 }}>{it.title}</span>
+        <span style={{ display: "block", fontSize: 12.5, color: V.body, marginTop: 2, lineHeight: 1.45 }}>{it.detail}</span>
+      </span>
+      <span style={{ display: "inline-flex", gap: 6, alignItems: "center", position: "relative" }}>
+        {it.action.to ? (
+          <Link className="v2-btn v2-btn-ghost v2-btn-sm" to={it.action.to.split("?")[0] as never} search={Object.fromEntries(new URLSearchParams(it.action.to.split("?")[1] ?? "")) as never}>
+            {it.action.label} <ArrowRight size={13} />
+          </Link>
+        ) : (
+          <button className="v2-btn v2-btn-primary v2-btn-sm" disabled={!it.action.run} data-busy={!it.action.run} onClick={it.action.run}>{it.action.label}</button>
+        )}
+        <button type="button" className="v2-icon-btn" aria-label={`More options for ${it.title}`} aria-haspopup="menu" aria-expanded={menu === it.key} onClick={(e) => { e.stopPropagation(); setMenu(menu === it.key ? null : it.key); }} style={{ width: 30, height: 30 }} data-testid="need-more">
+          <MoreHorizontal size={16} strokeWidth={1.7} />
+        </button>
+        {menu === it.key && (
+          <div role="menu" onClick={(e) => e.stopPropagation()} style={{ position: "absolute", right: 0, top: 36, zIndex: 20, width: 270, borderRadius: 14, border: `1px solid ${V.line}`, background: "var(--v2-pop)", boxShadow: "0 24px 60px -24px rgba(20,18,16,.45)", padding: 6 }}>
+            {closeOptions(it.key).map((o) => (
+              <button key={o.id} role="menuitem" type="button" onClick={() => act(it, o.id)} style={{ display: "block", width: "100%", textAlign: "left", border: 0, background: "transparent", font: "inherit", padding: "9px 11px", borderRadius: 10, cursor: "pointer" }} className="today-menuitem">
+                <span style={{ display: "block", fontSize: 13.5, fontWeight: 600, color: V.ink }}>{o.label}</span>
+                <span style={{ display: "block", fontSize: 12, color: V.muted, marginTop: 1 }}>{o.hint}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </span>
+    </motion.li>
+  );
   return (
     <Card style={{ padding: 0 }} data-testid="needs-you">
-      <div style={{ padding: "18px 20px 10px", display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+      <div style={{ padding: "18px 20px 6px", display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
         <h3 style={{ fontSize: 15.5 }}>Needs you</h3>
-        <span style={{ fontSize: 12.5, color: V.muted }}>{items.length ? `${items.length} item${items.length === 1 ? "" : "s"}` : ""}</span>
+        <span style={{ fontSize: 12.5, color: V.muted }}>{shown.length ? `${shown.length} item${shown.length === 1 ? "" : "s"}` : ""}</span>
       </div>
-      {items.length === 0 ? (
+      {shown.length === 0 ? (
         <div style={{ padding: "8px 20px 22px", display: "flex", gap: 12, alignItems: "center", color: V.body, fontSize: 13.5 }}>
           <span style={{ width: 34, height: 34, borderRadius: 999, background: TONE_BG.good, color: V.green, display: "grid", placeItems: "center" }}>
             <CheckCircle2 size={17} />
           </span>
-          All clear. Your agents have everything they need; new items appear here the moment they need a person.
+          {hidden.length ? `Nothing else needs you today. ${hidden.length} snoozed until tomorrow.` : "All clear. Your agents have everything they need; new items appear here the moment they need a person."}
         </div>
       ) : (
-        <ul style={{ listStyle: "none", margin: 0, padding: "0 8px 8px" }}>
-          <AnimatePresence initial={false}>
-            {items.slice(0, 8).map((it) => (
-              <motion.li
-                key={it.key}
-                layout
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, x: 24 }}
-                transition={{ duration: 0.25 }}
-                className="today-item"
-                data-need={it.key.split(":")[0]}
-              >
-                <span className="today-icon" style={{ background: TONE_BG[it.tone], color: TONE_FG[it.tone] }}>{it.icon}</span>
-                <span style={{ minWidth: 0 }}>
-                  <span style={{ display: "block", fontSize: 13.5, fontWeight: 600 }}>{it.title}</span>
-                  <span style={{ display: "block", fontSize: 12.5, color: V.body, marginTop: 2, lineHeight: 1.45 }}>{it.detail}</span>
-                </span>
-                {it.action.to ? (
-                  <Link
-                    className="v2-btn v2-btn-ghost v2-btn-sm"
-                    // "/app/clients/x?tab=documents&doc=y": the router takes the path and the query separately.
-                    to={it.action.to.split("?")[0] as never}
-                    search={Object.fromEntries(new URLSearchParams(it.action.to.split("?")[1] ?? "")) as never}
-                  >
-                    {it.action.label} <ArrowRight size={13} />
-                  </Link>
-                ) : (
-                  <button className="v2-btn v2-btn-primary v2-btn-sm" disabled={!it.action.run} data-busy={!it.action.run} onClick={it.action.run}>{it.action.label}</button>
-                )}
-              </motion.li>
-            ))}
-          </AnimatePresence>
-        </ul>
+        groups.map((g) => {
+          const cap = open[g.key] ? g.items.length : 3;
+          return (
+            <section key={g.key} data-group={g.key} aria-label={g.label}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "12px 20px 4px" }}>
+                <span style={{ fontSize: 11.5, letterSpacing: ".1em", textTransform: "uppercase", fontWeight: 700, color: V.muted }}>{g.label}</span>
+                <span className="pw-count" style={{ minWidth: 20, height: 20, fontSize: 11.5 }}>{g.items.length}</span>
+                <span style={{ fontSize: 12, color: V.muted }}>{g.blurb}</span>
+              </div>
+              <ul style={{ listStyle: "none", margin: 0, padding: "0 8px" }}>
+                <AnimatePresence initial={false}>{g.items.slice(0, cap).map(row)}</AnimatePresence>
+              </ul>
+              {g.items.length > 3 && (
+                <button type="button" onClick={() => setOpen((o) => ({ ...o, [g.key]: !o[g.key] }))} style={{ border: 0, background: "transparent", font: "inherit", fontSize: 12.5, fontWeight: 650, color: V.maroon, cursor: "pointer", padding: "2px 20px 6px" }}>
+                  {open[g.key] ? "Show fewer" : `Show ${g.items.length - 3} more`}
+                </button>
+              )}
+            </section>
+          );
+        })
       )}
-      {items.length > 8 && <div style={{ padding: "0 20px 16px", fontSize: 12.5, color: V.muted }}>{items.length - 8} more across your clients</div>}
+      {hidden.length > 0 && shown.length > 0 && (
+        <div style={{ padding: "6px 20px 16px", fontSize: 12.5, color: V.muted }}>
+          {hidden.length} snoozed until tomorrow. <button type="button" onClick={showSnoozed ? () => setShowSnoozed(false) : unsnoozeAll} style={{ border: 0, background: "transparent", font: "inherit", fontSize: 12.5, fontWeight: 650, color: V.maroon, cursor: "pointer", padding: 0 }}>Show them now</button>
+        </div>
+      )}
+      <div style={{ height: 8 }} />
     </Card>
   );
 }

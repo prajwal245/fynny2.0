@@ -6,6 +6,8 @@ import { read26asPdf, savePracticePartyMaster } from "@/lib/practice/practice.fu
 import { detectLedgerFile } from "@/lib/practice/gst/ledgers";
 import { readTrialBalance, readLedgerMasters, type MasterRow, type TrialBalance } from "@/lib/practice/review/trialBalance";
 import { readDayBookVouchers, type Voucher } from "@/lib/practice/review/dayBook";
+import AgeingTable from "./AgeingTable";
+import TdsTable from "./TdsTable";
 import { ageingReport } from "@/lib/practice/review/ageingReport";
 import { buildPartyMaster } from "@/lib/practice/review/partyMaster";
 import { booksTds, compareTds, matchDeductors, type As26, type As26Check } from "@/lib/practice/tax/tds";
@@ -108,82 +110,10 @@ export default function YearEndReviews({ clientId }: { clientId: string }) {
         </span>
       </div>
 
-      {ageing && (
-        <div style={{ marginTop: 14 }} data-testid="ageing">
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 6 }}>
-            <strong style={{ fontSize: 14 }}>Ageing at {asAt}</strong>
-            <select className="v2-input" style={{ maxWidth: 160 }} value={side} onChange={(e) => setSide(e.target.value as "debtor" | "creditor")} aria-label="Debtors or creditors"><option value="debtor">Debtors</option><option value="creditor">Creditors</option></select>
-            <label style={{ fontSize: 13 }}>Credit days (optional) <input className="v2-input" style={{ width: 70 }} inputMode="numeric" value={days} onChange={(e) => setDays(e.target.value.replace(/\D/g, ""))} /></label>
-            <Badge tone={ageing.untied.length ? "bad" : "good"}>{ageing.untied.length ? `${ageing.untied.length} do not tie to the Trial Balance` : "All tie to the Trial Balance"}</Badge>
-          </div>
-          <p style={{ fontSize: 12.5, color: V.body, margin: "0 0 6px" }}>{ageing.dueBasis}</p>
-          <div className="v2-scroll" style={{ maxHeight: 360 }}>
-            <table className="v2-table">
-              <thead><tr><th>Party</th><th style={{ textAlign: "right" }}>Closing</th><th style={{ textAlign: "right" }}>0–30</th><th style={{ textAlign: "right" }}>31–60</th><th style={{ textAlign: "right" }}>61–90</th><th style={{ textAlign: "right" }}>Over 90</th><th style={{ textAlign: "right" }}>On account</th><th>Basis</th></tr></thead>
-              <tbody>
-                {ageing.rows.slice(0, 200).map((r) => (
-                  <tr key={r.party}>
-                    <td>{r.party}{!r.tied && <> <Badge tone="bad">does not tie</Badge></>}</td>
-                    <td style={{ textAlign: "right" }} className="num">{inr(r.closing)}</td>
-                    <td style={{ textAlign: "right" }} className="num">{inr(r.buckets.current)}</td>
-                    <td style={{ textAlign: "right" }} className="num">{inr(r.buckets.d31_60)}</td>
-                    <td style={{ textAlign: "right" }} className="num">{inr(r.buckets.d61_90)}</td>
-                    <td style={{ textAlign: "right" }} className="num">{inr(r.buckets.d90plus)}</td>
-                    <td style={{ textAlign: "right" }} className="num">{inr(r.onAccount)}</td>
-                    <td>{r.billWise ? "FIFO (bill-wise in Tally)" : "FIFO"}</td>
-                  </tr>
-                ))}
-                <tr style={{ fontWeight: 700 }}><td>Total</td><td style={{ textAlign: "right" }} className="num">{inr(ageing.totals.closing)}</td><td style={{ textAlign: "right" }} className="num">{inr(ageing.totals.current)}</td><td style={{ textAlign: "right" }} className="num">{inr(ageing.totals.d31_60)}</td><td style={{ textAlign: "right" }} className="num">{inr(ageing.totals.d61_90)}</td><td style={{ textAlign: "right" }} className="num">{inr(ageing.totals.d90plus)}</td><td style={{ textAlign: "right" }} className="num">{inr(ageing.totals.onAccount)}</td><td /></tr>
-              </tbody>
-            </table>
-          </div>
-          {ageing.notes.map((n, i) => <p key={i} style={{ fontSize: 12, color: V.muted, margin: "4px 0 0" }}>{n}</p>)}
-        </div>
-      )}
+      {ageing && <div style={{ marginTop: 14 }}><AgeingTable report={ageing} side={side} onSide={setSide} days={days} onDays={setDays} /></div>}
 
-      {as26 && (
-        <div style={{ marginTop: 14, display: "grid", gap: 6 }} data-testid="tds-check">
-          <strong style={{ fontSize: 14 }}>TDS deducted from the client, books against 26AS</strong>
-          {as26.checks.map((c) => <Row key={c.id} ok={c.ok}><b>{c.label}.</b> <span style={{ color: V.muted }}>{c.detail}</span></Row>)}
-          {tds && (
-            <>
-              <div className="v2-scroll">
-                <table className="v2-table">
-                  <thead><tr><th>Section</th><th style={{ textAlign: "right" }}>26AS tax</th><th style={{ textAlign: "right" }}>Books (TDS receivable debits)</th><th style={{ textAlign: "right" }}>Difference</th></tr></thead>
-                  <tbody>
-                    {tds.cmp.rows.map((r) => (
-                      <tr key={r.section}>
-                        <td>{r.section}</td><td style={{ textAlign: "right" }} className="num">{inr(r.as26)}</td><td style={{ textAlign: "right" }} className="num">{inr(r.books)}</td>
-                        <td style={{ textAlign: "right", fontWeight: 600, color: r.status === "agree" ? V.green : V.maroon }} className="num">{r.status === "agree" ? "Agrees" : r.status === "books_higher" ? `Books higher by ${inr(r.diff)}` : `Books lower by ${inr(-r.diff)}`}</td>
-                      </tr>
-                    ))}
-                    <tr style={{ fontWeight: 700 }}><td>Total</td><td style={{ textAlign: "right" }} className="num">{inr(tds.cmp.as26Total)}</td><td style={{ textAlign: "right" }} className="num">{inr(tds.cmp.booksTotal)}</td><td /></tr>
-                  </tbody>
-                </table>
-              </div>
-              <strong style={{ fontSize: 13, marginTop: 4 }}>By deductor (parties matched by name; check the match)</strong>
-              <div className="v2-scroll">
-                <table className="v2-table">
-                  <thead><tr><th>Deductor (TAN)</th><th style={{ textAlign: "right" }}>26AS tax</th><th>Books parties</th><th style={{ textAlign: "right" }}>Books</th><th style={{ textAlign: "right" }}>Difference</th></tr></thead>
-                  <tbody>
-                    {tds.match.matches.map((m) => (
-                      <tr key={m.deductor.tan}>
-                        <td>{m.deductor.name} ({m.deductor.tan})</td><td style={{ textAlign: "right" }} className="num">{inr(m.deductor.tax)}</td>
-                        <td style={{ fontSize: 12 }}>{m.parties.join("; ") || "No party matched"}</td><td style={{ textAlign: "right" }} className="num">{inr(m.books)}</td>
-                        <td style={{ textAlign: "right", fontWeight: 600, color: Math.abs(m.diff) <= 1 ? V.green : V.maroon }} className="num">{Math.abs(m.diff) <= 1 ? "Agrees" : inr(m.diff)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {tds.match.unassigned.length > 0 && <p style={{ fontSize: 12.5, color: V.body, margin: 0 }}>TDS taken in the books from parties that match no deductor in 26AS: {tds.match.unassigned.map((u) => `${u.party} ${inr(u.amount)}`).join("; ")}.</p>}
-              {tds.books.clearedInYear.length > 0 && <p style={{ fontSize: 12, color: V.muted, margin: 0 }}>Credits to the TDS-receivable ledgers in the year (opening balances cleared or adjusted): {tds.books.clearedInYear.map((c) => `${c.ledger} ${inr(c.credit)}`).join("; ")}.</p>}
-              {tds.cmp.notes.map((n, i) => <p key={i} style={{ fontSize: 12, color: V.muted, margin: 0 }}>{n}</p>)}
-            </>
-          )}
-          {!tb || !vouchers ? <p style={{ fontSize: 12.5, color: V.muted, margin: 0 }}>Add the Trial Balance and the Day Book to compare with the books.</p> : null}
-        </div>
-      )}
+      {as26 && tds && tb && vouchers && <div style={{ marginTop: 14 }}><TdsTable as26={as26.as26} checks={as26.checks} cmp={tds.cmp} matches={tds.match.matches} unassigned={tds.match.unassigned} books={tds.books} /></div>}
+      {as26 && !(tb && vouchers) && <p style={{ fontSize: 12.5, color: V.muted, margin: "12px 0 0" }}>26AS read: {as26.as26.deductors.length} deductors. Add the Trial Balance and the Day Book to compare with the books.</p>}
 
       {party && (
         <div style={{ marginTop: 14, display: "grid", gap: 6 }} data-testid="party-master">

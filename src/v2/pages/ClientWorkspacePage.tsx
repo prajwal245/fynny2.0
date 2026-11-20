@@ -21,6 +21,8 @@ import { parsePeriod } from "@/lib/practice/core";
 import { openExceptionsIn } from "../lib/exceptions";
 import OpeningBalanceCheck from "../components/OpeningBalanceCheck";
 import YearEndReviews from "../components/YearEndReviews";
+import DataNeeded from "../components/readiness/DataNeeded";
+import ReadinessBanner from "../components/readiness/ReadinessBanner";
 import ReviewChecks from "../components/ReviewChecks";
 import PeriodLock from "../components/PeriodLock";
 import { MatchDrawer } from "../components/MatchDrawer";
@@ -41,10 +43,11 @@ export default function ClientWorkspacePage() {
   const { canSignOff, role, archiveClient, clients, docs, exceptions, reports, chases, review, runs, recon, runRecon, generateReport, period, closeStateFor, activityFor, agentRunsFor, isReadyForMis } = useV2();
   const client = clients.find((c) => c.id === clientId);
   // Deep links from Today ("Resolve exceptions") open the right tab: /v2/clients/:id?tab=exceptions
+  const [dataMissing, setDataMissing] = useState(0);
   const [tab, setTab] = useState(() => {
     if (typeof window === "undefined") return "overview";
     const t = new URLSearchParams(window.location.search).get("tab");
-    return t && ["overview", "documents", "review", "exceptions", "recon", "close", "mis", "chaser", "activity"].includes(t) ? t : "overview";
+    return t && ["overview", "documents", "data", "review", "exceptions", "recon", "close", "mis", "chaser", "activity"].includes(t) ? t : "overview";
   });
 
   // "Fix" in Needs you names the failed file: /v2/clients/:id?tab=documents&doc=<id>
@@ -165,6 +168,7 @@ export default function ClientWorkspacePage() {
         items={[
           { value: "overview", label: "Overview" },
           { value: "documents", label: "Documents", count: cDocs.length },
+          { value: "data", label: "Data needed", count: dataMissing || undefined },
           { value: "review", label: "Review Queue", count: cReview.length },
           { value: "exceptions", label: "Exception Queue", count: cEx.length },
           { value: "recon", label: "Recon" },
@@ -226,6 +230,7 @@ export default function ClientWorkspacePage() {
 
       {tab === "documents" && <DocumentsPage clientId={client.id} focusDocId={focusDoc} />}
 
+      {tab === "data" && <DataNeeded clientId={client.id} month={range ? range.start.slice(0, 7) : new Date().toISOString().slice(0, 7)} onOpenCheck={(where) => (where === "gst" ? window.location.assign("/app/gst") : setTab(where))} onBlockedCount={setDataMissing} />}
       {tab === "review" && <ReviewPage clientId={client.id} />}
 
       {tab === "exceptions" && <ExceptionsPage clientId={client.id} focusTxnId={matchTxn ?? undefined} onFocused={() => setMatchTxn(null)} />}
@@ -330,7 +335,7 @@ export default function ClientWorkspacePage() {
 
       <MatchDrawer txnId={viewMatch} onClose={() => setViewMatch(null)} />
 
-      {tab === "close" && <><PeriodLock clientId={client.id} period={range ? range.start.slice(0, 7) : ""} /><OpeningBalanceCheck /><YearEndReviews clientId={client.id} /><ReviewChecks clientId={client.id} clientName={client.name} /><CloseChecklist clientId={client.id} onTab={setTab} /></>}
+      {tab === "close" && <><ReadinessBanner clientId={client.id} month={range ? range.start.slice(0, 7) : new Date().toISOString().slice(0, 7)} onOpen={() => setTab("data")} /><PeriodLock clientId={client.id} period={range ? range.start.slice(0, 7) : ""} /><OpeningBalanceCheck /><YearEndReviews clientId={client.id} /><ReviewChecks clientId={client.id} clientName={client.name} /><CloseChecklist clientId={client.id} onTab={setTab} /></>}
 
       {tab === "mis" && <ReportsPage clientId={client.id} />}
 

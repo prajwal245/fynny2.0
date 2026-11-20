@@ -161,12 +161,16 @@ export function challanFlags(challans: Challan[], filings: Filing[]): string[] {
   return out;
 }
 
-/** A return filed after the 20th/22nd/24th of the next month, or a month with no 3B at all. */
+/** Returns with no row in the filing status report, one line per return type with the months as a range ("2025-10 to 2026-03"), not one line per month. */
 export function missingReturns(filings: Filing[], months: string[]): string[] {
   const out: string[] = [];
-  for (const m of months) for (const t of ["GSTR1", "GSTR3B"]) {
-    const f = filings.find((x) => x.month === m && x.type === t);
-    if (!f) out.push(`${t === "GSTR1" ? "GSTR-1" : "GSTR-3B"} for ${m} is not in the filing status report.`);
+  const nextOf = (m: string) => { const [y, mo] = m.split("-").map(Number); return mo === 12 ? `${y! + 1}-01` : `${y}-${String(mo! + 1).padStart(2, "0")}`; };
+  for (const t of ["GSTR1", "GSTR3B"]) {
+    const gone = months.filter((m) => !filings.some((x) => x.month === m && x.type === t)).sort();
+    const runs: string[][] = [];
+    for (const m of gone) { const last = runs.at(-1); if (last && nextOf(last.at(-1)!) === m) last.push(m); else runs.push([m]); }
+    const label = t === "GSTR1" ? "GSTR-1" : "GSTR-3B";
+    for (const r of runs) out.push(`${label} for ${r.length > 1 ? `${r[0]} to ${r.at(-1)}` : r[0]} ${r.length > 1 ? "are" : "is"} not in the filing status report.`);
   }
   return out;
 }

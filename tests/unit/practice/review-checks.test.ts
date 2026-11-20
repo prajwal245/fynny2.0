@@ -96,3 +96,40 @@ describe("ledger map suggestions", () => {
     expect(nearDuplicates(["18% SUB CONTRACTOR SERVICES", "18% SUBCONTRACTOR SERVICESS", "12% Goods Purchase", "18% Goods Purchase"])).toEqual([["18% SUB CONTRACTOR SERVICES", "18% SUBCONTRACTOR SERVICESS"]]);
   });
 });
+
+import * as XLSX from "xlsx";
+import { workbookBytes } from "@/lib/practice/review/workpaper";
+import { adjustmentSheet, cashSheet } from "@/lib/practice/review/workpapers";
+
+describe("working paper (Excel)", () => {
+  const vs = readDayBookVouchers(rows(
+    ["01-Apr-25", "Cash", "", "", "Receipt", "1", "50,000.00", ""], ["", "Customer A", "", "", "", "", "", "50,000.00"],
+    ["02-Apr-25", "Supplier B", "", "", "Payment", "2", "20,000.00", ""], ["", "Cash", "", "", "", "", "", "20,000.00"],
+  ));
+  const header: [string, string][] = [["Client", "X"], ["Working paper", "Cash"], ["Period", "p"], ["Source", "s"], ["Prepared by", "FynHelp"], ["Status", "Draft"]];
+  const wb = XLSX.read(workbookBytes([cashSheet(reviewCash(vs), header)]), { type: "array" });
+  const ws = wb.Sheets["Cash by day"]!;
+  it("carries a header block and live formulas, not pasted values", () => {
+    expect(ws["A1"]!.v).toBe("Client");
+    expect(ws["B2"]!.v).toBe("Cash");
+    // Table heading on row 8, first day on row 9, second on row 10.
+    expect(ws["A8"]!.v).toBe("Date");
+    expect(ws["E9"]!.f).toBe("B9+C9-D9");
+    expect(ws["B10"]!.f).toBe("E9");
+    expect(ws["E10"]!.f).toBe("B10+C10-D10");
+  });
+  it("ends with a control-total row built from SUM formulas that match the source", () => {
+    expect(ws["C11"]!.f).toBe("SUM(C9:C10)");
+    expect(ws["D11"]!.f).toBe("SUM(D9:D10)");
+    // The same figures the screen shows: 50,000 in and 20,000 out.
+    const r = reviewCash(vs);
+    expect(r.days.reduce((n, d) => n + d.receipts, 0)).toBe(50000);
+    expect(r.days.reduce((n, d) => n + d.payments, 0)).toBe(20000);
+  });
+  it("exports the adjustment register with a column for the CA's decision", () => {
+    const j = readDayBookVouchers(rows(["31-Mar-26", "Director loan", "", "", "Journal", "9", "500,000.00", ""], ["", "Profit & Loss A/c", "", "", "", "", "", "500,000.00"], ["", "BEING ADJUSTMENT", "", "", "", "", "", ""]));
+    const w = XLSX.read(workbookBytes([adjustmentSheet(adjustmentRegister(j), header)]), { type: "array" }).Sheets["Adjustment entries"]!;
+    expect(w["I8"]!.v).toBe("CA decision");
+    expect(w["D9"]!.v).toBe(500000);
+  });
+});

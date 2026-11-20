@@ -20,6 +20,7 @@ import ChaserPage from "./ChaserPage";
 import { parsePeriod } from "@/lib/practice/core";
 import { openExceptionsIn } from "../lib/exceptions";
 import OpeningBalanceCheck from "../components/OpeningBalanceCheck";
+import ReviewChecks from "../components/ReviewChecks";
 import { MatchDrawer } from "../components/MatchDrawer";
 import { closeStage } from "../lib/closeStage";
 
@@ -327,7 +328,7 @@ export default function ClientWorkspacePage() {
 
       <MatchDrawer txnId={viewMatch} onClose={() => setViewMatch(null)} />
 
-      {tab === "close" && <><OpeningBalanceCheck /><CloseChecklist clientId={client.id} onTab={setTab} /></>}
+      {tab === "close" && <><OpeningBalanceCheck /><ReviewChecks clientId={client.id} clientName={client.name} /><CloseChecklist clientId={client.id} onTab={setTab} /></>}
 
       {tab === "mis" && <ReportsPage clientId={client.id} />}
 

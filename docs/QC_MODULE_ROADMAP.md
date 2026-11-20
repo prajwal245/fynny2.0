@@ -101,3 +101,19 @@ No dates are promised: each phase ends when its acceptance tests pass on real fi
 
 From the CA: the "GSTR-3B vs 2B ITC" working file (to reproduce 186.05 and 4,484.49); Tally masters or trial balance as at 1 April 2025 for Satkaarika; the notes' schedules of the audited statements; a retest of the corrected build.
 From you: NDA and data terms; India hosting decision; whether Tally and Zoho posting stays switched off for the QC offering.
+
+## 7. Decisions of 20 Nov 2026, and what is built since this plan
+
+**Decisions:** (1) client data is hosted and processed in India only; the NDA and data terms are handled separately. (2) Posting to Tally and Zoho stays OFF for the QC module.
+
+**Built and tested** (each with unit tests; the Day Book items also pass the real-file gate on Satkaarika and SSSL):
+- Posting off: a server-side switch (`PRACTICE_TALLY_POSTING`, off unless set to `on`) refuses approvals and ledger creation and gives the connector nothing; the writing screen is hidden and says so. Zoho posting is off while `ZOHO_POSTING_FIRMS` is empty.
+- India-only residency switch for AI (`PRACTICE_DATA_RESIDENCY=india`): outside AI providers and the shared edge function are disabled; reading falls back to rules. System Health says "India-only mode". Moving the database and storage to an India region is an owner action: see `docs/INDIA_HOSTING.md`.
+- RC-6 post-match proof on every reconciliation, and the determinism test.
+- Review checks on the Day Book, in the client's Close tab: cash day by day with 40A(3) and 269ST party-day lists; adjustment entries register (year-end, month-end with another flag, round sums, narration words, owner or suspense ledgers, reversed next period, large entries; routine set-off and RCM tagged); ledger map suggestions by family, rate, tax head and year in the name; near-duplicate ledgers. Real result: all 4,290 Satkaarika and 10,724 SSSL vouchers read and balance; the Satkaarika register is 434 of 2,297 journals (a short list, not all of them); the duplicate check finds the blueprint's own "18% SUB CONTRACTOR SERVICES" against "18% SUBCONTRACTOR SERVICESS".
+- Excel working papers with a header block, live formulas (closing balance, differences, running totals) and control-total rows, for cash, adjustments, ledger map and the GST year view. A test reads each file back and checks the formulas.
+- GST year view (Returns check, when GSTR-1, 2B and 3B year files are dropped): by month and running total for outward tax and input credit. Outward ties to the year exactly on the real files. The input credit loop is labelled provisional until its definition is agreed with the CA.
+
+**Still not built** (in plan order): confirming and storing the ledger map and party master per client; GST open-item carry-forward store and IMS status; set-off against table 6.1 and the credit and cash ledger loops; RCM tested from the books by ledger; ledger-level opening balances and multi-year trial balance; TDS working and 26AS; 43B(h); fixed assets; ageing screen; audit log of reads and exports; period lock; India-region database migration.
+
+**Known limits of what is built:** cash needs an opening balance to be exact (it counts from nil unless one is entered); the 40A(3) and 269ST lists are for the CA to judge, not findings; the ledger map is a suggestion until confirmed; the ITC year difference of IGST +₹186.05 and CGST/SGST −₹4,484.49 is not yet reproduced.

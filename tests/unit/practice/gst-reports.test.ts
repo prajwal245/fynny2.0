@@ -144,3 +144,30 @@ describe("credit notes in portal reports", () => {
     expect(r.invoices[1]!.cgst).toBe(-3487.5);
   });
 });
+
+import { fiscalMonths, yearView } from "@/lib/practice/gst/year";
+import type { ReadInvoices } from "@/lib/practice/gst/invoices";
+
+describe("GST by year", () => {
+  const inv = (tax: number): ReadInvoices => ({ period: null, ownGstin: null, notes: [], invoices: [{ gstin: "G", party: "", no: "1", date: null, pos: "", taxable: tax * 5.5556, igst: 0, cgst: tax / 2, sgst: tax / 2, cess: 0, total: null, rate: 18, hsn: "", irn: "", reverseCharge: false, itc: "Y", docType: "invoice", filedIn: null, row: 1, lines: 1, repeats: 0 }] });
+  const empty = (): ReadInvoices => ({ period: null, ownGstin: null, notes: [], invoices: [] });
+  const z = { taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 };
+  const b3 = (out: number, net = 0): import("@/lib/practice/gst/returns").Gstr3bRead => ({ period: null, ownGstin: null, outward: { taxable: out * 5.5556, igst: 0, cgst: out / 2, sgst: out / 2, cess: 0 }, rcm: z, itcAvailable: z, itcOnRcm: z, itcReversed: z, itcNet: { ...z, cgst: net / 2, sgst: net / 2 }, notes: [] });
+  it("lists the twelve months of a financial year, April first", () => {
+    const m = fiscalMonths(2025);
+    expect([m[0], m[8], m[11]]).toEqual(["2025-04", "2025-12", "2026-03"]);
+  });
+  it("shows a difference that clears the next month as timing: the running total returns to nil", () => {
+    // Month 1: 3B declares 100 less than GSTR-1; month 2: 3B declares 100 more. A month-only cut shows two differences; the year shows none.
+    const v = yearView(["2025-04", "2025-05"], { gstr1: () => inv(1000), gstr2b: () => empty(), gstr3b: (m) => (m === "2025-04" ? b3(900) : b3(1100)) });
+    expect(v.rows.map((r) => r.outwardDiff)).toEqual([100, -100]);
+    expect(v.rows.map((r) => r.outwardCumulative)).toEqual([100, 0]);
+    expect(v.totals.outwardDiff).toBe(0);
+  });
+  it("calls a year with a missing month incomplete", () => {
+    const v = yearView(["2025-04", "2025-05"], { gstr1: (m) => (m === "2025-04" ? inv(10) : empty()), gstr2b: () => inv(5), gstr3b: () => b3(10) });
+    expect(v.missing.gstr1).toEqual(["2025-05"]);
+    expect(v.notes.join(" ")).toMatch(/incomplete/);
+    expect(v.notes.join(" ")).toMatch(/provisional/);
+  });
+});

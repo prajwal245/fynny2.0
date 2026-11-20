@@ -243,6 +243,18 @@ export const getTallyGstBooks = createServerFn({ method: "POST" })
     }),
   );
 
+/** Review checks on a client's prepared books (cash day by day, adjustment entries, ledger map). Read-only. */
+export const runPracticeReviewChecks = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ business_id: uuid, opening_cash: z.number().finite().nullable().optional() }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      const { assertClient } = await import("./db.server");
+      await assertClient(db, ctx, data.business_id);
+      return (await import("./reviewChecks.server")).runReviewChecks(db, ctx, data.business_id, { openingCash: data.opening_cash ?? null });
+    }),
+  );
+
 /** Whether writing to Tally is allowed on this deployment. It is off for the QC offering; the screens that write are hidden when it is. */
 export const getPostingMode = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

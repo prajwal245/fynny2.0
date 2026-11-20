@@ -40,7 +40,7 @@ function geminiKey(): string | undefined {
 /** What this deployment can reach, without any key value: for the owner's "check the AI reader" button. */
 export async function checkAiProviders(): Promise<{ configured: string[]; edge: boolean; results: { provider: string; ok: boolean; ms: number; detail: string }[] }> {
   const list = providers();
-  const edge = Boolean(supabaseUrl() && env("SUPABASE_SERVICE_ROLE_KEY")) && env("PRACTICE_AI_DISABLED") !== "1";
+  const edge = Boolean(supabaseUrl() && env("SUPABASE_SERVICE_ROLE_KEY")) && env("PRACTICE_AI_DISABLED") !== "1" && !residencyIndiaOnly();
   const results: { provider: string; ok: boolean; ms: number; detail: string }[] = [];
   for (const p of list) {
     const t0 = Date.now();
@@ -52,6 +52,8 @@ export async function checkAiProviders(): Promise<{ configured: string[]; edge: 
       results.push({ provider: `${p.name} (${p.model})`, ok: false, ms: Date.now() - t0, detail: m.slice(0, 200) });
     }
   }
+  // In India-only mode say so, so an empty list reads as a decision and not as a fault.
+  if (residencyIndiaOnly()) results.unshift({ provider: "India-only mode", ok: true, ms: 0, detail: list.length ? `AI limited to: ${indiaAiHosts().join(", ")}` : "AI reading is off: no Indian AI endpoint is configured, so documents are read by rules only." });
   return { configured: list.map((p) => p.name), edge, results };
 }
 

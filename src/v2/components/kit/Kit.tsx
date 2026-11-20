@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight, Filter, Search, SlidersHorizontal, X } from "lucide-react";
 import { V } from "../../ui";
+import { confidenceView, type Handoff } from "../../lib/agentTrust";
 
 /**
  * The shared pieces of a working screen, in one place so tables, side-by-side windows and forms look and behave the same everywhere:
@@ -124,6 +125,30 @@ export function Pager({ page, pageSize, total, onPage, onPageSize, sizes = [10, 
         ))}
         <button className="kt-pg" disabled={page >= pages} onClick={() => onPage(page + 1)} aria-label="Next page"><ChevronRight size={14} /></button>
       </nav>
+    </div>
+  );
+}
+
+/** Confidence in words with the number beside it, and the reason it is not higher on hover. Never a bare percentage. */
+export function ConfidenceBadge({ score, reason }: { score: number; reason?: string }) {
+  const v = confidenceView(score);
+  return <span className={`kt-pill ${v.tone}`} title={reason ? `${v.label} (${v.percent}%). ${reason}` : `${v.label} (${v.percent}%)`}>{v.label} · {v.percent}%</span>;
+}
+
+/** An agent handing something to a person: a visible state change saying what was done, why it stops here, and who has it now. */
+export function HandoffNote({ handoff, action }: { handoff: Handoff; action?: ReactNode }) {
+  return (
+    <div role="status" data-testid="handoff" style={{ borderRadius: 16, border: "1px solid rgba(217,43,43,.28)", background: "rgba(217,43,43,.06)", padding: "14px 16px", display: "grid", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 999, background: V.coral }} />
+        <b style={{ fontSize: 13.5, color: V.maroon }}>{handoff.title}</b>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 12px", fontSize: 13, lineHeight: 1.5, color: V.body }}>
+        <span style={{ color: V.muted, fontWeight: 600 }}>Done</span><span>{handoff.did}</span>
+        <span style={{ color: V.muted, fontWeight: 600 }}>Why it stopped</span><span>{handoff.why}</span>
+        <span style={{ color: V.muted, fontWeight: 600 }}>Now</span><span>{handoff.now}</span>
+      </div>
+      {action}
     </div>
   );
 }

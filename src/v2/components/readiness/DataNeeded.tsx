@@ -7,6 +7,7 @@ import { INPUTS, PACKS, askable, composeRequest, requestPlan, type InputStates, 
 import ReadinessView from "./ReadinessView";
 import RequestPanel, { type Channel } from "./RequestPanel";
 import BooksConnectionBar from "./BooksConnectionBar";
+import { sendWithUndo } from "../../lib/sendWithUndo";
 
 /** The monthly month and the financial year that a screen is looking at. */
 export const fyOf = (month: string) => { const [y, m] = month.split("-").map(Number); const s = m! >= 4 ? y! : y! - 1; return `${s}-${String((s + 1) % 100).padStart(2, "0")}`; };
@@ -66,12 +67,16 @@ export default function DataNeeded({ clientId, month, onOpenCheck, onBlockedCoun
 
   const send = () => {
     if (!client) return;
-    addChase({
-      clientId, type: `Data for FY ${fy}`.slice(0, 200), contact: client.contactName || client.name, email: client.email ?? "", phone: client.phone ?? "", due: "",
-      note: message.length <= 1000 ? message : plan.clientRequests.map((i, n) => `${n + 1}. ${i.label}`).join("\n").slice(0, 1000), channel,
-    } as Parameters<typeof addChase>[0]);
+    const who = client.contactName || client.name;
     setSent(true);
-    toast.success("Request sent. The Chaser keeps following up until it arrives.");
+    // A message to a client cannot be taken back once it leaves, so it waits a few seconds, visibly, with Undo.
+    sendWithUndo("chase_send", `Sending the request to ${who} on ${channel === "both" ? "WhatsApp and email" : channel === "whatsapp" ? "WhatsApp" : "email"}`, () => {
+      addChase({
+        clientId, type: `Data for FY ${fy}`.slice(0, 200), contact: who, email: client.email ?? "", phone: client.phone ?? "", due: "",
+        note: message.length <= 1000 ? message : plan.clientRequests.map((i, n) => `${n + 1}. ${i.label}`).join("\n").slice(0, 1000), channel,
+      } as Parameters<typeof addChase>[0]);
+      toast.success("Request sent. The Chaser keeps following up until it arrives.");
+    }, { onUndo: () => setSent(false) });
   };
 
   if (!client) return null;

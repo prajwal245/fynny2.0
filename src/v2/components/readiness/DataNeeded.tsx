@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { Drawer } from "../../ui";
 import { useV2 } from "../../store";
 import { getPracticeReadiness, markPracticeInput } from "@/lib/practice/practice.functions";
-import { INPUTS, PACKS, composeRequest, requestPlan, type InputStates, type Pack } from "@/lib/practice/readiness/model";
+import { INPUTS, PACKS, askable, composeRequest, requestPlan, type InputStates, type Pack } from "@/lib/practice/readiness/model";
 import ReadinessView from "./ReadinessView";
 import RequestPanel, { type Channel } from "./RequestPanel";
 
@@ -39,8 +39,8 @@ export default function DataNeeded({ clientId, month, onOpenCheck, onBlockedCoun
 
   const missing = useMemo(() => INPUTS.filter((i) => !["received", "not_applicable"].includes(inputs[i.key]?.status ?? "")), [inputs]);
   // Conditional items (bill-wise, loans) are asked for only once the team says they apply.
-  const askable = missing.filter((i) => !i.conditional);
-  const plan = useMemo(() => requestPlan(askable, { firmHoldsGstLogin: true, firmHoldsItLogin: true, tallyConnected: false }), [askable]);
+  const toAsk = useMemo(() => askable(missing), [missing]);
+  const plan = useMemo(() => requestPlan(toAsk, { firmHoldsGstLogin: true, firmHoldsItLogin: true, tallyConnected: false }), [toAsk]);
 
   const draft = useCallback(() => composeRequest(client?.contactName || client?.name || "there", plan.clientRequests, { period: `FY ${fy}`, uploadUrl: "auto" }), [client, plan, fy]);
   useEffect(() => { if (!open) setMessage(draft()); }, [open, draft]);

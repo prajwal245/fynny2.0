@@ -136,6 +136,9 @@ export function whatItUnblocks(inputKey: string, inputs: InputStates): CheckDef[
   return CHECKS.filter((c) => c.needs.includes(inputKey) && c.needs.every((k) => k === inputKey || have(inputs[k])));
 }
 
+/** What can be asked of the client now: items that only some clients have (bill-wise, loans) wait until the team says they apply. */
+export const askable = (missing: InputDef[]) => missing.filter((i) => !i.conditional);
+
 /* ── who is asked ──────────────────────────────────────── */
 
 export interface Plan { firmTasks: InputDef[]; clientRequests: InputDef[]; partyRequests: InputDef[] }
@@ -172,11 +175,14 @@ export function composeRequest(client: string, items: InputDef[], opts: { period
   ].filter((l, i, a) => !(l === "" && a[i - 1] === "")).join("\n").trim();
 }
 
-/** Which file a dropped document is, by the readers' own names, so an upload ticks the right item. */
+/**
+ * Which file a dropped document is, by the readers' own names, so an upload ticks the right item. A report derived from the returns (the ITC 3B vs 2B report,
+ * ITC claimed and utilised) is NOT the electronic credit ledger or the GSTR-3B itself, so it ticks nothing: the credit loop stays blocked on the portal's ledger.
+ */
 export function inputFromKind(kind: string): string | null {
   const map: Record<string, string> = {
     trial_balance: "tb_opening", ledger_masters: "ledger_masters", day_book: "day_book", gstr3b_annual: "gstr3b", gstr1_report: "gstr1", gstr2b_report: "gstr2b", gstr2b: "gstr2b",
-    tally_register: "registers", tally_journals: "gst_ledgers", challans: "challans", filing_status: "challans", itc_report: "gstr3b", itc_util: "credit_ledger",
+    tally_register: "registers", tally_journals: "gst_ledgers", challans: "challans", filing_status: "challans",
     loan_statement: "loan_statements", bank_statement: "bank_statements", form_26as: "form_26as", audited_statements: "audited_statements",
   };
   return map[kind] ?? null;

@@ -10,6 +10,7 @@ import type { ReadInvoices } from "@/lib/practice/gst/invoices";
 import { reconcileGstr2b, vendorMessage, type Gstr2bRecon } from "@/lib/practice/gst/reconcile";
 import { runValidations, type ValidationRun } from "@/lib/practice/gst/validations";
 import GstReturnsCheck from "../components/GstReturnsCheck";
+import GstLedgerLoops from "../components/GstLedgerLoops";
 import { getPracticeDocumentUrl, saveGstResult } from "@/lib/practice/practice.functions";
 
 const inr = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
@@ -69,7 +70,7 @@ export default function GstPage() {
   const [portal, setPortal] = useState<Loaded>(null);
   const [busy, setBusy] = useState<"books" | "portal" | null>(null);
   const [tab, setTab] = useState("vendors");
-  const [mode, setMode] = useState<"recon" | "returns">("recon");
+  const [mode, setMode] = useState<"recon" | "returns" | "ledgers">("recon");
   // The client this reconciliation belongs to. Saved files come back when the page is opened again.
   const [clientId, setClientId] = useState("");
   const [files, setFiles] = useState<{ books: File | null; portal: File | null }>({ books: null, portal: null });
@@ -147,7 +148,15 @@ export default function GstPage() {
     }
   };
 
-  const modeTabs = <Tabs items={[{ value: "recon", label: "GSTR-2B against purchases" }, { value: "returns", label: "Returns check: GSTR-1, 3B, ITC, RCM" }]} value={mode} onChange={(v) => setMode(v as "recon" | "returns")} />;
+  const modeTabs = <Tabs items={[{ value: "recon", label: "GSTR-2B against purchases" }, { value: "returns", label: "Returns check: GSTR-1, 3B, ITC, RCM" }, { value: "ledgers", label: "Credit and cash ledgers" }]} value={mode} onChange={(v) => setMode(v as "recon" | "returns" | "ledgers")} />;
+  if (mode === "ledgers")
+    return (
+      <div>
+        <PageHeader title="GST reconciliation" subtitle="Prove the credit ledger and the cash ledger from the portal reports, in the order a CA works: credit first, then cash. Nothing is filed or changed." />
+        {modeTabs}
+        <GstLedgerLoops />
+      </div>
+    );
   if (mode === "returns")
     return (
       <div>

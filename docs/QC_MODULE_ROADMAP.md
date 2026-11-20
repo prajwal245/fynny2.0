@@ -167,3 +167,14 @@ The advisor sent the FY 2025-26 Tally Trial Balance and ledger masters, a new Da
 - **Party master**: filled from the masters: GSTIN, PAN (from the GSTIN when the master has none), state, aliases for ledgers that share a GSTIN, a PAN that disagrees with its GSTIN flagged, parties with neither flagged. Real result: 655 parties, **only 45 with a GSTIN and 262 with a PAN; 393 have neither** (so 2B matching and TDS cannot be tested for them until the CA supplies them), 30 bill-wise, 9 groups of ledgers sharing one GSTIN. Saves identity fields only; credit days, Udyam and related-party flags are for the CA. Needs the SQL migration already listed above.
 
 **Still not built, and why**: TDS **payable** against challans (no TDS challan or 26Q file yet); 43B(h) (Udyam per supplier); fixed assets (asset register); the ledger-level tie to audited notes (notes not on file).
+
+## 11. Data pathway: "Data needed" (21 Nov 2026)
+
+From the advisor's feedback: the CA reviews findings; the product collects the data. Built as one thread, not a feature list.
+- **Registry** (`readiness/model.ts`): 26 inputs in three packs (year onboarding, monthly, year end), each with who holds it and where to get it; 19 checks that each name the inputs they need.
+- **The rule**: a check is Blocked, "waiting for X", whenever an input is missing. It never shows Passed on missing data, even if a result exists. An input marked not applicable (with a reason) satisfies a check; a check with nothing applicable is not applicable.
+- **Request list**: the missing items split by who must act. The client is asked only for what the client holds, in plain words, in one message. GST and income-tax portal downloads become tasks for the team (with the portal path) when the firm holds the login; Tally exports when the Tally connector is on. Party confirmations are listed separately. The message goes out through the existing Chaser, so follow-ups and the upload link come with it.
+- **Late data re-opens checks**: `reopened()` lists the checks an arrival unblocks; documents read by the product tick their input by themselves.
+- **Screens**: client tab "Data needed" (hero with readiness ring, pack switcher, items by holder, checks panel, request drawer), and a one-line banner at the top of the Month-end close tab. Mock-ups of the three states are in `docs/design/`.
+- **SQL**: `supabase/migrations/20261121100000_input_status.sql` (marks received / not applicable). Until it is run the screen says so and items read from documents still show.
+- **Not built yet**: a portfolio view of blocked checks across clients; auto-ticking inputs from the Excel and PDF reports dropped in the QC cards (`inputFromKind` is ready); GSTIN/PAN fallback from 2B.

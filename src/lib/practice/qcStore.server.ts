@@ -7,6 +7,7 @@ import { PracticeError } from "./core";
 import type { Db, FirmContext } from "./db.server";
 import { suggestLedgerMap, type Family, type MapSuggestion } from "./review/ledgerMap";
 import { loadVouchers } from "./reviewChecks.server";
+import { INPUTS, inputDef, type InputStates } from "./readiness/model";
 
 const canConfirm = (ctx: FirmContext) => ["owner", "admin", "partner", "manager"].includes(ctx.role);
 const missing = (e: { message?: string; code?: string } | null) => !!e && (e.code === "42P01" || /does not exist|schema cache|relation/i.test(e.message ?? ""));
@@ -53,6 +54,47 @@ export async function savePartyMaster(db: Db, ctx: FirmContext, businessId: stri
   }
   await logAccess(db, ctx, "export", "party master filled from Tally masters", businessId, { parties: rows.length });
   return { saved: rows.length };
+}
+
+/* ── data readiness ──────────────────────────────────────── */
+
+/** Onboarding and year-end items are kept per financial year; monthly items per month. */
+const scopeOf = (key: string, month: string, fy: string) => (inputDef(key)?.pack === "monthly" ? month : fy);
+
+/**
+ * What has arrived for a client: documents the product holds (read from their classification) and what a person has marked.
+ * A document counts for a month's monthly pack when it was added on or after the first of that month.
+ */
+export async function getInputStates(db: Db, ctx: FirmContext, businessId: string, month: string, fy: string): Promise<{ inputs: InputStates; sqlMissing: boolean }> {
+  const inputs: InputStates = {};
+  const monthStart = `${month}-01`;
+  const { data: docs } = await db.from("ca_document_extractions").select("classification, side, extracted, created_at, extract_status").eq("ca_firm_id", ctx.firmId).eq("business_id", businessId).neq("extract_status", "archived");
+  for (const d of (docs ?? []) as { classification: string | null; side: string | null; extracted: { register?: { kind?: string } } | null; created_at: string }[]) {
+    const kind = d.extracted?.register?.kind;
+    const key = d.classification === "bank_statement" ? "bank_statements"
+      : kind === "gstr2b" ? "gstr2b" : kind === "loan_statement" ? "loan_statements" : kind === "tally_masters" ? "ledger_masters"
+      : kind === "gst_sales_register" || kind === "gst_purchase_register" ? "registers" : d.side === "books" ? "day_book" : null;
+    if (!key) continue;
+    if (inputDef(key)?.pack === "monthly" && d.created_at.slice(0, 10) < monthStart) continue;
+    inputs[key] = { status: "received", at: d.created_at, source: "detected" };
+  }
+  const { data, error } = await db.from("ca_input_status").select("input_key, period, status, note, marked_by, marked_at").eq("ca_firm_id", ctx.firmId).eq("business_id", businessId).in("period", [month, fy]);
+  if (error && !missing(error)) throw new PracticeError("db_error", error.message);
+  for (const r of ((data ?? []) as { input_key: string; period: string; status: "received" | "not_applicable" | "missing"; note: string | null; marked_by: string | null; marked_at: string }[])) {
+    if (r.period !== scopeOf(r.input_key, month, fy)) continue;
+    if (r.status === "missing") { delete inputs[r.input_key]; continue; }
+    if (!inputs[r.input_key] || r.status === "not_applicable") inputs[r.input_key] = { status: r.status, at: r.marked_at, by: r.marked_by, source: "marked", note: r.note };
+  }
+  return { inputs, sqlMissing: !!error && missing(error) };
+}
+
+export async function markInput(db: Db, ctx: FirmContext, businessId: string, key: string, month: string, fy: string, status: "received" | "not_applicable" | "missing", note?: string | null): Promise<{ ok: true }> {
+  if (!inputDef(key)) throw new PracticeError("invalid", "Unknown input.");
+  if (status === "not_applicable" && !note?.trim()) throw new PracticeError("invalid", "Say why this does not apply to this client.");
+  const { error } = await db.from("ca_input_status").upsert({ ca_firm_id: ctx.firmId, business_id: businessId, input_key: key, period: scopeOf(key, month, fy), status, note: note?.trim() || null, marked_by: ctx.userId, marked_at: new Date().toISOString() }, { onConflict: "business_id,input_key,period" });
+  if (error) throw new PracticeError("db_error", missing(error) ? "The data-readiness table is not created yet. Run supabase/migrations/20261121100000_input_status.sql once." : error.message);
+  await logAccess(db, ctx, "export", `input marked ${status}: ${key}`, businessId, { period: month });
+  return { ok: true };
 }
 
 /** Records who read, downloaded or exported what. Never blocks the action it records. */

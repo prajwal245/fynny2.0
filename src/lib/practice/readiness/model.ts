@@ -89,7 +89,7 @@ export const CHECKS: CheckDef[] = [
 /* ── state ─────────────────────────────────────────────── */
 
 export type InputStatus = "received" | "missing" | "not_applicable";
-export interface InputState { status: InputStatus; at?: string | null; by?: string | null; source?: "detected" | "marked" | null; note?: string | null }
+export interface InputState { status: InputStatus; at?: string | null; by?: string | null; source?: "detected" | "marked" | "connector" | null; note?: string | null }
 export type InputStates = Record<string, InputState | undefined>;
 
 export type CheckStatus = "passed" | "failed" | "ready" | "blocked" | "not_applicable";

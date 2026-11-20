@@ -182,7 +182,7 @@ function ItemRow({ def, inputs, onMark }: { def: InputDef; inputs: InputStates; 
     return (
       <div className="rd-row compact">
         <span className={`rd-dot ${status === "received" ? "done" : "na"}`} aria-hidden="true">{status === "received" ? <Check size={13} strokeWidth={3} /> : <Minus size={13} />}</span>
-        <div className="rd-t" style={{ fontWeight: 550 }}>{def.label}<span className="rd-meta">{status === "received" ? (s?.source === "detected" ? "Read from a document" : "Marked received") : `Not applicable: ${s?.note ?? "no reason recorded"}`}{s?.at ? ` · ${new Date(s.at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : ""}</span></div>
+        <div className="rd-t" style={{ fontWeight: 550 }}>{def.label}<span className="rd-meta">{status === "received" ? (s?.source === "connector" ? `Synced from ${s.note ?? "the books"}` : s?.source === "detected" ? "Read from a document" : "Marked received") : `Not applicable: ${s?.note ?? "no reason recorded"}`}{s?.at ? ` · ${new Date(s.at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : ""}</span></div>
         <div className="rd-act"><button className="rd-link quiet" onClick={() => onMark(def.key, "missing")}>Undo</button></div>
       </div>
     );

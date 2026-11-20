@@ -69,15 +69,20 @@ export async function getInputStates(db: Db, ctx: FirmContext, businessId: strin
   const inputs: InputStates = {};
   const monthStart = `${month}-01`;
   const { data: docs } = await db.from("ca_document_extractions").select("classification, side, extracted, created_at, extract_status").eq("ca_firm_id", ctx.firmId).eq("business_id", businessId).neq("extract_status", "archived");
-  for (const d of (docs ?? []) as { classification: string | null; side: string | null; extracted: { register?: { kind?: string } } | null; created_at: string }[]) {
+  for (const d of (docs ?? []) as { classification: string | null; side: string | null; extracted: { register?: { kind?: string }; source?: string } | null; created_at: string }[]) {
     const kind = d.extracted?.register?.kind;
     const key = d.classification === "bank_statement" ? "bank_statements"
       : kind === "gstr2b" ? "gstr2b" : kind === "loan_statement" ? "loan_statements" : kind === "tally_masters" ? "ledger_masters"
-      : kind === "gst_sales_register" || kind === "gst_purchase_register" ? "registers" : d.side === "books" ? "day_book" : null;
+      : kind === "gst_sales_register" || kind === "gst_purchase_register" ? "registers" : d.side === "books" && d.extracted?.source !== "Zoho Books" ? "day_book" : null;
     if (!key) continue;
     if (inputDef(key)?.pack === "monthly" && d.created_at.slice(0, 10) < monthStart) continue;
     inputs[key] = { status: "received", at: d.created_at, source: "detected" };
   }
+  // What the connected books system supplies for this month fills its inputs, whatever was or was not uploaded.
+  try {
+    const bc = await (await import("./booksConnection.server")).booksConnection(db, ctx, businessId, month);
+    for (const key of bc.supplies) inputs[key] = { status: "received", at: bc.lastSyncedAt, source: "connector", note: bc.label };
+  } catch { /* a database without the connector tables just has no connection */ }
   const { data, error } = await db.from("ca_input_status").select("input_key, period, status, note, marked_by, marked_at").eq("ca_firm_id", ctx.firmId).eq("business_id", businessId).in("period", [month, fy]);
   if (error && !missing(error)) throw new PracticeError("db_error", error.message);
   for (const r of ((data ?? []) as { input_key: string; period: string; status: "received" | "not_applicable" | "missing"; note: string | null; marked_by: string | null; marked_at: string }[])) {

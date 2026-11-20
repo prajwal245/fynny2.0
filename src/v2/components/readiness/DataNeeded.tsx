@@ -6,6 +6,7 @@ import { getPracticeReadiness, markPracticeInput } from "@/lib/practice/practice
 import { INPUTS, PACKS, askable, composeRequest, requestPlan, type InputStates, type Pack } from "@/lib/practice/readiness/model";
 import ReadinessView from "./ReadinessView";
 import RequestPanel, { type Channel } from "./RequestPanel";
+import BooksConnectionBar from "./BooksConnectionBar";
 
 /** The monthly month and the financial year that a screen is looking at. */
 export const fyOf = (month: string) => { const [y, m] = month.split("-").map(Number); const s = m! >= 4 ? y! : y! - 1; return `${s}-${String((s + 1) % 100).padStart(2, "0")}`; };
@@ -77,6 +78,7 @@ export default function DataNeeded({ clientId, month, onOpenCheck, onBlockedCoun
   const reachable = channel === "email" ? (client.email || "No email saved") : client.phone ? `${client.contactName || client.name} · ${client.phone}` : "No WhatsApp number saved";
   return (
     <>
+      <div style={{ marginBottom: 16 }}><BooksConnectionBar clientId={clientId} month={month} onSynced={() => void load()} /></div>
       <ReadinessView
         client={client.name} pack={pack} onPack={setPack} inputs={inputs} sqlMissing={sqlMissing} onMark={onMark} onOpenCheck={onOpenCheck}
         onRequest={() => { setSent(false); setOpen(true); }} clientCount={plan.clientRequests.length + plan.partyRequests.length} teamCount={plan.firmTasks.length}

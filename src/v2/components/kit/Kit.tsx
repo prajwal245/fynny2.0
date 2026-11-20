@@ -35,8 +35,17 @@ export const KIT_CSS = `
 .kt-pages { margin-left:auto; display:flex; gap:4px; align-items:center; }
 .kt-pg { min-width:30px; height:30px; border-radius:9px; border:0; background:transparent; font:inherit; font-size:12.5px; font-weight:600; color:${V.body}; cursor:pointer; display:grid; place-items:center; }
 .kt-pg[data-on="1"] { background:${V.cream}; color:${V.maroon}; } .kt-pg:disabled { opacity:.4; cursor:default; }
-.kt-pill { display:inline-flex; align-items:center; height:22px; padding:0 9px; border-radius:999px; font-size:11.5px; font-weight:650; }
+.kt-pill { white-space:nowrap; display:inline-flex; align-items:center; height:22px; padding:0 9px; border-radius:999px; font-size:11.5px; font-weight:650; }
 .kt-pill.good { background:var(--v2-good-bg); color:${V.green}; } .kt-pill.bad { background:rgba(217,43,43,.14); color:${V.maroon}; } .kt-pill.warn { background:${V.warnBg}; color:${V.warnFg}; } .kt-pill.neutral { background:${V.gray}; color:${V.body}; } .kt-pill.info { background:${V.blue}; color:${V.brandDeep}; }
+.kt-bal { border-radius:20px; border:1px solid ${V.line}; background:${V.card}; box-shadow: var(--v2-card-shadow); overflow:hidden; cursor:pointer; text-align:left; font:inherit; padding:0; transition: transform .2s ease, box-shadow .2s ease; }
+.kt-bal:hover { transform: translateY(-2px); } .kt-bal[aria-pressed="true"] { outline:2px solid rgba(217,43,43,.35); }
+.kt-bal > header { display:flex; align-items:center; gap:12px; padding:16px 18px; }
+.kt-bal > header i { width:34px; height:34px; border-radius:11px; background:${V.cream}; color:${V.maroon}; display:grid; place-items:center; font-style:normal; font-weight:700; font-size:12px; letter-spacing:.02em; }
+.kt-bal > header b { display:block; font-size:16px; font-weight:600; letter-spacing:-.01em; color:${V.ink}; } .kt-bal > header small { font-size:12.5px; color:${V.muted}; }
+.kt-bal > header .kt-pill { margin-left:auto; }
+.kt-bal > div { display:grid; grid-template-columns:1fr 1fr; border-top:1px solid ${V.line}; background:${V.gray}; }
+.kt-bal > div section { padding:14px 18px 16px; } .kt-bal > div section + section { border-left:1px solid ${V.line}; }
+.kt-bal small.l { display:block; font-size:12px; color:${V.muted}; } .kt-bal b.v { display:block; margin-top:3px; font-size:22px; font-weight:500; letter-spacing:-.02em; color:${V.ink}; font-variant-numeric:tabular-nums; }
 .kt-cmp { display:grid; grid-template-columns: 1fr 1fr; border-radius:18px; border:1px solid ${V.line}; overflow:hidden; background:${V.card}; }
 .kt-cmp > section { padding:16px 18px; } .kt-cmp > section + section { border-left:1px solid ${V.line}; background:${V.gray}; }
 .kt-cmp h5 { margin:0 0 10px; font-size:11.5px; letter-spacing:.1em; text-transform:uppercase; color:${V.muted}; font-weight:700; }
@@ -121,6 +130,16 @@ export function Pager({ page, pageSize, total, onPage, onPageSize, sizes = [10, 
 
 export function StatusPill({ tone = "neutral", children }: { tone?: "good" | "bad" | "warn" | "neutral" | "info"; children: ReactNode }) {
   return <span className={`kt-pill ${tone}`}>{children}</span>;
+}
+
+/** One account or head with its two balances side by side (the portal and Tally, the bank and the books), as in the reference's account cards. */
+export function BalanceCard({ mark, title, sub, left, right, pill, selected, onClick }: { mark: string; title: string; sub?: string; left: { label: string; value: ReactNode }; right: { label: string; value: ReactNode }; pill?: ReactNode; selected?: boolean; onClick?: () => void }) {
+  return (
+    <button type="button" className="kt-bal" aria-pressed={selected} onClick={onClick}>
+      <header><i aria-hidden="true">{mark}</i><span><b>{title}</b>{sub && <small>{sub}</small>}</span>{pill}</header>
+      <div><section><small className="l">{left.label}</small><b className="v">{left.value}</b></section><section><small className="l">{right.label}</small><b className="v">{right.value}</b></section></div>
+    </button>
+  );
 }
 
 type Side = { title: string; lines: [string, ReactNode][] };

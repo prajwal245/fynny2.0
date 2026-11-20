@@ -248,7 +248,7 @@ export async function bindRoute(db: Db, phoneKey: string, firmId: string, via: "
  * with the AI calls table as purpose "whatsapp_send" (that table already has an error column and is admin-only), so no new table is
  * needed. Firms see the plain message only. Never throws.
  */
-async function recordWaFault(db: Db, firmId: string, text: string) {
+export async function recordWaFault(db: Db, firmId: string, text: string) {
   try {
     await db.from("ca_ai_calls").insert({ ca_firm_id: firmId, purpose: "whatsapp_send", provider: "meta", model: null, input: "", output: null, latency_ms: null, status: "error", error: text.slice(0, 500) });
   } catch {

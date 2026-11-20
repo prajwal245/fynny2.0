@@ -88,8 +88,10 @@ describe("follow-up messages on WhatsApp", () => {
     expect(pickTouchTemplate("setup", [mkt, tpl("fh_setup_help_v2")], o)).toMatchObject({ name: "fh_setup_help_v2", marketing: false });
     expect(pickTouchTemplate("setup", [], o).why).toContain("does not exist");
     expect(marketingAllowed(undefined)).toBe(true);
-    expect(marketingAllowed("0")).toBe(false);
-    expect(marketingAllowed("false")).toBe(false);
+    // A stray "0" or "off" no longer stops every follow-up; only an explicit "never" does.
+    expect(marketingAllowed("0")).toBe(true);
+    expect(marketingAllowed("off")).toBe(true);
+    expect(marketingAllowed("never")).toBe(false);
   });
 
   it("the sending rules: consent, a valid number, no opt-out, not twice in 3 days, daytime only", () => {
@@ -226,7 +228,7 @@ describe("sending a follow-up on WhatsApp", () => {
     const { sendTouchWhatsapps } = await import("@/lib/practice/touchpoints/whatsapp.server");
     metaList = [tpl("fh_get_started", { category: "MARKETING" })];
     tables.ca_touchpoints = [tp("q1", { kind: "paid_quiet", detail: { quietDays: 12 } })];
-    process.env["WHATSAPP_TOUCH_ALLOW_MARKETING"] = "0";
+    process.env["WHATSAPP_TOUCH_ALLOW_MARKETING"] = "never";
     expect((await sendTouchWhatsapps(db(), [subject("q1")], now, 12)).sent).toBe(0);
     delete process.env["WHATSAPP_TOUCH_ALLOW_MARKETING"];
     (await import("@/lib/practice/whatsappTemplates.server")).forgetTemplates();
@@ -245,7 +247,7 @@ describe("sending a follow-up on WhatsApp", () => {
     const { forgetTemplates } = await import("@/lib/practice/whatsappTemplates.server");
     tables.ca_touchpoints = [tp(ID)];
     // Marketing templates are allowed by default (at a higher rate); the switch-off flag is what this checks.
-    process.env["WHATSAPP_TOUCH_ALLOW_MARKETING"] = "0";
+    process.env["WHATSAPP_TOUCH_ALLOW_MARKETING"] = "never";
     for (const bad of [tpl("fh_setup_help", { category: "MARKETING" }), tpl("fh_setup_help", { status: "PENDING" }), tpl("fh_setup_help", { components: [{ type: "BODY" }] })]) {
       metaList = [bad];
       forgetTemplates();

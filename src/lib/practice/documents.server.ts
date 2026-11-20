@@ -216,6 +216,17 @@ export async function processExtraction(
   db: Db,
   extractionId: string,
   opts: { trigger?: RunTrigger; userId?: string | null; /** Opens a locked PDF or Excel file for this one read. Never stored or logged. */ password?: string } = {},
+): ReturnType<typeof processExtractionCore> {
+  const result = await processExtractionCore(db, extractionId, opts);
+  // A file that came in on WhatsApp: tell the sender when it has been read, whatever the outcome. Never changes the result.
+  await (await import("./whatsappDone.server")).notifyFileProcessed(db, extractionId).catch((e) => console.error(`[fyn:whatsapp] done message: ${(e as Error).message}`));
+  return result;
+}
+
+async function processExtractionCore(
+  db: Db,
+  extractionId: string,
+  opts: { trigger?: RunTrigger; userId?: string | null; password?: string } = {},
 ): Promise<{
   status: string;
   txns: number;

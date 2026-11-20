@@ -8,6 +8,9 @@ import { getPracticeWhatsappStatus } from "@/lib/practice/practice.functions";
 import { Badge, Card, Drawer, EmptyState, Modal, PageHeader, Segmented, Tone, V, formatDate } from "../ui";
 import { AgentGlyph, AgentStatusBadge, AgentTimeline, ShimmerText } from "../agents";
 import { Chase, useV2 } from "../store";
+import { HandoffNote } from "../components/kit/Kit";
+import { chaseHandoff } from "../lib/agentTrust";
+import { sendWithUndo } from "../lib/sendWithUndo";
 import { CreditsAlert, CreditsChip, TopUpModal } from "../components/CreditsPanel";
 import { WhatsAppIcon } from "../components/BrandIcons";
 import { WhatsappPreview } from "../components/WhatsappPreview";
@@ -68,9 +71,11 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
       toast.error("Add the client's WhatsApp number, with country code, or choose Email.");
       return;
     }
-    addChase(form);
     setCreating(false);
-    toast.success("Chase item created. Status is Open.");
+    sendWithUndo("chase_send", `Creating the chase and sending the first reminder to ${form.contact || "the client"}`, () => {
+      addChase(form);
+      toast.success("Chase item created. Status is Open.");
+    });
   };
 
   const message = (c: Chase) =>
@@ -236,9 +241,7 @@ export default function ChaserPage({ clientId: scopedClient }: { clientId?: stri
             {active.note && <p style={{ fontSize: 13.5, color: V.body, lineHeight: 1.6, margin: 0 }}>{active.note}</p>}
 
             {active.status === "Escalated" && (
-              <div style={{ background: "rgba(169,56,56,.07)", border: "1px solid rgba(169,56,56,.25)", borderRadius: 14, padding: 14, fontSize: 13, color: V.maroon }}>
-                The follow ups went unanswered. This item is with the partner now.
-              </div>
+              <HandoffNote handoff={chaseHandoff(active)} />
             )}
 
             <div>

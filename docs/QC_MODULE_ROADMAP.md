@@ -117,3 +117,22 @@ From you: NDA and data terms; India hosting decision; whether Tally and Zoho pos
 **Still not built** (in plan order): confirming and storing the ledger map and party master per client; GST open-item carry-forward store and IMS status; set-off against table 6.1 and the credit and cash ledger loops; RCM tested from the books by ledger; ledger-level opening balances and multi-year trial balance; TDS working and 26AS; 43B(h); fixed assets; ageing screen; audit log of reads and exports; period lock; India-region database migration.
 
 **Known limits of what is built:** cash needs an opening balance to be exact (it counts from nil unless one is entered); the 40A(3) and 269ST lists are for the CA to judge, not findings; the ledger map is a suggestion until confirmed; the ITC year difference of IGST +₹186.05 and CGST/SGST −₹4,484.49 is not yet reproduced.
+
+## 8. Update: the items listed as "not built" after section 7
+
+Built and tested (the GST loops on the real Satkaarika files):
+- **Set-off entry against GSTR-3B table 6.1**: payable by head, credit used, cash paid, and the use of credit by head. Real result: 11 of 12 months agree, including the blueprint's worked example (journal 1286, December). One real finding: in November the set-off journal leaves out the IGST liability of ₹16,341 that table 6.1 shows. A month with no set-off journal is reported as such. A credit note is not mistaken for a set-off entry.
+- **Reverse charge loop from the books**, by ledger: liability booked, cash paid, credit booked, and the return (3.1(d) and 4A(3)). Real result: 9 of 12 months agree; April differs by ₹6,322 (March's liability paid in April, a timing item the year view clears), October by ₹1.60 (rounding), and March by ₹1,14,878 in credit booked against 4A(3), which the CA should look at.
+- **Ledger map confirmation**: suggestions, edit by family, "Confirm these ledgers" (partner or manager), stored per client and re-used.
+- **Audit log** of reads, downloads and exports (documents opened or downloaded, working papers exported, the ledger map read or confirmed), and a **period lock** that records a fingerprint of every document and calls the lock stale when one is changed, added or removed.
+- All four need one SQL file run once: `supabase/migrations/20261120100000_ledger_map_party_audit_lock.sql`. Until it is run the screens say so and the checks that do not need it still work.
+
+Not built, and why (each needs a file or fact we do not have, so it cannot be built and proved yet):
+- **Credit and cash ledger loops** need the portal's electronic credit ledger and cash ledger statements.
+- **IMS status** needs the IMS download; the 2B Excel has no IMS column.
+- **Ledger-level opening balances** need the audited notes' schedules (debtor and creditor lists) and the Tally masters or TB as at 1 April.
+- **TDS working and 26AS** need the 26AS file and the party master (PAN, section) confirmed for the client.
+- **43B(h)** needs Udyam status per supplier in the party master.
+- **Fixed assets** need the asset register or the capital items with put-to-use dates.
+- **Ageing screen**: the engine is built and proved; the screen waits for the opening balances, because without them most receipts show as on account.
+- **Party master screen**: the table is created by the SQL above; the entry screen comes with TDS and 43B(h), because that is what fills it.

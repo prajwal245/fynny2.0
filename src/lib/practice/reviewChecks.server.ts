@@ -72,3 +72,11 @@ export async function runReviewChecks(db: Db, ctx: FirmContext, businessId: stri
     notes: files ? [] : ["No Tally Day Book (Excel) is on file for this client. Upload the Day Book to run these checks."],
   };
 }
+
+/** The vouchers that touch the GST ledgers (output, input, carry-forward, reverse charge, set-off and payment), for the set-off and reverse charge checks. */
+export async function gstLedgerVouchers(db: Db, ctx: FirmContext, businessId: string): Promise<{ vouchers: Voucher[]; files: number }> {
+  const { vouchers, files } = await loadVouchers(db, ctx, businessId);
+  const names = [...new Set(vouchers.flatMap((v) => v.legs.map((l) => l.ledger)))];
+  const gst = new Set(suggestLedgerMap(names.map((name) => ({ name }))).filter((m) => ["input_tax", "input_tax_carry_forward", "output_tax", "rcm_liability", "rcm_input", "gst_payment"].includes(m.family)).map((m) => m.ledger));
+  return { vouchers: vouchers.filter((v) => v.legs.some((l) => gst.has(l.ledger))).slice(0, 6000), files };
+}

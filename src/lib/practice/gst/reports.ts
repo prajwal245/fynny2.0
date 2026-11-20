@@ -262,3 +262,39 @@ export function readGstr3bAnnual(rows: string[][], month: string): Gstr3bRead {
 }
 
 export { normInvoiceNo };
+
+
+/* ── GSTR-3B table 6.1 (payment of tax), from the annual report ───────────────────────────────── */
+
+export interface Gstr3bPayment {
+  month: string;
+  /** Other than reverse charge: tax payable, paid through credit and paid in cash, by head of the liability. */
+  payable: TaxSplit;
+  paidItc: TaxSplit;
+  paidCash: TaxSplit;
+  /** Reverse charge liability, always paid in cash. */
+  rcmPayable: TaxSplit;
+  rcmPaidCash: TaxSplit;
+  found: boolean;
+}
+
+export function readGstr3bPayment(rows: string[][], month: string): Gstr3bPayment {
+  const zero = (): TaxSplit => ({ taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 });
+  const out: Gstr3bPayment = { month, payable: zero(), paidItc: zero(), paidCash: zero(), rcmPayable: zero(), rcmPaidCash: zero(), found: false };
+  const m = /^(\d{4})-(\d{2})$/.exec(month);
+  if (!m) return out;
+  const idx = (Number(m[2]) + 8) % 12;
+  const monthHeader = rows.find((r) => r.map(norm).includes("april"));
+  const base = (monthHeader ? monthHeader.map(norm).indexOf("april") : 7) + 5 * idx;
+  const secOther = rows.findIndex((r) => /^payment of tax \(other than rcm\)/i.test(cell(r[0])));
+  const secRcm = rows.findIndex((r) => /^payment of tax \(rcm liability\)/i.test(cell(r[0])));
+  if (secOther < 0) return out;
+  const grab = (from: number, re: RegExp): TaxSplit => {
+    const r = rows.slice(from, from + 6).find((x) => re.test(norm(x[1])));
+    return r ? { taxable: 0, igst: num(r[base]), cgst: num(r[base + 1]), sgst: num(r[base + 2]), cess: num(r[base + 3]) } : zero();
+  };
+  out.payable = grab(secOther, /^tax payable/); out.paidItc = grab(secOther, /^paid through itc/); out.paidCash = grab(secOther, /^paid through cash/);
+  if (secRcm >= 0) { out.rcmPayable = grab(secRcm, /^tax payable/); out.rcmPaidCash = grab(secRcm, /^paid through cash/); }
+  out.found = true;
+  return out;
+}

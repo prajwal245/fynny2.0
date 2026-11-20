@@ -16,6 +16,7 @@ export const INDEXABLE_PAGES: { path: string; changefreq: "weekly" | "monthly" |
   { path: "/agents/chaser", changefreq: "monthly", priority: "0.8" },
   { path: "/pricing", changefreq: "monthly", priority: "0.9" },
   { path: "/ca-firms", changefreq: "monthly", priority: "0.8" },
+  { path: "/for/accounting-firms", changefreq: "monthly", priority: "0.8" },
   { path: "/security", changefreq: "monthly", priority: "0.6" },
   { path: "/about", changefreq: "monthly", priority: "0.6" },
   { path: "/contact", changefreq: "yearly", priority: "0.5" },

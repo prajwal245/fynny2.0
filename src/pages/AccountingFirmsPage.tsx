@@ -33,6 +33,8 @@ import {
 } from "@/components/site/cta";
 import { DemoLink } from "@/components/site/BookDemo";
 import { ACCOUNTING_FAQS } from "@/content/accountingFirmsFaqs";
+import { FOOTER_COLUMNS, FOOTER_TAGLINE } from "@/components/site/footerLinks";
+import { openCookieSettings } from "@/lib/consent";
 
 /**
  * /for/accounting-firms: the end-to-end month-end story for the whole firm
@@ -267,6 +269,8 @@ const STYLES = `
 .fa-cols h5 { font-size:12px; font-weight:500; letter-spacing:.12em; text-transform:uppercase; color:rgba(244,242,236,.5); margin:0 0 16px; }
 .fa-cols a { display:block; text-decoration:none; font-size:15px; padding:6px 0; color:rgba(244,242,236,.88); } .fa-cols a:hover { color:#fff; text-decoration:underline; }
 .fa-cols .about { font-size:16px; line-height:1.5; color:rgba(244,242,236,.75); max-width:20em; margin-top:16px; font-weight:300; }
+.fa-cols .fa-cookie { display:block; background:none; border:0; padding:6px 0; font:inherit; font-size:15px; color:rgba(244,242,236,.88); cursor:pointer; text-align:left; }
+.fa-cols .fa-cookie:hover { color:#fff; text-decoration:underline; }
 .fa-cols .addr { font-size:13.5px; color:rgba(244,242,236,.5); margin-top:14px; line-height:1.5; }
 .fa-cols .mail { display:block; margin-top:14px; font-size:14px; padding:0; }
 .fa-bottom { margin-top:40px; padding-top:22px; border-top:1px solid rgba(244,242,236,.1); font-size:14px; color:rgba(244,242,236,.5); display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; }
@@ -1261,59 +1265,6 @@ function Faq() {
   );
 }
 
-const FOOT: { h: string; links: [string, string][] }[] = [
-  {
-    h: "Product",
-    links: [
-      ["How it works", "/pipeline"],
-      ["Extract", "/agents/extract"],
-      ["Recon", "/agents/recon"],
-      ["Narrate", "/agents/narrate"],
-      ["Chaser", "/agents/chaser"],
-      ["Pricing", "/pricing"],
-    ],
-  },
-  {
-    h: "Use cases",
-    links: [
-      ["Accounting firms", "/for/accounting-firms"],
-      ["CA firms", "/ca-firms"],
-      ["Finance teams", "/enterprise"],
-      ["All use cases", "/use-cases"],
-    ],
-  },
-  {
-    h: "Compare & connect",
-    links: [
-      ["Tally vs Zoho Books", "/blog/tally-vs-zoho-books-for-ca-firms"],
-      [
-        "ChatGPT vs FynHelp",
-        "/blog/chatgpt-for-accounting-vs-fynhelp-ca-firms-india",
-      ],
-      ["Bank reconciliation", "/agents/recon"],
-    ],
-  },
-  {
-    h: "Learn",
-    links: [
-      ["Blog", "/blog"],
-      ["Product guide", "/guide"],
-      ["Sample files", "/samples"],
-      ["Resources", "/resources"],
-    ],
-  },
-  {
-    h: "Company",
-    links: [
-      ["About", "/about"],
-      ["Security", "/security"],
-      ["Contact", "/contact"],
-      ["Privacy", "/privacy"],
-      ["Terms", "/terms"],
-    ],
-  },
-];
-
 function Closing() {
   return (
     <div className="fa-end">
@@ -1336,22 +1287,31 @@ function Closing() {
           <div className="fa-cols">
             <div className="brand">
               <FynLogo variant="light" size="sm" loading="lazy" />
-              <p className="about">
-                One workspace for your firm, and every client in it.
-              </p>
+              <p className="about">{FOOTER_TAGLINE}</p>
               <p className="addr">Bengaluru, India</p>
               <a className="mail" href="mailto:support@fynhelp.com">
                 support@fynhelp.com
               </a>
             </div>
-            {FOOT.map((c) => (
-              <nav key={c.h} aria-label={c.h}>
-                <h5>{c.h}</h5>
-                {c.links.map(([l, to]) => (
-                  <Link key={l} to={to}>
-                    {l}
-                  </Link>
-                ))}
+            {FOOTER_COLUMNS.map((c) => (
+              <nav key={c.heading} aria-label={c.heading}>
+                <h5>{c.heading}</h5>
+                {c.links.map((l) =>
+                  "action" in l ? (
+                    <button
+                      key={l.label}
+                      type="button"
+                      className="fa-cookie"
+                      onClick={() => openCookieSettings()}
+                    >
+                      {l.label}
+                    </button>
+                  ) : (
+                    <Link key={l.label} to={l.to}>
+                      {l.label}
+                    </Link>
+                  ),
+                )}
               </nav>
             ))}
           </div>

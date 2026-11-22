@@ -59,7 +59,7 @@ import {
   summariseRegister,
   type RegisterSummary,
 } from "./registers";
-import { rowsFromStatementText } from "./textStatement";
+import { rowsFromSplitCellText, rowsFromStatementText } from "./textStatement";
 
 export type FileKind =
   "csv" | "xlsx" | "tally_xml" | "pdf" | "image" | "json" | "unsupported";
@@ -930,7 +930,17 @@ export async function runExtract(
       const positionedOk = Boolean(positioned && positioned.rows.length >= 3 && positioned.verifiedShare >= 0.7);
       const textOk = byText.rows.length >= 3 && byText.verifiedShare >= 0.7;
       const preferText = positionedOk && positioned ? textOk && byText.rows.length > positioned.rows.length * 1.3 : true;
-      const statement = positionedOk && positioned && !preferText ? positioned : byText;
+      // A third reader, tried only when both found nothing: the split-cell layout of an overdraft or cash-credit statement.
+      const bySplit = !positionedOk && !textOk ? rowsFromSplitCellText(sourceText) : null;
+      const splitOk = Boolean(
+        bySplit && bySplit.rows.length >= 3 && bySplit.verifiedShare >= 0.7,
+      );
+      const statement =
+        splitOk && bySplit
+          ? bySplit
+          : positionedOk && positioned && !preferText
+            ? positioned
+            : byText;
       if (statement === positioned && positioned) {
         parsed = positioned.rows;
         documentKind = "bank_statement";

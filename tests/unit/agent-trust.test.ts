@@ -21,8 +21,16 @@ describe("the reversibility map", () => {
     for (const a of ACTIONS) if (!a.reversible) expect(a.gate, a.id).not.toBe("light");
   });
   it("gives a pause window to exactly the actions that go outside the firm and cannot come back", () => {
-    expect(ACTIONS.filter((a) => a.gate === "undo").map((a) => a.id)).toEqual(["chase_send"]);
-    expect(riskOf("chase_send").undoSeconds).toBeGreaterThan(0);
+    // A reminder and a question both go to a client; each can be cancelled for a few seconds before it leaves.
+    expect(ACTIONS.filter((a) => a.gate === "undo").map((a) => a.id)).toEqual(["chase_send", "query_send"]);
+    for (const id of ["chase_send", "query_send"]) expect(riskOf(id).undoSeconds, id).toBeGreaterThan(0);
+  });
+  it("never lets a message that leaves the firm go without a pause or a confirmation", () => {
+    // The supplier message goes to a third party, so it needs an explicit confirmation rather than a pause.
+    for (const id of ["chase_send", "query_send", "gst_supplier_send"]) {
+      expect(riskOf(id).reversible, id).toBe(false);
+      expect(["undo", "confirm"], id).toContain(riskOf(id).gate);
+    }
   });
   it("treats an action nobody has classified as irreversible", () => {
     expect(riskOf("something_new")).toMatchObject({ reversible: false, gate: "confirm" });

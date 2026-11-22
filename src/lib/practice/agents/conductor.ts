@@ -39,11 +39,15 @@ const daysBetween = (a: string, b: string) =>
     (Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000,
   );
 
+interface OwnerContext {
+  bankLines: number;
+  chase?: { open: number; escalated: number };
+}
+
 function ownerOf(
   step: StepState,
-  cm: ClientMonth,
+  cm: OwnerContext,
 ): { owner: Owner; blockedOn: string | null } {
-  const f = cm.facts;
   switch (step.key) {
     case "docs_received":
       return {
@@ -61,7 +65,7 @@ function ownerOf(
           }
         : { owner: "junior", blockedOn: null };
     case "recon_done":
-      return f.recon.bank === 0
+      return cm.bankLines === 0
         ? { owner: "client", blockedOn: "No bank lines yet." }
         : { owner: "agent", blockedOn: null };
     case "exceptions_explained":
@@ -80,13 +84,23 @@ function ownerOf(
 }
 
 export function nextAction(cm: ClientMonth, now: Date): NextAction {
-  const steps = deriveSteps(cm.period, cm.facts);
+  return nextActionFromSteps(
+    { clientId: cm.clientId, clientName: cm.clientName, period: cm.period },
+    deriveSteps(cm.period, cm.facts),
+    { bankLines: cm.facts.recon.bank, chase: cm.chase },
+    now,
+  );
+}
+
+/** The same decision from steps that were already derived (what the Close page holds), so the two can never disagree. */
+export function nextActionFromSteps(
+  who: { clientId: string; clientName: string; period: string },
+  steps: StepState[],
+  cm: OwnerContext,
+  now: Date,
+): NextAction {
   const step = steps.find((s) => s.status !== "done");
-  const base = {
-    clientId: cm.clientId,
-    clientName: cm.clientName,
-    period: cm.period,
-  };
+  const base = who;
   if (!step)
     return {
       ...base,

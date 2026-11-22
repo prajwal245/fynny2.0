@@ -15,11 +15,15 @@ The folder holds the real files, named `Client||name.pdf` (books: `Client||BOOKS
 | Case | Baseline |
 |---|---|
 | Satkaarika CA 7856871247 against its Day Book, full year | 43 bank lines, at least 42 matched, at most 1 open |
-| Satkaarika with the CC statement, a second CA account and the loan statements | 48 lines, at least 44 matched, at most 2 open |
+| Satkaarika with the CC statement, a second CA account and the loan statements | 112 lines (the cash-credit statement's 64 lines are now read), at least 106 matched, at most 4 open, none with an identical book entry |
 | SSSL four banks against the Day Book, May 2025 | 882 lines, at least 799 matched, at most 11 open, at most 4 open with an identical book entry |
 | Kotak 3368 | 31 lines, read, balances tie |
 | Indian Bank GECL, term and vehicle loan statements | recognised as loan statements, no bank lines |
 | Indian Bank CC statement | not mistaken for a loan |
+
+## Baseline change, 22 Nov 2026
+
+The Indian Bank cash-credit statement (every cell on its own line, dates and balances split across lines) was not read before, so the Satkaarika baseline of 48 lines left it out. A new reader reads its 64 lines, proved by the running balance to the paisa. The count rose from 48 to 112 lines, matched from 44 to 106, open from 2 to 4; none of the 4 has an identical book entry (`pairable` is 0).
 
 ## After an intended improvement
 

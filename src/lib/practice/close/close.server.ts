@@ -39,6 +39,8 @@ export interface ClientClose {
   done: number;
   total: number;
   bankBooks: boolean;
+  /** Bank lines read for the month by the last reconciliation run. */
+  bankLines?: number;
   steps: StepState[];
   statements: StatementInfo[];
   requirements: Requirement[];
@@ -170,7 +172,7 @@ export async function portfolioClose(db: Db, ctx: FirmContext, periodKey: string
     if (reqs.error) notes.push("Expected bank statements cannot be read yet, so that step cannot be checked.");
     if (steps.error) notes.push("Confirmations cannot be read yet, so GST, TDS, provisions and the MIS review show as waiting.");
     if (docs.error) notes.push("Statement verification cannot be read right now.");
-    out.push({ businessId: id, name: String(c.client_name ?? "Client"), period: p.key, state: cs.state, done: cs.done, total: cs.total, bankBooks: cs.bankBooks, steps: stepStates, statements, requirements, notes });
+    out.push({ businessId: id, name: String(c.client_name ?? "Client"), period: p.key, state: cs.state, done: cs.done, total: cs.total, bankBooks: cs.bankBooks, bankLines: facts.recon.bank, steps: stepStates, statements, requirements, notes });
   }
   return out.sort((a, b) => a.name.localeCompare(b.name));
 }

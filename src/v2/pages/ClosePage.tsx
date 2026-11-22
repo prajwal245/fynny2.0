@@ -9,6 +9,7 @@ import { getPracticePortfolioClose } from "@/lib/practice/practice.functions";
 import { CLOSE_LABEL, dueOn, overdueSteps, type StepState } from "@/lib/practice/close/steps";
 import { STATE_TONE } from "../components/CloseChecklist";
 import { AgentTrace } from "../components/AgentTrace";
+import { NeedsYou } from "../components/NeedsYou";
 
 type Row = Awaited<ReturnType<typeof getPracticePortfolioClose>>[number];
 type Filter = "all" | "attention" | "bank_books_closed" | "fully_closed" | "not_started";
@@ -87,6 +88,8 @@ export default function ClosePage() {
               </Card>
             ))}
           </div>
+
+          <NeedsYou rows={rows} onOpen={(id) => void nav({ to: "/app/clients/$clientId", params: { clientId: id }, search: { tab: "close" } as never })} />
 
           <div style={{ marginBottom: 14 }}>
             <Segmented

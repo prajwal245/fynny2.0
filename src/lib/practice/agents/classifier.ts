@@ -48,9 +48,38 @@ export const confidenceOf = (support: number, total: number): number =>
     ? 0
     : Math.round((support / total) * (support / (support + 1)) * 1000) / 1000;
 
+/** Earlier decisions counted once, by pattern, so each line is a lookup and not a scan of the whole history. */
+export interface DecisionIndex {
+  byPattern: Map<string, Map<string, number>>;
+  totals: Map<string, number>;
+}
+
+export function buildDecisionIndex(
+  history: readonly PastDecision[],
+): DecisionIndex {
+  const byPattern = new Map<string, Map<string, number>>();
+  const totals = new Map<string, number>();
+  for (const h of history) {
+    if (!h.pattern) continue;
+    const counts = byPattern.get(h.pattern) ?? new Map<string, number>();
+    counts.set(h.treatment, (counts.get(h.treatment) ?? 0) + 1);
+    byPattern.set(h.pattern, counts);
+    totals.set(h.pattern, (totals.get(h.pattern) ?? 0) + 1);
+  }
+  return { byPattern, totals };
+}
+
+const isIndex = (
+  h: readonly PastDecision[] | DecisionIndex,
+): h is DecisionIndex => !Array.isArray(h);
+
+/**
+ * Suggests a treatment for one line. To classify many lines, build the index once with buildDecisionIndex and pass it in:
+ * a plain array is indexed again on every call, which is fine for one line and slow for thousands.
+ */
 export function suggestTreatment(
   line: LineToClassify,
-  history: PastDecision[],
+  history: readonly PastDecision[] | DecisionIndex,
 ): Suggestion {
   const pattern = decisionPattern({
     side: line.side,
@@ -63,22 +92,21 @@ export function suggestTreatment(
       kind: "none",
       reason: "The narration has nothing distinctive to recognise.",
     };
-  const same = history.filter((h) => h.pattern === pattern);
-  if (!same.length)
+  const index = isIndex(history) ? history : buildDecisionIndex(history);
+  const counts = index.byPattern.get(pattern);
+  const total = index.totals.get(pattern) ?? 0;
+  if (!counts || total === 0)
     return {
       kind: "none",
       reason: "No earlier decision for this kind of line.",
     };
-  const counts = new Map<string, number>();
-  for (const h of same)
-    counts.set(h.treatment, (counts.get(h.treatment) ?? 0) + 1);
   const ranked = [...counts.entries()]
     .map(([treatment, support]) => ({ treatment, support }))
     .sort(
       (a, b) => b.support - a.support || a.treatment.localeCompare(b.treatment),
     );
   const top = ranked[0]!;
-  const share = top.support / same.length;
+  const share = top.support / total;
   if (top.support < MIN_SUPPORT)
     return {
       kind: "uncertain",
@@ -89,17 +117,26 @@ export function suggestTreatment(
     return {
       kind: "uncertain",
       candidates: ranked,
-      reason: `Treated differently ${same.length - top.support} of ${same.length} times.`,
+      reason: `Treated differently ${total - top.support} of ${total} times.`,
     };
   return {
     kind: "suggest",
     treatment: top.treatment,
-    confidence: confidenceOf(top.support, same.length),
+    confidence: confidenceOf(top.support, total),
     support: top.support,
-    total: same.length,
-    reason: `Treated this way ${top.support} of ${same.length} times before.`,
+    total,
+    reason: `Treated this way ${top.support} of ${total} times before.`,
     ruleId: ruleIdFor(pattern),
   };
+}
+
+/** Classifies many lines against one history, indexing it once. */
+export function suggestMany(
+  lines: readonly LineToClassify[],
+  history: readonly PastDecision[],
+): Suggestion[] {
+  const index = buildDecisionIndex(history);
+  return lines.map((l) => suggestTreatment(l, index));
 }
 
 export interface CandidateRule {

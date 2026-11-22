@@ -10,8 +10,10 @@ import {
   type QueryItem,
 } from "@/lib/practice/agents/queryLoop";
 import {
+  buildDecisionIndex,
   candidateRules,
   confidenceOf,
+  suggestMany,
   suggestTreatment,
   type PastDecision,
 } from "@/lib/practice/agents/classifier";
@@ -343,6 +345,44 @@ describe("the classifier", () => {
     expect(confidenceOf(10, 10)).toBeGreaterThanOrEqual(0.9); // reads as Confident
     expect(confidenceOf(8, 10)).toBeLessThan(confidenceOf(10, 10));
     expect(confidenceOf(0, 0)).toBe(0);
+  });
+
+  it("gives the same answer from a prebuilt index as from the plain history", () => {
+    const history = [
+      ...past("Freight", 5),
+      ...past("Purchases", 1),
+      { pattern: "bank:in:other", treatment: "Sales", at: "2026-01-01" },
+    ];
+    const lines = [
+      line,
+      { ...line, description: "NEFT CR SOMEONE ELSE ENTIRELY" },
+      { ...line, description: "" },
+    ];
+    const index = buildDecisionIndex(history);
+    for (const l of lines)
+      expect(suggestTreatment(l, index)).toEqual(suggestTreatment(l, history));
+    expect(suggestMany(lines, history)).toEqual(
+      lines.map((l) => suggestTreatment(l, history)),
+    );
+  });
+
+  it("classifies a month of lines against a large history in well under a second", () => {
+    const big: PastDecision[] = Array.from({ length: 100_000 }, (_, i) => ({
+      pattern: decisionPattern({
+        ...line,
+        description: `NEFT DR PARTY${i % 10_000} FREIGHT`,
+      }),
+      treatment: "Freight",
+      at: "x",
+    }));
+    const lines = Array.from({ length: 5_000 }, (_, i) => ({
+      ...line,
+      description: `NEFT DR PARTY${i} FREIGHT`,
+    }));
+    const started = Date.now();
+    const out = suggestMany(lines, big);
+    expect(Date.now() - started).toBeLessThan(3_000); // about 20 ms in practice; the margin is for slow machines
+    expect(out.filter((o) => o.kind === "suggest").length).toBe(5_000);
   });
 
   it("offers a pattern as a rule only when decided often and consistently", () => {

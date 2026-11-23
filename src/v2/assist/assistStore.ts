@@ -52,3 +52,6 @@ export function setAssistEnabled(enabled: boolean) {
 }
 
 export const ASSIST_EVENT = EVENT;
+
+/** Dispatched by the profile menu to show the tip for the current screen now. */
+export const ASSIST_SHOW_EVENT = "fynhelp:assist-show";

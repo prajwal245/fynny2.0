@@ -13,7 +13,7 @@ export function AssistSetting() {
   return (
     <SettingRow
       title="Help when I seem stuck"
-      description="A small prompt offers a walkthrough when a screen looks hard. It only explains and never changes anything. You can turn it off here."
+      description="A small prompt offers a walkthrough when a screen looks hard. It only explains and never changes anything. You can turn it off here. To see a tip right now, open the profile menu and choose Tips for this screen."
     >
       <Toggle
         checked={on}

@@ -15,6 +15,8 @@ import {
 import { guideFor, hasOpenWork, type Guide, type GuideFacts } from "./guides";
 import { loadConfig, loadPrefs, savePrefs } from "./assistStore";
 import { askAssistant } from "@/lib/practice/practice.functions";
+import { toast } from "sonner";
+import { ASSIST_SHOW_EVENT } from "./assistStore";
 
 const TICK_MS = 5_000;
 
@@ -87,12 +89,21 @@ export function ContextAssist({ facts }: { facts: GuideFacts }) {
     const mo = new MutationObserver((list) => {
       for (const m of list)
         m.addedNodes.forEach((n) => {
+          if (!(n instanceof HTMLElement)) return;
           if (
-            n instanceof HTMLElement &&
-            (n.matches?.('[data-sonner-toast][data-type="error"]') ||
-              n.querySelector?.('[data-sonner-toast][data-type="error"]'))
+            n.matches?.('[data-sonner-toast][data-type="error"]') ||
+            n.querySelector?.('[data-sonner-toast][data-type="error"]')
           )
             det.current.error(Date.now());
+          // Opening the same panel again and again (a drawer or dialog) is the clearest sign of someone going round in circles.
+          const panel = n.matches?.('[aria-modal="true"]')
+            ? n
+            : n.querySelector?.('[aria-modal="true"]');
+          if (panel && !panel.closest(".fha-dock"))
+            det.current.toggle(
+              `panel:${panel.getAttribute("aria-label") ?? "panel"}`,
+              Date.now(),
+            );
         });
     });
     document.addEventListener("click", onClick, true);
@@ -114,11 +125,11 @@ export function ContextAssist({ facts }: { facts: GuideFacts }) {
       const typing =
         !!a &&
         (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable);
-      const dialog = !!document.querySelector(
-        '[role="dialog"]:not(.fha-dock *), [aria-modal="true"]:not(.fha-dock *)',
+      // Only a modal panel that has taken over the screen counts as busy. Ordinary banners and loaders must not silence the assistant for good.
+      const modal = !!document.querySelector(
+        '[aria-modal="true"]:not(.fha-dock *)',
       );
-      const busy =
-        typing || dialog || !!document.querySelector('[aria-busy="true"]');
+      const busy = typing || modal;
       const now = Date.now();
       const reason = det.current.evaluate(
         now,
@@ -137,6 +148,21 @@ export function ContextAssist({ facts }: { facts: GuideFacts }) {
       setMode({ kind: "offer", reason });
     }, TICK_MS);
     return () => clearInterval(id);
+  }, [guide]);
+
+  // "Tips for this screen" in the profile menu: shown on request, whatever the rules and the switch say.
+  useEffect(() => {
+    const show = () => {
+      if (!guide) {
+        toast.info(
+          "Tips are for working screens such as Exceptions, Review, Documents and Reports.",
+        );
+        return;
+      }
+      setMode({ kind: "offer", reason: "idle" });
+    };
+    window.addEventListener(ASSIST_SHOW_EVENT, show);
+    return () => window.removeEventListener(ASSIST_SHOW_EVENT, show);
   }, [guide]);
 
   const close = useCallback(

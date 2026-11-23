@@ -130,3 +130,56 @@ describe("ContextAssist", () => {
     expect(screen.queryByText(/Step 2 of 3/)).toBeNull();
   });
 });
+
+describe("ContextAssist: the 23 Nov retest", () => {
+  it("offers help when the same panel is opened and closed three times, even while the person keeps clicking", async () => {
+    render(<ContextAssist facts={facts} />);
+    const open = (label: string) => {
+      const el = document.createElement("aside");
+      el.setAttribute("aria-modal", "true");
+      el.setAttribute("aria-label", label);
+      document.body.appendChild(el);
+      return el;
+    };
+    for (let i = 0; i < 3; i++) {
+      const el = open("Decide");
+      await wait(1000);
+      fireEvent.click(document.body);
+      el.remove();
+      await wait(1000);
+    }
+    await wait(6000);
+    expect(screen.getByText("Show me how")).toBeTruthy();
+  });
+  it("is not silenced by an ordinary banner or a loader", async () => {
+    render(
+      <>
+        <div role="dialog" aria-label="Banner" />
+        <div aria-busy="true" />
+        <ContextAssist facts={facts} />
+      </>,
+    );
+    await wait(9000);
+    expect(screen.getByText("Show me how")).toBeTruthy();
+  });
+  it("waits while a modal panel is open", async () => {
+    const m = document.createElement("aside");
+    m.setAttribute("aria-modal", "true");
+    document.body.appendChild(m);
+    render(<ContextAssist facts={facts} />);
+    await wait(30000);
+    expect(screen.queryByText("Show me how")).toBeNull();
+    m.remove();
+  });
+  it("shows a tip on request, even with tips switched off", async () => {
+    localStorage.setItem(
+      "fynhelp.assist.v1",
+      JSON.stringify({ enabled: false, lastShownAt: null, screens: {} }),
+    );
+    render(<ContextAssist facts={{ exceptions: 0, review: 0, chases: 0 }} />);
+    await act(async () => {
+      window.dispatchEvent(new Event("fynhelp:assist-show"));
+    });
+    expect(screen.getByText("Show me how")).toBeTruthy();
+  });
+});

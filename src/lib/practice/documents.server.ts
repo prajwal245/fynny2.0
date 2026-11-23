@@ -212,6 +212,20 @@ async function logAiCalls(
  * transactions and open review items from the previous run are replaced,
  * matched transactions are kept, and dedupe keys stop double entries.
  */
+/**
+ * A Day Book line that names no bank ledger and whose voucher type is not Receipt, Payment or Contra is an accrual entry (a bill, a
+ * sales invoice, a journal): no money moved through a bank, so it can never match a bank line. It is kept out of reconciliation like an invoice.
+ */
+export function isAccrualVoucher(description: string | null | undefined, rawText: string | null | undefined): boolean {
+  const type = /Vch Type:\s*([^|]+)/i.exec(rawText ?? "")?.[1]?.trim();
+  if (!type) return false;
+  if (/\([^()]*\d{4}[^()]*\)/.test(description ?? "")) return false;
+  return !/\b(receipts?|payments?|contra)\b|\bbank\b/i.test(type);
+}
+
+/** File names of returns and tax records that hold no bank lines. */
+export const TAX_REFERENCE_FILE = /\b(gstr[\s_-]?\w*|gst[\s_-]?(credit|liability|challan|return|payment)|itc|26\s?as|form[\s_-]?26as|ais|annual information|itr|form[\s_-]?3cd|3cd|computation of income|tax audit)\b/i;
+
 export async function processExtraction(
   db: Db,
   extractionId: string,
@@ -461,6 +475,30 @@ async function processExtractionCore(
     await finishRun(db, runId, runStarted, { summary: `${filename}: ${headline}`, detail: { register: reg.kind, entries: reg.entries } });
     return { status: "parsed", txns: 0, review: 0, duplicates: 0, pipeline: [] as { period: string; status: string }[] };
   }
+  if (outcome.rows.length === 0 && TAX_REFERENCE_FILE.test(filename)) {
+    // A GST return, ITC statement, 26AS, AIS, ITR or Form 3CD has no bank lines by nature. It is kept as a reference, not failed.
+    await db.from("ca_txns").delete().eq("extraction_id", doc.id).neq("match_status", "matched");
+    await db
+      .from("ca_document_extractions")
+      .update({
+        extract_status: "parsed",
+        review_state: "auto_accepted",
+        classification: "reference",
+        file_kind: outcome.kind,
+        confidence: 1,
+        row_count: 0,
+        txn_count: 0,
+        review_count: 0,
+        duplicate_count: 0,
+        error_message: null,
+        extracted: { ...(doc.extracted ?? {}), kind: outcome.kind, reference: true, text_preview: (outcome.sourceText ?? "").slice(0, 20_000) },
+        extract_finished_at: new Date().toISOString(),
+      })
+      .eq("id", doc.id);
+    await logActivity(db, doc.ca_firm_id, doc.business_id, "extract", `${filename} is a tax or return document. It has no bank transactions, so it is kept as a reference and not reconciled.`);
+    await finishRun(db, runId, runStarted, { summary: `${filename}: kept as a reference document`, detail: { reference: true } });
+    return { status: "parsed", txns: 0, review: 0, duplicates: 0, pipeline: [] as { period: string; status: string }[] };
+  }
   if (outcome.rows.length === 0)
     return failWith(
       "No transactions were found in this file. Check that it is the statement or ledger export itself, not a summary or cover page.",
@@ -603,6 +641,21 @@ async function processExtractionCore(
     .eq("extraction_id", doc.id)
     .eq("status", "open");
 
+  // A re-read of the same file must not add a line the first read already stored. Matched lines are kept across a re-read, and
+  // the narration can come out a little differently (a different reader, a wrapped line), which changes the narration-based key.
+  // The running balance does not change, so a stored line with the same date, direction, amount and balance is the same line.
+  const sameLine = (r: { txn_date?: string | null; date?: string | null; direction: string | null; amount: number | null; balance: number | null }) =>
+    r.balance == null || r.amount == null ? null : `${String(r.txn_date ?? r.date ?? "").slice(0, 10)}|${r.direction}|${Math.round(Number(r.amount) * 100)}|${Math.round(Number(r.balance) * 100)}`;
+  const alreadyStored = new Set<string>();
+  let reReadSkipped = 0;
+  {
+    const { data: kept } = await db.from("ca_txns").select("txn_date, direction, amount, balance").eq("extraction_id", doc.id).limit(50_000);
+    for (const k of (kept ?? []) as { txn_date: string; direction: string; amount: number; balance: number | null }[]) {
+      const key = sameLine(k);
+      if (key) alreadyStored.add(key);
+    }
+  }
+
   let otherAccountKept = 0;
   // Two lines of one file with the same date, direction, amount and narration but different running balances are two real
   // transactions: the second gets a key of its own (the first keeps the plain key, so existing data is unaffected).
@@ -611,6 +664,14 @@ async function processExtractionCore(
     .filter(
       (r) => r.route === "transaction" && r.date && r.amount && r.direction,
     )
+    .filter((r) => {
+      const key = sameLine({ date: r.date, direction: r.direction, amount: r.amount, balance: r.balance });
+      if (key && alreadyStored.has(key)) {
+        reReadSkipped += 1;
+        return false;
+      }
+      return true;
+    })
     .map((r) => ({
       ca_firm_id: doc.ca_firm_id,
       business_id: doc.business_id,
@@ -647,7 +708,7 @@ async function processExtractionCore(
       ...reconStatusFor(outcome.documentKind),
       // A sales invoice or a purchase bill is not a bank movement: its receipt or payment is a separate voucher. Keeping the invoice
       // out of bank reconciliation stops a bank receipt being "matched" to the invoice it settles.
-      ...(side === "books" && (r.category === "sales_invoice" || r.category === "purchase_invoice") ? { match_status: "ignored" as const, recon_tag: "invoice" as const } : {}),
+      ...(side === "books" && (r.category === "sales_invoice" || r.category === "purchase_invoice" || isAccrualVoucher(r.description, r.raw_text)) ? { match_status: "ignored" as const, recon_tag: "invoice" as const } : {}),
     }));
 
   let inserted = 0;
@@ -766,7 +827,7 @@ async function processExtractionCore(
       row_count: rows.length,
       txn_count: inserted,
       review_count: openReview ?? 0,
-      duplicate_count: outcome.duplicateRows + crossDocDuplicates,
+      duplicate_count: outcome.duplicateRows + crossDocDuplicates + reReadSkipped,
       error_message:
         rows.length === 0
           ? "No transactions were found in this file."

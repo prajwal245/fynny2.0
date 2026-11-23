@@ -957,11 +957,16 @@ export default function DocumentsPage({
                 onClick={async () => {
                   setRemoveBusy(true);
                   try {
-                    const r = await removePracticeDocument({ data: { id: active.id } });
+                    // A large file with many matches can take a while. Never leave the button stuck: after a minute, say so and let go.
+                    const r = await Promise.race([
+                      removePracticeDocument({ data: { id: active.id } }),
+                      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Removing is taking longer than usual. It may still finish: refresh the page in a minute to check.")), 60_000)),
+                    ]);
                     toast.success(`${r.filename} removed${r.matchesReversed ? `. ${r.matchesReversed} match${r.matchesReversed === 1 ? "" : "es"} reversed.` : "."} Upload the new file, then run recon again.`, { duration: 9000 });
                     setRemoving(false);
                     setOpen(null);
-                    await refresh();
+                    setRemoveBusy(false);
+                    void refresh();
                   } catch (e) {
                     toast.error(e instanceof Error ? e.message : "Could not remove it.");
                   } finally {

@@ -59,7 +59,9 @@ export function StatementCheckCard({ report, lineCount, period, onMove, onConfir
   const to = report.last?.slice(0, 7);
   const covers = from && to ? (from === to ? monthName(from) : `${monthName(from)} to ${monthName(to)}`) : null;
   const outside = Boolean(period && /^\d{4}-\d{2}$/.test(period) && from && to && (period < from || period > to));
-  const t = TONE[report.status];
+  // Held only because of who the statement belongs to: its balance, count and totals all tie. Say that, not "the balance does not follow".
+  const ownerOnly = report.status === "fail" && Boolean(report.hold) && (report.checks ?? []).filter((c) => !/^account (holder|number)$/i.test(c.label)).every((c) => c.ok !== false);
+  const t = ownerOnly ? { ...TONE.fail, title: "On hold: confirm it belongs to this client" } : TONE[report.status];
   // The count in the sentence is the statement's own number of lines, not how many rows happen to be loaded on screen.
   const overlap = report.overlap ? overlapSentence(report.overlap, report.lines || lineCount) : null;
   const Icon = report.status === "pass" ? CheckCircle2 : report.status === "unknown" ? CircleHelp : AlertTriangle;
@@ -70,7 +72,7 @@ export function StatementCheckCard({ report, lineCount, period, onMove, onConfir
         <div style={{ display: "grid", gap: 4 }}>
           <div style={{ fontWeight: 700, color: t.fg, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <span>Statement check: {t.title}</span>
-            <span data-testid="verification-result" style={{ fontSize: 11.5, fontWeight: 700, padding: "2px 9px", borderRadius: 999, background: verification.result === "passed" ? "rgba(47,107,79,.16)" : verification.result === "failed" ? "rgba(169,56,56,.16)" : "rgba(20,18,16,.08)", color: verification.result === "passed" ? "#2f6b4f" : verification.result === "failed" ? "#a93838" : V.body }}>Verification: {verification.label}</span>
+            <span data-testid="verification-result" style={{ fontSize: 11.5, fontWeight: 700, padding: "2px 9px", borderRadius: 999, background: verification.result === "passed" ? "rgba(47,107,79,.16)" : verification.result === "failed" ? "rgba(169,56,56,.16)" : "rgba(20,18,16,.08)", color: verification.result === "passed" ? "#2f6b4f" : verification.result === "failed" ? "#a93838" : V.body }}>Verification: {ownerOnly && verification.held ? "On hold" : verification.label}</span>
           </div>
           <div style={{ fontSize: 13.5 }}>{report.headline}</div>
           {(report.lines || lineCount) > 0 && (

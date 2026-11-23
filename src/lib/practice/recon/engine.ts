@@ -67,6 +67,8 @@ export interface ReconRule {
   /** Book entries count as the counterpart if their narration/category contains any of these. */
   book_narration_any?: string[];
   date_window_days?: number;
+  /** A line above this amount is never read as this rule (a bank charge is small). */
+  max_amount?: number;
 }
 
 export interface CounterpartyAlias {
@@ -105,6 +107,7 @@ export const DEFAULT_RULES: ReconRule[] = [
     tag: "bank_charge",
     book_narration_any: ["bank charge", "bank charges", "charges"],
     date_window_days: 31,
+    max_amount: 100_000,
   },
   {
     id: "default:interest",
@@ -818,6 +821,7 @@ export function reconcile(
     const rule = rules.find(
       (r) =>
         (!r.direction || r.direction === t.direction) &&
+        (r.max_amount === undefined || t.amount <= r.max_amount) &&
         (includesAny(`${t.description ?? ""} ${t.counterparty ?? ""}`, r.narration_any) ||
           // Extract already read it as a bank charge (or interest, tax): trust that.
           (!!t.category && t.category === r.tag)),

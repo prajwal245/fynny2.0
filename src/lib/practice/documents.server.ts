@@ -532,8 +532,9 @@ async function processExtractionCore(
     try {
       const text = outcome.sourceText ?? "";
       // A document carries the client's business id, which is not the id of the ca_clients row: compare on the same key.
-      const { data: cl } = await db.from("ca_clients").select("id, business_id, client_name").eq("ca_firm_id", doc.ca_firm_id).limit(2000);
-      const clients = ((cl ?? []) as { id: string; business_id: string | null; client_name: string }[]).map((c) => ({ id: c.business_id ?? c.id, name: c.client_name }));
+      const { data: cl } = await db.from("ca_clients").select("id, business_id, client_name, client_status").eq("ca_firm_id", doc.ca_firm_id).limit(2000);
+      // An archived client is never offered as the place a statement belongs.
+      const clients = ((cl ?? []) as { id: string; business_id: string | null; client_name: string; client_status?: string | null }[]).filter((c) => c.client_status !== "archived" || c.business_id === doc.business_id).map((c) => ({ id: c.business_id ?? c.id, name: c.client_name }));
       const mine = clients.find((c) => c.id === doc.business_id);
       const { data: co } = await db.from("ca_tally_companies").select("id").eq("ca_firm_id", doc.ca_firm_id).eq("business_id", doc.business_id).limit(1);
       let banks: string[] | null = null;

@@ -17,6 +17,7 @@ import { TrialBanner } from "./components/TrialBanner";
 import { TestBanner } from "./components/TestBanner";
 import { PhonePrompt } from "./components/PhonePrompt";
 import { FirstRunWelcome } from "./components/FirstCloseGuide";
+import { ASSIST_STYLES, ContextAssist } from "./assist/ContextAssist";
 import { SIDENAV_STYLES, SideNav } from "./components/SideNav";
 import { CONTROLS_STYLES } from "./components/Controls";
 import { MOTION_STYLES } from "./components/MotionKit";
@@ -39,7 +40,7 @@ const TITLES: Record<string, string> = {
 export default function V2Shell() {
   return (
     <V2StoreProvider>
-      <style>{V2_STYLES + AGENT_STYLES + SIDENAV_STYLES + CONTROLS_STYLES + MOTION_STYLES}</style>
+      <style>{V2_STYLES + AGENT_STYLES + SIDENAV_STYLES + CONTROLS_STYLES + MOTION_STYLES + ASSIST_STYLES}</style>
       <ShellBody />
     </V2StoreProvider>
   );
@@ -241,6 +242,7 @@ function ShellBody() {
             <TrialBanner partnerView={partnerView} />
             <FirstRunWelcome />
             <Outlet />
+            <ContextAssist facts={{ exceptions: COUNTS["/app/exceptions"] ?? 0, review: COUNTS["/app/review"] ?? 0, chases: COUNTS["/app/chaser"] ?? 0 }} />
             {/* Live agent cards dock at the bottom of the page: opening or closing one never moves what is under the cursor. */}
             <div data-testid="run-dock" style={{ position: "sticky", bottom: 16, zIndex: 30, display: "grid", gap: 10, width: "min(520px, 100%)", marginLeft: "auto", marginTop: runs.length ? 18 : 0 }}>
               <AnimatePresence>

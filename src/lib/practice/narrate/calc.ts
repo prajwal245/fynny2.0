@@ -6,6 +6,7 @@
  * click through to the source. The AI never produces a figure.
  */
 import { formatRupees, round2, sumRupees, toPaise, type Period } from "../core";
+import { BANK_CHARGE_MAX_RUPEES } from "../extract/classify";
 
 export interface NarrateTxn {
   id: string;
@@ -217,7 +218,9 @@ export function computeFigures(
 
   const catMap = new Map<string, NarrateTxn[]>();
   for (const t of matched) {
-    const k = `${t.direction}|${t.category || (t.direction === "in" ? "receipt" : "payment")}`;
+    // Lines stored before the size check existed can still carry "bank_charge" on a large payment; do not report them as charges.
+    const cat = t.category === "bank_charge" && t.amount > BANK_CHARGE_MAX_RUPEES ? null : t.category;
+    const k = `${t.direction}|${cat || (t.direction === "in" ? "receipt" : "payment")}`;
     (catMap.get(k) ?? catMap.set(k, []).get(k)!).push(t);
   }
   const by_category = [...catMap.entries()]

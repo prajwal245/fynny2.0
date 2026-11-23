@@ -23,6 +23,12 @@ export const CONFIDENCE_THRESHOLD = 0.75;
 
 /* ── heuristics ─────────────────────────────────────────── */
 
+/**
+ * A bank charge is small. A narration that merely contains the word "charges" or "gst on" but moves more than this is a
+ * payment to someone (the real-file test had Rs 47.3 lakh to a supplier read as a bank charge), so it is not read as one.
+ */
+export const BANK_CHARGE_MAX_RUPEES = 100_000;
+
 const RULES: { re: RegExp; category: TxnCategory }[] = [
   {
     re: /\b(chrgs?|chgs?|charges?|sms ?chgs?|amc|min(imum)? bal|annual fee|service fee|gst on|cgst on|sgst on|igst on)\b/i,
@@ -47,8 +53,17 @@ export function categorise(
   description: string,
   direction: Direction | null,
   side: Side,
+  amount?: number | null,
 ): TxnCategory {
-  for (const r of RULES) if (r.re.test(description)) return r.category;
+  for (const r of RULES) {
+    if (!r.re.test(description)) continue;
+    if (r.category === "bank_charge") {
+      if (amount != null && amount > BANK_CHARGE_MAX_RUPEES) continue;
+      // Indian Bank prints "Txn Amt. 47,32,488.00 Charges. 29.21" inside every transfer: the payment carries a fee, it is not the fee.
+      if (/\btxn amt\b/i.test(description) && amount != null && amount > 1_000) continue;
+    }
+    return r.category;
+  }
   if (
     side === "books" &&
     /\b(invoice|inv no|bill no|tax invoice)\b/i.test(description)
@@ -103,7 +118,7 @@ export function applyHeuristics(row: ExtractedRow, side: Side): ExtractedRow {
   const description = row.description ?? "";
   return {
     ...row,
-    category: row.category ?? categorise(description, row.direction, side),
+    category: row.category ?? categorise(description, row.direction, side, row.amount),
     counterparty:
       row.counterparty ??
       (side === "bank" ? counterpartyFromNarration(description) : null),

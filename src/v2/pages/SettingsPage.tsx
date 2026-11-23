@@ -31,6 +31,7 @@ import { AccountSettings } from "../components/AccountSettings";
 import { ZohoBooksSection } from "../components/ZohoBooks";
 import { INTEGRATION_STYLES, IntegrationCard } from "../components/IntegrationCard";
 import { CONTROLS_STYLES, Checkbox, Disclosure, Field, SettingRow } from "../components/Controls";
+import { AssistSetting } from "../assist/AssistSetting";
 import { StatefulButton } from "../components/MotionKit";
 import { Link } from "@tanstack/react-router";
 import { HelpPanel } from "../components/HelpPanel";
@@ -541,6 +542,7 @@ export default function SettingsPage() {
                     {intg.reading.ocr || intg.reading.vision ? "Active" : "Scans not available yet"}
                   </Badge>
                 </SettingRow>
+                <AssistSetting />
               </div>
             </div>
           )}

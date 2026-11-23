@@ -1905,3 +1905,36 @@ export const previewPracticeDocumentSheets = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) =>
     withFirm(context.userId, async (db, ctx) => (await import("./documents.server")).previewDocumentSheets(db, ctx, data.id)),
   );
+
+/* ── contextual assistant: a follow-up question about the screen ───────────── */
+
+/**
+ * Answers a question about the screen the person is on, from that screen's own written guide only. No client data is sent to the
+ * model, the question has identifiers masked, and the answer is a short explanation: it never tells anyone to change a figure.
+ * Any failure returns null and the screen shows its fixed steps instead.
+ */
+export const askAssistant = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ screen: z.string().min(1).max(60), question: z.string().min(2).max(300) }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      const { guideFor } = await import("@/v2/assist/guides");
+      const guide = guideFor(data.screen);
+      if (!guide) return { answer: null as string | null };
+      const { practiceLlm, withinAiCap } = await import("./llm.server");
+      if (!(await withinAiCap(db, ctx.firmId))) return { answer: null as string | null };
+      const { guardedJson, redact, wrapUntrusted, UNTRUSTED_NOTE } = await import("./agents/ai");
+      const res = await guardedJson(
+        practiceLlm({ timeoutMs: 9_000 }),
+        {
+          purpose: "assistant.ask",
+          system: `You help an accountant use one screen of FynHelp. ${UNTRUSTED_NOTE} Answer in at most three short sentences, using ONLY the screen description and steps below. If they do not cover the question, say you cannot answer it here and suggest contacting support. Never tell the person to change a figure, post, file or sign off on your say-so; say what the screen lets them decide. Answer JSON only: {"answer":"..."}.\nScreen: ${guide.about}\nSteps: ${guide.steps.map((s) => `${s.title}: ${s.text}`).join(" ")}`,
+          user: wrapUntrusted(redact(data.question)),
+          maxTokens: 700,
+        },
+        z.object({ answer: z.string().min(1).max(700) }),
+        { timeoutMs: 10_000 },
+      );
+      return { answer: res.ok ? res.data.answer : (null as string | null) };
+    }),
+  );

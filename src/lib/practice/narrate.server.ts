@@ -26,7 +26,8 @@ import {
 } from "./db.server";
 import { practiceLlm, withinAiCap } from "./llm.server";
 import { statutoryDueDates } from "./india";
-import { BUCKET_LABELS, cleanParty, gatewayGrossUp, misBucket, returnedChequePairs, settlementsFromRegister, type MisBucket, type Settlement } from "./narrate/flows";
+import { BUCKET_LABELS, cleanParty, gatewayGrossUp, misBucket, returnedChequePairs, settlementsFromRegister, type MisBucket, type OwnAccounts, type Settlement } from "./narrate/flows";
+import { holderName } from "./extract/statementOwner";
 import {
   computeFigures,
   ruleInsights,
@@ -173,10 +174,11 @@ export async function generateReport(
   // Bucket every matched line once: bank narration plus what the books say.
   const pairs = returnedChequePairs(statement);
   const pairIds = new Set(pairs.flatMap((p) => [p.deposit, p.ret]));
+  const own = await ownAccountsOf(db, ctx.firmId, businessId, client.client_name);
   const bucketOf = new Map<string, MisBucket>(
     matched.map((t) => [
       t.id,
-      pairIds.has(t.id) ? "returned_cheque" : misBucket({ ...t, description: `${t.description ?? ""} ${bookText(t.id)}` }),
+      pairIds.has(t.id) ? "returned_cheque" : misBucket({ ...t, description: `${t.description ?? ""} ${bookText(t.id)}` }, own),
     ]),
   );
   const revenueTxns = matched.filter((t) => bucketOf.get(t.id) === "revenue");
@@ -979,6 +981,37 @@ async function personName(db: Db, userId: string): Promise<string> {
  * For each matched bank line, the book entries it was matched to: their
  * party (ledger) name and the words that say what kind of entry it is.
  */
+/**
+ * The client's own accounts, for spotting transfers between them: the account holder as each uploaded bank statement prints it,
+ * and the account numbers of those statements. A failure here only means fewer transfers are recognised, never a wrong figure.
+ */
+async function ownAccountsOf(db: Db, firmId: string, businessId: string, clientName: string | null): Promise<OwnAccounts> {
+  const own: OwnAccounts = { names: [], accounts: [] };
+  try {
+    const { data } = await db
+      .from("ca_document_extractions")
+      .select("acct:extracted->>account_no, preview:extracted->>text_preview")
+      .eq("ca_firm_id", firmId)
+      .eq("business_id", businessId)
+      .eq("side", "bank")
+      .limit(60);
+    for (const r of (data ?? []) as { acct: string | null; preview: string | null }[]) {
+      if (r.acct) own.accounts.push(r.acct);
+      const h = r.preview ? holderName(r.preview) : null;
+      if (h) own.names.push(h);
+    }
+  } catch {
+    /* fewer transfers recognised */
+  }
+  if (clientName) own.names.push(clientName);
+  own.names = [...new Set(own.names)];
+  own.accounts = [...new Set(own.accounts)];
+  return own;
+}
+
+/** A bracketed note naming a bank ledger: it holds at least four digits, as an account number does. */
+export const BANK_LEDGER_NOTE = /\([^()]*\d{4}[^()]*\)/g;
+
 async function bookSideOf(db: Db, firmId: string, bankIds: string[]): Promise<Map<string, { party: string; text: string }>> {
   const out = new Map<string, { party: string; text: string }>();
   if (!bankIds.length) return out;
@@ -1011,7 +1044,9 @@ async function bookSideOf(db: Db, firmId: string, bankIds: string[]): Promise<Ma
     const parties = [...new Set(rows.map(nameOf).filter(Boolean))];
     // One party across the entries: show it.
     const party = parties.length === 1 && !/^(cash|bank|sundry)$/i.test(parties[0]) ? parties[0] : "";
-    const text = rows.map((r) => `${r.counterparty ?? ""} ${r.description ?? ""} ${r.category ?? ""}`).join(" ");
+    // The Day Book names the bank ledger the payment went through in brackets ("Manohar Civil (Indian Bank CC A/c 6407563276)").
+    // That is the account, not what the payment was for: without this, every payment from a cash-credit account read as a loan.
+    const text = rows.map((r) => `${r.counterparty ?? ""} ${(r.description ?? "").replace(BANK_LEDGER_NOTE, " ")} ${r.category ?? ""}`).join(" ");
     out.set(m.bank_txn_id, { party, text });
   }
   return out;

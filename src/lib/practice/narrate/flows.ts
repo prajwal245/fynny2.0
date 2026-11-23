@@ -54,7 +54,36 @@ const DRAWINGS = /\bdrawings?\b/i;
 /** Ledgers a CA parks money in until they know what it is. */
 export const SUSPENSE = /\b(suspense|unidentified|unknown receipts?|unknown party|unreconciled receipts?)\b/i;
 
-export function misBucket(t: Line): MisBucket {
+/** What identifies the client's own accounts: the holder name on its statements and the account numbers it has uploaded. */
+export interface OwnAccounts {
+  names: string[];
+  accounts: string[];
+}
+
+const OWN_CUE = /\b(tran ?sfer (from|to)|tr ?sf|tfr|by transfer|deposit by|from occ|to occ|sweep|inter ?account)\b/i;
+const norm = (s: string) => s.toUpperCase().replace(/[^A-Z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+const WEAK = new Set(["PVT", "LTD", "LIMITED", "PRIVATE", "LLP", "AND", "CO", "THE", "OF", "M", "S", "MS"]);
+
+/**
+ * A movement between the client's own accounts (a cash-credit account to the current account, a fixed deposit, a sister account in
+ * the same name). It is neither revenue nor an expense. It needs two things: wording that says it is a transfer, and either the
+ * holder's own name or one of the client's own account numbers.
+ */
+export function isOwnTransfer(text: string, own?: OwnAccounts | null): boolean {
+  if (!own || !OWN_CUE.test(text)) return false;
+  const t = norm(text);
+  for (const n of own.names) {
+    const words = norm(n).split(" ").filter((w) => w.length > 1 && !WEAK.has(w));
+    if (words.length >= 1 && norm(n).length >= 6 && words.every((w) => t.includes(w))) return true;
+  }
+  const digits = text.replace(/\D+/g, " ");
+  return own.accounts.some((a) => {
+    const d = a.replace(/\D/g, "");
+    return d.length >= 6 && digits.includes(d);
+  });
+}
+
+export function misBucket(t: Line, own?: OwnAccounts | null): MisBucket {
   const text = `${t.description ?? ""} ${t.counterparty ?? ""}`;
   // Booked to Suspense in the books: cash that is not yet anyone's income.
   if (t.direction === "in" && SUSPENSE.test(text)) return "unidentified";
@@ -63,6 +92,8 @@ export function misBucket(t: Line): MisBucket {
   if (t.direction === "out" && INTEREST.test(text) && !TAX.test(text)) return "expense";
   // Charges and fees are costs even when they sit on a loan or a cheque ("EMI CHQ RET CHGS", "LOAN PROCESSING FEE").
   if (t.direction === "out" && CHARGES.test(text) && !/\b(challan|cpin|itns|tds|advance tax)\b/i.test(text)) return "expense";
+  // Money moved between the client's own accounts is not income and not a cost.
+  if (isOwnTransfer(text, own)) return "transfer";
   // A proprietor's or partner's drawings are capital, never a transfer between the firm's own accounts.
   if (DRAWINGS.test(text)) return "loan_capital";
   if (t.category === "transfer" || TRANSFER.test(text)) return "transfer";

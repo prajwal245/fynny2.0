@@ -223,8 +223,10 @@ export function isAccrualVoucher(description: string | null | undefined, rawText
   return !/\b(receipts?|payments?|contra)\b|\bbank\b/i.test(type);
 }
 
-/** File names of returns and tax records that hold no bank lines. */
-export const TAX_REFERENCE_FILE = /\b(gstr[\s_-]?\w*|gst[\s_-]?(credit|liability|challan|return|payment)|itc|26\s?as|form[\s_-]?26as|ais|annual information|itr|form[\s_-]?3cd|3cd|computation of income|tax audit)\b/i;
+import { TAX_REFERENCE_FILE } from "./extract/taxReference";
+import { withUnsiloedFallback, type StoredResult } from "./extract/fallback/orchestrate";
+import { dbLedger } from "./extract/fallback/ledger";
+export { TAX_REFERENCE_FILE };
 
 export async function processExtraction(
   db: Db,
@@ -406,7 +408,7 @@ async function processExtractionCore(
     }
   }
   const sheetInfo = sheetNames ? { sheet_names: sheetNames } : {};
-  const outcome = await runExtract(
+  const primaryOutcome = await runExtract(
     {
       bytes: readBytes,
       filename,
@@ -426,6 +428,20 @@ async function processExtractionCore(
       sheetsAll: kind === "xlsx" ? await loadSheetsReader() : undefined,
     },
   );
+  // Optional fallback reader: a no-op unless UNSILOED_FALLBACK_ENABLED=true and a key is set. It never replaces a result that already ties.
+  const outcome = await withUnsiloedFallback(primaryOutcome, {
+    bytes: readBytes,
+    filename,
+    side,
+    stored: (doc.extracted as { parser_fallback_result?: StoredResult | null } | null)?.parser_fallback_result ?? null,
+    ledger: () => dbLedger(db, doc.ca_firm_id),
+  });
+  if (outcome.fallback?.pending) {
+    // Remember the running job so its webhook can find this document, and keep it on the in-memory copy so later saves do not drop it.
+    const extra = { ...(doc.extracted ?? {}), parser_fallback_pending: outcome.fallback.pending };
+    (doc as { extracted: unknown }).extracted = extra;
+    await db.from("ca_document_extractions").update({ extracted: extra }).eq("id", doc.id);
+  }
   await logAiCalls(db, doc.ca_firm_id, doc.id, outcome.aiCalls);
   if (outcome.error) return failWith(outcome.error.message, outcome.error.code, outcome.error.adminNote);
   if (outcome.side && outcome.side !== side) {
@@ -618,7 +634,7 @@ async function processExtractionCore(
         review_count: 0,
         duplicate_count: 0,
         error_message: "This statement looks like it belongs to another client. Its lines are held.",
-        extracted: { ...(doc.extracted ?? {}), source: (doc.extracted as { source?: string } | null)?.source ?? "Manual", kind: outcome.kind, text_preview: outcome.sourceText.slice(0, 20_000), statement_check: statementReport, ...sheetInfo },
+        extracted: { ...(doc.extracted ?? {}), source: (doc.extracted as { source?: string } | null)?.source ?? "Manual", kind: outcome.kind, text_preview: outcome.sourceText.slice(0, 20_000), statement_check: statementReport, ...(outcome.fallback?.record ? { parser_fallback: outcome.fallback.record, parser_fallback_pending: undefined, parser_fallback_result: undefined } : {}), ...sheetInfo },
         extract_finished_at: new Date().toISOString(),
       })
       .eq("id", doc.id);
@@ -843,6 +859,8 @@ async function processExtractionCore(
         // The account this statement is for, so a later statement of another account is never taken for a repeat of this one.
         ...(side === "bank" ? { account_no: statementAccount(outcome.sourceText ?? "", filename).accountNo } : {}),
         ...(statementReport ? { statement_check: statementReport } : {}),
+        // Which reader produced these lines, and the credits it used. Present only when the optional fallback was used.
+        ...(outcome.fallback?.record ? { parser_fallback: outcome.fallback.record, parser_fallback_pending: undefined, parser_fallback_result: undefined } : {}),
         ...sheetInfo,
       },
       extract_finished_at: new Date().toISOString(),

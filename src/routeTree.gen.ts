@@ -124,6 +124,7 @@ import { Route as ApiPublicEmailPreferencesRouteImport } from './routes/api/publ
 import { Route as ApiPublicPracticeTickRouteImport } from './routes/api/public/practice-tick'
 import { Route as ApiPublicPressIngestRouteImport } from './routes/api/public/press-ingest'
 import { Route as ApiPublicRazorpayWebhookRouteImport } from './routes/api/public/razorpay-webhook'
+import { Route as ApiWebhooksUnsiloedRouteImport } from './routes/api/webhooks/unsiloed'
 import { Route as ApiPublicTallyHelloRouteImport } from './routes/api/public/tally-hello'
 import { Route as ApiPublicTallyLedgerRouteImport } from './routes/api/public/tally-ledger'
 import { Route as ApiPublicTallyLedgersRouteImport } from './routes/api/public/tally-ledgers'
@@ -827,6 +828,12 @@ const ApiPublicRazorpayWebhookRoute =
   ApiPublicRazorpayWebhookRouteImport.update({
     id: '/api/public/razorpay-webhook',
     path: '/api/public/razorpay-webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiWebhooksUnsiloedRoute =
+  ApiWebhooksUnsiloedRouteImport.update({
+    id: '/api/webhooks/unsiloed',
+    path: '/api/webhooks/unsiloed',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicTallyHelloRoute = ApiPublicTallyHelloRouteImport.update({
@@ -1580,6 +1587,7 @@ export interface FileRoutesByFullPath {
   '/api/public/practice-tick': typeof ApiPublicPracticeTickRoute
   '/api/public/press-ingest': typeof ApiPublicPressIngestRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
+  '/api/webhooks/unsiloed': typeof ApiWebhooksUnsiloedRoute
   '/api/public/tally-hello': typeof ApiPublicTallyHelloRoute
   '/api/public/tally-ledger': typeof ApiPublicTallyLedgerRoute
   '/api/public/tally-ledgers': typeof ApiPublicTallyLedgersRoute
@@ -1799,6 +1807,7 @@ export interface FileRoutesByTo {
   '/api/public/practice-tick': typeof ApiPublicPracticeTickRoute
   '/api/public/press-ingest': typeof ApiPublicPressIngestRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
+  '/api/webhooks/unsiloed': typeof ApiWebhooksUnsiloedRoute
   '/api/public/tally-hello': typeof ApiPublicTallyHelloRoute
   '/api/public/tally-ledger': typeof ApiPublicTallyLedgerRoute
   '/api/public/tally-ledgers': typeof ApiPublicTallyLedgersRoute
@@ -2029,6 +2038,7 @@ export interface FileRoutesById {
   '/api/public/practice-tick': typeof ApiPublicPracticeTickRoute
   '/api/public/press-ingest': typeof ApiPublicPressIngestRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
+  '/api/webhooks/unsiloed': typeof ApiWebhooksUnsiloedRoute
   '/api/public/tally-hello': typeof ApiPublicTallyHelloRoute
   '/api/public/tally-ledger': typeof ApiPublicTallyLedgerRoute
   '/api/public/tally-ledgers': typeof ApiPublicTallyLedgersRoute
@@ -2255,6 +2265,7 @@ export interface FileRouteTypes {
     | '/api/public/practice-tick'
     | '/api/public/press-ingest'
     | '/api/public/razorpay-webhook'
+    | '/api/webhooks/unsiloed'
     | '/api/public/tally-hello'
     | '/api/public/tally-ledger'
     | '/api/public/tally-ledgers'
@@ -2474,6 +2485,7 @@ export interface FileRouteTypes {
     | '/api/public/practice-tick'
     | '/api/public/press-ingest'
     | '/api/public/razorpay-webhook'
+    | '/api/webhooks/unsiloed'
     | '/api/public/tally-hello'
     | '/api/public/tally-ledger'
     | '/api/public/tally-ledgers'
@@ -2703,6 +2715,7 @@ export interface FileRouteTypes {
     | '/api/public/practice-tick'
     | '/api/public/press-ingest'
     | '/api/public/razorpay-webhook'
+    | '/api/webhooks/unsiloed'
     | '/api/public/tally-hello'
     | '/api/public/tally-ledger'
     | '/api/public/tally-ledgers'
@@ -2852,6 +2865,7 @@ export interface RootRouteChildren {
   ApiPublicPracticeTickRoute: typeof ApiPublicPracticeTickRoute
   ApiPublicPressIngestRoute: typeof ApiPublicPressIngestRoute
   ApiPublicRazorpayWebhookRoute: typeof ApiPublicRazorpayWebhookRoute
+  ApiWebhooksUnsiloedRoute: typeof ApiWebhooksUnsiloedRoute
   ApiPublicTallyHelloRoute: typeof ApiPublicTallyHelloRoute
   ApiPublicTallyLedgerRoute: typeof ApiPublicTallyLedgerRoute
   ApiPublicTallyLedgersRoute: typeof ApiPublicTallyLedgersRoute
@@ -3670,6 +3684,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/razorpay-webhook'
       fullPath: '/api/public/razorpay-webhook'
       preLoaderRoute: typeof ApiPublicRazorpayWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/webhooks/unsiloed': {
+      id: '/api/webhooks/unsiloed'
+      path: '/api/webhooks/unsiloed'
+      fullPath: '/api/webhooks/unsiloed'
+      preLoaderRoute: typeof ApiWebhooksUnsiloedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/tally-hello': {
@@ -4985,6 +5006,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicPracticeTickRoute: ApiPublicPracticeTickRoute,
   ApiPublicPressIngestRoute: ApiPublicPressIngestRoute,
   ApiPublicRazorpayWebhookRoute: ApiPublicRazorpayWebhookRoute,
+  ApiWebhooksUnsiloedRoute: ApiWebhooksUnsiloedRoute,
   ApiPublicTallyHelloRoute: ApiPublicTallyHelloRoute,
   ApiPublicTallyLedgerRoute: ApiPublicTallyLedgerRoute,
   ApiPublicTallyLedgersRoute: ApiPublicTallyLedgersRoute,

@@ -157,6 +157,8 @@ export interface ExtractOutcome {
   note?: string;
   /** The control figures the bank printed on the statement (counts, totals, line numbers, page count), when it printed any. */
   bankSummary?: BankSummary | null;
+  /** Set only when the optional fallback reader changed this result or left a job running. See extract/fallback. */
+  fallback?: import("./fallback/orchestrate").FallbackOutcome;
   error: { code: string; message: string; /** For admins only: the technical reason (never shown to a firm's users). */ adminNote?: string } | null;
 }
 

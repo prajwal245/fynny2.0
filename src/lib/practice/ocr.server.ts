@@ -5,6 +5,8 @@
  * printed running balance, and every amount must appear in the text.
  */
 
+import { composeOcr, openRouterFallback, type OcrFn } from "./ocrFallback.server";
+
 const ENDPOINT = "https://api.ocr.space/parse/image";
 const TIMEOUT_MS = 45_000;
 
@@ -21,8 +23,13 @@ function toBase64(bytes: Uint8Array): string {
   return btoa(bin);
 }
 
-export function ocrConfigured(): boolean {
+export function ocrSpaceConfigured(): boolean {
   return Boolean(process.env["OCR_SPACE_API_KEY"]?.trim());
+}
+
+/** True when any scan reader is available: OCR.space, or the OpenRouter fallback. */
+export function ocrConfigured(): boolean {
+  return ocrSpaceConfigured() || openRouterFallback() !== null;
 }
 
 /** Reads the text of a scan. Throws with OCR.space's own reason when it cannot. */
@@ -73,6 +80,8 @@ export async function ocrSpaceText(
 }
 
 /** The dependency the Extract pipeline takes, or null when OCR is off. */
-export function practiceOcr(): ((bytes: Uint8Array, mime: string) => Promise<string>) | null {
-  return ocrConfigured() ? (bytes, mime) => ocrSpaceText(bytes, mime) : null;
+export function practiceOcr(): OcrFn | null {
+  const primary: OcrFn | null = ocrSpaceConfigured() ? (bytes, mime) => ocrSpaceText(bytes, mime) : null;
+  // With nothing else set, this is exactly the reader it always was: OCR.space text, as a string.
+  return composeOcr(primary, openRouterFallback());
 }

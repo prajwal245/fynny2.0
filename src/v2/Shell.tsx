@@ -228,6 +228,7 @@ function ShellBody() {
                       <div style={{ fontSize: 13.5, fontWeight: 600 }}>{session?.name || session?.email || ""}</div>
                       <div style={{ fontSize: 12, color: V.muted }} data-testid="firm-role">{firmRole ? firmRole[0].toUpperCase() + firmRole.slice(1) : role}{canSignOff && role === "Junior" ? " · viewing as Junior" : ""} · {firm?.name || "Your firm"}</div>
                     </div>
+                    <button role="menuitem" onClick={() => { setMenu(false); window.dispatchEvent(new Event("fynhelp:assist-show")); }}><LifeBuoy size={15} strokeWidth={1.7} /> Tips for this screen</button>
                     <Link role="menuitem" to="/app/settings" onClick={() => setMenu(false)}><Settings size={15} strokeWidth={1.7} /> Settings</Link>
                     <button role="menuitem" className="out" onClick={() => { setMenu(false); signOut(); navigate({ to: "/app/onboarding" }); }}><LogOut size={15} strokeWidth={1.7} /> Logout</button>
                   </div>
@@ -242,7 +243,7 @@ function ShellBody() {
             <TrialBanner partnerView={partnerView} />
             <FirstRunWelcome />
             <Outlet />
-            <ContextAssist facts={{ exceptions: COUNTS["/app/exceptions"] ?? 0, review: COUNTS["/app/review"] ?? 0, chases: COUNTS["/app/chaser"] ?? 0 }} />
+            <ContextAssist facts={{ exceptions: (COUNTS["/app/exceptions"] ?? 0) || exceptions.filter((e) => e.status === "open").length, review: COUNTS["/app/review"] ?? 0, chases: COUNTS["/app/chaser"] ?? 0 }} />
             {/* Live agent cards dock at the bottom of the page: opening or closing one never moves what is under the cursor. */}
             <div data-testid="run-dock" style={{ position: "sticky", bottom: 16, zIndex: 30, display: "grid", gap: 10, width: "min(520px, 100%)", marginLeft: "auto", marginTop: runs.length ? 18 : 0 }}>
               <AnimatePresence>

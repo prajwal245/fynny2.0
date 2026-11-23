@@ -56,3 +56,102 @@ describe("tax and return files are references", () => {
       expect(TAX_REFERENCE_FILE.test(f), f).toBe(false);
   });
 });
+
+import {
+  TAX_REFERENCE_FILE as REF,
+  looksLikeBankStatement,
+} from "@/lib/practice/extract/taxReference";
+import { rowsFromTable } from "@/lib/practice/extract/table";
+
+describe("files from the 23 Nov retest", () => {
+  it("catches challans, return status, registers and AIS parts by name", () => {
+    for (const f of [
+      "GST Challans and Return Filing Status FY 2025-26.xlsx",
+      "Satkaarika - Sales and Purchase Registers Dec 2025 (Tally 19-11-2026).xlsx",
+      "Satkaarika - AIS FY 2025-26 (Part 2 of 2).pdf",
+      "Form 3CD FY 2024-25.pdf",
+    ])
+      expect(REF.test(f), f).toBe(true);
+    for (const f of [
+      "Satkaarika - Ledger Indian Bank CA 7856871247 FY 2025-26 (Tally 16-11-2026).xlsx",
+      "Day Book.xlsx",
+      "CA 8088091704.pdf",
+    ])
+      expect(REF.test(f), f).toBe(false);
+  });
+  it("keeps a real statement even if its name looks like a return", () => {
+    const withBalance = [1, 2, 3, 4].map((n) => ({ balance: 100 * n }));
+    expect(looksLikeBankStatement(withBalance)).toBe(true);
+    expect(
+      looksLikeBankStatement([
+        { balance: null },
+        { balance: null },
+        { balance: null },
+        { balance: 5 },
+      ]),
+    ).toBe(false);
+  });
+});
+
+describe("a transfer to another of the client's bank accounts in a bank ledger", () => {
+  const ledger = [
+    ["SATKAARIKA ENTERPRISES PRIVATE LIMITED", "", "", "", "", ""],
+    ["Ledger Account", "", "", "", "", ""],
+    ["Indian bank CA 7856871247", "", "", "", "", ""],
+    ["1-Apr-25 to 31-Mar-26", "", "", "", "", ""],
+    ["Date", "Particulars", "Vch Type", "Vch No.", "Debit", "Credit"],
+    [
+      "2025-08-30",
+      "To Indian Bank CC A/c 6407563276",
+      "Contra",
+      "3",
+      "50000000",
+      "",
+    ],
+    [
+      "2025-09-01",
+      "By Indian Bank CC A/c 6407563276",
+      "Receipt",
+      "43",
+      "",
+      "50000000",
+    ],
+    [
+      "2025-09-02",
+      "By R K READY MIX CONCRETE (as per details)",
+      "Payment",
+      "361",
+      "",
+      "799229.21",
+    ],
+    [
+      "2025-09-03",
+      "To Sri Gopal Automotive Ltd",
+      "Receipt",
+      "44",
+      "250000",
+      "",
+    ],
+  ];
+  it("takes its direction from Debit and Credit, not from the voucher type", () => {
+    const rows = rowsFromTable(ledger, "books")!;
+    const by = (d: string) => rows.find((r) => r.date === d)!;
+    expect(by("2025-08-30")).toMatchObject({
+      direction: "in",
+      amount: 50_000_000,
+    });
+    expect(by("2025-09-01")).toMatchObject({
+      direction: "out",
+      amount: 50_000_000,
+    });
+  });
+  it("still uses the voucher type for an ordinary party", () => {
+    const rows = rowsFromTable(ledger, "books")!;
+    expect(rows.find((r) => r.date === "2025-09-02")).toMatchObject({
+      direction: "out",
+    });
+    expect(rows.find((r) => r.date === "2025-09-03")).toMatchObject({
+      direction: "in",
+    });
+  });
+});

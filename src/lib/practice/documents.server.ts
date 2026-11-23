@@ -223,7 +223,7 @@ export function isAccrualVoucher(description: string | null | undefined, rawText
   return !/\b(receipts?|payments?|contra)\b|\bbank\b/i.test(type);
 }
 
-import { TAX_REFERENCE_FILE } from "./extract/taxReference";
+import { TAX_REFERENCE_FILE, looksLikeBankStatement } from "./extract/taxReference";
 import { withUnsiloedFallback, type StoredResult } from "./extract/fallback/orchestrate";
 import { dbLedger } from "./extract/fallback/ledger";
 export { TAX_REFERENCE_FILE };
@@ -444,6 +444,34 @@ async function processExtractionCore(
     await db.from("ca_document_extractions").update({ extracted: extra }).eq("id", doc.id);
   }
   await logAiCalls(db, doc.ca_firm_id, doc.id, outcome.aiCalls);
+  const keepAsReference = async () => {
+    // A GST return or challan, ITC statement, 26AS, AIS, ITR, Form 3CD or a sales/purchase register has no bank lines by nature, even when
+    // its columns read as some (a day of the month as an amount). It is kept as a reference, whatever rows were read from it.
+    await db.from("ca_txns").delete().eq("extraction_id", doc.id).neq("match_status", "matched");
+    await db.from("ca_review_items").delete().eq("extraction_id", doc.id).eq("status", "open");
+    await db
+      .from("ca_document_extractions")
+      .update({
+        extract_status: "parsed",
+        review_state: "auto_accepted",
+        classification: "reference",
+        file_kind: outcome.kind,
+        confidence: 1,
+        row_count: 0,
+        txn_count: 0,
+        review_count: 0,
+        duplicate_count: 0,
+        error_message: null,
+        extracted: { ...(doc.extracted ?? {}), kind: outcome.kind, reference: true, text_preview: (outcome.sourceText ?? "").slice(0, 20_000) },
+        extract_finished_at: new Date().toISOString(),
+      })
+      .eq("id", doc.id);
+    await logActivity(db, doc.ca_firm_id, doc.business_id, "extract", `${filename} is a tax or return document. It has no bank transactions, so it is kept as a reference and not reconciled.`);
+    await finishRun(db, runId, runStarted, { summary: `${filename}: kept as a reference document`, detail: { reference: true } });
+    return { status: "parsed", txns: 0, review: 0, duplicates: 0, pipeline: [] as { period: string; status: string }[] };
+    };
+  // Tax and return files that cannot be read (a scan, an odd layout) are references too, not failures. Passwords still ask for the password.
+  if (outcome.error && TAX_REFERENCE_FILE.test(filename) && !/^password/.test(outcome.error.code) && outcome.error.code !== "unsupported_type") return keepAsReference();
   if (outcome.error) return failWith(outcome.error.message, outcome.error.code, outcome.error.adminNote);
   if (outcome.side && outcome.side !== side) {
     // The content decides: a Tally ledger is the books even when its name says "bank".
@@ -492,30 +520,7 @@ async function processExtractionCore(
     await finishRun(db, runId, runStarted, { summary: `${filename}: ${headline}`, detail: { register: reg.kind, entries: reg.entries } });
     return { status: "parsed", txns: 0, review: 0, duplicates: 0, pipeline: [] as { period: string; status: string }[] };
   }
-  if (outcome.rows.length === 0 && TAX_REFERENCE_FILE.test(filename)) {
-    // A GST return, ITC statement, 26AS, AIS, ITR or Form 3CD has no bank lines by nature. It is kept as a reference, not failed.
-    await db.from("ca_txns").delete().eq("extraction_id", doc.id).neq("match_status", "matched");
-    await db
-      .from("ca_document_extractions")
-      .update({
-        extract_status: "parsed",
-        review_state: "auto_accepted",
-        classification: "reference",
-        file_kind: outcome.kind,
-        confidence: 1,
-        row_count: 0,
-        txn_count: 0,
-        review_count: 0,
-        duplicate_count: 0,
-        error_message: null,
-        extracted: { ...(doc.extracted ?? {}), kind: outcome.kind, reference: true, text_preview: (outcome.sourceText ?? "").slice(0, 20_000) },
-        extract_finished_at: new Date().toISOString(),
-      })
-      .eq("id", doc.id);
-    await logActivity(db, doc.ca_firm_id, doc.business_id, "extract", `${filename} is a tax or return document. It has no bank transactions, so it is kept as a reference and not reconciled.`);
-    await finishRun(db, runId, runStarted, { summary: `${filename}: kept as a reference document`, detail: { reference: true } });
-    return { status: "parsed", txns: 0, review: 0, duplicates: 0, pipeline: [] as { period: string; status: string }[] };
-  }
+  if (TAX_REFERENCE_FILE.test(filename) && !looksLikeBankStatement(outcome.rows)) return keepAsReference();
   if (outcome.rows.length === 0)
     return failWith(
       "No transactions were found in this file. Check that it is the statement or ledger export itself, not a summary or cover page.",

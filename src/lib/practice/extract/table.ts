@@ -342,7 +342,10 @@ export function rowsFromTable(rows: string[][], side?: "bank" | "books"): Extrac
     );
 
     if (booksDebitIn) signed = -signed;
-    const vchDir = side === "books" ? directionFromVoucherType(cell(row, map.vchType)) : null;
+    // In a bank account's own ledger, Debit and Credit are that account's own movements. A line whose other side is another bank account
+    // is a transfer, and its voucher type (often "Receipt" for a move between a CA and a CC account) says nothing about the direction.
+    const otherIsBank = tallyLayout && !dayBook && isBankLedgerName(rawDescription.replace(/^\s*(by|to|dr|cr)\.?\s+/i, ""));
+    const vchDir = side === "books" && !otherIsBank ? directionFromVoucherType(cell(row, map.vchType)) : null;
     if (vchDir && signed !== 0) signed = vchDir === "in" ? Math.abs(signed) : -Math.abs(signed);
 
     // In a Tally ledger every real entry carries a date. An undated line WITH an amount is a breakdown of the

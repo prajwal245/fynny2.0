@@ -20,7 +20,7 @@ const ok =
   async () =>
     new Response(
       JSON.stringify({
-        model: "mistralai/mistral-ocr-latest",
+        model: "mistralai/pixtral-large-2502",
         choices: [{ message: { content } }],
         usage: { cost: 0.002 },
         ...extra,
@@ -36,12 +36,12 @@ const STATEMENT = [
 ].join("\n");
 
 describe("the request", () => {
-  it("is deterministic, chains Mistral OCR then Pixtral, and gives a PDF the Mistral OCR parser", () => {
+  it("is deterministic, chains two Mistral vision models, and gives a PDF the Mistral OCR parser", () => {
     const body = buildOpenRouterRequest(bytes, "application/pdf", cfg);
     expect(body).toMatchObject({
       temperature: 0,
       route: "fallback",
-      models: ["mistralai/mistral-ocr-latest", "mistralai/pixtral-large-2411"],
+      models: ["mistralai/pixtral-large-2502", "mistralai/mistral-medium-3-5"],
       plugins: [{ id: "file-parser", pdf: { engine: "mistral-ocr" } }],
     });
     expect(body.messages[0]).toEqual({
@@ -111,7 +111,7 @@ describe("reading", () => {
     expect(r.text).not.toContain("| ---");
     expect(r).toMatchObject({
       provider: "openrouter",
-      model: "mistralai/mistral-ocr-latest",
+      model: "mistralai/pixtral-large-2502",
       cost_usd: 0.002,
     });
   });

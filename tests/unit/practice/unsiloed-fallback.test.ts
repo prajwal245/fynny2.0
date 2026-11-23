@@ -18,9 +18,11 @@ import {
   rowsFromMarkdown,
 } from "@/lib/practice/extract/fallback/markdown";
 import {
+  createHttpClient,
   readResult,
   type UnsilodClient,
 } from "@/lib/practice/extract/fallback/client";
+import { sweepPendingJobs } from "@/lib/practice/extract/fallback/sweep";
 import {
   signatureValid,
   readWebhook,
@@ -147,7 +149,6 @@ describe("the fallback is off unless it is fully configured", () => {
     ["by default", {}],
     ["flag false", { ...ON, UNSILOED_FALLBACK_ENABLED: "false" }],
     ["no key", { ...ON, UNSILOED_API_KEY: "" }],
-    ["no base url", { ...ON, UNSILOED_BASE_URL: "" }],
     ["plain http url", { ...ON, UNSILOED_BASE_URL: "http://insecure.test" }],
   ] as const)
     it(`never calls the vendor ${name}, and returns the primary result itself`, async () => {
@@ -550,5 +551,154 @@ describe("webhook signature", () => {
       finished: false,
     });
     expect(readWebhook(null)).toEqual({ jobId: null, finished: false });
+  });
+});
+
+describe("the vendor's documented API", () => {
+  const cfg = readUnsilodConfig({
+    UNSILOED_FALLBACK_ENABLED: "true",
+    UNSILOED_API_KEY: "key-123",
+  });
+  const job = (status: string, extra: object = {}) =>
+    new Response(JSON.stringify({ job_id: "job-1", status, ...extra }), {
+      status: 200,
+    });
+  it("defaults to the production base URL with the key in the api-key header", () => {
+    expect(cfg.enabled).toBe(true);
+    expect(cfg.baseUrl).toBe("https://prod.visionapi.unsiloed.ai");
+    expect(cfg.authHeader).toBe("api-key");
+  });
+  it("submits a multipart file with mode and merge_tables, polls until Succeeded, and reads chunk markdown and credit_used", async () => {
+    const seen: {
+      url: string;
+      method: string;
+      key: string | null;
+      form?: FormData;
+    }[] = [];
+    const answers = [
+      job("Starting"),
+      job("Processing"),
+      job("Succeeded", {
+        page_count: 2,
+        credit_used: 10,
+        chunks: [
+          { embed: table(GOOD.slice(0, 3)) },
+          { embed: table(GOOD.slice(3)) },
+        ],
+      }),
+    ];
+    const submit = new Response(JSON.stringify({ job_id: "job-1" }), {
+      status: 200,
+    });
+    const fetchImpl = (async (url: string, init: RequestInit) => {
+      const h = init.headers as Record<string, string>;
+      seen.push({
+        url,
+        method: String(init.method),
+        key: h["api-key"] ?? null,
+        form: init.body instanceof FormData ? init.body : undefined,
+      });
+      return seen.length === 1 ? submit : answers.shift()!;
+    }) as unknown as typeof fetch;
+    const client = createHttpClient(
+      { ...cfg, pollMs: 1 },
+      fetchImpl,
+      async () => undefined,
+    );
+    const res = await client.parse({
+      bytes: pdf(2),
+      filename: "s.pdf",
+      tier: "fast",
+    });
+    expect(seen[0]).toMatchObject({
+      url: "https://prod.visionapi.unsiloed.ai/parse",
+      method: "POST",
+      key: "key-123",
+    });
+    expect(seen[0]!.form!.get("mode")).toBe("fast");
+    expect(seen[0]!.form!.get("merge_tables")).toBe("true");
+    expect((seen[0]!.form!.get("file") as File).name).toBe("s.pdf");
+    expect(seen.slice(1).map((r) => r.url)).toEqual([
+      "https://prod.visionapi.unsiloed.ai/parse/job-1",
+      "https://prod.visionapi.unsiloed.ai/parse/job-1",
+      "https://prod.visionapi.unsiloed.ai/parse/job-1",
+    ]);
+    expect(res).toMatchObject({
+      pending: false,
+      creditsUsed: 10,
+      pages: 2,
+      jobId: "job-1",
+    });
+    expect(rowsFromMarkdown(res.markdown!)).toHaveLength(5);
+  });
+  it("uses agentic_lite for the second tier", async () => {
+    let mode: unknown;
+    const fetchImpl = (async (_u: string, init: RequestInit) => {
+      if (init.body instanceof FormData) mode = init.body.get("mode");
+      return job("Succeeded", { chunks: [{ embed: "x" }] });
+    }) as unknown as typeof fetch;
+    await createHttpClient(cfg, fetchImpl, async () => undefined).parse({
+      bytes: pdf(1),
+      filename: "s.pdf",
+      tier: "lite",
+    });
+    expect(mode).toBe("agentic_lite");
+  });
+  it("reads Retry-After on 429 and 503, and treats Failed and Cancelled as errors", async () => {
+    const limited = (async () =>
+      new Response("{}", {
+        status: 503,
+        headers: { "retry-after": "12" },
+      })) as unknown as typeof fetch;
+    await expect(
+      createHttpClient(cfg, limited).parse({
+        bytes: pdf(1),
+        filename: "s.pdf",
+        tier: "fast",
+      }),
+    ).rejects.toMatchObject({ status: 503, retryAfterMs: 12_000 });
+    for (const status of ["Failed", "Cancelled"])
+      expect(() => readResult({ job_id: "j", status })).toThrow(
+        status.toLowerCase(),
+      );
+  });
+  it("asks about a job left running before paying for a new one", async () => {
+    const client = fake([]);
+    client.fetchJob = async () => ({
+      markdown: table(GOOD),
+      jobId: "job-9",
+      creditsUsed: 10,
+      pages: 2,
+      pending: false,
+    });
+    const res = await withUnsiloedFallback(
+      outcome(BROKEN),
+      ctx(2, { pendingJob: { job_id: "job-9", tier: "fast" } }),
+      { env: ON, client, ...quiet },
+    );
+    expect(client.calls).toEqual([]);
+    expect(res.fallback?.record?.job_id).toBe("job-9");
+    const waiting = fake([]);
+    waiting.fetchJob = async () => ({
+      markdown: null,
+      jobId: "job-9",
+      creditsUsed: null,
+      pages: null,
+      pending: true,
+    });
+    const p = outcome(BROKEN);
+    expect(
+      await withUnsiloedFallback(
+        p,
+        ctx(2, { pendingJob: { job_id: "job-9", tier: "fast" } }),
+        { env: ON, client: waiting, ...quiet },
+      ),
+    ).toBe(p);
+    expect(waiting.calls).toEqual([]);
+  });
+  it("does nothing in the sweep unless the fallback is on", async () => {
+    expect(await sweepPendingJobs({} as never, { env: {} })).toEqual({
+      skipped: "off",
+    });
   });
 });

@@ -33,8 +33,14 @@ const firstNumber = (...v: unknown[]) =>
   v.find((x): x is number => typeof x === "number" && Number.isFinite(x)) ??
   null;
 
-/** Reads the answer whatever its exact shape: a markdown field, a result or output object, or a list of chunks. */
+/**
+ * Reads a parse job. Documented shape: `status` (Starting, Queued, Processing, Succeeded, Failed, Cancelled), `chunks[].embed` (the
+ * chunk as Markdown, tables included), `credit_used`, `page_count`, `job_id`. Other shapes are read tolerantly.
+ */
 export function readResult(j: Json): ParseResult {
+  const status = String(j["status"] ?? "").toLowerCase();
+  if (/^(failed|cancelled|canceled)$/.test(status))
+    throw new Error(`Unsiloed job ${status}`);
   const result =
     asObj(j["result"]) ?? asObj(j["output"]) ?? asObj(j["data"]) ?? {};
   const chunks = (
@@ -47,6 +53,7 @@ export function readResult(j: Json): ParseResult {
   const fromChunks = chunks
     .map((c) =>
       firstString(
+        asObj(c)?.["embed"],
         asObj(c)?.["markdown"],
         asObj(c)?.["content"],
         asObj(c)?.["text"],
@@ -57,25 +64,25 @@ export function readResult(j: Json): ParseResult {
   const markdown = firstString(
     j["markdown"],
     result["markdown"],
+    fromChunks || null,
     j["content"],
     result["content"],
-    fromChunks || null,
   );
-  const status = String(j["status"] ?? result["status"] ?? "").toLowerCase();
   const done =
-    /^(done|completed|complete|succeeded|success|finished)$/.test(status) ||
+    /^(succeeded|done|completed|complete|success|finished)$/.test(status) ||
     (!status && markdown !== null);
   const usage = asObj(j["usage"]) ?? {};
   return {
     markdown: done ? markdown : null,
     jobId: firstString(j["job_id"], j["jobId"], j["id"], result["job_id"]),
     creditsUsed: firstNumber(
+      j["credit_used"],
       j["credits_used"],
       j["creditsUsed"],
       usage["credits"],
       usage["credits_used"],
     ),
-    pages: firstNumber(j["pages"], j["page_count"], usage["pages"]),
+    pages: firstNumber(j["page_count"], j["pages"], usage["pages"]),
     pending: !done,
   };
 }
@@ -85,10 +92,7 @@ export function createHttpClient(
   fetchImpl: typeof fetch = fetch,
   sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms)),
 ): UnsilodClient {
-  const headers = {
-    Authorization: `Bearer ${cfg.apiKey}`,
-    Accept: "application/json",
-  };
+  const headers = { [cfg.authHeader]: cfg.apiKey, Accept: "application/json" };
   const call = async (url: string, init: RequestInit): Promise<Json> => {
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), cfg.timeoutMs);
@@ -115,7 +119,8 @@ export function createHttpClient(
     let r = first;
     const until = Date.now() + cfg.maxPollMs;
     while (r.pending && r.jobId && Date.now() < until) {
-      await sleep(cfg.pollMs);
+      // The vendor asks for a poll every 3 to 5 seconds, with jitter.
+      await sleep(cfg.pollMs + Math.floor(Math.random() * 800));
       r = readResult(
         await call(
           `${cfg.baseUrl}${cfg.parsePath}/${encodeURIComponent(r.jobId)}`,
@@ -134,7 +139,8 @@ export function createHttpClient(
         req.filename,
       );
       form.append("mode", cfg.modeNames[req.tier]);
-      if (cfg.webhookUrl) form.append("webhook_url", cfg.webhookUrl);
+      // A statement's table runs over several pages; ask for it stitched into one.
+      form.append("merge_tables", "true");
       return poll(
         readResult(
           await call(`${cfg.baseUrl}${cfg.parsePath}`, {

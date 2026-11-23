@@ -57,6 +57,8 @@ export interface FallbackContext {
   side: string;
   /** A finished job the webhook stored for this document: used instead of calling the vendor again. */
   stored?: StoredResult | null;
+  /** A job left running by an earlier read of this document: asked about first, so no second paid call is made for it. */
+  pendingJob?: { job_id: string; tier: Tier } | null;
   /** A ledger, or a function that makes one. The function is called only once a document actually qualifies, so a disabled or unneeded fallback costs nothing. */
   ledger?: CreditLedger | (() => CreditLedger);
 }
@@ -225,6 +227,37 @@ async function run(
     if (out) {
       tried.push(ctx.stored.tier);
       return out;
+    }
+  }
+
+  if (ctx.pendingJob?.job_id) {
+    try {
+      const done = await limiterFor(cfg.concurrency)(() =>
+        withBackoff(() => client.fetchJob(ctx.pendingJob!.job_id), {
+          sleep: deps.sleep,
+        }),
+      );
+      if (done.pending) {
+        log({
+          event: "pending_job_still_running",
+          job_id: ctx.pendingJob.job_id,
+        });
+        return primary;
+      }
+      const out = done.markdown
+        ? accept(
+            ctx.pendingJob.tier,
+            done.markdown,
+            done.creditsUsed,
+            ctx.pendingJob.job_id,
+          )
+        : null;
+      if (out) return out;
+    } catch (e) {
+      log({
+        event: "pending_job_failed",
+        error: e instanceof Error ? e.message.slice(0, 120) : "unknown",
+      });
     }
   }
 

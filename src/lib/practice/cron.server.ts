@@ -28,6 +28,8 @@ export async function practiceTick(
     processed: 0,
     error: (e as Error).message,
   }));
+  // Parse jobs of the optional fallback reader that were still running: a no-op unless that reader is on.
+  await import("./extract/fallback/sweep").then(async (m) => m.sweepPendingJobs(await (await import("./db.server")).adminDb())).catch(() => undefined);
   const autoChase = await runAutoChases(now).catch((e) => ({
     created: 0,
     error: (e as Error).message,

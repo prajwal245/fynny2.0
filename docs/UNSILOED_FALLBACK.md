@@ -3,13 +3,15 @@
 A second reader for bank and cash-credit statement PDFs that the primary reader gets visibly wrong. It never replaces a result that already ties, and any failure returns the primary result untouched.
 
 ## Switching it on
-All of these must be set, or nothing runs and nothing is called:
+`UNSILOED_FALLBACK_ENABLED=true` and `UNSILOED_API_KEY` must both be set (the base URL has a default), or nothing runs and nothing is called:
 
 | Variable | Purpose | Default |
 | --- | --- | --- |
 | `UNSILOED_FALLBACK_ENABLED` | must be exactly `true` | `false` |
 | `UNSILOED_API_KEY` | vendor key (set in Vercel) | none |
-| `UNSILOED_BASE_URL` | https base URL of the vendor API | none |
+| `UNSILOED_BASE_URL` | https base URL of the vendor API | `https://prod.visionapi.unsiloed.ai` |
+| `UNSILOED_AUTH_HEADER` | header that carries the key | `api-key` |
+| `UNSILOED_CREDITS_FAST`, `UNSILOED_CREDITS_LITE` | credits per page assumed before a call (the real `credit_used` from each job replaces it) | `5`, `15` |
 | `UNSILOED_PARSE_PATH` | path that accepts a PDF; jobs are read from `<path>/<job id>` | `/parse` |
 | `UNSILOED_MODE_FAST`, `UNSILOED_MODE_LITE` | values sent in the `mode` field | `fast`, `agentic_lite` |
 | `UNSILOED_MAX_TIER` | `fast` stops after Fast; `lite` allows one escalation to Agentic Lite. Agentic Pro and Extract are never called | `lite` |
@@ -19,7 +21,7 @@ All of these must be set, or nothing runs and nothing is called:
 | `UNSILOED_TIMEOUT_MS`, `UNSILOED_POLL_MS`, `UNSILOED_MAX_POLL_MS` | per call, poll interval, longest wait | `20000`, `2000`, `40000` |
 | `UNSILOED_WEBHOOK_SECRET`, `UNSILOED_SIGNATURE_HEADER`, `UNSILOED_WEBHOOK_URL` | webhook at `/api/webhooks/unsiloed` (HMAC-SHA256 of the raw body, hex) | none, `x-unsiloed-signature`, none |
 
-**Before enabling:** the vendor's request and response field names used in `extract/fallback/client.ts` were not checked against their documentation (the site could not be reached from the build environment). Confirm the endpoint, the `mode` values, the response shape, the credit field and the webhook signature scheme, then adjust the variables above or `readResult`.
+**API used (from https://www.unsiloed.ai/docs):** `POST /parse` (multipart: `file`, `mode` = `fast` or `agentic_lite`, `merge_tables=true`) with the key in the `api-key` header; then `GET /parse/{job_id}` every 4 seconds with jitter until `status` is `Succeeded` (`Failed` and `Cancelled` end it); Markdown comes from `chunks[].embed`; `credit_used` and `page_count` come from the job. 429 and 503 are retried after `Retry-After`. Not exercised against the live service from the build environment (no key there). Their docs say webhooks are set up in their dashboard but do not document a signature scheme, so the webhook route stays off unless `UNSILOED_WEBHOOK_SECRET` is set and the signature check is confirmed; polling (in the request, and a sweep run by the cron tick) is the supported path.
 
 ## When it runs
 Only after the primary reader, only for a bank or CC statement PDF, and only if one of these is true: no rows from a non-empty statement; a row missing its date, amount or direction; the running balance does not tie. It skips GST returns, ITC, 26AS, AIS, ITR, Form 3CD, loan statements, books and non-PDFs, and any document over the page cap.
@@ -44,9 +46,9 @@ A second scan reader for scanned PDFs and photos. Off until `OPENROUTER_API_KEY`
 | --- | --- | --- |
 | `OPENROUTER_API_KEY` | key | none (feature off) |
 | `OPENROUTER_OCR_DISABLED` | `1` turns it off without removing the key | unset |
-| `OPENROUTER_OCR_MODELS` | comma-separated, tried in order | `mistralai/mistral-ocr-latest,mistralai/pixtral-large-2411` |
+| `OPENROUTER_OCR_MODELS` | comma-separated, tried in order | `mistralai/pixtral-large-2502,mistralai/mistral-medium-3-5` |
 | `OPENROUTER_OCR_TIMEOUT_MS`, `OPENROUTER_OCR_MAX_BYTES` | per call, largest file | `55000`, `12000000` |
 
-Request: `temperature: 0`, `route: "fallback"` with the `models` list, the strict verbatim instruction as the system message, and for a PDF `plugins: [{ id: "file-parser", pdf: { engine: "mistral-ocr" } }]`.
+Request ("mistral-ocr-latest" and "pixtral-large-2411" are not valid OpenRouter model ids; the chain uses models that exist, and Mistral OCR is the PDF parser engine): `temperature: 0`, `route: "fallback"` with the `models` list, the strict verbatim instruction as the system message, and for a PDF `plugins: [{ id: "file-parser", pdf: { engine: "mistral-ocr" } }]`.
 
 When it is used: the primary reader (OCR.space, unchanged) fails, returns nothing, leaves `[ILLEGIBLE]`, or returns something that looks like a statement but has fewer than 3 dates or 3 amounts. With OCR.space not configured, it is the only scan reader. Its Markdown tables are turned into column-spaced text and then go through the same checks as every other read: amounts must appear in the text and statement rows must reconcile to the printed running balance. The AI-call log records provider `openrouter`, the model that answered and the cost OpenRouter reports.

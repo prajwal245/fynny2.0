@@ -1,5 +1,5 @@
 /**
- * OCR fallback through OpenRouter: a strict, verbatim transcription by Mistral OCR, with Pixtral as the next model.
+ * OCR fallback through OpenRouter: a strict, verbatim transcription by a Mistral vision model, with Mistral OCR as the PDF parser.
  *
  * Used when the primary scan reader (OCR.space) fails, returns nothing, leaves "[ILLEGIBLE]" tags, or returns a statement whose fields
  * look wrong; or as the only reader when OCR.space is not configured. The text it returns is not trusted on its own: it goes through
@@ -26,6 +26,8 @@ export interface OpenRouterOcrConfig {
   models: string[];
   timeoutMs: number;
   maxBytes: number;
+  /** Most tokens the answer may use. Without it OpenRouter reserves the model's full limit and can refuse for lack of credit. */
+  maxTokens: number;
 }
 
 export interface OcrResult {
@@ -41,9 +43,14 @@ export type OcrFn = (
   mime: string,
 ) => Promise<string | OcrResult>;
 
+/**
+ * Vision models that exist on OpenRouter (checked against its model list): Pixtral Large first, then Mistral Medium 3.5. "Mistral OCR"
+ * itself is not a chat model there; it is the PDF parser engine, selected with the file-parser plugin below, which turns a PDF into
+ * text before the model sees it.
+ */
 const DEFAULT_MODELS = [
-  "mistralai/mistral-ocr-latest",
-  "mistralai/pixtral-large-2411",
+  "mistralai/pixtral-large-2502",
+  "mistralai/mistral-medium-3-5",
 ];
 
 export function readOpenRouterConfig(
@@ -67,6 +74,7 @@ export function readOpenRouterConfig(
     models: models.length ? models : DEFAULT_MODELS,
     timeoutMs: n(env["OPENROUTER_OCR_TIMEOUT_MS"], 55_000),
     maxBytes: n(env["OPENROUTER_OCR_MAX_BYTES"], 12_000_000),
+    maxTokens: n(env["OPENROUTER_OCR_MAX_TOKENS"], 8_000),
   };
 }
 
@@ -81,7 +89,7 @@ function toBase64(bytes: Uint8Array): string {
 export function buildOpenRouterRequest(
   bytes: Uint8Array,
   mime: string,
-  cfg: Pick<OpenRouterOcrConfig, "models">,
+  cfg: Pick<OpenRouterOcrConfig, "models"> & { maxTokens?: number },
 ) {
   const dataUrl = `data:${mime};base64,${toBase64(bytes)}`;
   const isPdf = mime === "application/pdf";
@@ -93,6 +101,7 @@ export function buildOpenRouterRequest(
     models: cfg.models,
     route: "fallback",
     temperature: 0,
+    max_tokens: cfg.maxTokens ?? 8000,
     messages: [
       { role: "system", content: STRICT_OCR_PROMPT },
       {
@@ -156,7 +165,18 @@ export async function openRouterOcr(
       body: JSON.stringify(buildOpenRouterRequest(bytes, mime, cfg)),
       signal: ctl.signal,
     });
-    if (!res.ok) throw new Error(`Fallback reader answered ${res.status}`);
+    if (!res.ok) {
+      // OpenRouter explains a refusal in its body (an invalid model id, no credit); that text never contains the key.
+      const why = await res
+        .json()
+        .then((b: { error?: { message?: string } }) =>
+          String(b?.error?.message ?? "").slice(0, 160),
+        )
+        .catch(() => "");
+      throw new Error(
+        `Fallback reader answered ${res.status}${why ? `: ${why}` : ""}`,
+      );
+    }
     const j = (await res.json()) as {
       model?: string;
       choices?: { message?: { content?: string | { text?: string }[] } }[];

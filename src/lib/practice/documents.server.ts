@@ -434,6 +434,7 @@ async function processExtractionCore(
     filename,
     side,
     stored: (doc.extracted as { parser_fallback_result?: StoredResult | null } | null)?.parser_fallback_result ?? null,
+    pendingJob: (doc.extracted as { parser_fallback_pending?: { job_id: string; tier: "fast" | "lite" } | null } | null)?.parser_fallback_pending ?? null,
     ledger: () => dbLedger(db, doc.ca_firm_id),
   });
   if (outcome.fallback?.pending) {

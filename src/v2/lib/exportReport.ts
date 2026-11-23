@@ -178,8 +178,10 @@ export async function downloadExcel(report: Report, meta: ExportMeta) {
     ...(report.warnings ?? []).map((w) => ["Note", w]),
   ];
   const wb = XLSX.utils.book_new();
+  // Excel refuses a cell over 32,767 characters and a number that is not finite; one such cell used to lose the whole file.
+  const clean = (v: string | number | null | undefined) => (typeof v === "string" ? v.slice(0, 32_000) : typeof v === "number" ? (Number.isFinite(v) ? v : 0) : (v ?? ""));
   const add = (name: string, rows: (string | number | null)[][], widths: number[]) => {
-    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const ws = XLSX.utils.aoa_to_sheet(rows.map((r) => r.map(clean)));
     ws["!cols"] = widths.map((wch) => ({ wch }));
     XLSX.utils.book_append_sheet(wb, ws, name);
   };

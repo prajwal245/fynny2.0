@@ -119,7 +119,7 @@ export interface ExtractDeps {
   /** Every text piece of a PDF with its position on the page (for reading a statement table by its columns). */
   pdfItems?: (bytes: Uint8Array) => Promise<PosItem[][]>;
   /** Text of a scanned PDF or photo (OCR.space). Null when OCR is not configured. */
-  ocr?: ((bytes: Uint8Array, mime: string) => Promise<string>) | null;
+  ocr?: ((bytes: Uint8Array, mime: string) => Promise<string | { text: string; provider: string; model: string | null; cost_usd: number | null; note?: string }>) | null;
   threshold?: number;
   /** Rows sent to the AI classifier per document; the rest use rules only. */
   maxAiRows?: number;
@@ -572,18 +572,21 @@ async function readViaOcr(
   let text = "";
   const started = Date.now();
   try {
-    text = (await deps.ocr(bytes, mime)).slice(0, MAX_TEXT_CHARS);
+    const read = await deps.ocr(bytes, mime);
+    // A plain string is the original OCR.space reader; an object says which reader answered (the fallback names itself).
+    const who = typeof read === "string" ? { provider: "ocr.space", model: null as string | null, cost_usd: ocrCostUsd(), note: undefined as string | undefined } : { provider: read.provider, model: read.model, cost_usd: read.cost_usd ?? 0, note: read.note };
+    text = (typeof read === "string" ? read : read.text).slice(0, MAX_TEXT_CHARS);
     calls.push({
       purpose: "extract_ocr",
-      provider: "ocr.space",
-      model: null,
-      input: mime,
+      provider: who.provider,
+      model: who.model,
+      input: who.note ? `${mime} (${who.note})` : mime,
       output: text.slice(0, 2000),
       latency_ms: Date.now() - started,
       status: "success",
       error: null,
       units: 1,
-      cost_usd: ocrCostUsd(),
+      cost_usd: who.cost_usd,
     });
   } catch (e) {
     calls.push({

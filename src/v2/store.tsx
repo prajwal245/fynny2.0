@@ -1240,7 +1240,8 @@ export function V2StoreProvider({ children }: { children: ReactNode }) {
                   ? `${name} is already filed under ${ex.clientName ?? "another client"} (as ${ex.filename}, ${ex.at}). Nothing was added twice.`
                   : `${name} is already in Unassigned (as ${ex.filename}). Nothing was added twice.`,
                 {
-                  duration: 15000,
+                  duration: 45000,
+                  closeButton: true,
                   action: { label: "Move it here", onClick: () => void assignDocRef.current?.(ex.id, clientId) },
                   cancel: { label: "Open it", onClick: open },
                 },

@@ -219,10 +219,14 @@ export default function ReportDetailPage() {
               </div>
             )}
             <div style={{ fontSize: 14, marginTop: 6, marginBottom: 12 }}>Open any number to see the transactions behind it, then accept or send it back.</div>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-              <button className="v2-btn v2-btn-primary" onClick={() => setConfirming(true)} disabled={confirming}>Sign off</button>
-              <input className="v2-input" style={{ width: 280 }} placeholder="What needs correcting" value={note} onChange={(e) => setNote(e.target.value)} />
-              <button className="v2-btn v2-btn-ghost" disabled={!note.trim()} onClick={() => { requestCorrection(report.id, note.trim()); setNote(""); toast.success("Sent back to the team"); }}>Request correction</button>
+            <div style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "stretch", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", flex: "1 1 420px", minWidth: 0 }} data-testid="correction-group">
+                <input className="v2-input" style={{ width: 280, maxWidth: "100%" }} placeholder="What needs correcting" aria-label="What needs correcting" value={note} onChange={(e) => setNote(e.target.value)} />
+                <button className="v2-btn v2-btn-ghost" disabled={!note.trim()} onClick={() => { requestCorrection(report.id, note.trim()); setNote(""); toast.success("Sent back to the team"); }}>Request correction</button>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", paddingLeft: 24, borderLeft: `1px solid ${V.line}` }} data-testid="signoff-group">
+                <button className="v2-btn v2-btn-primary" onClick={() => setConfirming(true)} disabled={confirming}>Sign off</button>
+              </div>
             </div>
           </div>
         ) : (

@@ -578,7 +578,7 @@ export default function DocumentsPage({
                       <DocStatus d={d} />
                     </td>
                     <td className="num" style={{ color: V.body }}>
-                      {d.register ? `${d.register.entries} entries` : !d.txnCount && d.duplicateCount ? `0 new, ${d.duplicateCount} dup.` : (d.txnCount ?? d.rows.length)}
+                      {d.register ? `${d.register.entries} entries` : !d.txnCount && d.duplicateCount ? `Already read, nothing new (${d.duplicateCount})` : (d.txnCount ?? d.rows.length)}
                       {d.reviewCount ? (
                         <span style={{ color: V.muted }}>
                           {" "}

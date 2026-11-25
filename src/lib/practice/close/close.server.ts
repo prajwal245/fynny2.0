@@ -76,11 +76,9 @@ export async function portfolioClose(db: Db, ctx: FirmContext, periodKey: string
     safe(() =>
       db
         .from("ca_document_extractions")
-        .select("id, business_id, original_filename, sc:extracted->statement_check, acct:extracted->>account_no")
+        .select("id, business_id, original_filename, cls:classification, rk:extracted->register->>kind, sc:extracted->statement_check, sp:extracted->statement_period, acct:extracted->>account_no")
         .eq("ca_firm_id", f)
         .eq("side", "bank")
-        .lte("extracted->statement_check->>first", p.end)
-        .gte("extracted->statement_check->>last", p.start)
         .limit(5000),
     ),
     safe(() => db.from("ca_recon_runs").select("business_id, total_items, period, recon_type").eq("ca_firm_id", f).eq("period", p.label).limit(5000)),
@@ -98,7 +96,15 @@ export async function portfolioClose(db: Db, ctx: FirmContext, periodKey: string
     return m;
   };
   const reqBy = group(reqs.data);
-  const docBy = group(docs.data);
+  // A statement belongs to the month when the period its header names (else the dates of its lines) reaches into it.
+  const reaches = (d: Row) => {
+    const sp = d.sp as { from?: string | null; to?: string | null } | null;
+    const sc = d.sc as { first?: string | null; last?: string | null } | null;
+    const a = (sp?.from ?? sc?.first) as string | null | undefined;
+    const b = (sp?.to ?? sc?.last) as string | null | undefined;
+    return Boolean(a && b && a <= p.end && b >= p.start);
+  };
+  const docBy = group(docs.data.filter(reaches));
   const runBy = group(runs.data);
   const excBy = group(excRows);
   const repBy = group(reports.data);
@@ -109,7 +115,8 @@ export async function portfolioClose(db: Db, ctx: FirmContext, periodKey: string
     const id = String(c.business_id);
     if (!ids.has(id)) continue;
     const requirements: Requirement[] = (reqBy.get(id) ?? []).map((r) => ({ id: String(r.id), label: String(r.label), accountTail: r.account_tail ? String(r.account_tail) : null }));
-    const statements: StatementInfo[] = (docBy.get(id) ?? []).map((d) => {
+    // A loan or CC-limit statement is kept as a register: it has no running balance that ties like a bank statement, so it is never verified as one.
+    const statements: StatementInfo[] = (docBy.get(id) ?? []).filter((d) => d.cls !== "loan_statement" && d.rk !== "loan_statement").map((d) => {
       const sc = (d.sc ?? null) as (StatementCheckLike & { first?: string | null; last?: string | null }) | null;
       return { id: String(d.id), filename: String(d.original_filename ?? "Statement"), accountTail: tail(d.acct), first: sc?.first ?? null, last: sc?.last ?? null, verification: verificationOf(sc) };
     });

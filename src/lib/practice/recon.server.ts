@@ -192,7 +192,7 @@ export async function resetAutoMatches(db: Db, ctx: FirmContext, businessId: str
     .gte("txn_date", shiftDay(period.start, -2))
     .lte("txn_date", shiftDay(period.end, 2))
     .limit(5000);
-  const asideIds = ((aside ?? []) as { id: string; recon_tag: string | null }[]).filter((r) => r.recon_tag && (r.recon_tag.startsWith(OWN_TAG) || r.recon_tag.startsWith(REV_TAG))).map((r) => r.id);
+  const asideIds = ((aside ?? []) as { id: string; recon_tag: string | null }[]).filter((r) => r.recon_tag && (r.recon_tag.startsWith(OWN_TAG) || r.recon_tag.startsWith(REV_TAG) || r.recon_tag === AWAIT_TAG)).map((r) => r.id);
   for (let i = 0; i < asideIds.length; i += 300) {
     const { data } = await db.from("ca_txns").update({ match_status: "unmatched", recon_tag: null }).in("id", asideIds.slice(i, i + 300)).select("id");
     reopened += data?.length ?? 0;
@@ -209,6 +209,8 @@ export async function runRecon(
 ): Promise<ReconSummary> {
   const client = await assertClient(db, ctx, businessId);
   const period = parsePeriod(periodInput);
+  // Entries set aside because their account had no statement are looked at again: the statement may have arrived since.
+  await db.from("ca_txns").update({ match_status: "unmatched", recon_tag: null }).eq("ca_firm_id", ctx.firmId).eq("business_id", businessId).eq("match_status", "ignored").eq("recon_tag", AWAIT_TAG).gte("txn_date", period.start).lte("txn_date", period.end);
   const scope = await loadScope(db, ctx.firmId, businessId, period, [
     "unmatched",
     "exception",
@@ -229,7 +231,8 @@ export async function runRecon(
   for (let i = 0; i < split.awaitingIds.length; i += 300) {
     const ids = split.awaitingIds.slice(i, i + 300);
     await db.from("ca_exceptions").update({ status: "resolved", resolved_at: new Date().toISOString(), resolution_action: "awaiting_statement", resolution_note: "Waiting for the bank statement of this account" }).in("txn_id", ids).eq("status", "open");
-    await db.from("ca_txns").update({ match_status: "unmatched" }).in("id", ids).eq("match_status", "exception");
+    // Set aside and labelled, so the screens say "no statement for this account" instead of listing them under "Needs matching".
+    await db.from("ca_txns").update({ match_status: "ignored", recon_tag: AWAIT_TAG }).in("id", ids).in("match_status", ["unmatched", "exception"]);
   }
   // The Day Book records a transfer between two bank accounts as two legs (a contra). When the statements prove the transfer, its two
   // book legs are set aside with it, so they do not wait as book-side exceptions.
@@ -565,6 +568,8 @@ export async function proveStored(db: Db, ctx: FirmContext, businessId: string, 
 const shiftDay = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 const OWN_TAG = "own_account:";
 const REV_TAG = "reversal:";
+/** A book entry for a bank account whose statement for that month has not arrived: set aside, and put back when the next run finds the statement. */
+export const AWAIT_TAG = "awaiting_statement";
 
 /**
  * The last 4 digits of the bank account a book line names: the first bracketed bank ledger with digits, because the Day Book reader
@@ -609,14 +614,16 @@ export interface StatementAccount {
 export async function loadStatementAccounts(db: Db, firmId: string, businessId: string): Promise<StatementAccount[]> {
   const { data } = await db
     .from("ca_document_extractions")
-    .select("id, original_filename, acct:extracted->>account_no, preview:extracted->>text_preview, first:extracted->statement_check->>first, last:extracted->statement_check->>last")
+    .select("id, original_filename, acct:extracted->>account_no, preview:extracted->>text_preview, first:extracted->statement_check->>first, last:extracted->statement_check->>last, pfrom:extracted->statement_period->>from, pto:extracted->statement_period->>to")
     .eq("ca_firm_id", firmId)
     .eq("business_id", businessId)
     .eq("side", "bank");
   const out: StatementAccount[] = [];
-  for (const d of (data ?? []) as { id: string; original_filename: string | null; acct: string | null; preview: string | null; first: string | null; last: string | null }[]) {
+  for (const d of (data ?? []) as { id: string; original_filename: string | null; acct: string | null; preview: string | null; first: string | null; last: string | null; pfrom?: string | null; pto?: string | null }[]) {
     const tail = accountTailOf({ acct: d.acct, preview: d.preview, filename: d.original_filename });
     let { first, last } = d;
+    // The statement's own header says which months it covers; its lines can start later (no entries in April to June).
+    if (d.pfrom && d.pto) { first = d.pfrom; last = d.pto; }
     // An older upload never recorded the dates the statement covers. Its own lines always carry them, so use those: a statement
     // with no recorded dates must not be taken to cover every month.
     if (!first || !last) {

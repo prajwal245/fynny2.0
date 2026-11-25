@@ -31,6 +31,9 @@ export default function ReviewChecks({ clientId, clientName }: { clientId: strin
   const [lm, setLm] = useState<Awaited<ReturnType<typeof getPracticeLedgerMap>> | null>(null);
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  // Which part of the map is listed, and how many rows of it. A count is never shown without a way to see what it counts.
+  const [mapView, setMapView] = useState<"tagged" | "parties" | "all">("tagged");
+  const [mapShown, setMapShown] = useState(250);
   const loadMap = async () => {
     try { setLm(await getPracticeLedgerMap({ data: { business_id: clientId } })); setEdits({}); } catch (e) { toast.error(e instanceof Error ? e.message : "Could not load the ledger map."); }
   };
@@ -82,7 +85,7 @@ export default function ReviewChecks({ clientId, clientName }: { clientId: strin
             <>
               <p style={{ fontSize: 12.5, color: V.muted, margin: "0 0 10px" }}>{r.vouchers.toLocaleString("en-IN")} vouchers from {r.files} Day Book{r.files === 1 ? "" : "s"}, {r.from} to {r.to}.</p>
               <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
-                <Segmented<Tab> label="Check" value={tab} onChange={setTab} options={[{ value: "cash", label: "Cash by day", count: r.cash.negativeDays }, { value: "adj", label: "Adjustment entries", count: r.adjustmentsTotal }, { value: "map", label: "Ledger map", count: r.ledgerMap.length }]} />
+                <Segmented<Tab> label="Check" value={tab} onChange={(t) => { setTab(t); if (t === "map" && !lm) void loadMap(); }} options={[{ value: "cash", label: "Cash by day", count: r.cash.negativeDays }, { value: "adj", label: "Adjustment entries", count: r.adjustmentsTotal }, { value: "map", label: "Ledger map", count: r.ledgerMap.length }]} />
                 <button className="v2-btn v2-btn-ghost" onClick={download}><Download size={14} /> Working paper (Excel)</button>
               </div>
 
@@ -121,16 +124,34 @@ export default function ReviewChecks({ clientId, clientName }: { clientId: strin
                       <p style={{ fontSize: 13, color: V.body, margin: "0 0 8px" }}>{lm.rows.length} ledgers; <b>{lm.confirmedCount}</b> confirmed. A partner or manager confirms the map once per client; every check then reads ledgers through it. Change a family where the suggestion is wrong, then confirm.</p>
                       {r.duplicates.length > 0 && <p style={{ fontSize: 13, margin: "0 0 8px" }}><b>Possible duplicate ledgers:</b> {r.duplicates.slice(0, 6).map(([a, b]) => `${a} / ${b}`).join("; ")}{r.duplicates.length > 6 ? ` and ${r.duplicates.length - 6} more` : ""}. Their groups can differ and change gross profit.</p>}
                       <button className="v2-btn v2-btn-primary" disabled={saving} data-busy={saving || undefined} onClick={() => void confirmMap()} style={{ marginBottom: 10 }}>{saving ? "Saving…" : "Confirm these ledgers"}</button>
-                      <div className="v2-scroll" style={{ maxHeight: 340 }}>
-                        <table className="v2-table"><thead><tr><th>Ledger</th><th>Family</th><th>GST head</th><th>Rate</th><th>Status</th></tr></thead>
-                          <tbody>{lm.rows.filter((m) => m.family !== "party_or_other" || m.confirmed).slice(0, 250).map((m) => (
-                            <tr key={m.ledger}>
-                              <td>{m.ledger}</td>
-                              <td><select className="v2-input" aria-label={`Family of ${m.ledger}`} style={{ minWidth: 190 }} value={edits[m.ledger] ?? m.confirmed?.family ?? m.family} onChange={(e) => setEdits((x) => ({ ...x, [m.ledger]: e.target.value }))}>{FAMILIES.map((f) => <option key={f} value={f}>{f.replace(/_/g, " ")}</option>)}</select></td>
-                              <td>{m.gstHead ?? ""}</td><td>{m.rate ?? ""}</td>
-                              <td>{m.confirmed ? <Badge tone="good">Confirmed</Badge> : <Badge tone="neutral">Suggested</Badge>}</td>
-                            </tr>))}</tbody></table>
-                      </div>
+                      {(() => {
+                        const isParty = (m: (typeof lm.rows)[number]) => m.family === "party_or_other" && !m.confirmed;
+                        const tagged = lm.rows.filter((m) => !isParty(m));
+                        const parties = lm.rows.filter(isParty);
+                        // With nothing tagged (a client of parties only), start on the full list instead of an empty table.
+                        const view = mapView === "tagged" && tagged.length === 0 ? "all" : mapView;
+                        const list = view === "tagged" ? tagged : view === "parties" ? parties : lm.rows;
+                        return (
+                          <>
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "0 0 8px" }} role="group" aria-label="Ledgers to show">
+                              {([["tagged", `Tax, cash, bank, expense and other tagged · ${tagged.length}`], ["parties", `Parties and untagged · ${parties.length}`], ["all", `All · ${lm.rows.length}`]] as const).map(([k, label]) => (
+                                <button key={k} className={`v2-btn v2-btn-sm ${view === k ? "v2-btn-primary" : "v2-btn-ghost"}`} aria-pressed={view === k} onClick={() => { setMapView(k); setMapShown(250); }}>{label}</button>
+                              ))}
+                            </div>
+                            <div className="v2-scroll" style={{ maxHeight: 340 }}>
+                              <table className="v2-table"><thead><tr><th>Ledger</th><th>Family</th><th>GST head</th><th>Rate</th><th>Status</th></tr></thead>
+                                <tbody>{list.slice(0, mapShown).map((m) => (
+                                  <tr key={m.ledger}>
+                                    <td>{m.ledger}</td>
+                                    <td><select className="v2-input" aria-label={`Family of ${m.ledger}`} style={{ minWidth: 190 }} value={edits[m.ledger] ?? m.confirmed?.family ?? m.family} onChange={(e) => setEdits((x) => ({ ...x, [m.ledger]: e.target.value }))}>{FAMILIES.map((f) => <option key={f} value={f}>{f.replace(/_/g, " ")}</option>)}</select></td>
+                                    <td>{m.gstHead ?? ""}</td><td>{m.rate ?? ""}</td>
+                                    <td>{m.confirmed ? <Badge tone="good">Confirmed</Badge> : <Badge tone="neutral">Suggested</Badge>}</td>
+                                  </tr>))}</tbody></table>
+                            </div>
+                            {list.length > mapShown && <button className="v2-btn v2-btn-ghost v2-btn-sm" style={{ marginTop: 8 }} onClick={() => setMapShown((n) => n + 250)}>Show 250 more ({list.length - mapShown} left)</button>}
+                          </>
+                        );
+                      })()}
                     </>
                   )}
                 </div>

@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { CalendarSearch, FileUp, FolderInput, Landmark, MailPlus, NotebookText, Send } from "lucide-react";
 import { Card, V } from "../ui";
 import { Doc, monthOf, useV2 } from "../store";
+import { parsePeriod } from "@/lib/practice/core";
 import { GmailIcon } from "./BrandIcons";
 
 const ACCEPT = ".csv,.xls,.xlsx,.xml,.pdf,.png,.jpg,.jpeg,.heic,.webp";
@@ -25,6 +26,12 @@ export function ReconGuide({ clientId, onUpload, onTab }: { clientId: string; on
   const bank = here.filter((r) => r.side !== "books").length;
   const books = here.filter((r) => r.side === "books").length;
   if (bank && books) return null;
+  // A statement covers the months its own header names, whether or not it has lines in each. Not seeing a line for a month is not the same
+  // as the statement being missing: an account can simply have had no entries.
+  let monthRange: { start: string; end: string } | null = null;
+  try { monthRange = parsePeriod(period); } catch { monthRange = null; }
+  const spanOf = (d: Doc) => (d.statementPeriod?.from && d.statementPeriod.to ? { a: d.statementPeriod.from, b: d.statementPeriod.to } : d.statementCheck?.first && d.statementCheck.last ? { a: d.statementCheck.first, b: d.statementCheck.last } : null);
+  const coveringStatement = monthRange ? cDocs.find((d) => d.side !== "books" && !d.register && d.statementCheck && (() => { const sp = spanOf(d); return !!sp && sp.a <= monthRange!.end && sp.b >= monthRange!.start; })()) : undefined;
 
   const months = [...new Set(rows.map((r) => (r.date ? monthOf(r.date) : null)).filter(Boolean) as string[])];
   const registers = cDocs.filter((d: Doc) => d.register).map((d) => d.register!.label);
@@ -34,11 +41,13 @@ export function ReconGuide({ clientId, onUpload, onTab }: { clientId: string; on
 
   // Files that could be the missing side: arrivals without a client, and this
   // client's files filed on the other side. Registers never count.
+  // A file of this client is offered as the missing side only when its CONTENT could be that side: a Day Book is never offered as a bank
+  // statement, and a bank statement is never offered as the books.
   const candidates = docs.filter(
     (d) =>
       !d.register &&
       d.status !== "Processing" &&
-      (!d.clientId || (d.clientId === clientId && need !== null && d.side !== need)),
+      (!d.clientId || (d.clientId === clientId && need !== null && d.side !== need && (need === "bank" ? Boolean(d.statementCheck) : !d.statementCheck))),
   );
 
   const upload = (files: FileList | null) => {
@@ -79,7 +88,12 @@ export function ReconGuide({ clientId, onUpload, onTab }: { clientId: string; on
   let icon = <FileUp size={18} />;
   let title = "";
   let body = "";
-  if (!bank && !books) {
+  if (!bank && coveringStatement) {
+    const sp = spanOf(coveringStatement)!;
+    icon = <Landmark size={18} />;
+    title = `No bank transactions in ${period}`;
+    body = `${coveringStatement.name} covers ${sp.a} to ${sp.b}, and the account has no entries in ${period}. Nothing is missing${books ? `; the ${books} book entr${books === 1 ? "y" : "ies"} for ${period} wait for their bank lines` : ""}.`;
+  } else if (!bank && !books) {
     icon = <CalendarSearch size={18} />;
     title = months.length ? `Nothing dated in ${period}` : "Recon needs two files for the month";
     body = months.length
@@ -107,6 +121,7 @@ export function ReconGuide({ clientId, onUpload, onTab }: { clientId: string; on
             <div style={{ fontSize: 13.5, color: V.body, marginTop: 4, lineHeight: 1.55 }}>{body}</div>
           </div>
 
+          {!(coveringStatement && !bank) && (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button className="v2-btn v2-btn-primary" onClick={() => fileRef.current?.click()} data-testid="recon-guide-upload">
               <FileUp size={15} /> Upload {need === "bank" ? "bank statement" : need === "books" ? "books" : "files"}
@@ -127,8 +142,9 @@ export function ReconGuide({ clientId, onUpload, onTab }: { clientId: string; on
                 </button>
               ))}
           </div>
+          )}
 
-          {candidates.length > 0 && (
+          {candidates.length > 0 && !(coveringStatement && !bank) && (
             <div style={{ display: "grid", gap: 6 }}>
               <label className="v2-label" htmlFor={`recon-pick-${clientId}`} style={{ marginBottom: 0 }}>
                 <FolderInput size={12} style={{ verticalAlign: "-1px" }} /> Or use a file that already arrived

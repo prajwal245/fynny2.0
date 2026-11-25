@@ -1,0 +1,148 @@
+// @vitest-environment jsdom
+/**
+ * Renders the product's REAL components with invented demo data and writes standalone HTML for screenshots.
+ * Temporary: not part of the repo's test suite. Nothing here is real client data.
+ */
+import { mkdirSync, writeFileSync } from "node:fs";
+import { cleanup, render, waitFor } from "@testing-library/react";
+import { createElement as h, type ReactNode } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { deriveSteps, closeState, type CloseFacts } from "@/lib/practice/close/steps";
+import { checkStatement } from "@/lib/practice/extract/statementCheck";
+
+const OUT = process.env["SHOTS_OUT"]!;
+const PERIOD = "October 2026";
+const KEY = "2026-10";
+
+vi.mock("framer-motion", async () => {
+  const React = await import("react");
+  const strip = ({ children, initial, animate, exit, transition, layout, layoutId, whileHover, whileTap, ...rest }: Record<string, unknown>) => ({ children, rest });
+  const make = (tag: string) => (props: Record<string, unknown>) => {
+    const { children, rest } = strip(props);
+    const style = { ...(rest["style"] as object) } as Record<string, unknown>;
+    const animate = props["animate"] as Record<string, unknown> | undefined;
+    if (animate && typeof animate["width"] === "string") style["width"] = animate["width"];
+    return React.createElement(tag, { ...rest, style }, children as ReactNode);
+  };
+  return { AnimatePresence: ({ children }: { children: ReactNode }) => React.createElement(React.Fragment, null, children), motion: new Proxy({}, { get: (_t, tag: string) => make(tag) }), useReducedMotion: () => true, useIsPresent: () => true, useInView: () => true, useMotionValue: (v: number) => ({ get: () => v, set: () => undefined, on: () => () => undefined }), useSpring: (v: unknown) => v, useTransform: (v: unknown) => v, animate: () => ({ stop: () => undefined }), useAnimation: () => ({ start: async () => undefined }), MotionConfig: ({ children }: { children: ReactNode }) => children };
+});
+vi.mock("@tanstack/react-router", () => ({ useNavigate: () => () => undefined, useRouterState: () => "/app/close", Link: ({ children }: { children: ReactNode }) => children }));
+vi.mock("@/v2/components/PagesPanel", () => ({ PagesChip: () => null, PagesTopUpModal: () => null }));
+vi.mock("@/v2/lib/pages", () => ({ refreshPages: () => undefined }));
+vi.mock("sonner", () => ({ toast: { success: () => undefined, error: () => undefined, info: () => undefined } }));
+
+type Row = { businessId: string; name: string; period: string; state: string; done: number; total: number; bankBooks: boolean; bankLines: number; steps: ReturnType<typeof deriveSteps>; statements: unknown[]; requirements: unknown[]; notes: string[] };
+const base: CloseFacts = { statements: { expected: 2, received: 2, verified: 2, held: 0, failed: 0, notAvailable: 0 }, recon: { bank: 48, runDone: true }, exceptions: { open: 0, explained: 0 }, report: { exists: false, signedOff: false }, confirmed: {} };
+const person = (by: string, at = "2026-11-05T10:00:00Z") => ({ by, at });
+function mk(id: string, name: string, f: Partial<CloseFacts>, statements: unknown[] = [], requirements: unknown[] = []): Row {
+  const facts = { ...base, ...f } as CloseFacts;
+  const steps = deriveSteps(KEY, facts);
+  const cs = closeState(steps);
+  return { businessId: id, name, period: KEY, state: cs.state, done: cs.done, total: cs.total, bankBooks: cs.bankBooks, bankLines: facts.recon.bank, steps, statements, requirements, notes: [] };
+}
+const ROWS: Row[] = [
+  mk("c1", "Sundara Textiles Pvt Ltd", { statements: { expected: 2, received: 1, verified: 1, held: 0, failed: 0, notAvailable: 0 }, recon: { bank: 0, runDone: false } }),
+  mk("c2", "Kaveri Fashions Pvt Ltd", { exceptions: { open: 14, explained: 3 }, confirmed: { tds: person("Priya", "2026-11-05T10:00:00Z") } }),
+  mk("c3", "Lakshmi Traders", { statements: { expected: 1, received: 1, verified: 0, held: 1, failed: 0, notAvailable: 0 }, recon: { bank: 31, runDone: true } }),
+  mk("c4", "Orion Logistics LLP", { report: { exists: true, signedOff: false }, confirmed: { gst: person("Priya"), tds: person("Priya"), provisions: person("Priya") } }),
+  mk("c5", "Greenfield Foods Pvt Ltd", { report: { exists: true, signedOff: true }, confirmed: { gst: person("Anita Rao"), tds: person("Anita Rao"), provisions: person("Anita Rao"), mis_reviewed: person("Priya"), partner_signoff: person("Anita Rao") } }),
+  mk("c6", "Mehra Constructions", { statements: { expected: 3, received: 0, verified: 0, held: 0, failed: 0, notAvailable: 0 }, recon: { bank: 0, runDone: false } }),
+];
+
+vi.mock("@/lib/practice/practice.functions", () => ({
+  getPracticePortfolioClose: async () => ROWS,
+  getPracticeClientClose: async ({ data }: { data: { business_id: string } }) => ({
+    summary: { ...ROWS[1]!, businessId: data.business_id, statements: [{ id: "s1", filename: "HDFC_Current_1704_Oct2026.pdf", accountTail: "1704", first: "2026-10-01", last: "2026-10-31", verification: { result: "passed", label: "Passed", held: false, summary: "tied", reasons: ["Counts and totals agree with the figures the bank prints."], acceptedBy: null } }, { id: "s2", filename: "ICICI_CC_2290_Oct2026.pdf", accountTail: "2290", first: "2026-10-01", last: "2026-10-31", verification: { result: "passed", label: "Passed", held: false, summary: "not_available", reasons: ["The bank prints no summary to compare, so the verification rests on the running balance."], acceptedBy: null } }], requirements: [{ id: "r1", label: "HDFC Current account", accountTail: "1704" }, { id: "r2", label: "ICICI cash-credit account", accountTail: "2290" }] },
+    history: [{ by: "Priya", action: "confirmed", step: "tds", at: "2026-11-05T10:00:00Z", note: "Challan paid on 6 Nov" }],
+    role: "owner",
+  }),
+  tallyWorkbench: async () => {
+    const { suggestLedger } = await import("@/lib/practice/tallyLedgerSuggest");
+    const names = LEDGERS.map((l) => l.name);
+    return { linked: true, company: "Sundara Textiles Pvt Ltd", connectorSeenAt: new Date().toISOString(), connectorProblem: null, lastSyncedAt: new Date().toISOString(), moreLines: false, ledgers: LEDGERS, bankLedgers: ["HDFC Bank A/c 1704"], groups: [], ledgerRequests: [], canCreateLedgers: true,
+      lines: RAW.map((t) => ({ txn_id: t.id, date: t.date, direction: t.direction, amount: t.amount, counterparty: t.counterparty, description: t.description, reference: null, suggestion: suggestLedger({ counterparty: t.counterparty, description: t.description, reference: null, direction: t.direction }, names, "HDFC Bank A/c 1704"), posting: null })),
+      view: { statement: { accountNo: "…1704", bank: "HDFC Bank" }, suggestedBank: "HDFC Bank A/c 1704",
+        rows: RAW.map((t) => ({ txn_id: t.id, date: t.date, particulars: t.description, debit: t.direction === "in" ? t.amount : 0, credit: t.direction === "out" ? t.amount : 0, status: "missing", label: "Missing in Tally", why: "No entry in Tally for this amount and date.", tally: [], nearest: null, difference: null, looksInTally: [] })),
+        counts: { missing: RAW.length, partial: 0, matched: 0, pushed: 0 },
+        accountChecks: { "HDFC Bank A/c 1704": { state: "match", message: "The statement is for account 1704 at HDFC Bank, which matches the Tally ledger HDFC Bank A/c 1704." } } } };
+  },
+  tallyApprove: async () => ({}), tallyCancel: async () => ({}), tallyCancelLedger: async () => ({}), tallyCreateLedger: async () => ({}), tallyMarkPosted: async () => ({}),
+  acceptPracticeStatement: async () => ({}), addPracticeExpectedStatement: async () => ({}), confirmPracticeCloseStep: async () => ({}), removePracticeExpectedStatement: async () => ({}),
+}));
+const LEDGERS = [
+  { name: "HDFC Bank A/c 1704", parent: "Bank Accounts" }, { name: "Prime Realty", parent: "Sundry Creditors" }, { name: "Airtel Postpaid", parent: "Sundry Creditors" },
+  { name: "Bank Charges", parent: "Indirect Expenses" }, { name: "Kaveri Fashions Pvt Ltd", parent: "Sundry Debtors" }, { name: "Sai Balaji Marketing", parent: "Sundry Creditors" },
+  { name: "Salaries", parent: "Indirect Expenses" }, { name: "Interest Received", parent: "Indirect Incomes" },
+];
+const RAW = [
+  { id: "t1", date: "2026-10-03", direction: "out" as const, amount: 118000, counterparty: "Prime Realty", description: "NEFT/PRIME REALTY/OCT RENT" },
+  { id: "t2", date: "2026-10-05", direction: "out" as const, amount: 2360, counterparty: "Airtel", description: "UPI/AIRTEL POSTPAID/BILL PAY" },
+  { id: "t3", date: "2026-10-07", direction: "out" as const, amount: 590, counterparty: null, description: "SMS CHARGES QTR GST ON CHG" },
+  { id: "t6", date: "2026-10-14", direction: "out" as const, amount: 14200, counterparty: null, description: "UPI/9876XXXX/PAYMENT" },
+];
+vi.mock("@/lib/practice/tallyPostingStub", () => ({}));
+vi.mock("@/v2/store", () => ({
+  useV2: () => ({ period: PERIOD, clients: ROWS.map((r) => ({ id: r.businessId, name: r.name })), docs: [], exceptions: [], reports: [] }),
+  monthOf: () => "", V2StoreProvider: ({ children }: { children: ReactNode }) => children,
+}));
+
+import { V2_STYLES } from "@/v2/ui";
+import { AGENT_STYLES } from "@/v2/agents";
+import { CONTROLS_STYLES } from "@/v2/components/Controls";
+import { MOTION_STYLES } from "@/v2/components/MotionKit";
+import ClosePage from "@/v2/pages/ClosePage";
+import { CloseChecklist } from "@/v2/components/CloseChecklist";
+import { StatementCheckCard } from "@/v2/components/StatementCheckCard";
+import { TallyPosting } from "@/v2/components/TallyPosting";
+
+const FONTS = "/home/user/fynny2.0/src/assets/fonts/geist";
+const page = (inner: string, width: number, title: string) => `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>
+@font-face{font-family:"Geist";src:url("file://${FONTS}/geist-latin-wght-normal.woff2") format("woff2");font-weight:100 900}
+@font-face{font-family:"Geist Mono";src:url("file://${FONTS}/geist-mono-latin-wght-normal.woff2") format("woff2");font-weight:100 900}
+:root{--font-geist-sans:"Geist",system-ui,sans-serif;--font-geist-mono:"Geist Mono",monospace}
+html,body{margin:0}
+${V2_STYLES}${AGENT_STYLES}${CONTROLS_STYLES}${MOTION_STYLES}
+</style></head><body class="v2" style="background:var(--v2-bg)"><div id="shot" style="width:${width}px;padding:28px 32px;box-sizing:border-box;background:var(--v2-bg)">${inner}</div></body></html>`;
+const save = (name: string, html: string) => { mkdirSync(OUT, { recursive: true }); writeFileSync(`${OUT}/${name}.html`, html); };
+
+afterEach(cleanup);
+describe("shots", () => {
+  it("close dashboard", async () => {
+    const { container } = render(h(ClosePage));
+    await waitFor(() => expect(container.querySelector('[data-testid="needs-you"]')).toBeTruthy());
+    save("close-dashboard", page(container.innerHTML, 1280, "Month-end close"));
+  });
+  it("client close checklist", async () => {
+    const { container } = render(h(CloseChecklist, { clientId: "c2", onTab: () => undefined }));
+    await waitFor(() => expect(container.textContent).toContain("Bank statement verification"));
+    save("close-checklist", page(container.innerHTML, 980, "Close checklist"));
+  });
+  const rows = (broken: boolean) => {
+    const base = [["2026-10-01", 12000, "out", 88000], ["2026-10-03", 4500, "in", 92500], ["2026-10-05", 23000, "out", 69500], ["2026-10-08", 760, "out", 68740], ["2026-10-12", 150000, "in", 218740], ["2026-10-15", 48000, "out", 170740]] as const;
+    return base.map((r, i) => ({ index: i + 1, date: r[0], amount: r[1], direction: r[2], balance: broken && i === 3 ? 70000 : r[3] }));
+  };
+  it("statement verified", () => {
+    const check = checkStatement(rows(false));
+    const report = { ...check, overlap: null, bankTie: { tied: true, source: "the bank's own totals" } };
+    const { container } = render(h(StatementCheckCard, { report: report as never, lineCount: 6, period: KEY }));
+    save("statement-verified", page(container.innerHTML, 760, "Statement verified"));
+  });
+  it("statement held for the account holder", () => {
+    const check = checkStatement(rows(false));
+    const report = { ...check, status: "fail" as const, checks: [...check.checks, { ok: false, label: "Account holder", detail: 'The statement names "Sundara Retail LLP", not "Sundara Textiles Pvt Ltd".' }], headline: 'This statement may belong to another client or account.', overlap: null, bankTie: { tied: true, source: "the bank's own totals" }, hold: { reason: 'The statement names "Sundara Retail LLP", not "Sundara Textiles Pvt Ltd".', suggested: { id: "c9", name: "Sundara Retail LLP" } } };
+    const { container } = render(h(StatementCheckCard, { report: report as never, lineCount: 6, period: KEY, onMove: () => undefined, onConfirm: () => undefined, onAccept: async () => undefined }));
+    save("statement-held-owner", page(container.innerHTML, 760, "Statement held"));
+  });
+  it("statement held for a broken balance", () => {
+    const check = checkStatement(rows(true));
+    const report = { ...check, overlap: null };
+    const { container } = render(h(StatementCheckCard, { report: report as never, lineCount: 6, period: KEY, onAccept: async () => undefined }));
+    save("statement-held-balance", page(container.innerHTML, 760, "Statement held balance"));
+  });
+  it("ledger suggestions", async () => {
+    const { container } = render(h(TallyPosting, { clientId: "c1" }));
+    await new Promise((r) => setTimeout(r, 300));
+    await waitFor(() => expect(container.textContent).toContain("Suggested"));
+    save("ledger-suggestions", page(container.innerHTML, 1180, "Ledger suggestions"));
+  });
+});

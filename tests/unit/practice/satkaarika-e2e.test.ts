@@ -37,6 +37,13 @@ it.skipIf(!have)("satkaarika end to end: every screen agrees with the uploaded f
   expect(lm.rows.length).toBeGreaterThan(0);
   const { clientClose } = await import("@/lib/practice/close/close.server");
   for (const mo of ["2025-04","2025-09","2026-01","2026-03"]) { const c2 = await clientClose(db, ctx, "b1", mo); console.log("E2E close", mo, JSON.stringify(c2?.statements.map((s) => [s.filename.slice(0, 18), s.verification.result, s.verification.held]))); }
+  const { clientYearChecks } = await import("@/lib/practice/yearChecks.server");
+  const yc = await clientYearChecks(db, ctx, "b1");
+  for (const c of yc.checks) console.log("E2E year", c.id, c.status, c.rows.length, c.needs.join("+"), "|", c.summary.slice(0, 140));
+  // A check with no file behind it is blocked, never passed.
+  for (const r of yc.checks.find((c) => c.id === "chart_of_accounts")!.rows) console.log("E2E chart", r.ref, r.detail.slice(0, 160));
+  expect(yc.checks.find((c) => c.id === "opened_closed")?.status).toBe("blocked");
+  expect(yc.checks.find((c) => c.id === "rcm")?.status).not.toBe("blocked");
   const { runRecon } = await import("@/lib/practice/recon.server");
   for (const mo of [["2025-12-01","2025-12-31"]]) {
     const r1 = await runRecon(db, ctx, "b1", { start: mo[0]!, end: mo[1]! });

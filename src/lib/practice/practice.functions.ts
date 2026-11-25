@@ -271,6 +271,18 @@ export const runPracticeReviewChecks = createServerFn({ method: "POST" })
     }),
   );
 
+/** Year-end checks (sales against GSTR-1, reverse charge, AIS, chart of accounts, accounts opened, unchanged and closed by journal) from the client's own files. Read-only. */
+export const getPracticeYearChecks = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ business_id: uuid }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      const { assertClient } = await import("./db.server");
+      await assertClient(db, ctx, data.business_id);
+      return (await import("./yearChecks.server")).clientYearChecks(db, ctx, data.business_id);
+    }),
+  );
+
 /** The vouchers that touch the GST ledgers, for checking the set-off entry and reverse charge against the returns. Read-only. */
 export const getGstLedgerVouchers = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

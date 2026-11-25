@@ -24,6 +24,7 @@ import YearEndReviews from "../components/YearEndReviews";
 import DataNeeded from "../components/readiness/DataNeeded";
 import ReadinessBanner from "../components/readiness/ReadinessBanner";
 import ReviewChecks from "../components/ReviewChecks";
+import YearChecks from "../components/YearChecks";
 import PeriodLock from "../components/PeriodLock";
 import { MatchDrawer } from "../components/MatchDrawer";
 import { closeStage } from "../lib/closeStage";
@@ -335,7 +336,7 @@ export default function ClientWorkspacePage() {
 
       <MatchDrawer txnId={viewMatch} onClose={() => setViewMatch(null)} />
 
-      {tab === "close" && <><ReadinessBanner clientId={client.id} month={range ? range.start.slice(0, 7) : new Date().toISOString().slice(0, 7)} onOpen={() => setTab("data")} /><PeriodLock clientId={client.id} period={range ? range.start.slice(0, 7) : ""} /><OpeningBalanceCheck /><YearEndReviews clientId={client.id} /><ReviewChecks clientId={client.id} clientName={client.name} /><CloseChecklist clientId={client.id} onTab={setTab} /></>}
+      {tab === "close" && <><ReadinessBanner clientId={client.id} month={range ? range.start.slice(0, 7) : new Date().toISOString().slice(0, 7)} onOpen={() => setTab("data")} /><PeriodLock clientId={client.id} period={range ? range.start.slice(0, 7) : ""} /><OpeningBalanceCheck /><YearEndReviews clientId={client.id} /><YearChecks clientId={client.id} clientName={client.name} /><ReviewChecks clientId={client.id} clientName={client.name} /><CloseChecklist clientId={client.id} onTab={setTab} /></>}
 
       {tab === "mis" && <ReportsPage clientId={client.id} />}
 

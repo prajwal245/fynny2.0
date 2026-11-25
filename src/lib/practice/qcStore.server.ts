@@ -8,6 +8,7 @@ import type { Db, FirmContext } from "./db.server";
 import { suggestLedgerMap, type Family, type MapSuggestion } from "./review/ledgerMap";
 import { loadVouchers } from "./reviewChecks.server";
 import { INPUTS, inputDef, type InputStates } from "./readiness/model";
+import { coverageNote, coversMonth, inputKeyOfDoc, type DocFact } from "./readiness/documents";
 
 const canConfirm = (ctx: FirmContext) => ["owner", "admin", "partner", "manager"].includes(ctx.role);
 const missing = (e: { message?: string; code?: string } | null) => !!e && (e.code === "42P01" || /does not exist|schema cache|relation/i.test(e.message ?? ""));
@@ -67,16 +68,24 @@ const scopeOf = (key: string, month: string, fy: string) => (inputDef(key)?.pack
  */
 export async function getInputStates(db: Db, ctx: FirmContext, businessId: string, month: string, fy: string): Promise<{ inputs: InputStates; sqlMissing: boolean }> {
   const inputs: InputStates = {};
-  const monthStart = `${month}-01`;
-  const { data: docs } = await db.from("ca_document_extractions").select("classification, side, extracted, created_at, extract_status").eq("ca_firm_id", ctx.firmId).eq("business_id", businessId).neq("extract_status", "archived");
-  for (const d of (docs ?? []) as { classification: string | null; side: string | null; extracted: { register?: { kind?: string }; source?: string } | null; created_at: string }[]) {
-    const kind = d.extracted?.register?.kind;
-    const key = d.classification === "bank_statement" ? "bank_statements"
-      : kind === "gstr2b" ? "gstr2b" : kind === "loan_statement" ? "loan_statements" : kind === "tally_masters" ? "ledger_masters"
-      : kind === "gst_sales_register" || kind === "gst_purchase_register" ? "registers" : d.side === "books" && d.extracted?.source !== "Zoho Books" ? "day_book" : null;
+  const { data: docs } = await db.from("ca_document_extractions").select("id, original_filename, classification, side, extracted, created_at, extract_status").eq("ca_firm_id", ctx.firmId).eq("business_id", businessId).neq("extract_status", "archived");
+  // Every stored document goes through the one mapping, and counts for the month by what it contains, not by when it was uploaded.
+  const facts: DocFact[] = ((docs ?? []) as { id: string; original_filename: string | null; classification: string | null; side: string | null; created_at: string; extracted: { register?: { kind?: string }; source?: string; reference_kind?: string | null; statement_check?: { first?: string | null; last?: string | null } | null; date_range?: { first: string | null; last: string | null } | null; statement_period?: { from: string | null; to: string | null } | null; books_kind?: "day_book" | "ledger" | "unknown" | null } | null }[]).map((d) => ({
+    id: d.id, filename: d.original_filename, side: d.side, classification: d.classification, createdAt: d.created_at,
+    registerKind: d.extracted?.register?.kind ?? null, referenceKind: d.extracted?.reference_kind ?? null,
+    statement: d.extracted?.statement_check ? { first: d.extracted.statement_check.first ?? null, last: d.extracted.statement_check.last ?? null } : null,
+    range: d.extracted?.date_range ?? null, period: d.extracted?.statement_period ?? null, booksKind: d.extracted?.books_kind ?? null, source: d.extracted?.source ?? null,
+  }));
+  const byKey = new Map<string, DocFact[]>();
+  for (const f of facts) {
+    const key = inputKeyOfDoc(f);
     if (!key) continue;
-    if (inputDef(key)?.pack === "monthly" && d.created_at.slice(0, 10) < monthStart) continue;
-    inputs[key] = { status: "received", at: d.created_at, source: "detected" };
+    if (inputDef(key)?.pack === "monthly" && !coversMonth(f, month)) continue;
+    (byKey.get(key) ?? byKey.set(key, []).get(key)!).push(f);
+  }
+  for (const [key, list] of byKey) {
+    const latest = list.map((f) => f.createdAt).sort().at(-1) ?? null;
+    inputs[key] = { status: "received", at: latest, source: "detected", note: coverageNote(list) };
   }
   // What the connected books system supplies for this month fills its inputs, whatever was or was not uploaded.
   try {

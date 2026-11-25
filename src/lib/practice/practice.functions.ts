@@ -330,6 +330,18 @@ export const getPracticeReadiness = createServerFn({ method: "POST" })
     }),
   );
 
+/** The GST reports a client already has on file, for the GST page to preload. */
+export const getPracticeGstFiles = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ business_id: uuid }).parse(d))
+  .handler(async ({ data, context }) =>
+    withFirm(context.userId, async (db, ctx) => {
+      const { assertClient } = await import("./db.server");
+      await assertClient(db, ctx, data.business_id);
+      return (await import("./gstFiles.server")).clientGstFiles(db, ctx, data.business_id);
+    }),
+  );
+
 export const getPracticeBooksConnection = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ business_id: uuid, month: z.string().regex(/^\d{4}-\d{2}$/) }).parse(d))

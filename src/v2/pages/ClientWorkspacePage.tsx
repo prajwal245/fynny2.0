@@ -308,7 +308,7 @@ export default function ClientWorkspacePage() {
                           <td className="num">{formatDate(r.date)}</td>
                           <td>{r.particulars}</td>
                           <td className="num" style={{ color: r.amount < 0 ? V.maroon : V.green }}>{formatINR(r.amount)}</td>
-                          <td><Badge tone={r.matchStatus === "matched" ? "good" : r.matchStatus === "exception" ? "bad" : r.matchStatus === "ignored" ? "neutral" : "warn"}>{STATUS_LABEL[r.matchStatus ?? "unmatched"] ?? r.matchStatus}</Badge></td>
+                          <td><Badge tone={r.matchStatus === "matched" ? "good" : r.matchStatus === "exception" ? "bad" : r.matchStatus === "ignored" ? "neutral" : "warn"}>{r.reconTag === "awaiting_statement" ? "No statement for this account" : (STATUS_LABEL[r.matchStatus ?? "unmatched"] ?? r.matchStatus)}</Badge></td>
                           <td className="v2-sticky-end" style={{ textAlign: "right" }}>
                             {r.id && r.matchStatus === "matched" && (
                               <button className="v2-btn v2-btn-quiet" onClick={() => setViewMatch(r.id!)} aria-label={`View match for ${r.particulars}`}>View</button>

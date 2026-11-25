@@ -224,9 +224,27 @@ export function isAccrualVoucher(description: string | null | undefined, rawText
 }
 
 import { TAX_REFERENCE_FILE, looksLikeBankStatement } from "./extract/taxReference";
+import { referenceInputKey } from "./readiness/documents";
+import { statedPeriod } from "./extract/statementPeriod";
+import { booksExportKind } from "./review/dayBook";
 import { withUnsiloedFallback, type StoredResult } from "./extract/fallback/orchestrate";
 import { dbLedger } from "./extract/fallback/ledger";
 export { TAX_REFERENCE_FILE };
+
+/** The first and last date among the lines read, or nulls when none has one. */
+function dateRangeOf(rows: { date: string | null }[]): { first: string | null; last: string | null } {
+  const d = rows.map((r) => r.date).filter((x): x is string => Boolean(x)).sort();
+  return { first: d[0] ?? null, last: d.at(-1) ?? null };
+}
+
+/** Wraps the sheet reader so the rows it returns can be looked at again, without reading the file twice. */
+function capturingSheetReader(read: (b: Uint8Array) => string[][], keep: (rows: string[][]) => void) {
+  return (b: Uint8Array) => {
+    const rows = read(b);
+    keep(rows);
+    return rows;
+  };
+}
 
 export async function processExtraction(
   db: Db,
@@ -408,6 +426,8 @@ async function processExtractionCore(
     }
   }
   const sheetInfo = sheetNames ? { sheet_names: sheetNames } : {};
+  // The rows of the sheet that was read, kept to say what kind of books export this is (a Day Book, or one ledger's extract).
+  let firstSheetRows: string[][] | null = null;
   const primaryOutcome = await runExtract(
     {
       bytes: readBytes,
@@ -424,7 +444,7 @@ async function processExtractionCore(
       ocr: practiceOcr(),
       pdfText: (b) => pdfText(b, password),
       pdfItems: (b) => pdfItems(b, password),
-      sheetRows: kind === "xlsx" ? await loadSheetReader() : undefined,
+      sheetRows: kind === "xlsx" ? await capturingSheetReader(await loadSheetReader(), (r) => (firstSheetRows = r)) : undefined,
       sheetsAll: kind === "xlsx" ? await loadSheetsReader() : undefined,
     },
   );
@@ -462,7 +482,7 @@ async function processExtractionCore(
         review_count: 0,
         duplicate_count: 0,
         error_message: null,
-        extracted: { ...(doc.extracted ?? {}), kind: outcome.kind, reference: true, text_preview: (outcome.sourceText ?? "").slice(0, 20_000) },
+        extracted: { ...(doc.extracted ?? {}), kind: outcome.kind, reference: true, reference_kind: referenceInputKey(filename), text_preview: (outcome.sourceText ?? "").slice(0, 20_000) },
         extract_finished_at: new Date().toISOString(),
       })
       .eq("id", doc.id);
@@ -539,7 +559,7 @@ async function processExtractionCore(
 
   // Is the statement correct and complete? Checked from its own running balance, and against earlier statements of the account.
   let statementReport: (StatementCheck & { overlap: Overlap | null; bankTie?: { tied: boolean | null; source: string }; hold?: { reason: string; suggested: { id: string; name: string } | null } }) | null = null;
-  if (side === "bank" && outcome.documentKind !== "invoice" && rows.length) {
+  if (side === "bank" && outcome.documentKind !== "invoice" && outcome.documentKind !== "loan_statement" && rows.length) {
     const usable = rows.filter((r) => r.date && r.amount && r.direction);
     const check = checkStatement(
       usable.map((r) => ({ index: r.row_index, date: r.date!, amount: r.amount!, direction: r.direction!, balance: r.balance ?? null })),
@@ -865,6 +885,11 @@ async function processExtractionCore(
         // The account this statement is for, so a later statement of another account is never taken for a repeat of this one.
         ...(side === "bank" ? { account_no: statementAccount(outcome.sourceText ?? "", filename).accountNo } : {}),
         ...(statementReport ? { statement_check: statementReport } : {}),
+        // What the file covers (the dates of its own lines) and, for a Tally export, whether it is a Day Book or one ledger's extract.
+        // Every screen that asks "has the client sent it?" reads these, not the upload date.
+        date_range: dateRangeOf(rows),
+        ...(side === "bank" && outcome.documentKind !== "loan_statement" ? (() => { const sp = statedPeriod(outcome.sourceText ?? ""); return sp ? { statement_period: sp } : {}; })() : {}),
+        ...(side === "books" && firstSheetRows ? { books_kind: booksExportKind(firstSheetRows) } : {}),
         // Which reader produced these lines, and the credits it used. Present only when the optional fallback was used.
         ...(outcome.fallback?.record ? { parser_fallback: outcome.fallback.record, parser_fallback_pending: undefined, parser_fallback_result: undefined } : {}),
         ...sheetInfo,

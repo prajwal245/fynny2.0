@@ -45,3 +45,24 @@ export function readDayBookVouchers(rows: string[][]): Voucher[] {
   });
   return out;
 }
+
+/**
+ * What a Tally export is: a Day Book (every voucher, with all its legs) or one ledger account's extract (one line per entry, one leg
+ * each). They share a layout, so a bank ledger read as a Day Book counts its entries a second time. The title rows say which it is; with
+ * no title, an export whose vouchers almost all have a single leg is a ledger.
+ */
+export function booksExportKind(rows: string[][], vouchers: Voucher[] = readDayBookVouchers(rows)): "day_book" | "ledger" | "unknown" {
+  const head = rows.findIndex((r) => r.some((c) => /^particulars$/i.test(String(c).trim())) && r.some((c) => /vch\s*type/i.test(String(c))));
+  const title = rows.slice(0, Math.max(0, head)).flat().map((c) => String(c)).join(" ");
+  if (/\bday\s?book\b/i.test(title)) return "day_book";
+  if (/\bledger\s+account\b/i.test(title)) return "ledger";
+  if (!vouchers.length) return "unknown";
+  const single = vouchers.filter((v) => v.legs.length <= 1).length;
+  return single / vouchers.length >= 0.9 ? "ledger" : "unknown";
+}
+
+/** One voucher is one date, type, number and total, however many files carry it. The version with the most legs wins. */
+export function voucherIdentity(v: Voucher): string {
+  const total = Math.round(v.legs.reduce((n, l) => n + l.debit, 0) * 100);
+  return `${v.date}|${v.type.toLowerCase()}|${v.no}|${total}`;
+}

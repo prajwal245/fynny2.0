@@ -65,6 +65,8 @@ export type Txn = {
   particulars: string;
   amount: number;
   matchStatus?: string;
+  /** Why a line was set aside, when it was: "awaiting_statement" for a book entry whose account has no statement for the month. */
+  reconTag?: string | null;
   side?: string;
 };
 
@@ -112,6 +114,8 @@ export type Doc = {
   sheetChoice?: string;
   /** GST/TDS/payroll/gateway files: summarised, not reconciled. */
   /** Is the bank statement correct and complete: balance chain, opening and closing, quiet stretches, overlap with earlier statements. */
+  /** The period the statement's own header names. It can start earlier than its first line. */
+  statementPeriod?: { from: string | null; to: string | null };
   statementCheck?: import("@/lib/practice/extract/statementCheck").StatementCheck & { overlap: import("@/lib/practice/extract/statementCheck").Overlap | null; bankTie?: { tied: boolean | null; source: string }; hold?: { reason: string; suggested: { id: string; name: string } | null } };
   register?: { kind: string; label: string; entries: number; totals: { label: string; amount: number }[]; groups?: { key: string; amount: number; count: number }[]; checks?: { ok: boolean; label: string; detail: string }[]; note: string };
 };

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AlertTriangle, Upload } from "lucide-react";
 import { Badge, Card, SortTh, Tabs, useSort, V } from "../ui";
@@ -25,8 +25,10 @@ const STATUS_TEXT = { PAID: "Paid", FAILED: "Failed", EXPIRED: "Expired", AWAITI
  * against what the portal showed. Each part is a table with a side window that puts the two sides of the proof next to each other.
  * Drop whatever reports you have; each sheet is recognised by what it holds. Nothing is posted, filed or changed.
  */
-export default function GstLedgerLoops({ preload, defaultView }: { preload?: Partial<Record<LedgerFileKind, string[][]>>; defaultView?: View } = {}) {
+export default function GstLedgerLoops({ preload, defaultView, sources, onSaveFiles, clientName }: { preload?: Partial<Record<LedgerFileKind, string[][]>>; defaultView?: View; /** Which stored file supplied each preloaded report. */ sources?: Partial<Record<LedgerFileKind, { id: string; name: string }>>; /** Called with the files that were recognised, so they are kept on the client instead of being forgotten. */ onSaveFiles?: (files: File[]) => void; clientName?: string } = {}) {
   const [rows, setRows] = useState<Partial<Record<LedgerFileKind, string[][]>>>(preload ?? {});
+  // Stored files arrive after the first paint; fill in only what has not been dropped by hand.
+  useEffect(() => { if (preload) setRows((cur) => ({ ...preload, ...cur })); }, [preload]);
   const [busy, setBusy] = useState(false);
   const [view, setView] = useState<View>(defaultView ?? "credit");
   const input = useRef<HTMLInputElement>(null);
@@ -34,18 +36,21 @@ export default function GstLedgerLoops({ preload, defaultView }: { preload?: Par
   const take = async (files: FileList | File[]) => {
     setBusy(true);
     const XLSX = await import("xlsx");
+    const recognised: File[] = [];
     for (const f of Array.from(files)) {
       try {
         const wb = XLSX.read(await f.arrayBuffer(), { type: "array", raw: false });
         const sheets = wb.SheetNames.map((name) => ({ name, rows: XLSX.utils.sheet_to_json<string[]>(wb.Sheets[name]!, { header: 1, raw: false, defval: "" }) }));
         const found = detectLedgerFile(sheets);
         if (!found.length) { toast.error(`${f.name}: not one of the GST ledger reports, the Trial Balance or the Day Book.`); continue; }
+        recognised.push(f);
         setRows((cur) => { const next = { ...cur }; for (const d of found) next[d.kind] = sheets.find((s) => s.name === d.sheet)!.rows; return next; });
       } catch (e) {
         toast.error(`${f.name}: ${e instanceof Error ? e.message : "could not be read"}`);
       }
     }
     setBusy(false);
+    if (recognised.length && onSaveFiles) onSaveFiles(recognised);
   };
 
   const m = useMemo(() => {
@@ -63,6 +68,7 @@ export default function GstLedgerLoops({ preload, defaultView }: { preload?: Par
   }, [rows]);
 
   const have = Object.keys(rows) as LedgerFileKind[];
+  const fromClient = Object.entries(sources ?? {}).filter(([k]) => rows[k as LedgerFileKind]) as [LedgerFileKind, { id: string; name: string }][];
   const creditBad = m.credit ? !m.credit.ok : false;
   const cashBad = m.cash ? m.cash.lowestBalance < -0.5 : false;
   const unpaid = m.ch ? m.ch.challans.filter((c) => c.status !== "PAID").length : 0;
@@ -91,6 +97,11 @@ export default function GstLedgerLoops({ preload, defaultView }: { preload?: Par
           </div>
           <span style={{ marginLeft: "auto", display: "flex", gap: 6, flexWrap: "wrap" }}>{have.map((k) => <Badge key={k} tone="info">{LABEL[k]}</Badge>)}</span>
         </div>
+        {fromClient.length > 0 && (
+          <div data-testid="gst-from-client" style={{ padding: "10px 18px 14px", borderTop: `1px solid ${V.line}`, fontSize: 12.5, color: V.body }}>
+            Read from the files already on {clientName ?? "this client"}: {fromClient.map(([k, f]) => `${LABEL[k]} (${f.name})`).join("; ")}. Files you drop here are saved to the client too.
+          </div>
+        )}
       </Card>
 
       <Flags items={[...m.flags, ...m.missing]} />

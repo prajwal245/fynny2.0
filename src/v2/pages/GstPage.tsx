@@ -11,6 +11,7 @@ import { reconcileGstr2b, vendorMessage, type Gstr2bRecon } from "@/lib/practice
 import { runValidations, type ValidationRun } from "@/lib/practice/gst/validations";
 import GstReturnsCheck from "../components/GstReturnsCheck";
 import GstLedgerLoops from "../components/GstLedgerLoops";
+import { getPracticeGstFiles } from "@/lib/practice/practice.functions";
 import { getPracticeDocumentUrl, saveGstResult } from "@/lib/practice/practice.functions";
 
 const inr = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
@@ -68,6 +69,8 @@ export default function GstPage() {
   const firmName = firm?.name ?? "our firm";
   const [books, setBooks] = useState<Loaded>(null);
   const [portal, setPortal] = useState<Loaded>(null);
+  // The GST reports the chosen client already has on file, read from the same stored documents as every other screen.
+  const [clientGst, setClientGst] = useState<Awaited<ReturnType<typeof getPracticeGstFiles>> | null>(null);
   const [busy, setBusy] = useState<"books" | "portal" | null>(null);
   const [tab, setTab] = useState("vendors");
   const [mode, setMode] = useState<"recon" | "returns" | "ledgers">("recon");
@@ -79,6 +82,13 @@ export default function GstPage() {
   useEffect(() => {
     if (!clientId && clients.length === 1) setClientId(clients[0]!.id);
   }, [clients, clientId]);
+  // Ledger reports already stored on the client (also refreshed when a document is added from any screen).
+  useEffect(() => {
+    if (mode !== "ledgers" || !clientId) { setClientGst(null); return; }
+    let live = true;
+    getPracticeGstFiles({ data: { business_id: clientId } }).then((r) => { if (live) setClientGst(r); }).catch(() => { if (live) setClientGst(null); });
+    return () => { live = false; };
+  }, [mode, clientId, docs.length]);
   const saved = useMemo(() => {
     const mine = docs.filter((d) => d.clientId === clientId && d.register);
     const pick = (kinds: string[]) => mine.find((d) => kinds.includes(d.register!.kind));
@@ -152,9 +162,22 @@ export default function GstPage() {
   if (mode === "ledgers")
     return (
       <div>
-        <PageHeader title="GST reconciliation" subtitle="Prove the credit ledger and the cash ledger from the portal reports, in the order a CA works: credit first, then cash. Nothing is filed or changed." />
+        <PageHeader title="GST reconciliation" subtitle="Prove the credit ledger and the cash ledger from the portal reports, in the order a CA works: credit first, then cash. Nothing is filed or changed. Choose a client to start from the files it already has." />
         {modeTabs}
-        <GstLedgerLoops />
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
+          <label className="v2-label" htmlFor="gst-ledger-client" style={{ margin: 0 }}>Client</label>
+          <select id="gst-ledger-client" className="v2-input" style={{ maxWidth: 320 }} value={clientId} onChange={(e) => { setClientId(e.target.value); setClientGst(null); }}>
+            <option value="">No client: drop files only</option>
+            {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+        <GstLedgerLoops
+          key={clientId || "none"}
+          preload={clientGst?.rows}
+          sources={clientGst?.from}
+          clientName={clients.find((c) => c.id === clientId)?.name}
+          onSaveFiles={clientId ? (fs) => { fs.forEach((f) => addDoc(f.name, clientId, "Manual", f)); toast.success(`${fs.length === 1 ? fs[0]!.name : `${fs.length} files`} saved to ${clients.find((c) => c.id === clientId)?.name ?? "the client"}. Every screen sees them now.`); } : undefined}
+        />
       </div>
     );
   if (mode === "returns")

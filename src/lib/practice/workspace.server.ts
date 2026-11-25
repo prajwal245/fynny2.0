@@ -199,6 +199,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       amount: number;
       side: string;
       matchStatus: string;
+      reconTag?: string | null;
       counterparty: string | null;
       reference: string | null;
     }[]
@@ -217,12 +218,13 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
         direction: "in" | "out";
         side: string;
         match_status: string;
+        recon_tag?: string | null;
         row_index: number | null;
       }>(
         (from, to) =>
           db
             .from("ca_txns")
-            .select("id, extraction_id, txn_date, description, counterparty, reference, amount, direction, side, match_status, row_index")
+            .select("id, extraction_id, txn_date, description, counterparty, reference, amount, direction, side, match_status, recon_tag, row_index")
             .in("extraction_id", docIds.slice(i, i + DOCS_PER_BATCH))
             .order("extraction_id")
             .order("txn_date")
@@ -252,6 +254,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
           }),
           side: t.side,
           matchStatus: t.match_status,
+          reconTag: t.recon_tag ?? null,
           counterparty: t.counterparty,
           reference: t.reference,
         });
@@ -295,6 +298,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       register?: { kind: string; label: string; entries: number; totals: { label: string; amount: number }[]; groups?: { key: string; amount: number; count: number }[]; note: string };
       sheet_names?: string[];
       sheet_name?: string;
+      statement_period?: { from: string | null; to: string | null } | null;
       statement_check?: import("./extract/statementCheck").StatementCheck & { overlap: import("./extract/statementCheck").Overlap | null; hold?: { reason: string; suggested: { id: string; name: string } | null } };
     };
     docName.set(r.id, r.original_filename ?? "Document");
@@ -334,6 +338,7 @@ export async function loadWorkspace(db: Db, ctx: FirmContext) {
       subject: r.gmail_subject ?? undefined,
       register: ex.register ?? undefined,
       statementCheck: ex.statement_check ?? undefined,
+      statementPeriod: ex.statement_period ?? undefined,
       passwordSaved: withPassword.has(r.id) || undefined,
       sheetNames: ex.sheet_names,
       sheetChoice: ex.sheet_name,
